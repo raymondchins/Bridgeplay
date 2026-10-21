@@ -19,7 +19,7 @@ bump differs), skips them;
 
 | Define | Meaning | In the app | In the appcast |
 |---|---|---|---|
-| `BRIDGEPLAY_VERSION` | Bridgeplay semver, kept slow: patch for every normal release (fixes, features, upstream NotProton merges), so 3.5.12 is fine. Minor only for a milestone chosen on purpose (a new engine or backend, a big redesign). Major only for breaks (prefix, save or install layout). Bundle changes into one release rather than releasing per merge | `CFBundleShortVersionString`, About, Status | `sparkle:shortVersionString`, tag `v<version>` |
+| `BRIDGEPLAY_VERSION` | Bridgeplay semver, kept slow (it went from 3.5.0 back to 0.7.0 in build 44, so it never orders installs): patch for every normal release (fixes, features, upstream NotProton merges), so 3.5.12 is fine. Minor only for a milestone chosen on purpose (a new engine or backend, a big redesign). Major only for breaks (prefix, save or install layout). Bundle changes into one release rather than releasing per merge | `CFBundleShortVersionString`, About, Status | `sparkle:shortVersionString`, tag `v<version>` |
 | `BRIDGEPLAY_BUILD` | +1 on every release; Sparkle orders updates by it | `CFBundleVersion` | `sparkle:version` |
 | `NOTPROTON_VERSION` | the upstream release this is based on, exactly as upstream ships it | `NotProtonVersion`, About ("based on NotProton 1.2.0") | release notes |
 
@@ -33,10 +33,11 @@ every NotProton-WineHQ build:
 | next fix | — | `2.0.1`, build `33` |
 | next upstream merge | — | `2.1.0`, build `34` |
 
-Sparkle compares `32` with `1.1.9.31` part by part, so `32 > 1` makes it newer. The semver
-starts at 2.0.0 because the app compares the build recorded in Steam numerically
-(`DeploymentContent`): a 1.0.0 would read as older than the installed 1.2.0-… and block
-installation. `VersioningTests` guards both.
+Sparkle compares `32` with `1.1.9.31` part by part, so `32 > 1` makes it newer. The app
+compares the build recorded in Steam numerically (`DeploymentContent`), so since 0.7.0 that
+record holds `4.0.<build>` (`AppVersion.deployKey`), not the semver: it sorts past every
+older record (`1.2.0-…`, `3.5.0`), and an older app that another macOS user still runs sees
+a newer install and leaves it alone. `VersioningTests` guards both.
 
 ## Steps
 

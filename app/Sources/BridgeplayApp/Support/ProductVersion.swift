@@ -7,7 +7,7 @@ enum ProductVersion {
 
     // CFBundleShortVersionString: Bridgeplay semver, the same string recorded as the
     // installed build in Steam.
-    static var short: String { AppVersion.bundled }
+    static var short: String { AppVersion.display }
 
     // CFBundleVersion: the release counter Sparkle orders updates by.
     static var build: String? { stamped(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion")) }

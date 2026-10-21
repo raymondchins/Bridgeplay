@@ -8,8 +8,24 @@ import UniformTypeIdentifiers
 enum AppVersion {
     static let fallback = "0.1.0-dev"
 
-    static var bundled: String {
+    // The semver people see. It went from 3.5.0 back to 0.7.0, so it doesn't order installs.
+    static var display: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? fallback
+    }
+
+    // What Steam's install records carry and compare (dylib.version, the build record).
+    static var bundled: String { deployKey(build: ProductVersion.build, display: display) }
+
+    // "4.0.<build>": the build counter only goes up, and 4 sorts past every 3.x record, so an
+    // older app another macOS user still runs sees a newer install and leaves it alone.
+    static func deployKey(build: String?, display: String) -> String {
+        build.map { "4.0.\($0)" } ?? display
+    }
+
+    // A deploy key as people read it: "4.0.44" is "build 44"; older records are versions.
+    static func label(deployed: String) -> String {
+        guard deployed.hasPrefix("4.0."), let build = Int(deployed.dropFirst(4)) else { return deployed }
+        return String(localized: "build \(build)")
     }
 }
 

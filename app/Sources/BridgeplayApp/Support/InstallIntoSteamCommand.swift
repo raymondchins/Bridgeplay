@@ -34,7 +34,7 @@ enum InstallIntoSteamCommand {
                 _ = try await ValveFetcher.run { say($0.label) }
             }
             try SteamInstaller.finish(result)
-            say("Bridgeplay \(result.version) installed into Steam.")
+            say("Bridgeplay \(ProductVersion.short) installed into Steam.")
             return 0
         } catch {
             AppLog.note("command line failed: \(RemoveEverythingCommand.failureMessage(error))")

@@ -587,7 +587,7 @@ struct StatusView: View {
             if payload.isSteamComplete {
                 StatusRow(
                     title: "Bridgeplay",
-                    value: String(localized: "Installed") + (version.map { " (\($0))" } ?? ""),
+                    value: String(localized: "Installed") + (version.map { " (\(AppVersion.label(deployed: $0)))" } ?? ""),
                     tone: .ok
                 )
             } else {
@@ -599,10 +599,10 @@ struct StatusView: View {
                     action: installAction(prominent: true)
                 )
             }
-        case .outdated(_, let bundled):
+        case .outdated:
             StatusRow(
                 title: "Bridgeplay",
-                value: String(localized: "Update available (\(bundled))."),
+                value: String(localized: "Update available (\(ProductVersion.short))."),
                 tone: .warning,
                 action: installAction(prominent: true)
             )

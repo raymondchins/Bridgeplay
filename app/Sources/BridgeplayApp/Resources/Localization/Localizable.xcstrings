@@ -10187,6 +10187,22 @@
         }
       }
     },
+    "build %lld" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "build %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %lld"
+          }
+        }
+      }
+    },
     "declares a second bundle. One is the most that can be installed." : {
       "localizations" : {
         "it" : {
