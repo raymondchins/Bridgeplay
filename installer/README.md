@@ -4,6 +4,9 @@
 default configs from the folder it sits in, downloads Steam from Valve's CDN when
 `/Applications/Steam.app` is missing, then opens the app's Setup Assistant.
 
+Before copying Steam, `Install.command` verifies its strict code signature against Apple's
+trust chain, Valve's Team ID, and the `com.valvesoftware.steam` bundle identifier.
+
 Build the zip with:
 
     make app

@@ -32,6 +32,10 @@ die()  { printf '\n\033[1;31mGagal:\033[0m %s\n' "$*" >&2; read -r -p "Tekan Ent
 # Valve's official macOS Steam installer, and the Team ID Valve signs Steam.app with.
 steam_url="https://cdn.cloudflare.steamstatic.com/client/installer/steam.dmg"
 valve_team="MXGJJ98X76"
+steam_identifier="com.valvesoftware.steam"
+# A grep -q pipe can SIGPIPE codesign under pipefail; let codesign check the trust chain,
+# Valve's Team ID and Steam's bundle identifier as one requirement.
+steam_requirement="=anchor apple generic and certificate leaf[subject.OU] = \"$valve_team\" and identifier \"$steam_identifier\""
 steam_tmp=""
 steam_mnt=""
 # The installer carries no app, so it never goes stale: it installs the Latest release.
@@ -95,8 +99,7 @@ if [ ! -d /Applications/Steam.app ]; then
     mkdir "$steam_mnt" || die "Folder sementara tidak bisa dibuat."
     hdiutil attach -nobrowse -readonly -noautoopen -quiet -mountpoint "$steam_mnt" "$dmg" </dev/null \
         || { steam_mnt=""; die "Installer Steam tidak bisa dibuka."; }
-    if ! codesign --verify --strict "$steam_mnt/Steam.app" 2>/dev/null \
-        || ! codesign -dv "$steam_mnt/Steam.app" 2>&1 | grep -qx "TeamIdentifier=$valve_team"; then
+    if ! codesign --verify --strict -R "$steam_requirement" "$steam_mnt/Steam.app" 2>/dev/null; then
         die "Steam yang diunduh tidak ditandatangani Valve. Instalasi dibatalkan."
     fi
     ditto "$steam_mnt/Steam.app" /Applications/Steam.app || die "Steam gagal disalin ke Applications."
