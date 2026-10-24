@@ -1,142 +1,38 @@
-<p align="center">
-  <a href="https://bridgeplay.dev"><img src="docs/readme/banner-v5.png" alt="Bridgeplay: Windows games, in your Mac's Steam" width="100%"></a>
-</p>
+# Bridgeplay is discontinued
 
-<p align="center">
-  <b>Windows-only Steam games on Apple Silicon, right inside the Steam you already use.</b><br>
-  Same library. Same Play button. No bottles, no second launcher.
-</p>
+I'm sorry.
 
-<p align="center">
-  <a href="https://bridgeplay.dev"><img alt="Website" src="https://img.shields.io/badge/bridgeplay.dev-000?style=for-the-badge&logo=safari&logoColor=white"></a>
-  <a href="https://github.com/raymondchins/Bridgeplay/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/raymondchins/Bridgeplay?style=for-the-badge&logo=github&color=000&labelColor=1c1c1e"></a>
-  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple_Silicon-M1_or_later-000?style=for-the-badge&logo=apple&logoColor=white">
-  <img alt="macOS 26+" src="https://img.shields.io/badge/macOS-26%2B-000?style=for-the-badge">
-  <a href="LICENSE"><img alt="License GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-000?style=for-the-badge"></a>
-</p>
+I built Bridgeplay as a fork of [NotProton](https://github.com/NotProtonNot/NotProton) so it would
+run on engines other than CrossOver. NotProton's maintainer had said many times, in public, that
+they did not want that. The GPL let me make the fork. That did not make it the right thing to do,
+and I put my own idea of what was allowed ahead of what they had asked for.
 
-> **Bridgeplay is a fork of [NotProton](https://github.com/NotProtonNot/NotProton)** by NotProtonNot. Games run on CodeWeavers' open-source Wine, the engine behind [CrossOver](https://www.codeweavers.com/crossover), and Apple's Game Porting Toolkit. I'm not affiliated with either. If CrossOver works for you, buy it: that money is a big part of what keeps Wine on the Mac moving. Bridgeplay is a hobby project I maintain part-time, so support is best-effort. Full list in [Credits](#credits) and [Support Wine](#support-wine).
+I also leaned on AI assistance heavily and told people the result was well tested. The maintainer
+said that kind of development reflects poorly on their project, and they were right to be
+concerned about something that touches the Steam client. I also presented a 32-bit game bug as a
+NotProton problem when it was a bug in my own code. I should not have done that.
 
-<br>
+The core of it is that Wine on the Mac exists because of CodeWeavers. They are the largest
+contributor to Wine, and CrossOver licence sales are what pay for that work. A free tool that
+steers people away from CrossOver takes money from the people who make Mac gaming possible. I
+should have understood that before publishing, not after.
 
-<p align="center">
-  <img src="docs/readme/bento-v4.png" alt="What Bridgeplay does: plays natively inside Steam, up to 3x the frames, DLSS answered by MetalFX, DirectX 12 on Metal, any controller, full Retina, one-click install" width="100%">
-</p>
+## What I've done
 
-## What it does
+- Stopped development. The code has been removed from this repository.
+- I won't distribute Bridgeplay or builds of it anymore.
+- I won't send PRs or issues to NotProton about Bridgeplay.
 
-| | |
-|---|---|
-| **Plays natively inside Steam** | Windows games sit in your Mac Steam library and start with Play, like Mac games. |
-| **DirectX 12 on Metal** | Apple's Game Porting Toolkit 4 (D3DMetal) runs DirectX 11 and 12 on your Mac's GPU. |
-| **DLSS, answered by MetalFX** | Games see a DLSS-capable card, so the option shows up. Apple's MetalFX does the upscaling, and DLSS Frame Generation runs on MetalFX interpolation. |
-| **Up to 3× the frames** | Built-in frame generation (2×, 3×, adaptive) for any game, native Mac games included, switched on per game from Steam's properties. |
-| **Any controller** | DualSense, Xbox, GameSir and other pads work without a mapping screen. |
-| **Full Retina** | Games draw at your display's real resolution. |
-| **One-click install** | Open the installer and a Setup Assistant handles Rosetta, Steam and permissions. |
+## Please support CodeWeavers
 
-<p align="center">
-  <img src="docs/readme/tour-v4.png" alt="Mac gaming, unleashed: a Windows game in the Mac Steam library, ready to Play" width="100%">
-</p>
-<p align="center"><sub>Illustrations of the real screens.</sub></p>
+If you want to play Windows games on your Mac, buy [CrossOver](https://www.codeweavers.com/crossover)
+and use [NotProton](https://github.com/NotProtonNot/NotProton) with it. That is the supported way,
+and it pays for the work all of us depend on.
 
-## Already playing
+- CrossOver: <https://www.codeweavers.com/crossover>
+- NotProton: <https://github.com/NotProtonNot/NotProton>
+- The Wine Project: <https://www.winehq.org>
 
-<p align="center">
-  <img src="docs/readme/games-v4.png" alt="Games already running with Bridgeplay: Resident Evil Requiem, Marvel's Spider-Man 2, 007 First Light, Deadlock and more" width="100%">
-</p>
+Thank you to CodeWeavers and to NotProton's maintainer. I'm sorry for the harm and the noise.
 
-Verified on a MacBook Pro with M5 Max and Game Porting Toolkit 4.0 beta 3, each averaging above 90 fps as measured by the developer. Settings are the ones each game launched with, read from its launch log.
-
-| Game | Launch settings |
-|---|---|
-| Resident Evil Requiem | D3DMetal · DLSS → MetalFX · DLSS Frame Gen · Retina · V-Sync forced |
-| Marvel's Spider-Man 2 | D3DMetal · Retina · MSync |
-| 007 First Light | D3DMetal · DLSS → MetalFX · DLSS Frame Gen · Retina |
-| Deadlock | D3DMetal · DLSS → MetalFX · Retina · audio fix |
-| TEKKEN 8 | D3DMetal · Retina · ranked online |
-
-Also running on the same setup: Street Fighter 6, Mortal Kombat 1, The Last of Us Part I, Death Stranding Director's Cut, Horizon Zero Dawn, Split Fiction, It Takes Two, A Way Out, Batman: Arkham Knight, Sifu, Ghostrunner, Control Resonant, Ravenswatch, Megabonk, PowerWash Simulator 2, The Witcher 3.
-
-<sub>Games with kernel-level anti-cheat do not run.</sub>
-
-### Compatibility list
-
-Every game tested so far, and the Mac it ran on, is at [bridgeplay.dev/compatibility](https://bridgeplay.dev/compatibility). It combines results a maintainer checked ([`compat/`](compat/)), one-tap reports from players, and CrossOver ratings from AppleGamingWiki for games nobody has tried with Bridgeplay yet.
-
-To add yours: after you play, Bridgeplay asks once per game *How did it run?* One tap posts the result, with your Mac and the game's log, to [Compatibility reports](https://github.com/raymondchins/Bridgeplay/discussions/categories/compatibility-reports). No GitHub account needed, and the log is stripped of your user, computer and Steam account details. **Report Your Games…** in the Prefix menu covers everything you've already played. Without the app, use the [Game report form](https://github.com/raymondchins/Bridgeplay/issues/new?template=game-report.yml).
-
-## Install
-
-1. **Download the installer** from [bridgeplay.dev](https://bridgeplay.dev): `Bridgeplay-Setup.zip`, under 1 MB. It fetches Bridgeplay, Apple's graphics, the engine and Steam (from Valve, if missing) as it installs, and checks every download against Bridgeplay's signature.
-2. **Open Bridgeplay Installer.** macOS blocks it the first time: `READ ME FIRST.html` in the download shows the three clicks, Done, then **Open Anyway** in **System Settings > Privacy & Security**, then confirm with your password or Touch ID. It needs an admin account.
-3. **Follow the Setup Assistant**: Rosetta, graphics, Steam sign-in and a couple of standard macOS prompts. Setup modifies your Steam app; see [What Bridgeplay changes in Steam](#what-bridgeplay-changes-in-steam).
-4. **Press Play** on any Windows game in Steam. The first time you use a controller, allow Steam's Input Monitoring request.
-
-Each game's Bridgeplay settings (graphics backend, Metal HUD, DLSS, frame generation, controllers) are in Steam: right-click the game, **Properties… › Bridgeplay**.
-
-Updates install themselves: Bridgeplay, its patch in Steam and the engine. **Refresh** on the Status page checks on demand.
-
-The installer includes Apple's Game Porting Toolkit redistributables under Apple's license, which allows non-commercial distribution only. Bridgeplay is free and non-commercial.
-
-<p align="center">
-  <img src="docs/readme/install-v5.png" alt="The Setup Assistant working through Your Mac, Rosetta, Graphics, Steam and Set Up" width="100%">
-</p>
-
-## Requirements
-
-<p align="center">
-  <a href="https://bridgeplay.dev/#specs"><img src="docs/readme/specs-v5.png" alt="Check your Mac in one click on bridgeplay.dev, next to the minimum requirements" width="100%"></a>
-</p>
-
-| | |
-|---|---|
-| Mac | Apple Silicon, M1 or later. Intel Macs are not supported. |
-| macOS | 26 or later |
-| Steam | A Steam account. Windows games install from Steam as usual. |
-| Download | About 570 MB. Installing Rosetta 2 and Steam, and signing in to Steam, need internet. |
-
-## How it works
-
-Bridgeplay runs inside the native macOS Steam client and registers itself as a Steam Play compatibility tool. Under the hood:
-
-- **Engine:** CodeWeavers' open-source WineCX 11.17 with MSync, running under Rosetta 2. Bridgeplay does not include CrossOver: its free engine is built from the LGPL source CodeWeavers publishes ([dappermint/winecx](https://github.com/dappermint/winecx)). If you own CrossOver, Bridgeplay can run games on your copy instead.
-- **Graphics:** Apple's Game Porting Toolkit 4.0 beta 3 (D3DMetal). It is not stored in this repository; the installer ships its redistributables under Apple's non-commercial license (see Install). DXMT and DXVK are available for games that prefer them.
-- **Extras:** NVAPI/NGX routing for DLSS on MetalFX, in-process frame generation on `CAMetalLayer`, per-game Game Mode, Retina back buffers and a controller layer for HID pads.
-
-<p align="center">
-  <img src="docs/readme/architecture-v5.png" alt="How a Windows game reaches the Mac's GPU: Steam, Bridgeplay, the WineCX and Wine engines, D3DMetal, DXMT, DXVK and MoltenVK, then Metal, with the open-source project behind each piece" width="100%">
-</p>
-
-Building from source: see [docs/DEVELOPING.md](docs/DEVELOPING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/BUILD-LOCAL.md](docs/BUILD-LOCAL.md). The one-click installer lives in [`installer/`](installer/) and is packaged by `scripts/package-installer.sh`.
-
-## What Bridgeplay changes in Steam
-
-Bridgeplay modifies your Steam app. To turn on Steam Play for Windows games, it copies a library (`notproton.dylib`) into `/Applications/Steam.app`, sets Steam's `Info.plist` so Steam loads that library at startup, and re-signs Steam on your Mac with a local signature, which replaces Valve's. The library hooks Steam's compatibility tool, shortcut and launch option code, and changes Steam's interface in memory to show Steam Play. Games run in Wine with Proton's lsteamclient, which passes Steam API calls to your Mac Steam.
-
-Valve does not support or endorse Bridgeplay, and modifying the Steam client may go against the [Steam Subscriber Agreement](https://store.steampowered.com/subscriber_agreement/). Use it at your own risk. **Repair Steam** and **Remove Everything** on the Status page put Steam's original `Info.plist` back, and reinstalling Steam from Valve restores Valve's signature.
-
-## Online games and anti-cheat
-
-Online games with anti-cheat (Easy Anti-Cheat, BattlEye and others) often won't start under Wine. For games that do start, Bridgeplay can't promise that anti-cheat, VAC included, won't flag it, so play online and competitive games at your own risk. The [compatibility list](compat/README.md) shows what other players found.
-
-## Credits
-
-Bridgeplay is a fork of [NotProton](https://github.com/NotProtonNot/NotProton) (GPL-3.0), built on CodeWeavers' [WineCX](https://www.codeweavers.com/crossover) and Apple's [Game Porting Toolkit](https://developer.apple.com/games/game-porting-toolkit/). The DualSense Bluetooth bridge and Steam rumble forwarding come from [sn0wst0rm's NotProton fork](https://github.com/sn0wst0rm/NotProton). It also uses [Dobby](https://github.com/jmpews/Dobby) (Apache-2.0), [Sparkle](https://sparkle-project.org) (MIT), [DXMT](https://github.com/3Shain/dxmt) and [DXVK-macOS](https://github.com/Gcenx/DXVK-macOS).
-
-## Support Wine
-
-Wine on the Mac exists largely because of [CodeWeavers](https://www.codeweavers.com), the biggest contributor to the Wine project. They fund that work by selling [CrossOver](https://www.codeweavers.com/crossover). Bridgeplay's free engine is built from the source code CodeWeavers publishes, so every game it runs also stands on their work.
-
-If you can, buy CrossOver.
-
-## License
-
-Bridgeplay is licensed under the [GPL-3.0](LICENSE). Third-party licenses, and the source for the patched Wine files the app ships (LGPL-2.1-or-later), are listed in [NOTICE](NOTICE).
-
-<p>
-  <a href="https://github.com/raymondchins"><img src="https://github.com/raymondchins.png?size=64" width="32" height="32" alt="" align="left" style="border-radius:50%"></a>
-  &nbsp;Built by <a href="https://github.com/raymondchins"><b>Raymond Chin</b></a>, Jakarta.
-</p>
-
-<sub>Bridgeplay is not affiliated with Apple, Valve, NVIDIA or CodeWeavers. Game Porting Toolkit is Apple software provided under Apple's license for non-commercial use. Steam is a trademark of Valve Corporation. DLSS is a trademark of NVIDIA Corporation. Game names are trademarks of their owners.</sub>
+The GPL-3.0 licence text is kept in [LICENSE](LICENSE).

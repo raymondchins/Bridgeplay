@@ -1,4 +1,0 @@
-LIBRARY nvapi64.dll
-EXPORTS
-    nvapi_QueryInterface
-    nvapi_Direct_GetMethod = nvapi.nvapi_Direct_GetMethod

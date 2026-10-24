@@ -1,6 +1,0 @@
-# A change that touches only these paths is docs-only: the app workflow skips its build
-# and check jobs and its gate still passes. Anything else runs everything.
-# One shell glob per line, matched against the repo-relative path; * also matches /.
-# scripts/build-local.sh reads this file too, when it decides which CI runs it can reuse.
-*.md
-docs/*

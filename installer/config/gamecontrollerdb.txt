@@ -1,5 +1,0 @@
-# SDL mappings for pads SDL does not know. One per line. Read by the Bridgeplay run script.
-# GameSir G7 Pro via its 2.4 GHz dongle, recorded with pad-mapper on 2026-10-10; axes renumbered to SDL IOKit order (X,Y,Z,Rz,Accel,Brake).
-03000000373500002210000000010000,GameSir G7 Pro (dongle),a:b0,b:b1,x:b3,y:b4,leftshoulder:b6,rightshoulder:b7,lefttrigger:a5,righttrigger:a4,back:b10,start:b11,leftstick:b13,rightstick:b14,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,platform:Mac OS X,
-# Same pad over Bluetooth (SDL reports bus 0x03, HID version 0x011b). Same X,Y,Z,Rz,Accel,Brake axes as the dongle; 16 buttons.
-0300000037350000221000001b010000,GameSir G7 Pro (Bluetooth),a:b0,b:b1,x:b3,y:b4,leftshoulder:b6,rightshoulder:b7,lefttrigger:a5,righttrigger:a4,back:b10,start:b11,leftstick:b13,rightstick:b14,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,platform:Mac OS X,
