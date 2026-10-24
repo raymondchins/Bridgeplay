@@ -56,6 +56,6 @@ The GPL-3.0 licence text is kept in [LICENSE](LICENSE).
 
 ---
 
-*How this was written: the wording of this apology was drafted with Claude Sonnet, at the request of
+*How this was written: the wording of this apology was drafted with Claude Sonnet 5.5 on 24 October 2026, at the request of
 Rahmat Wibowo, so that it would be clear and honest. The decision to stop the project is his. You can
 reach him on [LinkedIn](https://www.linkedin.com/in/rahmatwi/).*
