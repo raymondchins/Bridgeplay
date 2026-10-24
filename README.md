@@ -36,3 +36,9 @@ and it pays for the work all of us depend on.
 Thank you to CodeWeavers and to NotProton's maintainer. I'm sorry for the harm and the noise.
 
 The GPL-3.0 licence text is kept in [LICENSE](LICENSE).
+
+---
+
+*How this was written: the wording of this apology was drafted with Claude Sonnet, at the request of
+Rahmat Wibowo, so that it would be clear and honest. The decision to stop the project is his. You can
+reach him on [LinkedIn](https://www.linkedin.com/in/rahmatwi/).*
