@@ -17,6 +17,23 @@ contributor to Wine, and CrossOver licence sales are what pay for that work. A f
 steers people away from CrossOver takes money from the people who make Mac gaming possible. I
 should have understood that before publishing, not after.
 
+## What was said
+
+This started with NotProton issue #79, "This should not exist". I'm showing it so you can read
+their words, not only my summary.
+
+![NotProton issue #79, "This should not exist"](screenshots/1-issue-79-this-should-not-exist.png)
+
+![The maintainer on CodeWeavers and the Wine Project](screenshots/2-codeweavers-and-wine.png)
+
+I answered the maintainer and said I would not delete the project. I was wrong to.
+
+![My earlier reply, which I now withdraw](screenshots/3-my-reply.png)
+
+The reply to it ran my answer through an AI detector and told me to delete the repo.
+
+![An AI detector result on my reply, with a request to delete the repo](screenshots/4-ai-detector-response.png)
+
 ## What I've done
 
 - Stopped development. The code has been removed from this repository.
