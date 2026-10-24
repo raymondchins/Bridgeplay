@@ -29,9 +29,39 @@ struct ReportPayload: Codable, Equatable, Sendable {
     var log: String?
     var wineLog: String?
 
-    // Together under the endpoint's 1 MB cap, newest lines kept.
     static let logLimit = 550_000
     static let wineLogLimit = 350_000
+    static let maximumEncodedSize = 1_000_000
+
+    func encoded() throws -> Data {
+        let encoder = JSONEncoder()
+        let full = try encoder.encode(self)
+        guard full.count > Self.maximumEncodedSize else { return full }
+
+        var trimmed = self
+        trimmed.log = nil
+        trimmed.wineLog = nil
+        var result = try encoder.encode(trimmed)
+        guard result.count <= Self.maximumEncodedSize else {
+            throw EncodingError.invalidValue(self, .init(codingPath: [], debugDescription: "Report metadata exceeds the upload limit."))
+        }
+
+        var lower = 0
+        var upper = max(log?.count ?? 0, wineLog?.count ?? 0)
+        while lower <= upper {
+            let limit = lower + (upper - lower) / 2
+            trimmed.log = log.map { String($0.suffix(limit)) }
+            trimmed.wineLog = wineLog.map { GameReport.wineTail($0, limit: limit) }
+            let candidate = try encoder.encode(trimmed)
+            if candidate.count <= Self.maximumEncodedSize {
+                result = candidate
+                lower = limit + 1
+            } else {
+                upper = limit - 1
+            }
+        }
+        return result
+    }
 
     static func make(name: String, appID: String, status: ReportStatus, source: Source, session: GameSession,
                      log: String?, wineLog: String?, machine: GameReport.Machine, install: String,
@@ -74,13 +104,20 @@ struct ReportSender: Sendable {
     }
 
     func submit(_ payload: ReportPayload) async -> Outcome {
+        let body: Data
+        do {
+            body = try payload.encoded()
+        } catch {
+            AppLog.note("play report: could not encode the report: \(error.localizedDescription)")
+            return .dropped
+        }
         let file = queue.appending(path: "\(payload.appid)-\(UUID().uuidString).json")
         do {
             try FileManager.default.createDirectory(at: queue, withIntermediateDirectories: true)
-            try JSONEncoder().encode(payload).write(to: file, options: .atomic)
+            try body.write(to: file, options: .atomic)
         } catch {
             AppLog.note("play report: could not queue the report: \(error.localizedDescription)")
-            return await post(try? JSONEncoder().encode(payload))
+            return await post(body)
         }
         return await send(file)
     }
@@ -108,7 +145,12 @@ struct ReportSender: Sendable {
     }
 
     private func post(_ body: Data?) async -> Outcome {
-        guard let body else { return .dropped }
+        guard var body else { return .dropped }
+        if body.count > ReportPayload.maximumEncodedSize {
+            guard let payload = try? JSONDecoder().decode(ReportPayload.self, from: body),
+                  let bounded = try? payload.encoded() else { return .dropped }
+            body = bounded
+        }
         var request = URLRequest(url: endpoint, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
