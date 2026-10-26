@@ -321,6 +321,54 @@
         }
       }
     },
+    "%@ is already set up in Steam, and Bridgeplay won't install on top of it. Repair Steam to remove it, then try again." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ è già configurato in Steam e Bridgeplay non si installa sopra. Ripara Steam per rimuoverlo, poi riprova."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已在 Steam 中设置，Bridgeplay 不会覆盖安装。请修复 Steam 将其移除，然后重试。"
+          }
+        }
+      }
+    },
+    "%@ is already set up in Steam." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ è già configurato in Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已在 Steam 中设置。"
+          }
+        }
+      }
+    },
+    "%@ is already set up in Steam. Repair Steam to remove it, and Setup continues by itself." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ è già configurato in Steam. Ripara Steam per rimuoverlo e la configurazione prosegue da sola."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已在 Steam 中设置。修复 Steam 即可将其移除，设置会自动继续。"
+          }
+        }
+      }
+    },
     "%@ is left from a rebuild that did not finish and may hold the only copy of the saves. Move it somewhere safe, then try again." : {
       "localizations" : {
         "it" : {
@@ -541,6 +589,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 重新签名后缺少 dyld 授权项。"
+          }
+        }
+      }
+    },
+    "%@ will stop working in Steam. Bridgeplay's own files are kept." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ smetterà di funzionare in Steam. I file di Bridgeplay vengono mantenuti."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 将无法在 Steam 中使用。Bridgeplay 自己的文件会保留。"
           }
         }
       }
@@ -1384,38 +1448,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "即将就绪"
-          }
-        }
-      }
-    },
-    "Another dylib is present." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "È presente un'altra dylib."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检测到其他动态库。"
-          }
-        }
-      }
-    },
-    "Another dylib is present. Repair your Steam install before installing Bridgeplay." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "È presente un'altra dylib. Ripara l'installazione di Steam prima di installare Bridgeplay."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检测到其他动态库。请先修复 Steam，再安装 Bridgeplay。"
           }
         }
       }
@@ -7330,18 +7362,18 @@
         }
       }
     },
-    "Repair your Steam install before installing Bridgeplay." : {
+    "Repair Steam to remove it, then install Bridgeplay." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ripara l'installazione di Steam prima di installare Bridgeplay."
+            "value" : "Ripara Steam per rimuoverlo, poi installa Bridgeplay."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请先修复 Steam，再安装 Bridgeplay。"
+            "value" : "请修复 Steam 将其移除，然后安装 Bridgeplay。"
           }
         }
       }

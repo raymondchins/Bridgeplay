@@ -61,6 +61,8 @@ final class SetupAssistant {
     // Finish
     var tasks: [SetupTask] = SetupAssistant.plannedTasks
     var needsAppManagement = false
+    // The tool already set up in Steam, while Setup offers Repair Steam to remove it.
+    var needsSteamRepair: String?
     @ObservationIgnored private var permissionWatch: Task<Void, Never>?
 
     // Done: settings for every game, read from and written to gamefixes/default.conf.
@@ -271,6 +273,7 @@ final class SetupAssistant {
         isWorking = true
         defer { isWorking = false }
         needsAppManagement = false
+        needsSteamRepair = nil
         message = nil
         tasks = Self.plannedTasks
 
@@ -296,11 +299,9 @@ final class SetupAssistant {
         await status.installIntoSteam()
         if let failure = status.failure {
             if status.failureRemedy == .appManagement {
-                needsAppManagement = true
-                set("steam", .failed(String(localized: "macOS needs your permission first.")))
-                openAppManagement()
-                watchPermission(status)
+                askForAppManagement(status)
             } else {
+                needsSteamRepair = Self.foreignTool(after: status.lastRunError)
                 set("steam", .failed(failure))
             }
             return
@@ -365,6 +366,36 @@ final class SetupAssistant {
     private func set(_ id: String, _ state: TaskState) {
         guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
         tasks[index].state = state
+    }
+
+    nonisolated static func foreignTool(after error: Error?) -> String? {
+        (error as? SteamInstaller.ForeignInsert)?.tool
+    }
+
+    // Repair Steam swaps in Valve's bundle, which also needs App Management.
+    func repairSteamAndRetry(with status: SystemStatus) async {
+        guard !isWorking else { return }
+        isWorking = true
+        needsSteamRepair = nil
+        set("steam", .running)
+        await status.repairSteam()
+        isWorking = false
+        if let failure = status.failure {
+            if status.failureRemedy == .appManagement {
+                askForAppManagement(status)
+            } else {
+                set("steam", .failed(failure))
+            }
+            return
+        }
+        await finish(with: status)
+    }
+
+    private func askForAppManagement(_ status: SystemStatus) {
+        needsAppManagement = true
+        set("steam", .failed(String(localized: "macOS needs your permission first.")))
+        openAppManagement()
+        watchPermission(status)
     }
 
     func openAppManagement() {

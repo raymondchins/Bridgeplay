@@ -253,6 +253,13 @@ struct SetupChecksTests {
         #expect(message.contains("internet"))
     }
 
+    @Test("Setup offers Repair Steam only when another tool is set up in Steam")
+    func repairOnlyForForeignInsert() {
+        #expect(SetupAssistant.foreignTool(after: SteamInstaller.ForeignInsert(tool: "Cartouche")) == "Cartouche")
+        #expect(SetupAssistant.foreignTool(after: SteamInstaller.ClientStarted()) == nil)
+        #expect(SetupAssistant.foreignTool(after: nil) == nil)
+    }
+
     @Test("The App Management advice explains the switch that looks on after an update")
     func appManagementAdvice() {
         #expect(Remedy.appManagement.advice.contains("App Management"))

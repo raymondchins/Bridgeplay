@@ -6,6 +6,16 @@ import Testing
 @Suite("Steam bundle")
 struct SteamBundleTests {
 
+    @Test("A foreign insert names the tool when known, else its file, and ignores ours")
+    func foreignToolNames() {
+        let ours = "/Applications/Steam.app/Contents/MacOS/notproton.dylib"
+        let cartouche = "/Applications/Steam.app/Contents/MacOS/cartouche.dylib"
+        #expect(SteamBundle.foreignTool(in: cartouche, deployed: ours) == "Cartouche")
+        #expect(SteamBundle.foreignTool(in: "\(ours):\(cartouche)", deployed: ours) == "Cartouche")
+        #expect(SteamBundle.foreignTool(in: "/opt/other/hook.dylib", deployed: ours) == "hook.dylib")
+        #expect(SteamBundle.foreignTool(in: ours, deployed: ours) == nil)
+    }
+
     // The bug this guards was live: the sweep covered only the bundle being replaced, and the
     // helpers do not run from there, so an ipcserver survived a stop that reported success.
     @Test("The process sweep covers the helpers as well as the bundle being modified")

@@ -251,8 +251,9 @@ struct SteamInstallerTests {
         do {
             _ = try install(fixture)
             Issue.record("an install over a foreign insert was allowed")
-        } catch let failure as StepFailure {
-                #expect(failure.detail.contains("Repair your Steam install"))
+        } catch let failure as SteamInstaller.ForeignInsert {
+            #expect(failure.tool == "somethingelse.dylib")
+            #expect(failure.localizedDescription.contains("somethingelse.dylib is already set up in Steam"))
         }
 
         #expect(SteamBundle.currentInsert(at: fixture.plist) == foreign, "the foreign insert was modified")

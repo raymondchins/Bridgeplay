@@ -74,6 +74,16 @@ enum SteamBundle {
         return environment[insertKey] as? String
     }
 
+    // The first library in the insert that isn't ours, by tool name when known.
+    static func foreignTool(in insert: String, deployed: String) -> String? {
+        guard let other = insert.split(separator: ":").map(String.init).first(where: { $0 != deployed })
+        else { return nil }
+        let file = URL(filePath: other).lastPathComponent
+        return knownTools[file] ?? file
+    }
+
+    private static let knownTools = ["cartouche.dylib": "Cartouche"]
+
     static func currentControllerBlock(at url: URL = SupportPaths.Steam.infoPlist) -> String? {
         guard let dict = readInfoPlist(at: url),
               let environment = dict[environmentKey] as? [String: Any]

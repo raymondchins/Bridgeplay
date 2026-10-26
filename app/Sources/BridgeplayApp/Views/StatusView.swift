@@ -611,12 +611,14 @@ struct StatusView: View {
                 tone: .warning,
                 action: installAction(prominent: true)
             )
-        case .foreign:
+        case .foreign(let insert):
+            let tool = SteamBundle.foreignTool(in: insert, deployed: SupportPaths.Steam.deployedDylib.path(percentEncoded: false))
+                ?? insert
             StatusRow(
                 title: "Bridgeplay",
-                value: String(localized: "Another dylib is present."),
+                value: String(localized: "\(tool) is already set up in Steam."),
                 tone: .warning,
-                detail: String(localized: "Repair your Steam install before installing Bridgeplay.")
+                detail: String(localized: "Repair Steam to remove it, then install Bridgeplay.")
             )
         }
     }

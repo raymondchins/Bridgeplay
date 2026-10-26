@@ -76,6 +76,11 @@ struct SetupAssistantSnapshots {
             m.tasks[0].state = .failed("macOS needs your permission first.")
             m.needsAppManagement = true
         }
+        try wizard("2-wizard-4c-repair") { m in
+            m.step = .finish
+            m.tasks[0].state = .failed(SteamInstaller.ForeignInsert(tool: "Cartouche").localizedDescription)
+            m.needsSteamRepair = "Cartouche"
+        }
         try wizard("2-wizard-5-done") { $0.step = .done }
     }
 

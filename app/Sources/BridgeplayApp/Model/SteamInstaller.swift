@@ -66,6 +66,15 @@ enum SteamInstaller {
         }
     }
 
+    // Typed so Setup can offer Repair Steam for it.
+    struct ForeignInsert: LocalizedError {
+        let tool: String
+
+        var errorDescription: String? {
+            "\(SteamInstaller.step): " + String(localized: "\(tool) is already set up in Steam, and Bridgeplay won't install on top of it. Repair Steam to remove it, then try again.")
+        }
+    }
+
     static func run(
         payload suppliedPayload: InstallPayload.Located? = nil,
         bridgePayload suppliedBridge: BridgePayload.Located? = nil,
@@ -300,13 +309,8 @@ enum SteamInstaller {
     static func assertInsertIsDeployedOrAbsent(at plist: URL, dylib: URL) throws {
         guard let insert = SteamBundle.currentInsert(at: plist), !insert.isEmpty else { return }
 
-        let deployed = dylib.path(percentEncoded: false)
-        let foreign = insert.split(separator: ":").map(String.init).filter { $0 != deployed }
-        guard foreign.isEmpty else {
-            throw StepFailure(
-                step: step,
-                detail: String(localized: "Another dylib is present. Repair your Steam install before installing Bridgeplay.")
-            )
+        if let tool = SteamBundle.foreignTool(in: insert, deployed: dylib.path(percentEncoded: false)) {
+            throw ForeignInsert(tool: tool)
         }
     }
 

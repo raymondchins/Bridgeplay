@@ -13,6 +13,7 @@ struct SetupAssistantView: View {
     // How many rows of the current step have resolved; the rest still show "Checking…".
     @State private var revealed: Int
     @State private var forward = true
+    @State private var confirmingRepair = false
     private let fixedReveal: Int?
     private let onClose: (() -> Void)?
 
@@ -296,6 +297,20 @@ struct SetupAssistantView: View {
                           detail: String(localized: "After a Bridgeplay update the switch can look on but no longer work. Turn it off and on again, or remove Bridgeplay from the list with − and add it back with +."),
                           action: StatusAction(label: Remedy.settingsButton, isProminent: true) { model.openAppManagement() }))
             }
+        } else if let tool = model.needsSteamRepair {
+            SetupCard {
+                WizardRow(row: StatusRow(title: String(localized: "Repair Steam"),
+                          value: String(localized: "\(tool) is already set up in Steam. Repair Steam to remove it, and Setup continues by itself."),
+                          tone: .warning,
+                          action: StatusAction(label: String(localized: "Repair Steam"), isProminent: true) { confirmingRepair = true }))
+            }
+            .confirmationDialog(String(localized: "Replace Steam with Valve's bundle?"),
+                                isPresented: $confirmingRepair, titleVisibility: .visible) {
+                Button("Replace Steam", role: .destructive) { Task { await model.repairSteamAndRetry(with: status) } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(String(localized: "\(tool) will stop working in Steam. Bridgeplay's own files are kept."))
+            }
         } else if model.tasks.contains(where: { $0.state != .done }) {
             approvals
         }
@@ -409,9 +424,10 @@ struct SetupAssistantView: View {
         }
     }
 
-    // App Management has its own card and button.
+    // App Management and Repair Steam have their own card and button.
     private func report(_ task: SetupAssistant.SetupTask) -> StatusAction? {
-        guard case .failed(let reason) = task.state, !model.needsAppManagement else { return nil }
+        guard case .failed(let reason) = task.state, !model.needsAppManagement, model.needsSteamRepair == nil
+        else { return nil }
         return StatusAction(label: ErrorReport.reportLabel) { ErrorReport.open(reason, in: "Setup: \(task.title)") }
     }
 
@@ -474,10 +490,13 @@ struct SetupAssistantView: View {
                     .disabled(!model.steamInstalled || !model.signedIn || model.isWorking)
                     .keyboardShortcut(.defaultAction)
             case .finish:
-                Button(model.failed ? "Try Again" : "Set Up") { Task { await model.finish(with: status) } }
-                    .buttonStyle(.pillLarge)
-                    .disabled(model.isWorking || !(model.failed || model.notStarted))
-                    .keyboardShortcut(.defaultAction)
+                // Trying again would only hit the same tool, so the Repair Steam card is the way on.
+                if model.needsSteamRepair == nil {
+                    Button(model.failed ? "Try Again" : "Set Up") { Task { await model.finish(with: status) } }
+                        .buttonStyle(.pillLarge)
+                        .disabled(model.isWorking || !(model.failed || model.notStarted))
+                        .keyboardShortcut(.defaultAction)
+                }
             case .done:
                 Button("Close") { model.dismiss(); close() }
                     .buttonStyle(.pillSecondaryLarge)
