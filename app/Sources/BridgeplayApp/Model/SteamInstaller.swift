@@ -71,7 +71,9 @@ enum SteamInstaller {
         let tool: String
 
         var errorDescription: String? {
-            "\(SteamInstaller.step): " + String(localized: "\(tool) is already set up in Steam, and Bridgeplay won't install on top of it. Repair Steam to remove it, then try again.")
+            StepFailure(step: SteamInstaller.step,
+                        detail: String(localized: "\(tool) is already set up in Steam, and Bridgeplay won't install on top of it. Repair Steam to remove it, then try again."))
+                .errorDescription
         }
     }
 

@@ -63,6 +63,8 @@ final class SetupAssistant {
     var needsAppManagement = false
     // The tool already set up in Steam, while Setup offers Repair Steam to remove it.
     var needsSteamRepair: String?
+    // A repair stopped for App Management, resumed once it's granted.
+    @ObservationIgnored private var repairPending = false
     @ObservationIgnored private var permissionWatch: Task<Void, Never>?
 
     // Done: settings for every game, read from and written to gamefixes/default.conf.
@@ -274,6 +276,7 @@ final class SetupAssistant {
         defer { isWorking = false }
         needsAppManagement = false
         needsSteamRepair = nil
+        repairPending = false
         message = nil
         tasks = Self.plannedTasks
 
@@ -300,7 +303,7 @@ final class SetupAssistant {
         if let failure = status.failure {
             if status.failureRemedy == .appManagement {
                 askForAppManagement(status)
-            } else if let tool = Self.foreignTool(after: status.lastRunError) {
+            } else if let tool = (status.lastRunError as? SteamInstaller.ForeignInsert)?.tool {
                 needsSteamRepair = tool
                 set("steam", .failed(String(localized: "\(tool) is already set up in Steam.")))
             } else {
@@ -370,21 +373,19 @@ final class SetupAssistant {
         tasks[index].state = state
     }
 
-    nonisolated static func foreignTool(after error: Error?) -> String? {
-        (error as? SteamInstaller.ForeignInsert)?.tool
-    }
-
     // Repair Steam swaps in Valve's bundle, which also needs App Management.
     func repairSteamAndRetry(with status: SystemStatus) async {
         guard !isWorking else { return }
         isWorking = true
         needsSteamRepair = nil
+        repairPending = false
         set("steam", .running)
         await status.repairSteam()
         isWorking = false
         if let failure = status.failure {
             if status.failureRemedy == .appManagement {
                 askForAppManagement(status)
+                repairPending = true
             } else {
                 set("steam", .failed(failure))
             }
@@ -412,7 +413,11 @@ final class SetupAssistant {
                 try? await Task.sleep(for: .seconds(2))
                 guard let self, self.needsAppManagement else { return }
                 if Self.canWriteSteam() {
-                    await self.finish(with: status)
+                    if self.repairPending {
+                        await self.repairSteamAndRetry(with: status)
+                    } else {
+                        await self.finish(with: status)
+                    }
                     return
                 }
             }

@@ -490,12 +490,16 @@ struct SetupAssistantView: View {
                     .disabled(!model.steamInstalled || !model.signedIn || model.isWorking)
                     .keyboardShortcut(.defaultAction)
             case .finish:
-                // Trying again would only hit the same tool, so the Repair Steam card is the way on.
+                // Secondary while the Repair Steam card leads, for a tool removed some other way.
                 if model.needsSteamRepair == nil {
                     Button(model.failed ? "Try Again" : "Set Up") { Task { await model.finish(with: status) } }
                         .buttonStyle(.pillLarge)
                         .disabled(model.isWorking || !(model.failed || model.notStarted))
                         .keyboardShortcut(.defaultAction)
+                } else {
+                    Button("Try Again") { Task { await model.finish(with: status) } }
+                        .buttonStyle(.pillSecondaryLarge)
+                        .disabled(model.isWorking)
                 }
             case .done:
                 Button("Close") { model.dismiss(); close() }
