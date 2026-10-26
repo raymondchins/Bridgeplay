@@ -299,7 +299,7 @@ struct SetupAssistantView: View {
             }
         } else if let tool = model.needsSteamRepair {
             SetupCard {
-                WizardRow(row: StatusRow(title: String(localized: "Repair Steam"),
+                WizardRow(row: StatusRow(title: String(localized: "Steam needs repair"),
                           value: String(localized: "\(tool) is already set up in Steam. Repair Steam to remove it, and Setup continues by itself."),
                           tone: .warning,
                           action: StatusAction(label: String(localized: "Repair Steam"), isProminent: true) { confirmingRepair = true }))
@@ -309,7 +309,7 @@ struct SetupAssistantView: View {
                 Button("Replace Steam", role: .destructive) { Task { await model.repairSteamAndRetry(with: status) } }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text(String(localized: "\(tool) will stop working in Steam. Bridgeplay's own files are kept."))
+                Text(String(localized: "\(tool) will stop working in Steam, and Steam may quit for a moment."))
             }
         } else if model.tasks.contains(where: { $0.state != .done }) {
             approvals

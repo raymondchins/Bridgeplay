@@ -300,8 +300,10 @@ final class SetupAssistant {
         if let failure = status.failure {
             if status.failureRemedy == .appManagement {
                 askForAppManagement(status)
+            } else if let tool = Self.foreignTool(after: status.lastRunError) {
+                needsSteamRepair = tool
+                set("steam", .failed(String(localized: "\(tool) is already set up in Steam.")))
             } else {
-                needsSteamRepair = Self.foreignTool(after: status.lastRunError)
                 set("steam", .failed(failure))
             }
             return

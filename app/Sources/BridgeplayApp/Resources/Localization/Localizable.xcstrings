@@ -593,18 +593,18 @@
         }
       }
     },
-    "%@ will stop working in Steam. Bridgeplay's own files are kept." : {
+    "%@ will stop working in Steam, and Steam may quit for a moment." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ smetterà di funzionare in Steam. I file di Bridgeplay vengono mantenuti."
+            "value" : "%@ smetterà di funzionare in Steam, e Steam potrebbe chiudersi per un momento."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 将无法在 Steam 中使用。Bridgeplay 自己的文件会保留。"
+            "value" : "%@ 将无法在 Steam 中使用，Steam 可能会短暂退出。"
           }
         }
       }
@@ -8849,6 +8849,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Steam 已配置为注入其他动态库。请先修复 Steam，再安装 Bridgeplay。"
+          }
+        }
+      }
+    },
+    "Steam needs repair" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam va riparato"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 需要修复"
           }
         }
       }
