@@ -78,7 +78,7 @@ struct SetupAssistantSnapshots {
         }
         try wizard("2-wizard-4c-repair") { m in
             m.step = .finish
-            m.tasks[0].state = .failed(SteamInstaller.ForeignInsert(tool: "Cartouche").localizedDescription)
+            m.tasks[0].state = .failed("Cartouche is already set up in Steam.")
             m.needsSteamRepair = "Cartouche"
         }
         try wizard("2-wizard-5-done") { $0.step = .done }
