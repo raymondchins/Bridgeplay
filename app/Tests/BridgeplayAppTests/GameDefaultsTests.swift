@@ -232,12 +232,37 @@ import Testing
         try put("steam/userdata/222/config/localconfig.vdf", localconfig.replacingOccurrences(of: "CX_GRAPHICS_BACKEND=dxmt ", with: ""))
 
         let found = GameDefaults.overrides(gamefixes: root.appending(path: "gamefixes"),
-                                           steamUserData: root.appending(path: "steam"))
+                                           steamUserData: root.appending(path: "steam"), libraries: [])
         #expect(found == [
             .init(appID: "1245620", place: .conf, settings: [.backend]),
             .init(appID: "287700", place: .launchOptions(account: "111"), settings: [.backend, .frameGen]),
             .init(appID: "287700", place: .launchOptions(account: "222"), settings: [.frameGen]),
         ])
+    }
+
+    @Test func namesEachGameFromItsManifestOrShortcut() throws {
+        let root = try scratchDirectory("gamedefaults-names")
+        defer { try? FileManager.default.removeItem(at: root) }
+        func put(_ path: String, _ data: Data) throws {
+            let url = root.appending(path: path)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: url)
+        }
+        for appID in ["3372060", "990080", "3000000000"] {
+            try put("gamefixes/\(appID).conf", Data("MTL_HUD_ENABLED=0\n".utf8))
+        }
+        let library = SteamLibrary(root: root.appending(path: "external"))
+        try put("external/steamapps/appmanifest_3372060.acf",
+                Data("\"AppState\"\n{\n\t\"appid\"\t\t\"3372060\"\n\t\"name\"\t\t\"Hell \\\"Maiden\\\"\"\n}\n".utf8))
+        var vdf: [UInt8] = [0x00] + Array("shortcuts".utf8) + [0] + [0x00, 0x30, 0]
+        vdf += [0x02] + Array("appid".utf8) + [0] + withUnsafeBytes(of: UInt32(3_000_000_000).littleEndian, Array.init)
+        vdf += [0x01] + Array("AppName".utf8) + [0] + Array("Postal2".utf8) + [0]
+        vdf += [0x08, 0x08, 0x08]
+        try put("steam/userdata/111/config/shortcuts.vdf", Data(vdf))
+
+        let found = GameDefaults.overrides(gamefixes: root.appending(path: "gamefixes"),
+                                           steamUserData: root.appending(path: "steam"), libraries: [library])
+        #expect(found.map(\.name) == ["Postal2", "Hell \"Maiden\"", nil])
     }
 
     @Test func useDefaultsForAConfKeepsOtherLinesAndABackup() throws {

@@ -187,7 +187,7 @@ struct GameDefaultsView: View {
                 StatusRow(title: String(localized: "None"), value: String(localized: "Every game uses these defaults."))
             }
             ForEach(overrides) { item in
-                StatusRow(title: String(localized: "App \(item.appID)"),
+                StatusRow(title: item.name ?? String(localized: "App \(item.appID)"),
                           value: item.settings.map(Self.title).joined(separator: ", "),
                           trailing: Self.place(item.place),
                           action: StatusAction(label: String(localized: "Open in Steam")) { Self.openInSteam(item.appID) },

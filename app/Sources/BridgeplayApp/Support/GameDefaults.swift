@@ -356,6 +356,8 @@ enum GameDefaults {
         var appID: String
         var place: Place
         var settings: [Setting]
+        // From the game's appmanifest, or a non-Steam shortcut's name; nil when not installed.
+        var name: String? = nil
 
         var id: String {
             switch place {
@@ -410,15 +412,23 @@ enum GameDefaults {
 
     // Read only; a game is listed once per place it sets something of these.
     static func overrides(gamefixes: URL = SupportPaths.gamefixes,
-                          steamUserData: URL = SupportPaths.Steam.userData) -> [Override] {
+                          steamUserData: URL = SupportPaths.Steam.userData,
+                          libraries: [SteamLibrary] = PrefixStore.libraries()) -> [Override] {
         let files = FileManager.default
         var found: [Override] = []
+        var shortcuts: [String: String]?
+        func gameName(_ appID: String) -> String? {
+            if let name = libraries.lazy.compactMap({ PrefixStore.appName(appID: appID, in: $0) }).first { return name }
+            guard let id = UInt32(appID), id & 0x8000_0000 != 0 else { return nil }
+            if shortcuts == nil { shortcuts = PrefixStore.shortcutNames(userdata: steamUserData.appending(path: "userdata")) }
+            return shortcuts?[appID]
+        }
         let confs = (try? files.contentsOfDirectory(atPath: gamefixes.path(percentEncoded: false))) ?? []
         for name in confs.sorted() where name.hasSuffix(".conf") {
             let appID = String(name.dropLast(".conf".count))
             guard !appID.isEmpty, appID.allSatisfy(\.isNumber) else { continue }
             let settings = confOverrides(read(gamefixes.appending(path: name)))
-            if !settings.isEmpty { found.append(Override(appID: appID, place: .conf, settings: settings)) }
+            if !settings.isEmpty { found.append(Override(appID: appID, place: .conf, settings: settings, name: gameName(appID))) }
         }
         let userdata = steamUserData.appending(path: "userdata")
         let accounts = (try? files.contentsOfDirectory(atPath: userdata.path(percentEncoded: false))) ?? []
@@ -427,7 +437,8 @@ enum GameDefaults {
             for (appID, options) in launchOptions(inLocalConfig: text).sorted(by: { $0.key < $1.key }) {
                 let settings = launchOverrides(options)
                 if !settings.isEmpty {
-                    found.append(Override(appID: appID, place: .launchOptions(account: account), settings: settings))
+                    found.append(Override(appID: appID, place: .launchOptions(account: account),
+                                          settings: settings, name: gameName(appID)))
                 }
             }
         }
