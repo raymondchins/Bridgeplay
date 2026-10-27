@@ -14,6 +14,9 @@ struct SteamBundleTests {
         #expect(SteamBundle.foreignTool(in: "\(ours):\(cartouche)", deployed: ours) == "Cartouche")
         #expect(SteamBundle.foreignTool(in: "/opt/other/hook.dylib", deployed: ours) == "hook.dylib")
         #expect(SteamBundle.foreignTool(in: ours, deployed: ours) == nil)
+        #expect(SteamBundle.foreignTool(in: "\(ours):/x/other.dylib", deployed: ours) == "other.dylib")
+        #expect(SteamBundle.foreignTool(in: ":\(ours)", deployed: ours) == nil)
+        #expect(SteamBundle.foreignTool(in: "\(ours):", deployed: ours) == nil)
     }
 
     // The bug this guards was live: the sweep covered only the bundle being replaced, and the

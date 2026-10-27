@@ -2351,6 +2351,22 @@
         }
       }
     },
+    "Bridgeplay is still busy with another task. Try again when it finishes." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay sta ancora eseguendo un'altra operazione. Riprova quando ha finito."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 仍在执行另一项任务。完成后再试一次。"
+          }
+        }
+      }
+    },
     "Bridgeplay is still moving its files to the new Bridgeplay folders." : {
       "localizations" : {
         "it" : {

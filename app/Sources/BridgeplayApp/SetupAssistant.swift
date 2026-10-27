@@ -64,7 +64,7 @@ final class SetupAssistant {
     // The tool already set up in Steam, while Setup offers Repair Steam to remove it.
     var needsSteamRepair: String?
     // A repair stopped for App Management, resumed once it's granted.
-    @ObservationIgnored private var repairPending = false
+    @ObservationIgnored private(set) var repairPending = false
     @ObservationIgnored private var permissionWatch: Task<Void, Never>?
 
     // Done: settings for every game, read from and written to gamefixes/default.conf.
@@ -374,24 +374,44 @@ final class SetupAssistant {
     }
 
     // Repair Steam swaps in Valve's bundle, which also needs App Management.
-    func repairSteamAndRetry(with status: SystemStatus) async {
+    func repairSteamAndRetry(with status: SystemStatus,
+                             repair: @MainActor (SystemStatus) async -> Void = { await $0.repairSteam() }) async {
         guard !isWorking else { return }
+        // perform() drops a run that overlaps another without a failure, which would read as success.
+        guard !status.isBusy else {
+            set("steam", .failed(String(localized: "Bridgeplay is still busy with another task. Try again when it finishes.")))
+            return
+        }
         isWorking = true
+        // A card left from an earlier attempt would hide this attempt's error and its Report button.
+        permissionWatch?.cancel()
+        permissionWatch = nil
+        needsAppManagement = false
         needsSteamRepair = nil
         repairPending = false
         set("steam", .running)
-        await status.repairSteam()
+        await repair(status)
         isWorking = false
         if let failure = status.failure {
-            if status.failureRemedy == .appManagement {
-                askForAppManagement(status)
-                repairPending = true
-            } else {
-                set("steam", .failed(failure))
+            if repairFailed(failure, remedy: status.failureRemedy) {
+                openAppManagement()
+                watchPermission(status)
             }
             return
         }
         await finish(with: status)
+    }
+
+    // Shows why a repair failed; true when it waits for App Management and resumes after.
+    func repairFailed(_ failure: String, remedy: Remedy?) -> Bool {
+        guard remedy == .appManagement else {
+            set("steam", .failed(failure))
+            return false
+        }
+        needsAppManagement = true
+        repairPending = true
+        set("steam", .failed(String(localized: "macOS needs your permission first.")))
+        return true
     }
 
     private func askForAppManagement(_ status: SystemStatus) {
@@ -413,6 +433,8 @@ final class SetupAssistant {
                 try? await Task.sleep(for: .seconds(2))
                 guard let self, self.needsAppManagement else { return }
                 if Self.canWriteSteam() {
+                    // Detached first, so the retry's own cancel doesn't stop this task mid-run.
+                    self.permissionWatch = nil
                     if self.repairPending {
                         await self.repairSteamAndRetry(with: status)
                     } else {
