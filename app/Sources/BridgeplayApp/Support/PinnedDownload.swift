@@ -229,8 +229,10 @@ final class ProgressRelay: NSObject, URLSessionTaskDelegate, @unchecked Sendable
     }
 
     func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
-        let observation = task.progress.observe(\.completedUnitCount) { [weak self] progress, _ in
-            self?.update(received: progress.completedUnitCount, total: progress.totalUnitCount)
+        // The task's own byte counts: on macOS 27 task.progress counts 100 units, not bytes, and
+        // sits at 5 until the body is done, so the bar read "5 bytes / 100 bytes" for the whole engine.
+        let observation = task.observe(\.countOfBytesReceived) { [weak self] task, _ in
+            self?.update(received: task.countOfBytesReceived, total: task.countOfBytesExpectedToReceive)
         }
         lock.withLock { self.observation = observation; self.task = task }
         Task { @MainActor in
