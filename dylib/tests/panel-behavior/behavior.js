@@ -353,6 +353,23 @@ for (const form of Object.keys(FORMS)) {
        `no home: the old launcher is found and kept (${last()})`);
   delete globalThis.MSCXFx;
 
+  // Use Bridgeplay defaults: only for a game that sets one of them, and it drops just those.
+  const reset = ns => ns.find(x => x.type === 'button' && x.props.className === 'MSCXBtn');
+  t.ok(!reset(nodes('')) && !reset(nodes('FOO=1 BRIDGEPLAY_RAW_CONTROLLERS=1')),
+       'no Use Bridgeplay defaults button when the game sets none of them');
+  written.length = 0;
+  reset(nodes('CX_GRAPHICS_BACKEND=dxvk FOO=bar NOTPROTON_RETINA=1 BRIDGEPLAY_FRAMEGEN=3 BRIDGEPLAY_RAW_CONTROLLERS=1')
+        ).props.onClick();
+  t.ok(last().trim() === 'FOO=bar BRIDGEPLAY_RAW_CONTROLLERS=1 %command%',
+       `Use Bridgeplay defaults drops only those settings, either spelling (${last()})`);
+  written.length = 0;
+  reset(nodes('CX_GRAPHICS_BACKEND=dxmt DXMT_CONFIG="d3d11.metalSpatialUpscaleFactor=2.0;dxgi.x=1"')).props.onClick();
+  t.ok(last().trim() === 'DXMT_CONFIG=dxgi.x=1 %command%',
+       `Use Bridgeplay defaults keeps other DXMT_CONFIG entries (${last()})`);
+  written.length = 0;
+  reset(nodes('MTL_HUD_ENABLED=1')).props.onClick();
+  t.ok(last() === '', `a line left with only %command% is cleared (${JSON.stringify(last())})`);
+
   const css = nodes('').filter(x => x.type === 'style');
   t.ok(css.length === 1 && css[0].props.children.includes('.MSCXPanel .MSCXRow{'),
        'the panel carries one stylesheet defining the row rule');

@@ -371,9 +371,11 @@ $pad_maps"
 }
 np_pad_mappings
 
-# Per-game fixes: the shipped gamefixes-default/<appid>.conf, then the user's
-# gamefixes/<appid>.conf, the later file winning per key. KEY=VALUE lines are checked
-# against an allow-list and never sourced, and the launch options win over both files.
+# Settings for every game, then per-game fixes, the later file winning per key: the shipped
+# gamefixes-default/default.conf, the user's gamefixes/default.conf (Game Defaults in the
+# app), the shipped gamefixes-default/<appid>.conf, then the user's gamefixes/<appid>.conf.
+# KEY=VALUE lines are checked against an allow-list and never sourced, and the launch
+# options win over every file.
 gamefix_keys=""
 gamefix_backend=""
 gamefix_dlloverrides=""
@@ -487,6 +489,7 @@ gamefix_apply_env() {
 
 load_gamefixes() {
   case "$app_id" in ''|0) return 0 ;; esac
+  gamefix_read "$np_support/gamefixes-default/default.conf" shipped-global
   gamefix_read "$np_support/gamefixes/default.conf" global
   gamefix_read "$np_support/gamefixes-default/$app_id.conf" default
   gamefix_read "$np_support/gamefixes/$app_id.conf" user
@@ -714,7 +717,8 @@ select_backend() {
   fi
   if [ -z "$wanted" ] && [ -n "$gamefix_backend" ]; then
     wanted=$gamefix_backend
-    backend_from="BACKEND in the gamefix conf"
+    # Names the layer, so a fallback from a Game Defaults choice reads as one in the log.
+    backend_from="BACKEND in the ${gamefix_from_BACKEND:-gamefix} conf"
   fi
   # A helper has no game to inspect, so it keeps what the game last ran with.
   if [ -z "$wanted" ] && [ "$verb" != waitforexitandrun ] \

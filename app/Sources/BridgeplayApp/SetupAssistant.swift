@@ -63,7 +63,7 @@ final class SetupAssistant {
     var needsAppManagement = false
     @ObservationIgnored private var permissionWatch: Task<Void, Never>?
 
-    // Done: settings for every game, read from and written to gamefixes/default.conf.
+    // Done: two of the settings for every game (GameDefaults); the rest are on the Game Defaults page.
     var metalHUD = GameDefaults.isOn(.metalHUD)
     var highResolution = GameDefaults.isOn(.highResolution)
 
@@ -110,6 +110,7 @@ final class SetupAssistant {
         switch setting {
         case .metalHUD: metalHUD = on
         case .highResolution: highResolution = on
+        default: return
         }
         guard !isPreview else { return }
         do {

@@ -108,11 +108,11 @@ done <"$gptk_list"
 
 # --- gamefixes --------------------------------------------------------------------
 
-# Per-game confs come from gamefixes/, the same files the app ships into
-# gamefixes-default/, so the installer can never carry a divergent copy. default.conf (the
-# global file in the user's gamefixes/) is installer-only and lives in installer/config/.
+# The confs come from gamefixes/, the same files the app ships into gamefixes-default/, so
+# the installer can never carry a divergent copy. default.conf there is Bridgeplay's
+# defaults for every game; the user's own gamefixes/default.conf is never shipped.
 ls gamefixes/*.conf >/dev/null 2>&1 || die "no gamefixes/*.conf in the repository"
-[ -s installer/config/gamefixes/default.conf ] || die "missing installer/config/gamefixes/default.conf"
+[ -s gamefixes/default.conf ] || die "missing gamefixes/default.conf"
 
 # --- stage ------------------------------------------------------------------------
 

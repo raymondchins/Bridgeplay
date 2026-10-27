@@ -38,11 +38,11 @@ which migrates them on first launch.
 Every Mach-O file in `gptk/` must pass `codesign --verify --strict -R 'anchor apple'`
 (Apple's own signature) or the script stops.
 
-`Install.command` puts the per-game confs in `gamefixes-default/`, the folder the app owns
-and refreshes on update, never in the user's `gamefixes/`. `config/gamefixes/default.conf`
-(the global file, installer-only) replaces the user's copy unless the user has edited it
-since the last install (`.installer/default.conf` records that copy); an edited one is kept
-and the new file lands next to it as `default.conf.new`.
+`Install.command` puts the confs from the repository's `gamefixes/`, `default.conf` (Bridgeplay's
+defaults for every game) included, in `gamefixes-default/`, the folder the app owns and
+refreshes on update. It never writes to the user's `gamefixes/`. Earlier installers copied
+`default.conf` there and recorded that copy in `.installer/default.conf`; the app uses the
+record once to trim the user's file down to their own changes.
 
 Never shipped: Valve's Steam client and the Steam packages in `valve-packages/` (the app
 downloads those from Valve's CDN) and the WineCX runtime (the app downloads it from

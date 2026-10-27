@@ -466,7 +466,13 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "{data:\"d3dmetal\",label:\"D3DMetal\"}," \
     "{data:\"dxmt\",label:\"DXMT\"}," \
     "{data:\"dxvk\",label:\"DXVK\"}," \
-    "{data:\"wined3d\",label:\"WineD3D\"}].filter(x=>!fex||x.data!==\"d3dmetal\");" \
+    "{data:\"wined3d\",label:\"WineD3D\"}].filter(x=>!fex||x.data!==\"d3dmetal\")," \
+    /* The settings Game Defaults in the app also sets: the ones this game sets for itself, \
+       which Use Bridgeplay defaults drops (DXMT_CONFIG keeps entries other than the factor). */ \
+    "OV=[\"CX_GRAPHICS_BACKEND\",\"MTL_HUD_ENABLED\",\"D3DM_ENABLE_METALFX\",\"DXMT_ENABLE_NVEXT\"," \
+    "\"ROSETTA_ADVERTISE_AVX\",\"WINEMSYNC\",\"BRIDGEPLAY_RETINA\",\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"DXMT_CONFIG\"," \
+    "\"BRIDGEPLAY_FRAMEGEN\",\"BRIDGEPLAY_FRAMEGEN_QUALITY\",\"BRIDGEPLAY_FRAMEGEN_UI\",\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"," \
+    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
     "if(nat)return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
     "T([\"MTL_HUD_ENABLED\"],\"Metal HUD\",\"1\"),FG()," \
@@ -506,7 +512,10 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "]},\"ctl\")," \
     "fex&&(0," RT ".jsx)(" BARREL ".XY,{label:\"FEX\"," \
     "children:X(\"FEX_X87REDUCEDPRECISION\"," \
-    "\"Reduced x87 Precision (Reducing precision improves game performance, is enabled by default in CrossOver Preview)\")},\"fex\")" \
+    "\"Reduced x87 Precision (Reducing precision improves game performance, is enabled by default in CrossOver Preview)\")},\"fex\")," \
+    "OV.length>0&&(0," RT ".jsx)(\"div\",{className:\"MSCXBtns\",children:(0," RT ".jsx)(\"button\",{className:\"MSCXBtn\"," \
+    "onClick:()=>s(OV.map(k=>[k,\"DXMT_CONFIG\"===k?fx(\"\"):\"\"]))," \
+    "children:npL(\"Use Bridgeplay defaults\",\"使用 Bridgeplay 默认设置\",\"Usa le impostazioni predefinite di Bridgeplay\")})},\"npdef\")" \
     "]})})}"
 
 #define NP_CX_OPTIONS_CAPTURE(RT, BARREL) \
@@ -822,7 +831,7 @@ int np_webpatch_should_patch(const char *path) {
 
 // The panel shows what a launch will actually use. The run script resolves each setting as
 // launch options > gamefixes/<appid>.conf > gamefixes-default/<appid>.conf >
-// gamefixes/default.conf > the engine, so the values below the launch options are handed to
+// gamefixes/default.conf > gamefixes-default/default.conf > the engine, so the values below the launch options are handed to
 // the page as globalThis.MSCXFx when Steam loads it (a later conf edit shows after a restart).
 // Native games go through np-native instead, which reads gamefixes/native/<appid>.conf over
 // gamefixes/native-default.conf with variable names as they are; those land in ng and na.
@@ -1039,7 +1048,10 @@ static int fx_build(char *buf, size_t cap) {
     if (n < 0 || (size_t)n >= cap) return 0;
     len = (size_t)n;
 
+    // Every game: Bridgeplay's shipped defaults, then the user's Game Defaults over them.
     fx_set_t global = {0};
+    snprintf(path, sizeof(path), "%s/gamefixes-default/default.conf", root);
+    fx_read(path, &global, 0);
     snprintf(path, sizeof(path), "%s/gamefixes/default.conf", root);
     fx_read(path, &global, 0);
     if (!fx_json_set(buf, cap, &len, &global)) return 0;

@@ -1004,18 +1004,34 @@
         }
       }
     },
-    "A game's own settings in Steam Properties › Bridgeplay win over these." : {
+    "A game with launch options goes back to these defaults with Use Bridgeplay defaults in its Steam Properties › Bridgeplay." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le impostazioni di un gioco in Proprietà di Steam › Bridgeplay hanno la precedenza su queste."
+            "value" : "Un gioco con opzioni di avvio torna a queste impostazioni con Usa le impostazioni predefinite di Bridgeplay in Proprietà di Steam › Bridgeplay."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "单个游戏在 Steam 属性 › Bridgeplay 中的设置优先于这里。"
+            "value" : "设置了启动选项的游戏，可在其 Steam 属性 › Bridgeplay 中点按“使用 Bridgeplay 默认设置”恢复为这些默认值。"
+          }
+        }
+      }
+    },
+    "A game's own settings in Steam Properties › Bridgeplay win over these. Game Defaults has the rest." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le impostazioni di un gioco in Proprietà di Steam › Bridgeplay hanno la precedenza su queste. Le altre sono in Impostazioni predefinite dei giochi."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单个游戏在 Steam 属性 › Bridgeplay 中的设置优先于这里。其余设置位于“游戏默认设置”。"
           }
         }
       }
@@ -1128,6 +1144,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关于 Bridgeplay"
+          }
+        }
+      }
+    },
+    "Adaptive" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adattiva"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自适应"
           }
         }
       }
@@ -1288,6 +1320,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在游戏自身的帧之间插入生成帧：2x、3x 或自适应（补足到显示器刷新率）。画面更流畅，输入延迟略增。适用于任何游戏，包括原生 Mac 游戏。"
+          }
+        }
+      }
+    },
+    "Advanced" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avanzate"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高级"
           }
         }
       }
@@ -1596,6 +1644,22 @@
         }
       }
     },
+    "Apply" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applica"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用"
+          }
+        }
+      }
+    },
     "Are you sure you want to back up these prefixes?" : {
       "localizations" : {
         "it" : {
@@ -1688,6 +1752,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自动"
+          }
+        }
+      }
+    },
+    "Automatic follows the engine." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatico segue il motore."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“自动”跟随引擎设置。"
+          }
+        }
+      }
+    },
+    "Automatic picks D3DMetal when the Game Porting Toolkit is linked, and DXMT otherwise." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatico sceglie D3DMetal quando il Game Porting Toolkit è collegato, altrimenti DXMT."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“自动”会在已链接 Game Porting Toolkit 时选择 D3DMetal，否则选择 DXMT。"
           }
         }
       }
@@ -2207,6 +2303,22 @@
         }
       }
     },
+    "Bridgeplay doesn't know this value." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay non riconosce questo valore."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 无法识别此值。"
+          }
+        }
+      }
+    },
     "Bridgeplay doesn't run on Intel Macs." : {
       "localizations" : {
         "it" : {
@@ -2267,6 +2379,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 已移除，但需要重新下载 Steam。请联网后再次执行“修复 Steam”。"
+          }
+        }
+      }
+    },
+    "Bridgeplay ignores a value over 1024 characters." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay ignora un valore più lungo di 1024 caratteri."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 会忽略超过 1024 个字符的值。"
+          }
+        }
+      }
+    },
+    "Bridgeplay ignores a value with a backtick, $( or a quote." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay ignora un valore con un backtick, $( o un apice."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 会忽略含有反引号、$( 或引号的值。"
+          }
+        }
+      }
+    },
+    "Bridgeplay ignores a value with a control character." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay ignora un valore con un carattere di controllo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 会忽略含有控制字符的值。"
           }
         }
       }
@@ -2383,6 +2543,22 @@
         }
       }
     },
+    "Bridgeplay removes these settings from the game's conf and keeps a copy in its backups folder." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay rimuove queste impostazioni dal conf del gioco e ne conserva una copia nella sua cartella dei backup."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 会从该游戏的 conf 中移除这些设置，并在其备份文件夹中保留一份副本。"
+          }
+        }
+      }
+    },
     "Bridgeplay runs Windows games from your Steam library. First, a few quick checks." : {
       "localizations" : {
         "it" : {
@@ -2459,6 +2635,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 已更新其在 Steam 中的文件。"
+          }
+        }
+      }
+    },
+    "Bridgeplay's default." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predefinito di Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 默认值。"
           }
         }
       }
@@ -2603,6 +2795,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消"
+          }
+        }
+      }
+    },
+    "Changes apply the next time a game starts. A game's own settings in Steam Properties › Bridgeplay win over these." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le modifiche valgono dal prossimo avvio di un gioco. Le impostazioni di un gioco in Proprietà di Steam › Bridgeplay hanno la precedenza su queste."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改将在游戏下次启动时生效。单个游戏在 Steam 属性 › Bridgeplay 中的设置优先于这里。"
           }
         }
       }
@@ -3474,6 +3682,54 @@
         }
       }
     },
+    "DLL Overrides" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Override delle DLL"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DLL 覆盖"
+          }
+        }
+      }
+    },
+    "DLSS through MetalFX" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DLSS tramite MetalFX"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通过 MetalFX 提供 DLSS"
+          }
+        }
+      }
+    },
+    "Default Compatibility Tool" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento di compatibilità predefinito"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认兼容性工具"
+          }
+        }
+      }
+    },
     "Delete" : {
       "localizations" : {
         "it" : {
@@ -3858,6 +4114,22 @@
         }
       }
     },
+    "Display" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schermo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示"
+          }
+        }
+      }
+    },
     "Do not run. Their anti-cheat needs a Windows driver." : {
       "localizations" : {
         "it" : {
@@ -4194,6 +4466,22 @@
         }
       }
     },
+    "Every game uses these defaults." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutti i giochi usano queste impostazioni predefinite."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有游戏都使用这些默认设置。"
+          }
+        }
+      }
+    },
     "Every setting on the Bridgeplay tab" : {
       "localizations" : {
         "it" : {
@@ -4206,6 +4494,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 标签页上的所有设置"
+          }
+        }
+      }
+    },
+    "Every setting on this page goes back to Bridgeplay's default." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ogni impostazione di questa pagina torna a quella predefinita di Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此页面上的每项设置都会恢复为 Bridgeplay 的默认值。"
+          }
+        }
+      }
+    },
+    "Experimental. Adds input lag." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sperimentale. Aumenta la latenza dei comandi."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实验性功能，会增加输入延迟。"
           }
         }
       }
@@ -4238,6 +4558,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "操作失败"
+          }
+        }
+      }
+    },
+    "Fast-Motion Fallback" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripiego nei movimenti rapidi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速运动回退"
           }
         }
       }
@@ -4402,6 +4738,22 @@
         }
       }
     },
+    "Force VSync" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forza VSync"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "强制垂直同步"
+          }
+        }
+      }
+    },
     "Found. Set it up in Status to play on it." : {
       "localizations" : {
         "it" : {
@@ -4414,6 +4766,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已找到。在“状态”中设置后即可用它玩游戏。"
+          }
+        }
+      }
+    },
+    "Frame Generation" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generazione di fotogrammi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧生成"
           }
         }
       }
@@ -4482,6 +4850,22 @@
         }
       }
     },
+    "Game Defaults" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impostazioni predefinite dei giochi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏默认设置"
+          }
+        }
+      }
+    },
     "Game Porting Toolkit" : {
       "localizations" : {
         "it" : {
@@ -4542,6 +4926,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提供 Vulkan 渲染选项的游戏会通过 MoltenVK 运行，且不支持 DLSS。建议选择 DirectX 11 或 12。"
+          }
+        }
+      }
+    },
+    "Games with Their Own Settings" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giochi con impostazioni proprie"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有单独设置的游戏"
           }
         }
       }
@@ -4622,6 +5022,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图形"
+          }
+        }
+      }
+    },
+    "Graphics Backend" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backend grafico"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图形后端"
           }
         }
       }
@@ -4798,6 +5214,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "如果 macOS 显示了该开关，请将其开启。设置会自动继续。"
+          }
+        }
+      }
+    },
+    "Ignored: %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignorato: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已忽略：%@"
           }
         }
       }
@@ -5218,6 +5650,22 @@
         }
       }
     },
+    "Keeps static HUD and menus sharp." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantiene nitidi HUD statici e menu."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持静态 HUD 和菜单清晰。"
+          }
+        }
+      }
+    },
     "Keeps your controller working after Bridgeplay updates. Adds a certificate for this Mac to your login keychain. If macOS then asks for your password, choose Always Allow." : {
       "localizations" : {
         "it" : {
@@ -5298,6 +5746,22 @@
         }
       }
     },
+    "Launch options, account %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opzioni di avvio, account %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动选项，账户 %@"
+          }
+        }
+      }
+    },
     "Launcher, sign-in or anti-cheat" : {
       "localizations" : {
         "it" : {
@@ -5326,6 +5790,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "允许游戏直接读取控制器（Mac 上推荐，仅在需要 Steam Input 按键映射时关闭）"
+          }
+        }
+      }
+    },
+    "Lets games offer DLSS, served by MetalFX. Some games take NVIDIA-only paths with it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permette ai giochi di offrire DLSS, gestito da MetalFX. Con questa opzione alcuni giochi seguono percorsi solo NVIDIA."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让游戏提供由 MetalFX 实现的 DLSS。开启后，部分游戏会走仅限 NVIDIA 的路径。"
           }
         }
       }
@@ -5586,6 +6066,22 @@
         }
       }
     },
+    "Many games quit without it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Molti giochi si chiudono senza."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有它，许多游戏会直接退出。"
+          }
+        }
+      }
+    },
     "Metal HUD" : {
       "localizations" : {
         "it" : {
@@ -5774,6 +6270,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要重建"
+          }
+        }
+      }
+    },
+    "Needs the Game Porting Toolkit. Without it, games use DXMT." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Richiede il Game Porting Toolkit. Senza, i giochi usano DXMT."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要 Game Porting Toolkit。没有它时，游戏使用 DXMT。"
           }
         }
       }
@@ -5970,6 +6482,22 @@
         }
       }
     },
+    "Not set" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non impostato"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未设置"
+          }
+        }
+      }
+    },
     "Not set up yet" : {
       "localizations" : {
         "it" : {
@@ -6066,6 +6594,22 @@
         }
       }
     },
+    "On" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attivato"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启"
+          }
+        }
+      }
+    },
     "On by default. Mac Steam has no virtual gamepad for Windows games, so games read the pad themselves. Turn it off only to use Steam Input's button remapping." : {
       "localizations" : {
         "it" : {
@@ -6110,6 +6654,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "仅限原生 Mac 游戏，位于 Metal HUD 和帧生成旁边。Raw HID 适合 Unity、SDL 和 Unreal 游戏，GameController 使用 Apple 的框架，关闭则不处理控制器。"
+          }
+        }
+      }
+    },
+    "Only takes effect when DLSS is switched on in the game." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ha effetto solo quando DLSS è attivo nel gioco."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅在游戏中开启 DLSS 时生效。"
           }
         }
       }
@@ -6258,6 +6818,22 @@
         }
       }
     },
+    "Open in Steam" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri in Steam"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Steam 中打开"
+          }
+        }
+      }
+    },
     "Opened %@ in %@." : {
       "localizations" : {
         "it" : {
@@ -6290,6 +6866,22 @@
         }
       }
     },
+    "Other lines in gamefixes/default.conf are kept as they are." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le altre righe di gamefixes/default.conf restano come sono."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gamefixes/default.conf 中的其他行保持不变。"
+          }
+        }
+      }
+    },
     "Overlay shim" : {
       "localizations" : {
         "it" : {
@@ -6318,6 +6910,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已有 CrossOver？Bridgeplay 可以用它运行游戏。购买它是在资助 Wine。"
+          }
+        }
+      }
+    },
+    "Own conf" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conf proprio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自有 conf"
           }
         }
       }
@@ -6414,6 +7022,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已暂停"
+          }
+        }
+      }
+    },
+    "Performance" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prestazioni"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "性能"
           }
         }
       }
@@ -6542,6 +7166,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "属性…"
+          }
+        }
+      }
+    },
+    "Protect UI" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proteggi l'interfaccia"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保护界面"
           }
         }
       }
@@ -7442,6 +8082,22 @@
         }
       }
     },
+    "Report an NVIDIA GPU" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala una GPU NVIDIA"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告为 NVIDIA GPU"
+          }
+        }
+      }
+    },
     "Report on GitHub" : {
       "localizations" : {
         "it" : {
@@ -7490,6 +8146,22 @@
         }
       }
     },
+    "Reset All" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina tutto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部重置"
+          }
+        }
+      }
+    },
     "Reset controller permission" : {
       "localizations" : {
         "it" : {
@@ -7502,6 +8174,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重置控制器权限"
+          }
+        }
+      }
+    },
+    "Reset every game default?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristinare tutte le impostazioni predefinite dei giochi?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要重置所有游戏默认设置吗？"
+          }
+        }
+      }
+    },
+    "Reset to Bridgeplay's Default" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina il predefinito di Bridgeplay"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复为 Bridgeplay 默认值"
           }
         }
       }
@@ -7902,6 +8606,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置兼容工具"
+          }
+        }
+      }
+    },
+    "Set by you." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impostato da te."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由你设置。"
           }
         }
       }
@@ -8334,6 +9054,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已跳过。游戏将使用 DXMT；你可以稍后在“状态”中添加。"
+          }
+        }
+      }
+    },
+    "Skips generated frames that would smear." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salta i fotogrammi generati che risulterebbero sbavati."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过会产生拖影的生成帧。"
           }
         }
       }
@@ -8897,6 +9633,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Steam 正在运行"
+          }
+        }
+      }
+    },
+    "Steam runs every game without a tool of its own with this one. Change it in the Setup Assistant while Steam is closed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam usa questo strumento per ogni gioco che non ne ha uno proprio. Cambialo nell'Assistente di configurazione mentre Steam è chiuso."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 会用此工具运行所有未单独指定工具的游戏。请在 Steam 关闭时于设置助理中更改。"
           }
         }
       }
@@ -10261,6 +11013,38 @@
         }
       }
     },
+    "Use Defaults" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa predefinite"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用默认设置"
+          }
+        }
+      }
+    },
+    "Use Defaults…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa predefinite…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用默认设置…"
+          }
+        }
+      }
+    },
     "Use This" : {
       "localizations" : {
         "it" : {
@@ -10277,6 +11061,22 @@
         }
       }
     },
+    "Use Wine's syntax, for example dinput8=n,b;xinput1_3=n." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa la sintassi di Wine, per esempio dinput8=n,b;xinput1_3=n."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请使用 Wine 的语法，例如 dinput8=n,b;xinput1_3=n。"
+          }
+        }
+      }
+    },
     "Use a copy of Steam from another folder or drive." : {
       "localizations" : {
         "it" : {
@@ -10289,6 +11089,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用其他文件夹或磁盘中的 Steam。"
+          }
+        }
+      }
+    },
+    "Use the defaults for this game?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usare le impostazioni predefinite per questo gioco?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要让此游戏使用默认设置吗？"
           }
         }
       }
@@ -10421,6 +11237,22 @@
         }
       }
     },
+    "Waits for the display even when a game turns VSync off." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attende lo schermo anche quando un gioco disattiva VSync."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即使游戏关闭了垂直同步，也会等待显示器刷新。"
+          }
+        }
+      }
+    },
     "What went wrong? Optional, and public with the report." : {
       "localizations" : {
         "it" : {
@@ -10529,6 +11361,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Wine 日志"
+          }
+        }
+      }
+    },
+    "Wine syntax. A game's own overrides come after these." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sintassi di Wine. Gli override di un gioco vengono dopo questi."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine 语法。单个游戏自己的覆盖排在这些之后。"
           }
         }
       }

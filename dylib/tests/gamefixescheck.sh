@@ -656,6 +656,40 @@ is "a file is left alone" "644" "$(stat -f %Lp "$wine_dir")"
 has "and is warned about" "is not a directory (Regular File), left alone" "$heal_log"
 rm "$wine_dir"
 
+echo "== layers: shipped and user defaults for every game"
+new_case
+full_engine
+global_conf() { printf '%s\n' "$@" > "$case_dir/support/gamefixes-default/default.conf"; }
+user_global_conf() { printf '%s\n' "$@" > "$case_dir/support/gamefixes/default.conf"; }
+global_conf 'BACKEND=dxvk' 'RETINA=1' 'WINEDEBUG=-all' 'FRAMEGEN=2'
+user_global_conf 'RETINA=0' 'FRAMEGEN=adaptive'
+default_conf 'FRAMEGEN=3'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "the shipped global conf applies" "dxvk" "$(got backend)"
+is "the shipped global conf exports" "-all" "$(got WINEDEBUG)"
+is "the user's global conf wins over the shipped one" "0" "$(got NOTPROTON_RETINA)"
+is "a shipped per-game conf wins over both global confs" "3" "$(got NOTPROTON_FRAMEGEN)"
+has "the shipped global conf is read first" "reading the shipped-global conf" "$case_dir/log"
+has "the log names the shipped global layer" "BACKEND in the shipped-global conf" "$case_dir/log"
+has "the log names the user's global layer" "applied NOTPROTON_RETINA=0 from the global conf" "$case_dir/log"
+
+new_case
+full_engine
+global_conf 'BACKEND=dxvk' 'RETINA=1'
+user_global_conf 'MTL_HUD_ENABLED=1'
+user_conf 'BACKEND=dxmt'
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_RETINA=0 MTL_HUD_ENABLED=0
+is "a user per-game conf wins over the global confs" "dxmt" "$(got backend)"
+is "launch options win over the shipped global conf" "0" "$(got NOTPROTON_RETINA)"
+is "launch options win over the user's global conf" "0" "$(got MTL_HUD_ENABLED)"
+
+new_case
+full_engine
+user_global_conf 'BACKEND=d3dmetal'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a global d3dmetal on an engine without it falls back" "dxmt" "$(got backend)"
+has "the fallback names the global layer" "BACKEND in the global conf, fell back from d3dmetal" "$case_dir/log"
+
 if [ "$fails" -eq 0 ]; then
 	echo "==> gamefixescheck: all assertions hold"
 else

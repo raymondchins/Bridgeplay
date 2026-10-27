@@ -154,23 +154,11 @@ for old in 1422450:3ec703897532711d09717384333bce001642c16e9b33875e20f685af8fd09
     rm -f "$f" || die "Config game lama tidak bisa dihapus: $f"
 done
 
-# default.conf is the user's global file. It follows the bundled one unless the user has
-# edited it: .installer/default.conf records the copy last installed, and a default.conf
-# that still matches it, or the one every earlier installer shipped, is replaced. An
-# edited one is kept and the new bundled file is put next to it as default.conf.new.
-shipped="$here/config/gamefixes/default.conf"
-current="$support/gamefixes/default.conf"
-record="$support/.installer/default.conf"
-first_shipped=442803b868fc31b188aa7f650c711efc6b8d2d63cb47399312d028c92be7b130
-if [ ! -f "$current" ] || cmp -s "$current" "$shipped" \
-    || { [ -f "$record" ] && cmp -s "$current" "$record"; } \
-    || [ "$(shasum -a 256 "$current" | cut -d' ' -f1)" = "$first_shipped" ]; then
-    cp -f "$shipped" "$current" || die "default.conf gagal disalin."
-else
-    cp -f "$shipped" "$current.new" || die "default.conf gagal disalin."
-    say "default.conf kamu sudah diubah, jadi tidak ditimpa. Versi terbaru disimpan sebagai default.conf.new di $support/gamefixes."
-fi
-cp -f "$shipped" "$record" || die "default.conf gagal dicatat."
+# Bridgeplay's defaults for every game are gamefixes-default/default.conf, copied above with
+# the per-game confs. The user's gamefixes/default.conf holds only their own changes and is
+# never written here. On its next start the app trims a copy earlier installers wrote there,
+# using .installer/default.conf, the record of that copy, which therefore stays as it is.
+
 # The user's own controller mappings: only seeded when there are none yet.
 if [ ! -f "$support/gamecontrollerdb.txt" ]; then
     cp "$here/config/gamecontrollerdb.txt" "$support/" || die "gamecontrollerdb.txt gagal disalin."

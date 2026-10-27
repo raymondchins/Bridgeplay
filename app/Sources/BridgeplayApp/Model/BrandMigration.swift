@@ -459,7 +459,7 @@ struct BrandMigration: Sendable {
     // MARK: Text helpers
 
     // A line holding only a quoted key, as in SteamDefaultTool.
-    private static func quotedKey(_ line: String) -> String? {
+    static func quotedKey(_ line: String) -> String? {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard trimmed.count >= 2, trimmed.hasPrefix("\""), trimmed.hasSuffix("\""),
               !trimmed.dropFirst().dropLast().contains("\"")

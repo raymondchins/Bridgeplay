@@ -77,19 +77,21 @@ struct BridgeplayApp: App {
                 .keyboardShortcut("3", modifiers: .command)
             Button("Guide") { pane = .guide }
                 .keyboardShortcut("4", modifiers: .command)
+            Button("Game Defaults") { pane = .gameDefaults }
+                .keyboardShortcut("5", modifiers: .command)
 
             Divider()
 
             Button("Refresh") {
                 Task {
                     switch pane {
-                    case .status, .guide: await status.refresh()
+                    case .status, .guide, .gameDefaults: await status.refresh()
                     case .prefixes, .backups: await prefixes.load()
                     }
                 }
             }
             .keyboardShortcut("r", modifiers: .command)
-            .disabled(pane == .status || pane == .guide ? !status.isIdle : prefixes.isLoading)
+            .disabled(pane == .status || pane == .guide || pane == .gameDefaults ? !status.isIdle : prefixes.isLoading)
 
             Divider()
         }

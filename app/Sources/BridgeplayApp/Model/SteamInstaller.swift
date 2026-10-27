@@ -172,6 +172,12 @@ enum SteamInstaller {
         }
         pruneGamefixes(keeping: payload.gamefixes.map(\.lastPathComponent),
                        in: deployedVersion.deletingLastPathComponent().appending(path: "gamefixes-default"))
+        // The shipped defaults now sit in gamefixes-default/, so the user's file keeps only their own.
+        do {
+            try GameDefaults.splitShipped(in: support)
+        } catch {
+            AppLog.note("game defaults: could not split the shipped defaults out: \(error.localizedDescription)")
+        }
         try removeStaleFonts(in: fonts, keeping: payload.fonts)
 
         var backedUp = false
