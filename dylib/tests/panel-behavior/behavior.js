@@ -363,6 +363,10 @@ for (const form of Object.keys(FORMS)) {
   t.ok(last().trim() === 'FOO=bar BRIDGEPLAY_RAW_CONTROLLERS=1 %command%',
        `Use Bridgeplay defaults drops only those settings, either spelling (${last()})`);
   written.length = 0;
+  reset(nodes('NOTPROTON_VSYNC=1 FOO=bar BRIDGEPLAY_BACKEND=dxvk')).props.onClick();
+  t.ok(last().trim() === 'FOO=bar %command%',
+       `Use Bridgeplay defaults also drops vsync and the backend's own spelling (${last()})`);
+  written.length = 0;
   reset(nodes('CX_GRAPHICS_BACKEND=dxmt DXMT_CONFIG="d3d11.metalSpatialUpscaleFactor=2.0;dxgi.x=1"')).props.onClick();
   t.ok(last().trim() === 'DXMT_CONFIG=dxgi.x=1 %command%',
        `Use Bridgeplay defaults keeps other DXMT_CONFIG entries (${last()})`);

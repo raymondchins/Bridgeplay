@@ -472,7 +472,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "OV=[\"CX_GRAPHICS_BACKEND\",\"MTL_HUD_ENABLED\",\"D3DM_ENABLE_METALFX\",\"DXMT_ENABLE_NVEXT\"," \
     "\"ROSETTA_ADVERTISE_AVX\",\"WINEMSYNC\",\"BRIDGEPLAY_RETINA\",\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"DXMT_CONFIG\"," \
     "\"BRIDGEPLAY_FRAMEGEN\",\"BRIDGEPLAY_FRAMEGEN_QUALITY\",\"BRIDGEPLAY_FRAMEGEN_UI\",\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"," \
-    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
+    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
     "if(nat)return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
     "T([\"MTL_HUD_ENABLED\"],\"Metal HUD\",\"1\"),FG()," \
