@@ -509,5 +509,70 @@
     "last_tested": "2026-10-22",
     "fork_commit": null,
     "tested_on": "Community reports · M1, M4 Pro"
+  },
+  {
+    "appid": 949230,
+    "name": "Cities: Skylines II",
+    "api": "D3D11",
+    "anticheat": "none known",
+    "status": "gold",
+    "backend": "d3dmetal",
+    "engine": "winecx-11.17",
+    "notes": "Needs a Steam launch option that starts Cities2.exe instead of the Paradox launcher (dowser.exe). 1080p at 60 Hz. From a player report (#1415). Launch option: sh -c 'exec \"$1\" \"$2\" \"${3%/Launcher/dowser.exe}/Cities2.exe\"' -- %command%",
+    "last_tested": "2026-10-27",
+    "fork_commit": null,
+    "tested_on": "M4 · macOS 27.2"
+  },
+  {
+    "appid": 4732690,
+    "name": "Arknights: Endfield",
+    "api": "D3D11+Vulkan",
+    "anticheat": "Anti-Cheat Expert",
+    "status": "gold",
+    "backend": "dxmt",
+    "engine": null,
+    "notes": "Needs a third-party patch from https://github.com/stoicswe/Endfield_FineWine (the reporter works on it). 4K, Very High, 120 fps. Engine version not reported. From a player report (#1253).",
+    "last_tested": "2026-10-26",
+    "fork_commit": null,
+    "tested_on": "M4 Pro · macOS 27.0.1"
+  },
+  {
+    "appid": 2215430,
+    "name": "Ghost of Tsushima DIRECTOR'S CUT",
+    "api": "D3D12",
+    "anticheat": "none known",
+    "status": "platinum",
+    "backend": null,
+    "engine": "winecx-11.17",
+    "notes": "Runs out of the box. From a player report (#824).",
+    "last_tested": "2026-10-24",
+    "fork_commit": null,
+    "tested_on": "M5 Pro · macOS 26.6.2"
+  },
+  {
+    "appid": 243470,
+    "name": "Watch_Dogs™",
+    "api": "D3D11",
+    "anticheat": "none known",
+    "status": "borked",
+    "backend": null,
+    "engine": "winecx-11.17",
+    "notes": "Started 2 times in 10 tries; even then, heavy shading and display glitches leave almost nothing visible. From a player report (#786).",
+    "last_tested": "2026-10-24",
+    "fork_commit": null,
+    "tested_on": "M4 · macOS 27"
+  },
+  {
+    "appid": 631510,
+    "name": "Devil May Cry HD Collection",
+    "api": "D3D11",
+    "anticheat": "none known",
+    "status": "borked",
+    "backend": "dxmt",
+    "engine": "winecx-11.17",
+    "notes": "The launcher works and DMC 1/2/3 can be picked, but DMC3 always hangs on the loading screen before the game starts. From a player report (#621).",
+    "last_tested": "2026-10-23",
+    "fork_commit": null,
+    "tested_on": "M3 Pro · macOS 27.0.1"
   }
 ]
