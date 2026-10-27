@@ -11365,18 +11365,18 @@
         }
       }
     },
-    "Wine syntax. A game's own overrides come after these." : {
+    "Wine syntax. A game's own conf replaces these; its launch options win per DLL." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sintassi di Wine. Gli override di un gioco vengono dopo questi."
+            "value" : "Sintassi di Wine. Il conf di un gioco li sostituisce; le sue opzioni di avvio prevalgono DLL per DLL."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wine 语法。单个游戏自己的覆盖排在这些之后。"
+            "value" : "Wine 语法。单个游戏自己的 conf 会替换这些设置；其启动选项按 DLL 逐个优先。"
           }
         }
       }

@@ -288,7 +288,7 @@ struct GameDefaultsView: View {
         case .frameGen, .frameGenQuality, .frameGenEngine: ""
         case .frameGenUI: String(localized: "Keeps static HUD and menus sharp.")
         case .frameGenFallback: String(localized: "Skips generated frames that would smear.")
-        case .dllOverrides: String(localized: "Wine syntax. A game's own overrides come after these.")
+        case .dllOverrides: String(localized: "Wine syntax. A game's own conf replaces these; its launch options win per DLL.")
         }
     }
 
