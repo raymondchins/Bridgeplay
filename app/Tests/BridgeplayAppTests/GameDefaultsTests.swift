@@ -162,6 +162,28 @@ import Testing
         #expect(backups.count == 1)
     }
 
+    @Test func onlyARecordedCopyTurnsADeletedKeyOff() throws {
+        func split(_ text: String, record: String?) throws -> String {
+            let support = try scratchDirectory("gamedefaults-record")
+            defer { try? FileManager.default.removeItem(at: support) }
+            var files = ["gamefixes/default.conf": text, "gamefixes-default/default.conf": Self.shipped]
+            if let record { files[".installer/default.conf"] = record }
+            for (path, text) in files {
+                let url = support.appending(path: path)
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data(text.utf8).write(to: url)
+            }
+            try GameDefaults.splitShipped(in: support)
+            return GameDefaults.read(support.appending(path: "gamefixes/default.conf"))
+        }
+        // The app wrote these, not an installer: nothing was deleted, so nothing is turned off.
+        #expect(try split("MTL_HUD_ENABLED=1\n", record: nil) == "MTL_HUD_ENABLED=1\n")
+        #expect(try split("", record: nil) == "")
+        // The user deleted NVAPI=1 from the copy the installer recorded, or wrote NVAPI=0.
+        #expect(try split(Self.shipped.replacingOccurrences(of: "NVAPI=1\n", with: ""), record: Self.shipped) == "NVAPI=0\n")
+        #expect(try split(Self.shipped.replacingOccurrences(of: "NVAPI=1", with: "NVAPI=0"), record: Self.shipped) == "NVAPI=0\n")
+    }
+
     // MARK: Games with their own settings
 
     @Test func launchVariablesAreTheWordsBeforeCommand() {

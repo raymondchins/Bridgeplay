@@ -277,14 +277,15 @@ enum GameDefaults {
     // gamefixes/default.conf, where they masked every later change to them. Once the shipped
     // file sits in gamefixes-default/, the user's file keeps only what the user changed: a
     // copy nobody edited goes, and so do lines identical to the copy last installed, while a
-    // shipped KEY=1 the user deleted becomes KEY=0, the off it meant. The original is backed
-    // up first, and a marker makes this run once.
+    // shipped KEY=1 the user deleted from that recorded copy becomes KEY=0, the off it meant.
+    // The original is backed up first, and a marker makes this run once.
     static let splitMarker = ".installer/defaults-split"
     // What the first installers shipped, before .installer/default.conf recorded it.
     static let firstShippedHash = "442803b868fc31b188aa7f650c711efc6b8d2d63cb47399312d028c92be7b130"
 
-    // nil when nothing of the user's is left.
-    static func splitText(_ user: String, baseline: String) -> String? {
+    // nil when nothing of the user's is left. Without a record of the installed copy a
+    // missing key says nothing: the app writes the file too, so it may never have been there.
+    static func splitText(_ user: String, baseline: String, recorded: Bool = true) -> String? {
         if user == baseline { return nil }
         let baseLines = Set(baseline.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
         var lines = user.components(separatedBy: "\n")
@@ -295,7 +296,7 @@ enum GameDefaults {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             return !trimmed.isEmpty && baseLines.contains(trimmed)
         }
-        for line in baseline.split(separator: "\n") {
+        for line in baseline.split(separator: "\n") where recorded {
             guard let (key, value) = assignment(line), value == "1", !userKeys.contains(key) else { continue }
             lines.append("\(key)=0")
         }
@@ -318,9 +319,10 @@ enum GameDefaults {
         if files.fileExists(atPath: user.path(percentEncoded: false)) {
             let text = read(user)
             let recorded = support.appending(path: ".installer/default.conf")
-            let baseline = files.fileExists(atPath: recorded.path(percentEncoded: false)) ? read(recorded) : read(shipped)
+            let hasRecord = files.fileExists(atPath: recorded.path(percentEncoded: false))
+            let baseline = hasRecord ? read(recorded) : read(shipped)
             let unedited = (try? Digest.sha256(of: user)) == firstShippedHash
-            let kept = unedited ? nil : splitText(text, baseline: baseline)
+            let kept = unedited ? nil : splitText(text, baseline: baseline, recorded: hasRecord)
             if kept != text {
                 let backup = support.appending(path: "backups/default.conf.\(Int(now.timeIntervalSince1970))")
                 try files.createDirectory(at: backup.deletingLastPathComponent(), withIntermediateDirectories: true)
