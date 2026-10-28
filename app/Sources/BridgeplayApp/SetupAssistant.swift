@@ -432,18 +432,24 @@ final class SetupAssistant {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 guard let self, self.needsAppManagement else { return }
-                if Self.canWriteSteam() {
-                    // Detached first, so the retry's own cancel doesn't stop this task mid-run.
-                    self.permissionWatch = nil
-                    if self.repairPending {
-                        await self.repairSteamAndRetry(with: status)
-                    } else {
-                        await self.finish(with: status)
-                    }
-                    return
-                }
+                if await self.resumeAfterPermission(status, canWrite: Self.canWriteSteam()) { return }
             }
         }
+    }
+
+    // One poll of the watch; false keeps it polling. A pending repair also waits while another
+    // run is in flight, since the repair would refuse it and nothing would retry.
+    func resumeAfterPermission(_ status: SystemStatus, canWrite: Bool,
+                               repair: @MainActor (SystemStatus) async -> Void = { await $0.repairSteam() }) async -> Bool {
+        guard canWrite, !(repairPending && status.isBusy) else { return false }
+        // Detached first, so the retry's own cancel doesn't stop this task mid-run.
+        permissionWatch = nil
+        if repairPending {
+            await repairSteamAndRetry(with: status, repair: repair)
+        } else {
+            await finish(with: status)
+        }
+        return true
     }
 
     nonisolated static func canWriteSteam(app: URL = SupportPaths.Steam.app) -> Bool {

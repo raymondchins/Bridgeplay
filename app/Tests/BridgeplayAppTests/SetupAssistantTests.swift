@@ -126,6 +126,29 @@ struct SetupAssistantTests {
         #expect(steamState(model) == .failed("Bridgeplay is still busy with another task. Try again when it finishes."))
     }
 
+    @Test("A repair waiting for App Management keeps waiting while Bridgeplay is busy, then resumes")
+    @MainActor
+    func repairResumesAfterBusy() async {
+        let model = SetupAssistant()
+        #expect(model.repairFailed("Could not write files.", remedy: .appManagement))
+        let status = SystemStatus()
+        status.activity = "Installing"
+        var ran = false
+        let repair: @MainActor (SystemStatus) async -> Void = { ran = true; $0.setFailure("Steam did not quit.") }
+
+        #expect(!(await model.resumeAfterPermission(status, canWrite: true, repair: repair)))
+        #expect(!ran)
+        #expect(model.needsAppManagement)
+        #expect(model.repairPending)
+        #expect(steamState(model) == .failed("macOS needs your permission first."))
+
+        status.activity = nil
+        #expect(await model.resumeAfterPermission(status, canWrite: true, repair: repair))
+        #expect(ran)
+        #expect(!model.needsAppManagement)
+        #expect(steamState(model) == .failed("Steam did not quit."))
+    }
+
     // MARK: Making WineCX Steam's default
 
     // Steam in this account, another account, or both. quits: whether it obeys steam://exit.
