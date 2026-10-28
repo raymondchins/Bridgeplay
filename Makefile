@@ -85,7 +85,7 @@ DEPS := $(OBJS:.o=.d)
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve bridge runcheck compatcheck \
-        compatsvc-check prefixstate-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck gamedrivecheck \
+        compatsvc-check prefixstate-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck gamedrivecheck \
         gamefixescheck launchercheck padcheck launch-shell activatecheck stamp-check versioncheck cicheck compat-reported-check FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
@@ -163,6 +163,10 @@ powernotecheck:
 exitcheck:
 	@if [ ! -f dylib/tests/exitcheck.sh ]; then $(call SKIP,exitcheck,dylib/tests/exitcheck.sh); exit 0; fi; \
 	sh dylib/tests/exitcheck.sh dylib/feats/compat_run.sh
+
+anticheatcheck:
+	@if [ ! -f dylib/tests/anticheatcheck.sh ]; then $(call SKIP,anticheatcheck,dylib/tests/anticheatcheck.sh); exit 0; fi; \
+	sh dylib/tests/anticheatcheck.sh dylib/feats/compat_run.sh
 
 gamedrivecheck:
 	@if [ ! -f dylib/tests/gamedrivecheck.sh ]; then $(call SKIP,gamedrivecheck,dylib/tests/gamedrivecheck.sh); exit 0; fi; \
@@ -891,7 +895,7 @@ np-inventory-check:
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck compat-reported-import-check compatcheck compatsvc-check prefixstate-check shortcutcheck launch-shell envcheck \
-	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck gamedrivecheck launchercheck \
+	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck gamedrivecheck launchercheck \
 	seedcheck gamefixescheck versioncheck cicheck padcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
 	app-tests native-installercheck
 
