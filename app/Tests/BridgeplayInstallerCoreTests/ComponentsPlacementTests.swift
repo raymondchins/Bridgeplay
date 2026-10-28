@@ -123,7 +123,9 @@ struct ComponentsPlacementTests {
     func concurrentPlacements() throws {
         let f = try fixture()
         defer { try? FileManager.default.removeItem(at: f.root) }
-        let placement = placement(f, Calls())
+        var placement = placement(f, Calls())
+        // Shared by the workers below, so it must not touch the unlocked call counters.
+        placement.resetSetupAssistant = {}
         try placement.place()
         nonisolated(unsafe) var failures: [Error] = []
         let lock = NSLock()
