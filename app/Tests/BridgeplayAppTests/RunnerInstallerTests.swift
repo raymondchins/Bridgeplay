@@ -38,6 +38,23 @@ struct RunnerInstallerTests {
         #expect(RunnerInstaller.hasClone(forBuild: version, runners: runners))
     }
 
+    @Test("Clearing quarantine leaves the tree's other attributes alone")
+    func clearQuarantineOnlyRemovesQuarantine() throws {
+        let runners = try makeRunners()
+        defer { try? FileManager.default.removeItem(at: runners) }
+        let file = runners.appending(path: "lib/wine/ntdll.so")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("so".utf8).write(to: file)
+        try Shell.check("/usr/bin/xattr", ["-w", "com.apple.quarantine", "0083;6a2b3c4d;Safari;", file.path(percentEncoded: false)])
+        try Shell.check("/usr/bin/xattr", ["-w", "com.bridgeplay.keep", "1", file.path(percentEncoded: false)])
+
+        RunnerInstaller.clearQuarantine(at: runners)
+
+        let left = try Shell.run("/usr/bin/xattr", [file.path(percentEncoded: false)]).stdout
+        #expect(!left.contains("com.apple.quarantine"))
+        #expect(left.contains("com.bridgeplay.keep"))
+    }
+
     // A CrossOver bundle holding only the files the clone path hashes, with the build describing
     // those exact bytes, so verification passes without a real 1.2G install to copy.
     private func makeSupportedInstall(

@@ -26,13 +26,16 @@ user is a hardening request, not a vulnerability, but it is still welcome as an 
 ## Known trade-offs
 
 - Releases are signed with the maintainer's Apple Developer ID (Team AF38EA29BA) and notarized by Apple.
-  The installer still removes the quarantine flag from the folders it sets up. Download only from https://bridgeplay.dev or GitHub.
+  Download only from https://bridgeplay.dev or GitHub.
 - Steam is re-signed to load Bridgeplay, with a local "NotProton Local Signing" keychain identity or ad hoc,
   and loses Valve's hardened runtime.
 - `notproton.dylib` loads for every macOS user of a shared `/Applications/Steam.app`.
-- Setup removes quarantine from Steam.app and Bridgeplay's folder, resets Steam's Accessibility,
-  PostEvent and ListenEvent approvals (`tccutil`), re-signs Wine loaders ad hoc where needed, and sets
-  Steam's default compatibility tool (`config.vdf`).
+- Setup removes quarantine in three places, each after a check. Bridgeplay.app must carry the
+  maintainer's signature and Steam.app Valve's. The Wine engine and a CrossOver clone must match their
+  pinned hashes first, since macOS refuses to load a quarantined Wine file once Bridgeplay has patched
+  it and signed it ad hoc. Setup also resets Steam's Accessibility, PostEvent and ListenEvent approvals
+  (`tccutil`), re-signs Wine loaders ad hoc where needed, and sets Steam's default compatibility tool
+  (`config.vdf`).
 - Optional "Block Steam client updates" (`BootStrapperInhibitUpdateOnLaunch` in `steam.cfg`) also blocks
   Steam's security fixes.
 - Game calls to Steam's `steamclient` are redirected in memory to Proton's lsteamclient (`ntdll-patch/`).

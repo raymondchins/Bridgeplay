@@ -33,6 +33,7 @@ enum RunnerInstaller {
             defer { try? fm.removeItem(at: staging) }
             try copyPayload(from: install.crossOverRoot, to: staging)
             try verifyClone(build: build, root: staging.appending(path: "CrossOver"))
+            clearQuarantine(at: staging.appending(path: "CrossOver"))
             guard occupied else {
                 try fm.moveItem(at: staging, to: target)
                 return build
@@ -270,10 +271,7 @@ enum RunnerInstaller {
         let destination = landing.path(percentEncoded: false)
 
         let cloned = try Shell.run("/bin/cp", ["-c", "-R", source, destination])
-        if cloned.status == 0 {
-            scrubDownloadMarkers(at: landing)
-            return
-        }
+        if cloned.status == 0 { return }
 
         try? fm.removeItem(at: landing)
         let copied = try Shell.run("/bin/cp", ["-R", source, destination])
@@ -283,13 +281,14 @@ enum RunnerInstaller {
                 detail: String(localized: "Copying \(source) failed. \(copied.stderr.trimmingCharacters(in: .whitespacesAndNewlines))")
             )
         }
-        scrubDownloadMarkers(at: landing)
     }
 
-    static func scrubDownloadMarkers(at payload: URL) {
-        for marker in ["com.apple.quarantine", "com.apple.provenance"] {
-            _ = try? Shell.run("/usr/bin/xattr", ["-r", "-d", marker, payload.path(percentEncoded: false)])
-        }
+    // Only for a tree already checked against its pins: a CrossOver clone, or an engine built
+    // from pinned archives. A browser-downloaded CrossOver, or an engine archive that came in
+    // a browser-downloaded installer zip (tar passes the flag on), leaves quarantine on files
+    // Bridgeplay patches and signs ad hoc, and macOS then refuses to load them.
+    static func clearQuarantine(at tree: URL) {
+        _ = try? Shell.run("/usr/bin/xattr", ["-r", "-d", "com.apple.quarantine", tree.path(percentEncoded: false)])
     }
 
     static func verifyClone(build: RunnerBuild, root: URL) throws {

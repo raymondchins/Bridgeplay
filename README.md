@@ -117,7 +117,7 @@ Also changed:
 - Steam's default compatibility tool is set in `config.vdf`, and Bridgeplay's tools go in `compatibilitytools.d`.
 - Steam's Accessibility and input permissions are reset (`tccutil`), so macOS asks again.
 - Steam is signed with a local "NotProton Local Signing" keychain identity, or ad hoc, and loses Valve's hardened runtime.
-- The quarantine flag is removed from Steam.app and Bridgeplay's folder, and Wine loaders are re-signed ad hoc where needed.
+- The quarantine flag is removed from Bridgeplay.app and Steam.app once their signatures check out, and from the Wine engine and a CrossOver clone once they match their pins. Wine loaders are re-signed ad hoc where needed.
 - Optional **Block Steam client updates** (`steam.cfg`) also blocks Steam's security fixes.
 - The library loads for every macOS user of a shared `/Applications/Steam.app`.
 - In games, Steam calls reach your Mac Steam through Proton's lsteamclient, via an in-memory redirect (`ntdll-patch/`).

@@ -63,8 +63,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-xattr -dr com.apple.quarantine "$here" 2>/dev/null || true
-
 [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ] || die "Mac ini bukan Apple Silicon (M1/M2/M3/...). Bridgeplay tidak jalan di Mac Intel."
 major="$(sw_vers -productVersion | cut -d. -f1)"
 [ "$major" -ge 26 ] || die "Butuh macOS 26 atau lebih baru (sekarang $(sw_vers -productVersion)). Update macOS dulu."
@@ -163,7 +161,6 @@ done
 if [ ! -f "$support/gamecontrollerdb.txt" ]; then
     cp "$here/config/gamecontrollerdb.txt" "$support/" || die "gamecontrollerdb.txt gagal disalin."
 fi
-xattr -dr com.apple.quarantine "$support" 2>/dev/null || true
 # Show the Setup Assistant again even if an earlier Bridgeplay was dismissed.
 defaults delete com.bridgeplay.Bridgeplay setupAssistantFinished >/dev/null 2>&1 || true
 
