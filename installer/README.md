@@ -6,9 +6,11 @@ configs from the folder it sits in, downloads Steam from Valve's CDN when
 `/Applications/Steam.app` is missing, then opens the app's Setup Assistant. The Setup
 Assistant downloads the WineCX engine (dappermint/winecx-gptk's runtime) itself: the zip does
 not carry it, because it bundles GPL libraries whose source neither project publishes (see
-`NOTICE`). `Bridgeplay Installer.app` runs the same script without the app step
-([docs/NATIVE-INSTALLER.md](../docs/NATIVE-INSTALLER.md)), and so does the app's own Setup
-Assistant when the user presses Download in its Graphics step.
+`NOTICE`). `Bridgeplay Installer.app` and the app's own Setup Assistant (Download in its
+Graphics step) no longer run this script: `ComponentsPlacement` in `BridgeplayInstallerCore`
+does the same steps without the app step ([docs/NATIVE-INSTALLER.md](../docs/NATIVE-INSTALLER.md)).
+The zip still carries the script for app versions before that, so a change to one belongs in
+the other.
 
 Before copying Steam, `Install.command` verifies its strict code signature against Apple's
 trust chain, Valve's Team ID, and the `com.valvesoftware.steam` bundle identifier.

@@ -13,7 +13,7 @@ public struct InstallerDownloadProgress: Sendable, Equatable {
         self.speed = speed
     }
 
-    /// One line of curl's progress meter, which Install.command shows while it downloads Steam:
+    /// One line of curl's progress meter, shown while the components step downloads Steam:
     /// "  45 4200k   45 1890k    0     0  2105k      0  0:00:01  0:00:00  0:00:01 2105k"
     public init?(curlMeter line: String) {
         let fields = line.split(separator: " ")

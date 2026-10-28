@@ -213,9 +213,8 @@ final class SetupAssistant {
     }
 
     // The one-click installer's components zip, so the app alone is enough: BridgeplayInstallerCore
-    // checks its EdDSA signature and Apple's signature on GPTK, then runs its Install.command
-    // without the app step. That copies GPTK, the DXMT and DXVK archives and the configs, and
-    // installs Steam from Valve when it is missing.
+    // checks its EdDSA signature and Apple's signature on GPTK, then copies GPTK, the DXMT and
+    // DXVK archives and the configs, and installs Steam from Valve when it is missing.
     func downloadGPTK() async {
         if let refusal = MigrationLaunch.shared.refusal {
             message = refusal
@@ -255,7 +254,7 @@ final class SetupAssistant {
             meter.clear()
             gptkProgress = String(localized: "Installing the Game Porting Toolkit")
             try await Task.detached(priority: .userInitiated) {
-                try InstallerComponents.install(archive: archive, work: work, status: { AppLog.note("setup: Install.command: \($0)") })
+                try InstallerComponents.install(archive: archive, work: work, status: { AppLog.note("setup: components: \($0)") })
             }.value
         } catch {
             AppLog.note("setup: components failed: \(error.localizedDescription)")

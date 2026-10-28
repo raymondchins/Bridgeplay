@@ -2,9 +2,9 @@ import Foundation
 
 /// Apple's Game Porting Toolkit, DXMT, DXVK and the default configs (not WineCX, which the
 /// app downloads from dappermint): the one-click
-/// installer ZIP on the `installer` release, which Install.command inside it puts in place.
-/// The wizard downloads it only when this Mac lacks them, checks it against the same EdDSA
-/// key as the app, then runs that Install.command without the app step and without Terminal.
+/// installer ZIP on the `installer` release. The wizard downloads it only when this Mac lacks
+/// them, checks it against the same EdDSA key as the app, then puts its contents in place
+/// itself (ComponentsPlacement) rather than running the Install.command inside it.
 public struct InstallerComponents: Sendable, Equatable {
     public static let archiveURL = URL(
         string: "https://github.com/raymondchins/Bridgeplay/releases/download/installer/Bridgeplay-Installer.zip"
@@ -120,26 +120,25 @@ public struct InstallerComponents: Sendable, Equatable {
         try InstallerRelease.verify(data, signature: signature, publicKey: verificationKey)
     }
 
-    /// Unpack the verified archive and run its Install.command for Steam, GPTK, the engine and
-    /// the configs. `status` gets each "==>" step the script announces.
+    /// Unpack the verified archive and put Steam, GPTK, the engine archives and the configs in
+    /// place (ComponentsPlacement). `status` gets each step as it starts.
     public static func install(archive: URL, work: URL, status: @escaping @Sendable (String) -> Void = { _ in },
                                download: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in }) throws {
+        try install(archive: archive, work: work, status: status, download: download) { _ in }
+    }
+
+    static func install(archive: URL, work: URL, status: @escaping @Sendable (String) -> Void,
+                        download: @escaping @Sendable (InstallerDownloadProgress) -> Void,
+                        configure: (inout ComponentsPlacement) -> Void) throws {
         let unpacked = work.appending(path: "components")
         try? FileManager.default.removeItem(at: unpacked)
         try FileManager.default.createDirectory(at: unpacked, withIntermediateDirectories: true)
         try run("/usr/bin/ditto", ["-x", "-k", archive.path, unpacked.path])
-        let script = unpacked.appending(path: "Bridgeplay/Install.command")
-        guard FileManager.default.isReadableFile(atPath: script.path) else {
-            throw InstallerError.invalidInstallation("The components download has no Install.command.")
-        }
-        try verifyAppleSigned(gptk: unpacked.appending(path: "Bridgeplay/gptk"))
-        var environment = ProcessInfo.processInfo.environment
-        environment["BRIDGEPLAY_INSTALL_APP"] = "0"
-        environment["BRIDGEPLAY_NONINTERACTIVE"] = "1"
-        try run("/bin/bash", [script.path], environment: environment) { line in
-            if line.hasPrefix("==> ") { status(String(line.dropFirst(4))) }
-            else if let meter = InstallerDownloadProgress(curlMeter: line) { download(meter) }
-        }
+        let source = unpacked.appending(path: "Bridgeplay")
+        try verifyAppleSigned(gptk: source.appending(path: "gptk"))
+        var placement = ComponentsPlacement(source: source)
+        configure(&placement)
+        try placement.place(status: status, download: download)
     }
 
     /// GPTK ships unmodified: D3DMetal.framework and every other Mach-O file must carry Apple's

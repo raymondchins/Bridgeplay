@@ -19,7 +19,7 @@ final class InstallerModel {
     var paused = false
     @ObservationIgnored private var control = InstallerDownloadControl()
     @ObservationIgnored private var rate = DownloadRate()
-    // Steam downloading inside Install.command, from curl's meter.
+    // Steam downloading during the components step, from curl's meter.
     var scriptDownload: InstallerDownloadProgress?
     var failure: String?
     var openBridgeplay = true
@@ -166,7 +166,7 @@ final class InstallerModel {
                     componentStatus = nil
                     try await Task.detached(priority: .userInitiated) {
                         try InstallerComponents.install(archive: archive, work: work, status: { line in
-                            InstallerLog.write("Install.command: \(line)")
+                            InstallerLog.write("Components: \(line)")
                             Task { @MainActor [weak self] in self?.componentStatus = Self.status(line); self?.scriptDownload = nil }
                         }, download: { meter in
                             Task { @MainActor [weak self] in self?.scriptDownload = meter }
@@ -229,7 +229,7 @@ final class InstallerModel {
         } catch { failure = error.localizedDescription; finishing = false }
     }
 
-    // Install.command's "==>" steps, in the installer's words.
+    // The components steps (ComponentsPlacement), in the installer's words.
     nonisolated static func status(_ line: String) -> String? {
         if line.contains("Steam") { return tr("Installing Steam from Valve") }
         if line.contains("Game Porting Toolkit") { return tr("Copying Apple's graphics, the engine and settings") }

@@ -5,9 +5,10 @@ or updates `/Applications/Bridgeplay.app`. It downloads the app from the release
 Bridgeplay's Sparkle feed and checks its EdDSA signature before extracting it. On a Mac
 without Game Porting Toolkit or Steam it also downloads the one-click installer zip
 (`Bridgeplay-Installer.zip` on the `installer` release, signature in the `.sig` beside it),
-checks it against the same key, and runs its `Install.command` without the app step and
-without Terminal. That zip carries GPTK, DXMT, DXVK and the default configs, not Wine: the app
-downloads the WineCX runtime from dappermint/winecx-gptk during its Setup Assistant (see
+checks it against the same key, and puts its contents in place itself
+(`ComponentsPlacement` in `BridgeplayInstallerCore`), without running the `Install.command` the
+zip still carries for older app versions. That zip carries GPTK, DXMT, DXVK and the default
+configs, not Wine: the app downloads the WineCX runtime from dappermint/winecx-gptk during its Setup Assistant (see
 [NOTICE](../NOTICE)). Discussion: [issue #17](https://github.com/raymondchins/Bridgeplay/issues/17).
 
 ## Build
@@ -48,15 +49,15 @@ read-only directories stay intact as `.Bridgeplay.app.previous-<UUID>` siblings;
 administrator can remove them in Finder. They do not block subsequent updates.
 
 Prefixes, saves and Steam libraries are never touched. The components step writes only what
-`Install.command` writes (`gptk/`, `gamefixes-default/`, the cached DXMT/DXVK archives, and
+`Install.command` would (`gptk/`, `gamefixes-default/`, the cached DXMT/DXVK archives, and
 `default.conf` unless the user edited it; see [installer/README.md](../installer/README.md)).
 Opening the installed app continues its Setup Assistant, which downloads the WineCX engine
 and sets up Steam. Neither installer changes Sparkle's update feed.
 
 Bridgeplay.app does not need either installer. Its Setup Assistant's Graphics step offers
 Download, which fetches the same `Bridgeplay-Installer.zip` through `BridgeplayInstallerCore`
-(EdDSA check, then Apple's signature on every Mach-O file in `gptk/`) and runs its
-`Install.command` without the app step, so a Mac with only the app gets the same files.
+(EdDSA check, then Apple's signature on every Mach-O file in `gptk/`) and puts it in
+place the same way, so a Mac with only the app gets the same files.
 
 On Finish, users may open Bridgeplay. When the installer was started from a mounted disk
 image that `hdiutil` identifies exactly, it also offers to eject the image and move it to
