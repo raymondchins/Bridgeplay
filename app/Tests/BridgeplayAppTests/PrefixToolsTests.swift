@@ -412,9 +412,11 @@ struct PrefixToolsTests {
         #expect(helper.upperBound == gate.lowerBound)
         #expect(gate.upperBound < alert.lowerBound)
         // The first-launch notice uses osascript too, but as a notification, not an alert. The
-        // rebuild failure alert and the rebuild prompt carry their own gates.
-        #expect(source.ranges(of: "display alert").count == 2, "an alert bypasses show_alert")
-        #expect(source.ranges(of: "osascript").count == 5)
+        // rebuild failure alert, the rebuild prompt and the anti-cheat prompt carry their own gates.
+        #expect(source.ranges(of: "display alert").count == 3, "an alert bypasses show_alert")
+        #expect(source.ranges(of: "osascript").count == 6)
+        let anticheat = try #require(source.range(of: "kernel_anticheat_notice() {\n"))
+        #expect(source[anticheat.upperBound...].hasPrefix(#"  [ "$verb" = waitforexitandrun ] || return 0"#))
         let rebuild = try #require(source.range(of: "rebuild_prefix() {"))
         let prompt = try #require(source.range(of: "choice=$(osascript"))
         #expect(source[rebuild.upperBound..<prompt.lowerBound].contains(#"[ "$verb" != run ] || { [ -n "$3" ] && return 0; exit 1; }"#))
