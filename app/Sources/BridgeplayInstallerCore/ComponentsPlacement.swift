@@ -47,12 +47,8 @@ struct ComponentsPlacement {
         }
 
         // Copied beside the old one first, so a failed copy leaves the working toolkit alone.
-        let gptk = support.appending(path: "gptk"), staged = support.appending(path: ".gptk-new")
-        try? fm.removeItem(at: staged)
         try fail("The Game Porting Toolkit could not be copied.") {
-            try InstallerComponents.run("/usr/bin/ditto", [source.appending(path: "gptk").path, staged.path])
-            try? fm.removeItem(at: gptk)
-            try fm.moveItem(at: staged, to: gptk)
+            try Self.put(source.appending(path: "gptk"), at: support.appending(path: "gptk"))
         }
         // Bridgeplay reuses any cached file whose hash matches its pin, so DXMT and DXVK are
         // not downloaded again. The WineCX runtime is not in the zip; the app downloads it.
@@ -67,22 +63,22 @@ struct ComponentsPlacement {
         let confs = (try? fm.contentsOfDirectory(at: defaults, includingPropertiesForKeys: nil)) ?? []
         for conf in confs where conf.pathExtension == "conf" {
             try fail("A game config could not be copied.") {
-                let target = support.appending(path: "gamefixes-default/\(conf.lastPathComponent)")
-                try? fm.removeItem(at: target)
-                try fm.copyItem(at: conf, to: target)
+                try Self.put(conf, at: support.appending(path: "gamefixes-default/\(conf.lastPathComponent)"))
             }
         }
         for (appid, sha256) in oldConfs {
             let old = support.appending(path: "gamefixes/\(appid).conf")
             guard let data = fm.contents(atPath: old.path), Self.hex(SHA256.hash(data: data)) == sha256 else { continue }
-            try fail("An old game config could not be removed: \(old.path)") { try fm.removeItem(at: old) }
+            try fail("An old game config could not be removed: \(old.path)") {
+                do { try fm.removeItem(at: old) } catch where !fm.fileExists(atPath: old.path) {}
+            }
         }
 
         // The user's own controller mappings: only seeded when there are none yet.
         let mappings = support.appending(path: "gamecontrollerdb.txt")
         if !fm.fileExists(atPath: mappings.path) {
             try fail("gamecontrollerdb.txt could not be copied.") {
-                try fm.copyItem(at: source.appending(path: "config/gamecontrollerdb.txt"), to: mappings)
+                try Self.put(source.appending(path: "config/gamecontrollerdb.txt"), at: mappings, replacing: false)
             }
         }
         resetSetupAssistant()
@@ -99,6 +95,20 @@ struct ComponentsPlacement {
             return !fm.fileExists(atPath: current.path) && fm.fileExists(atPath: legacy.path) ? legacy : current
         }
         return (pick("Application Support"), pick("Caches"))
+    }
+
+    // Copies to a name unique to this run beside the target, then swaps it in atomically, so the
+    // installer and the app's Setup Assistant placing at once never leave a target missing or
+    // half-written. With replacing false, a target that appeared meanwhile is kept.
+    static func put(_ source: URL, at target: URL, replacing: Bool = true) throws {
+        let fm = FileManager.default
+        let staged = target.deletingLastPathComponent().appending(path: ".\(target.lastPathComponent)-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: staged) }
+        try InstallerComponents.run("/usr/bin/ditto", [source.path, staged.path])
+        do { try fm.moveItem(at: staged, to: target) }
+        catch where fm.fileExists(atPath: target.path) {
+            if replacing { _ = try fm.replaceItemAt(target, withItemAt: staged) }
+        }
     }
 
     static func hex(_ digest: SHA256.Digest) -> String { digest.map { String(format: "%02x", $0) }.joined() }

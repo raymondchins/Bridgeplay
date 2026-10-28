@@ -112,11 +112,27 @@ struct ComponentsPlacementTests {
         try placement.place()
 
         #expect(!fm.fileExists(atPath: f.support.appending(path: "gptk/stale.dylib").path))
-        #expect(!fm.fileExists(atPath: f.support.appending(path: ".gptk-new").path))
+        #expect(try fm.contentsOfDirectory(atPath: f.support.path).filter { $0.hasPrefix(".gptk-") }.isEmpty)
         #expect(text(f.support.appending(path: "gamecontrollerdb.txt")) == "my mappings")
         #expect(!fm.fileExists(atPath: f.support.appending(path: "gamefixes/111.conf").path))
         #expect(text(f.support.appending(path: "gamefixes/222.conf")) == "edited copy")
         #expect(text(f.support.appending(path: "gamefixes-default/448510.conf")) == "BACKEND=dxmt\n")
+    }
+
+    @Test("Two placements at once both succeed and leave one whole toolkit")
+    func concurrentPlacements() throws {
+        let f = try fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        let placement = placement(f, Calls())
+        try placement.place()
+        nonisolated(unsafe) var failures: [Error] = []
+        let lock = NSLock()
+        DispatchQueue.concurrentPerform(iterations: 4) { _ in
+            do { try placement.place() } catch { lock.withLock { failures.append(error) } }
+        }
+        #expect(failures.isEmpty, "\(failures)")
+        #expect(text(f.support.appending(path: "gptk/external/libd3dshared.dylib")) == "new gptk")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: f.support.path).filter { $0.hasPrefix(".gptk-") }.isEmpty)
     }
 
     @Test("While only the notproton folders exist, the files go there for the app's own move")
