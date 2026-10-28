@@ -29,6 +29,8 @@ struct ReportPayload: Codable, Equatable, Sendable {
     var log: String?
     var wineLog: String?
 
+    // Newest lines kept. These count characters, not bytes, so encoded() is what keeps the
+    // JSON under the endpoint's 1 MB cap.
     static let logLimit = 550_000
     static let wineLogLimit = 350_000
     static let maximumEncodedSize = 1_000_000

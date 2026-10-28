@@ -26,6 +26,7 @@ struct ReportPayloadSizeTests {
         let error = "wine: could not load missing.dll\n"
         let report = payload(log: "SteamUser=private_player\n" + filler + "\nnewest run line\n",
                              wineLog: error + filler + "\nnewest Wine line\n")
+        #expect(report.log?.contains("private_player") == false, "redacted before trimming, not by it")
         #expect(try JSONEncoder().encode(report).count > ReportPayload.maximumEncodedSize)
         let body = try report.encoded()
         let sent = try JSONDecoder().decode(ReportPayload.self, from: body)
