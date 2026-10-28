@@ -2323,10 +2323,9 @@ native_vc_runtime() {
   done
 }
 
-stage_step="anti-cheat check"
-kernel_anticheat_notice
-
 if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
+  stage_step="anti-cheat check"
+  kernel_anticheat_notice
   export WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
   stage_step="prefix lock"
   prepare_prefix_directory
