@@ -1099,8 +1099,6 @@ APPLESCRIPT
 kernel_anticheat_name() {
   case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
     randgrid.sys) echo "Ricochet" ;;
-    bedaisy.sys) echo "BattlEye's kernel driver" ;;
-    vgk.sys) echo "Riot Vanguard" ;;
     xhunter1.sys) echo "XIGNCODE3" ;;
     eaanticheat.installer.exe | eaanticheat.gameservicelauncher.exe) echo "EA Javelin" ;;
   esac
