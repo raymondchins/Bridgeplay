@@ -145,9 +145,13 @@ enum ValveSteam {
         guard (try? InstallerComponents.run("/usr/bin/codesign", ["--verify", "--strict", "-R", requirement, steam.path])) != nil else {
             throw InstallerError.componentsFailure("The Steam download is not signed by Valve, so it was not installed.")
         }
+        // Only reached when Applications had no Steam.app, so a half-copied one is ours to remove;
+        // left behind, it would pass as installed next time.
+        let destination = applications.appending(path: "Steam.app")
         do {
-            try InstallerComponents.run("/usr/bin/ditto", [steam.path, applications.appending(path: "Steam.app").path])
+            try InstallerComponents.run("/usr/bin/ditto", [steam.path, destination.path])
         } catch {
+            try? fm.removeItem(at: destination)
             throw InstallerError.componentsFailure("Steam could not be copied to Applications.")
         }
     }

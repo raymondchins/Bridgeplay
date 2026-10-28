@@ -48,9 +48,11 @@ rotated by rename before replacement. Retired copies owned by another account or
 read-only directories stay intact as `.Bridgeplay.app.previous-<UUID>` siblings; an
 administrator can remove them in Finder. They do not block subsequent updates.
 
-Prefixes, saves and Steam libraries are never touched. The components step writes only what
-`Install.command` would (`gptk/`, `gamefixes-default/`, the cached DXMT/DXVK archives, and
-`default.conf` unless the user edited it; see [installer/README.md](../installer/README.md)).
+Prefixes, saves and Steam libraries are never touched. The components step writes `gptk/`,
+`gamefixes-default/`, the cached DXMT/DXVK archives, and `gamecontrollerdb.txt` when there is
+none yet. It never writes the user's `gamefixes/default.conf`, and from `gamefixes/` it removes
+only per-game confs still identical to ones earlier installers copied there (see
+[installer/README.md](../installer/README.md)).
 Opening the installed app continues its Setup Assistant, which downloads the WineCX engine
 and sets up Steam. Neither installer changes Sparkle's update feed.
 
