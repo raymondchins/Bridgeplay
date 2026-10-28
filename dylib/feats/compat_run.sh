@@ -1094,6 +1094,57 @@ APPLESCRIPT
   [ "$answer" != "Open Log" ] || { [ -f "$log" ] && [ ! -L "$log" ] && open -t "$log" >/dev/null 2>&1; } || true
 }
 
+# Kernel anti-cheat needs a Windows driver, which Wine cannot load, so these games quit at
+# start. Prints the anti-cheat's name for one of its file names, nothing otherwise.
+kernel_anticheat_name() {
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    randgrid.sys) echo "Ricochet" ;;
+    bedaisy.sys) echo "BattlEye's kernel driver" ;;
+    vgk.sys) echo "Riot Vanguard" ;;
+    xhunter1.sys) echo "XIGNCODE3" ;;
+    eaanticheat.installer.exe | eaanticheat.gameservicelauncher.exe) echo "EA Javelin" ;;
+  esac
+}
+
+# The first kernel anti-cheat in a game folder, as "Name (file)". Shallow, so a large
+# install does not hold up the launch.
+find_kernel_anticheat() {
+  [ -d "$1" ] || return 0
+  find "$1" -maxdepth 3 -type f \( -iname '*.sys' -o -iname 'eaanticheat.*.exe' \) 2>/dev/null |
+    while IFS= read -r ka_file; do
+      ka_name=$(kernel_anticheat_name "${ka_file##*/}")
+      [ -z "$ka_name" ] || { printf '%s (%s)\n' "$ka_name" "${ka_file##*/}"; break; }
+    done
+}
+
+# Asks before a launch that cannot work. The launch goes ahead when the dialog cannot show.
+kernel_anticheat_notice() {
+  [ "$verb" = waitforexitandrun ] || return 0
+  ka_found=$(find_kernel_anticheat "$STEAM_COMPAT_INSTALL_PATH")
+  [ -n "$ka_found" ] || return 0
+  echo "anticheat: found kernel anti-cheat $ka_found, whose driver Wine cannot load" >> "$log" 2>&1 || true
+  answer=$(osascript - "$ka_found" 8>&- 9>&- <<'APPLESCRIPT'
+on run argv
+  set answer to display alert "This game's anti-cheat can't run" message ("It uses " & (item 1 of argv) & ", kernel anti-cheat that needs a Windows driver. Wine cannot load it, so the game will most likely quit at start. Playing online with it is at your own risk.") as critical buttons {"Launch Anyway", "Don't Launch"} default button "Don't Launch"
+  return button returned of answer
+end run
+APPLESCRIPT
+  ) || answer=""
+  [ "$answer" = "Don't Launch" ] || return 0
+  echo "=== not launched: kernel anti-cheat, the player chose Don't Launch ===" >> "$log" 2>&1 || true
+  exit 0
+}
+
+# The anti-cheat whose driver failed to load, from Wine's log.
+exit_anticheat() {
+  [ -f "$1" ] || return 0
+  grep -a -E 'err:(module:import_dll|ntoskrnl:ZwLoadDriver)' "$1" 2>/dev/null |
+    grep -a -o -i -E '[a-z0-9_.-]+\.sys' | while IFS= read -r ea_file; do
+      ea_name=$(kernel_anticheat_name "$ea_file")
+      [ -z "$ea_name" ] || { printf '%s (%s)\n' "$ea_name" "$ea_file"; break; }
+    done
+}
+
 # Steam shows the game as running while this waits, and Stop kills the script's process
 # group and children. A rebuild killed between its two renames leaves no pfx at all, so the
 # app runs outside both: the inner subshell is reparented to launchd and the app calls
@@ -1372,6 +1423,8 @@ exit_summary() {
     es_how="the game quit by itself"
   fi
   printf '=== exit summary: exit status %s after %s, %s ===\n' "$1" "$es_took" "$es_how"
+  es_anticheat=$(exit_anticheat "$4")
+  [ -z "$es_anticheat" ] || printf '=== exit cause: kernel anti-cheat %s could not load its Windows driver, which Wine cannot run, so the game will not start ===\n' "$es_anticheat"
   exit_crash_lines "$4" | while IFS= read -r es_line; do
     printf '=== exit cause: %s ===\n' "$es_line"
   done
@@ -2269,6 +2322,9 @@ native_vc_runtime() {
     fi
   done
 }
+
+stage_step="anti-cheat check"
+kernel_anticheat_notice
 
 if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   export WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"

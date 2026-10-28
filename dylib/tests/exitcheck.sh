@@ -7,7 +7,7 @@ SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 
 extract() { sed -n "/^$1() {\$/,/^}\$/p" "$SRC"; }
 functions=""
-for name in exit_meaning exit_signal exit_crash_lines exit_summary; do
+for name in kernel_anticheat_name exit_anticheat exit_meaning exit_signal exit_crash_lines exit_summary; do
 	body=$(extract "$name")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -80,6 +80,20 @@ is "the first three crash lines follow the summary, then the crash handler" \
 === exit cause: Unhandled exception: page fault on read access to 0x00000000 in 64-bit code (0x0000000140001234). ===
 === exit note: Wine started its crash handler, whose error dialog can sit behind the game ===" \
 	"$(summary 5 12 0 "$crash")"
+
+echo "== kernel anti-cheat =="
+cod="$work/cod.log"
+{
+	printf '01e0:err:module:import_dll Library ci.dll (which is needed by L"S:\\\\steamapps\\\\common\\\\Call of Duty HQ\\\\Randgrid.sys") not found\n'
+	printf '01e0:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\\\Registry\\\\Machine\\\\System\\\\CurrentControlSet\\\\Services\\\\atvi-randgrid_sr": c0000142\n'
+} > "$cod"
+is "Ricochet's driver is named first (Call of Duty)" \
+	"=== exit summary: exit status 0 after 13s, the game quit by itself within a minute without an error code, usually after its own error message ===
+=== exit cause: kernel anti-cheat Ricochet (Randgrid.sys) could not load its Windows driver, which Wine cannot run, so the game will not start ===
+=== exit cause: 01e0:err:module:import_dll Library ci.dll (which is needed by L\"S:\\\\steamapps\\\\common\\\\Call of Duty HQ\\\\Randgrid.sys\") not found ===" \
+	"$(summary 0 13 0 "$cod")"
+printf '0024:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\\\Driver\\\\winebth.sys": c00000e5\n' > "$work/winebth.log"
+is "Wine's own drivers are not anti-cheat" "" "$(exit_anticheat "$work/winebth.log")"
 
 odd="$work/odd.log"
 long=$(printf '%0400d' 0)
