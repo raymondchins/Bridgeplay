@@ -1115,21 +1115,41 @@ find_kernel_anticheat() {
     done
 }
 
-# Asks before a launch that cannot work. The launch goes ahead when the dialog cannot show.
+# Seconds the anti-cheat prompt waits. Steam shows the game as running until it is answered.
+kernel_anticheat_wait=90
+
+# Asks before a launch that cannot work and that could get the account banned. Only Launch
+# Anyway goes ahead: Don't Launch, no answer in time or a dialog that cannot show all exit
+# before Wine or the prefix is touched.
 kernel_anticheat_notice() {
   [ "$verb" = waitforexitandrun ] || return 0
   ka_found=$(find_kernel_anticheat "$STEAM_COMPAT_INSTALL_PATH")
   [ -n "$ka_found" ] || return 0
   echo "anticheat: found kernel anti-cheat $ka_found, whose driver Wine cannot load" >> "$log" 2>&1 || true
-  answer=$(osascript - "$ka_found" 8>&- 9>&- <<'APPLESCRIPT'
+  ka_status=0
+  answer=$(osascript - "$ka_found" "$kernel_anticheat_wait" 8>&- 9>&- 2>> "$log" <<'APPLESCRIPT'
 on run argv
-  set answer to display alert "This game's anti-cheat can't run" message ("It uses " & (item 1 of argv) & ", kernel anti-cheat that needs a Windows driver. Wine cannot load it, so the game will most likely quit at start. Playing online with it is at your own risk.") as critical buttons {"Launch Anyway", "Don't Launch"} default button "Don't Launch"
+  set answer to display alert "This game's anti-cheat can't run" message ("It uses " & (item 1 of argv) & ", kernel anti-cheat that needs a Windows driver. Wine cannot load it, so the game will most likely quit at start. Playing online with it is at your own risk.") as critical buttons {"Launch Anyway", "Don't Launch"} default button "Don't Launch" giving up after ((item 2 of argv) as integer)
+  if gave up of answer then return "gave up"
   return button returned of answer
 end run
 APPLESCRIPT
-  ) || answer=""
-  [ "$answer" = "Don't Launch" ] || return 0
-  echo "=== not launched: kernel anti-cheat, the player chose Don't Launch ===" >> "$log" 2>&1 || true
+  ) || ka_status=$?
+  case "$ka_status:$answer" in
+    "0:Launch Anyway")
+      echo "anticheat: the player chose Launch Anyway" >> "$log" 2>&1 || true
+      return 0
+      ;;
+    "0:Don't Launch") ka_why="the player chose Don't Launch" ;;
+    "0:gave up") ka_why="no answer within ${kernel_anticheat_wait}s" ;;
+    0:*) ka_why="the dialog returned no choice" ;;
+    *) ka_why="the dialog could not be shown (exit $ka_status)" ;;
+  esac
+  {
+    echo "=== not launched: kernel anti-cheat, $ka_why ==="
+    echo "=== exit summary: not launched, stopped before Wine started ==="
+    echo "=== exit cause: blocked: kernel anti-cheat $ka_found not confirmed, $ka_why ==="
+  } >> "$log" 2>&1 || true
   exit 0
 }
 
