@@ -79,7 +79,10 @@ the dylib into `Steam.app` and installs the signatures, fonts and helpers into
   don't amend or reset the author; a rewrite keeps the original author or adds a
   `Co-authored-by:` line and names the source commit or PR. New third-party code goes in
   [NOTICE](NOTICE). See CONTRIBUTING.md.
-- **PR descriptions** are written by the contributor in their own words. Don't generate one.
+- **PR descriptions:** an agent may draft one, filling every section of
+  `.github/pull_request_template.md` with the checks actually run and what wasn't tested.
+  The contributor reviews it before the PR opens. Replies to people in issues, PRs and
+  discussions are written by a human, not generated.
 - **Comments:** keep them short. Comment where the code is hard to follow, not where it is
   obvious.
 - **Run the checks your change touches** before opening a PR.
