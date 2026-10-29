@@ -187,6 +187,7 @@ final class SetupAssistant {
         isWorking = true
         defer { isWorking = false }
         rosettaNote = nil
+        message = nil
         if isPreview { await pretend(); rosettaInstalled = true; return }
         do {
             try await Task.detached(priority: .userInitiated) { try SetupChecks.installRosetta() }.value

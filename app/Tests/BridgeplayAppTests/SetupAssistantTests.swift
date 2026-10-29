@@ -67,6 +67,17 @@ struct SetupAssistantTests {
         #expect(SetupChecks.rosettaInstalled(runtime: runtime))
     }
 
+    @Test("Retrying Rosetta install clears the old error card, not just the cancellation note")
+    @MainActor
+    func installRosettaClearsStaleMessage() async {
+        let model = SetupAssistant(preview: .thisMac)
+        // Mimics the card left over from an earlier wrong-password attempt.
+        model.message = "Rosetta wasn't installed because macOS didn't accept the password. Use the name and password of an administrator of this Mac."
+        await model.installRosetta()
+        #expect(model.message == nil)
+        #expect(model.rosettaNote == nil)
+    }
+
     @Test("The assistant stays away once the user finished or dismissed it")
     @MainActor
     func finishedFlag() throws {
