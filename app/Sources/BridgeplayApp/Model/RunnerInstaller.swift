@@ -33,7 +33,7 @@ enum RunnerInstaller {
             defer { try? fm.removeItem(at: staging) }
             try copyPayload(from: install.crossOverRoot, to: staging)
             try verifyClone(build: build, root: staging.appending(path: "CrossOver"))
-            clearQuarantine(at: staging.appending(path: "CrossOver"))
+            try clearQuarantine(at: staging.appending(path: "CrossOver"))
             guard occupied else {
                 try fm.moveItem(at: staging, to: target)
                 return build
@@ -287,9 +287,10 @@ enum RunnerInstaller {
     // from pinned archives. A browser-downloaded CrossOver, or an engine archive that came in
     // a browser-downloaded installer zip (tar passes the flag on), leaves quarantine on files
     // Bridgeplay patches and signs ad hoc, and macOS then refuses to load them. -s keeps xattr
-    // on the links themselves, so a link in the tree can't clear a file outside it.
-    static func clearQuarantine(at tree: URL) {
-        _ = try? Shell.run("/usr/bin/xattr", ["-r", "-s", "-d", "com.apple.quarantine", tree.path(percentEncoded: false)])
+    // on the links themselves, so a link in the tree can't clear a file outside it. xattr exits
+    // 0 for files that never had the flag, so a failure here means some file still has it.
+    static func clearQuarantine(at tree: URL) throws {
+        _ = try Shell.check("/usr/bin/xattr", ["-r", "-s", "-d", "com.apple.quarantine", tree.path(percentEncoded: false)])
     }
 
     static func verifyClone(build: RunnerBuild, root: URL) throws {
