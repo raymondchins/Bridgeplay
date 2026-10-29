@@ -90,9 +90,13 @@ The Setup Assistant's graphics download carries Apple's Game Porting Toolkit red
 | | |
 |---|---|
 | Mac | Apple Silicon, M1 or later. Intel Macs are not supported. |
-| macOS | 26 or later |
+| macOS | 26 or later ([macOS version guide](https://bridgeplay.dev/guides/macos-version-requirements)) |
 | Steam | A Steam account. Windows games install from Steam as usual. |
 | Download | About 530 MB, most of it the engine the Setup Assistant fetches. Installing Rosetta 2 and Steam, and signing in to Steam, need internet. |
+
+## Guides and help
+
+The [guides on bridgeplay.dev](https://bridgeplay.dev/guides) cover installing Bridgeplay, troubleshooting, DirectX 12, DLSS and frame generation, and anti-cheat. The [FAQ](https://bridgeplay.dev/faq) answers common questions, and the [compatibility list](https://bridgeplay.dev/compatibility) shows which games other players got running.
 
 ## How it works
 
@@ -135,7 +139,7 @@ Online games with anti-cheat (Easy Anti-Cheat, BattlEye and others) often won't 
 
 Bridgeplay is a fork of [NotProton](https://github.com/NotProtonNot/NotProton) by [NotProtonNot](https://github.com/NotProtonNot) and [its contributors](https://github.com/NotProtonNot/NotProton/graphs/contributors) (GPL-3.0), by way of [Leon Seemann](https://github.com/leonseemann)'s NotProton-WineHQ. The Steam hooks, the Steam Play interface patches, the run script and the steamclient bridge all started as their work. Copyright and license details are in [NOTICE](NOTICE).
 
-- **Engine:** CodeWeavers' [WineCX](https://www.codeweavers.com/crossover) (LGPL-2.1-or-later), as rebased by [dappermint](https://github.com/dappermint/winecx) and packaged with [winecx-gptk](https://github.com/dappermint/winecx-gptk).
+- **Engine:** CodeWeavers' [WineCX](https://www.codeweavers.com/crossover) (LGPL-2.1-or-later), their branch of [Wine](https://www.winehq.org), as rebased by [dappermint](https://github.com/dappermint/winecx) and packaged with [winecx-gptk](https://github.com/dappermint/winecx-gptk).
 - **Graphics:** Apple's [Game Porting Toolkit](https://developer.apple.com/games/game-porting-toolkit/) (Apple's license), [DXMT](https://github.com/3Shain/dxmt) by 3Shain and [DXVK-macOS](https://github.com/Gcenx/DXVK-macOS) by Gcenx.
 - **Steam bridge:** `lsteamclient` and `steam.exe` come from Valve's [Proton](https://github.com/ValveSoftware/Proton).
 - **Controllers and Game Mode:** [sn0wst0rm](https://github.com/sn0wst0rm) wrote the DualSense Bluetooth bridge, Steam rumble forwarding and game-mode host that Bridgeplay 0.7.51 and earlier shipped. They are paused until NotProton merges the same work ([NotProton#90](https://github.com/NotProtonNot/NotProton/pull/90)).
