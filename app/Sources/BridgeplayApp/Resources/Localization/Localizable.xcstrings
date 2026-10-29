@@ -8530,6 +8530,22 @@
         }
       }
     },
+    "Rosetta is still needed to run Windows games. The password window was closed, so it wasn't installed. Press Install to try again." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosetta serve ancora per avviare i giochi Windows. La finestra della password è stata chiusa, quindi non è stato installato. Premi Installa per riprovare."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "运行 Windows 游戏仍需要 Rosetta。密码窗口已关闭，因此未能安装。请点击“安装”重试。"
+          }
+        }
+      }
+    },
     "Rosetta wasn't installed because macOS didn't accept the password. Use the name and password of an administrator of this Mac." : {
       "localizations" : {
         "it" : {
@@ -8542,22 +8558,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "由于 macOS 未接受该密码，Rosetta 未能安装。请使用这台 Mac 管理员的名称和密码。"
-          }
-        }
-      }
-    },
-    "Rosetta wasn't installed because the password window was closed. Press Install to try again." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rosetta non è stato installato perché la finestra della password è stata chiusa. Premi Installa per riprovare."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "由于密码窗口已关闭，Rosetta 未能安装。请点击“安装”重试。"
           }
         }
       }

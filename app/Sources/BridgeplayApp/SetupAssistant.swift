@@ -42,6 +42,8 @@ final class SetupAssistant {
 
     // Mac
     var rosettaInstalled = SetupChecks.rosettaInstalled()
+    // Set when the password window was closed; the Rosetta row says so in place of an error.
+    var rosettaNote: String?
     let appleSilicon = SetupChecks.isAppleSilicon
     let macOSSupported = SetupChecks.macOSVersion.majorVersion >= SetupChecks.minimumMacOS
     let freeBytes = SetupChecks.freeBytes()
@@ -184,12 +186,17 @@ final class SetupAssistant {
     func installRosetta() async {
         isWorking = true
         defer { isWorking = false }
+        rosettaNote = nil
         if isPreview { await pretend(); rosettaInstalled = true; return }
         do {
             try await Task.detached(priority: .userInitiated) { try SetupChecks.installRosetta() }.value
         } catch {
             AppLog.note("setup: Rosetta install failed: \(error.localizedDescription)")
-            message = SetupChecks.rosettaFailure(error)
+            if SetupChecks.rosettaCancelled(error) {
+                rosettaNote = SetupChecks.rosettaFailure(error)
+            } else {
+                message = SetupChecks.rosettaFailure(error)
+            }
         }
         rosettaInstalled = SetupChecks.rosettaInstalled()
     }

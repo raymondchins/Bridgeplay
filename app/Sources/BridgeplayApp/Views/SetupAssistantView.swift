@@ -178,7 +178,7 @@ struct SetupAssistantView: View {
                       tone: model.hasSpace ? .ok : .bad))
             SetupHairline()
             checked(3, StatusRow(title: String(localized: "Rosetta 2"),
-                      value: model.rosettaInstalled ? String(localized: "Installed.") : String(localized: "Apple's translator for Windows games. Asks for your Mac password."),
+                      value: model.rosettaInstalled ? String(localized: "Installed.") : model.rosettaNote ?? String(localized: "Apple's translator for Windows games. Asks for your Mac password."),
                       tone: model.rosettaInstalled ? .ok : .warning,
                       action: model.rosettaInstalled ? nil : StatusAction(
                         label: String(localized: "Install"), isProminent: true, isEnabled: !model.isWorking
