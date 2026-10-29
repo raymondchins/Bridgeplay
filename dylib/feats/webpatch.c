@@ -447,7 +447,10 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     /* A toggle that is on unless set to "0" (upstream 1.2.0: AVX2, FEX x87 precision). */ \
     "X=(k,l)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
     "checked:\"0\"!==ev(k),onChange:v=>s([[k,v?\"\":\"0\"]])},k)," \
-    "bv=g(\"CX_GRAPHICS_BACKEND\"),b=fex&&\"d3dmetal\"===bv?\"\":bv," \
+    /* The run script takes a valid BRIDGEPLAY_BACKEND over CX_GRAPHICS_BACKEND, so the menu \
+       shows that one, and a pick from the menu drops it. */ \
+    "pb=g(\"BRIDGEPLAY_BACKEND\"),bv=/^(dxmt|dxvk|wined3d|d3dmetal)$/.test(pb)?pb:g(\"CX_GRAPHICS_BACKEND\")," \
+    "b=fex&&\"d3dmetal\"===bv?\"\":bv," \
     "dm=!fex&&(\"\"===b||\"d3dmetal\"===b)," \
     "dx=\"\"===b||\"dxmt\"===b," \
     "sw=\"1\"===g(\"DXMT_METALFX_SPATIAL_SWAPCHAIN\")," \
@@ -485,7 +488,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "typeof MSCXPrefixRow==\"function\"&&(0," RT ".jsx)(\"div\",{className:\"MSCXRow\",ref:e=>e&&MSCXPrefixRow(e,t.unAppID)},\"npstate\")," \
     "(0," RT ".jsxs)(" BARREL ".XY,{label:npL(\"Graphics\",\"图形\",\"Grafica\"),children:[" \
     "(0," RT ".jsx)(" BARREL ".m,{rgOptions:B,selectedOption:b," \
-    "onChange:v=>s([[\"CX_GRAPHICS_BACKEND\",v.data]]" \
+    "onChange:v=>s([[\"CX_GRAPHICS_BACKEND\",v.data],[\"BRIDGEPLAY_BACKEND\",\"\"]]" \
     ".concat(\"\"===v.data||\"d3dmetal\"===v.data?[]:[[\"D3DM_ENABLE_METALFX\",\"\"]])" \
     ".concat(\"\"===v.data||\"dxmt\"===v.data?[]:" \
     "[[\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"\"],[\"DXMT_CONFIG\",fx(\"\")]])" \

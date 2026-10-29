@@ -69,6 +69,24 @@ for (const form of Object.keys(FORMS)) {
     (x.props.rgOptions || []).some(o => o.data === 'dxmt')).props.onChange({ data: 'dxvk' });
   const opts = written[written.length - 1].opts;
   t.ok(opts.trim().endsWith('%command%'), `%command% stays last (${opts})`);
+  // The run script takes a valid BRIDGEPLAY_BACKEND (NOTPROTON_BACKEND winning) over
+  // CX_GRAPHICS_BACKEND, so the menu shows what runs, and a pick has to drop it.
+  const menu = o => walk(P({ details: details(o + ' %command%') })).find(x => x.type === 'Dropdown' &&
+    (x.props.rgOptions || []).some(d => d.data === 'dxmt'));
+  for (const [o, want] of [['BRIDGEPLAY_BACKEND=dxvk', 'dxvk'],
+                           ['CX_GRAPHICS_BACKEND=dxmt BRIDGEPLAY_BACKEND=wined3d', 'wined3d'],
+                           ['NOTPROTON_BACKEND=dxmt BRIDGEPLAY_BACKEND=dxvk', 'dxmt'],
+                           ['CX_GRAPHICS_BACKEND=dxmt BRIDGEPLAY_BACKEND=bogus', 'dxmt']]) {
+    const got = menu(o).props.selectedOption;
+    t.ok(got === want, `${o} shows ${want} (${got})`);
+  }
+  for (const to of ['dxmt', '']) {
+    written.length = 0;
+    menu('BRIDGEPLAY_BACKEND=dxvk NOTPROTON_BACKEND=dxvk').props.onChange({ data: to });
+    const w = written.length ? written[written.length - 1].opts : '';
+    t.ok(!/(BRIDGEPLAY|NOTPROTON)_BACKEND=/.test(w) && menu(w.replace(/ ?%command%.*/, '')).props.selectedOption === to,
+         `picking ${to || 'automatic'} drops BRIDGEPLAY_BACKEND (${w})`);
+  }
   failed += t.failed;
 }
 console.log(failed ? `\n${failed} failure(s)` : '\nno stale arguments, nothing lost');
