@@ -286,9 +286,10 @@ enum RunnerInstaller {
     // Only for a tree already checked against its pins: a CrossOver clone, or an engine built
     // from pinned archives. A browser-downloaded CrossOver, or an engine archive that came in
     // a browser-downloaded installer zip (tar passes the flag on), leaves quarantine on files
-    // Bridgeplay patches and signs ad hoc, and macOS then refuses to load them.
+    // Bridgeplay patches and signs ad hoc, and macOS then refuses to load them. -s keeps xattr
+    // on the links themselves, so a link in the tree can't clear a file outside it.
     static func clearQuarantine(at tree: URL) {
-        _ = try? Shell.run("/usr/bin/xattr", ["-r", "-d", "com.apple.quarantine", tree.path(percentEncoded: false)])
+        _ = try? Shell.run("/usr/bin/xattr", ["-r", "-s", "-d", "com.apple.quarantine", tree.path(percentEncoded: false)])
     }
 
     static func verifyClone(build: RunnerBuild, root: URL) throws {
