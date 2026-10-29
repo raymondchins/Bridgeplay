@@ -81,10 +81,16 @@ private final class DelayedToolScan: @unchecked Sendable {
     private let lock = NSLock()
     private var calls = 0
     private let tools: [InstalledTool]
-    let entered = DispatchSemaphore(value: 0)
+    // Finishes once the first scan has started. Awaited, not timed: a busy test run can take
+    // longer than any fixed timeout to get the first load this far.
+    let entered: AsyncStream<Void>
+    private let enteredContinuation: AsyncStream<Void>.Continuation
     let resume = DispatchSemaphore(value: 0)
 
-    init(_ tools: [InstalledTool]) { self.tools = tools }
+    init(_ tools: [InstalledTool]) {
+        self.tools = tools
+        (entered, enteredContinuation) = AsyncStream.makeStream()
+    }
 
     func list() -> [InstalledTool] {
         let first = lock.withLock {
@@ -92,7 +98,8 @@ private final class DelayedToolScan: @unchecked Sendable {
             return calls == 1
         }
         if first {
-            entered.signal()
+            enteredContinuation.yield()
+            enteredContinuation.finish()
             resume.wait()
             return []
         }
@@ -236,7 +243,7 @@ struct PrefixesModelTests {
         #expect(!model.isLoading)
     }
 
-    @Test("A superseded tool scan cannot replace the newer prefix records")
+    @Test("A superseded tool scan cannot replace the newer prefix records", .timeLimit(.minutes(1)))
     func supersededToolScanPublishesNothing() async throws {
         let (oldDir, oldLibrary) = try makeLibrary(appIDs: ["1574480"])
         defer { try? FileManager.default.removeItem(at: oldDir) }
@@ -251,11 +258,8 @@ struct PrefixesModelTests {
         defer { scan.resume.signal() }
         let model = PrefixesModel(libraries: { libraries.current }, installedTools: { scan.list() })
         let first = Task { await model.load() }
-        let entered = await withCheckedContinuation { continuation in
-            DispatchQueue.global().async {
-                continuation.resume(returning: scan.entered.wait(timeout: .now() + 5) == .success)
-            }
-        }
+        var entered = false
+        for await _ in scan.entered { entered = true }
         try #require(entered)
 
         libraries.current = [newLibrary]
