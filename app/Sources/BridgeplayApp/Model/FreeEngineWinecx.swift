@@ -535,7 +535,7 @@ enum FreeEngineWinecx {
         ]
         let plist = try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
         try plist.write(to: shaped.appending(path: "Contents/Info.plist"))
-        RunnerInstaller.clearQuarantine(at: shaped)
+        try RunnerInstaller.clearQuarantine(at: shaped)
 
         let install = CrossOverSource.inspect(bundle: shaped)
         guard case .supported(let build) = install.support, build.id == release.build else {

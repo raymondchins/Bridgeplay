@@ -48,7 +48,7 @@ struct RunnerInstallerTests {
         try Shell.check("/usr/bin/xattr", ["-w", "com.apple.quarantine", "0083;6a2b3c4d;Safari;", file.path(percentEncoded: false)])
         try Shell.check("/usr/bin/xattr", ["-w", "com.bridgeplay.keep", "1", file.path(percentEncoded: false)])
 
-        RunnerInstaller.clearQuarantine(at: runners)
+        try RunnerInstaller.clearQuarantine(at: runners)
 
         let left = try Shell.run("/usr/bin/xattr", [file.path(percentEncoded: false)]).stdout
         #expect(!left.contains("com.apple.quarantine"))
@@ -73,12 +73,30 @@ struct RunnerInstallerTests {
         try FileManager.default.createSymbolicLink(at: tree.appending(path: "dir"), withDestinationURL: outside)
         try FileManager.default.createSymbolicLink(at: tree.appending(path: "file.dylib"), withDestinationURL: lonelyFile)
 
-        RunnerInstaller.clearQuarantine(at: tree)
+        try RunnerInstaller.clearQuarantine(at: tree)
 
         for target in [outside, outsideFile, lonelyFile] {
             let left = try Shell.run("/usr/bin/xattr", [target.path(percentEncoded: false)]).stdout
             #expect(left.contains("com.apple.quarantine"), "\(target.lastPathComponent) lost its quarantine")
         }
+    }
+
+    @Test("A file whose quarantine can't be cleared fails the step")
+    func clearQuarantineReportsFailure() throws {
+        let runners = try makeRunners()
+        let locked = runners.appending(path: "lib")
+        defer {
+            _ = try? Shell.run("/bin/chmod", ["-R", "u+w", runners.path(percentEncoded: false)])
+            try? FileManager.default.removeItem(at: runners)
+        }
+        let file = locked.appending(path: "winemetal.so")
+        try FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)
+        try Data("so".utf8).write(to: file)
+        try Shell.check("/usr/bin/xattr", ["-w", "com.apple.quarantine", "0083;6a2b3c4d;Safari;", file.path(percentEncoded: false)])
+        try Shell.check("/bin/chmod", ["444", file.path(percentEncoded: false)])
+        try Shell.check("/bin/chmod", ["555", locked.path(percentEncoded: false)])
+
+        #expect(throws: CommandFailure.self) { try RunnerInstaller.clearQuarantine(at: runners) }
     }
 
     // A CrossOver bundle holding only the files the clone path hashes, with the build describing
