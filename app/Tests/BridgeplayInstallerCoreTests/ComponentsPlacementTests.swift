@@ -127,10 +127,11 @@ struct ComponentsPlacementTests {
         // Shared by the workers below, so it must not touch the unlocked call counters.
         placement.resetSetupAssistant = {}
         try placement.place()
+        nonisolated(unsafe) let shared = placement
         nonisolated(unsafe) var failures: [Error] = []
         let lock = NSLock()
         DispatchQueue.concurrentPerform(iterations: 4) { _ in
-            do { try placement.place() } catch { lock.withLock { failures.append(error) } }
+            do { try shared.place() } catch { lock.withLock { failures.append(error) } }
         }
         #expect(failures.isEmpty, "\(failures)")
         #expect(text(f.support.appending(path: "gptk/external/libd3dshared.dylib")) == "new gptk")
