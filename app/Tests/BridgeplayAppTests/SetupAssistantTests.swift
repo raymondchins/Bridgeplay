@@ -326,6 +326,38 @@ struct SetupAssistantTests {
 @Suite("Setup checks")
 struct SetupChecksTests {
 
+    @Test("Steam reaches Applications whole or not at all")
+    func steamCopyIsStaged() throws {
+        let fm = FileManager.default
+        let dir = try scratchDirectory("setup-steam")
+        defer { try? fm.removeItem(at: dir) }
+        let applications = dir.appending(path: "Applications")
+        try fm.createDirectory(at: applications, withIntermediateDirectories: true)
+        let app = applications.appending(path: "Steam.app")
+        let image = dir.appending(path: "image")
+        try fm.createDirectory(at: image.appending(path: "Steam.app/Contents"), withIntermediateDirectories: true)
+        try Data("valve".utf8).write(to: image.appending(path: "Steam.app/Contents/Info.plist"))
+
+        struct DiskFull: Error {}
+        #expect(throws: DiskFull.self) {
+            try SetupChecks.copySteam(from: image, to: app, verify: { _ in }) { _, target in
+                try fm.createDirectory(at: target, withIntermediateDirectories: true)
+                throw DiskFull()
+            }
+        }
+        #expect(try fm.contentsOfDirectory(atPath: applications.path(percentEncoded: false)).isEmpty)
+
+        try SetupChecks.copySteam(from: image, to: app, verify: { _ in })
+        let plist = app.appending(path: "Contents/Info.plist")
+        #expect(try Data(contentsOf: plist) == Data("valve".utf8))
+        #expect(try fm.contentsOfDirectory(atPath: applications.path(percentEncoded: false)) == ["Steam.app"])
+
+        try Data("other".utf8).write(to: plist)
+        try SetupChecks.copySteam(from: image, to: app, verify: { _ in })
+        #expect(try Data(contentsOf: plist) == Data("other".utf8))
+        #expect(try fm.contentsOfDirectory(atPath: applications.path(percentEncoded: false)) == ["Steam.app"])
+    }
+
     @Test("Downloads is not read when a Game Porting Toolkit is already installed")
     func downloadsScanGated() {
         var scans = 0
