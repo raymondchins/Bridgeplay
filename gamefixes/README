@@ -2,10 +2,10 @@ Per-game defaults shipped with Bridgeplay.
 
 One file per game, named <steam appid>.conf (for example 1245620.conf), in KEY=VALUE form.
 `make app-payload` bundles every *.conf here into the app, and the installer copies them
-to ~/Library/Application Support/bridgeplay/gamefixes-default/, replacing that directory's
-contents each time. Overrides belong in ~/Library/Application Support/bridgeplay/gamefixes/,
-which Bridgeplay never touches.
+to ~/Library/Application Support/bridgeplay/gamefixes-default/, replacing the files there
+each time. Overrides belong in ~/Library/Application Support/bridgeplay/gamefixes/, which the
+app's Game Defaults page edits. The format is in docs/GAMEFIXES.md.
 
 Example 1245620.conf:
   # Elden Ring
-  BACKEND=dxmt
+  BACKEND=wined3d
