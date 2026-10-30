@@ -24,12 +24,13 @@ enum ErrorReport {
         NSWorkspace.shared.activateFileViewerSelecting([AppLog.file])
     }
 
-    static func url(_ failure: String, in place: String) -> URL? {
-        GitHubIssue.bugReport(
-            title: "\(place): \(GitHubIssue.summary(failure))",
-            what: "\(place) showed:\n\n\(GameReport.redacted(failure))",
+    static func url(_ failure: String, in place: String, log: URL = AppLog.file) -> URL? {
+        let clean = GameReport.redacted(failure)
+        return GitHubIssue.bugReport(
+            title: "\(place): \(GitHubIssue.summary(clean))",
+            what: "\(place) showed:\n\n\(clean)",
             version: ProductVersion.display,
             mac: [SetupChecks.chipName, SetupChecks.macOSDisplay].filter { !$0.isEmpty }.joined(separator: ", "),
-            logs: GameReport.redacted(GitHubIssue.tail(of: AppLog.file)))
+            logs: GameReport.redacted(GitHubIssue.tail(of: log)))
     }
 }
