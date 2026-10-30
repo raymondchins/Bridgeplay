@@ -10,7 +10,9 @@ every game, and the last two are named after the game's Steam app id:
 
 A later file wins per key. A variable you set in the game's Steam launch options
 (`NAME=value %command%`) wins over all four files. Bridgeplay replaces the files in
-`gamefixes-default/` on every install and never writes to your `<appid>.conf`.
+`gamefixes-default/` on every install. It changes your `<appid>.conf` only if you click
+Use Defaults for that game on the Game Defaults page, which saves a copy in `backups/` and
+removes the file's lines for the settings that page shows.
 
 The Game Defaults page in the app edits file 2. It rewrites only the lines for the settings
 it shows and keeps every other line and comment. When you pick what files below it already
