@@ -447,6 +447,19 @@
     "tested_on": "M5 Max · macOS 27"
   },
   {
+    "appid": 1778820,
+    "name": "TEKKEN 8",
+    "api": "D3D12",
+    "anticheat": "none known",
+    "status": "gold",
+    "backend": "d3dmetal",
+    "engine": null,
+    "notes": "Maintainer-tested by Ray on 30 Oct 2026.",
+    "last_tested": "2026-10-30",
+    "fork_commit": null,
+    "tested_on": "M5 Max"
+  },
+  {
     "appid": 489830,
     "name": "The Elder Scrolls V: Skyrim Special Edition",
     "api": "D3D11",
