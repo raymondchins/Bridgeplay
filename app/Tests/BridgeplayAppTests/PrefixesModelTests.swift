@@ -406,7 +406,7 @@ struct PrefixesModelTests {
 
         await model.backUp([first])
         #expect(model.outcome == "Backed up the prefix for \(first.title).")
-        #expect(model.failure == nil)
+        #expect(model.report?.message == nil)
 
         await model.backUp(targets)
         #expect(model.outcome == "Backed up 2 prefixes.")
@@ -436,7 +436,7 @@ struct PrefixesModelTests {
         #expect(model.outcome == "Rebuilt 3 prefixes. Each original is kept beside the game's "
             + "prefix. Check that your saves are present in the games, then delete the backups "
             + "to save space.")
-        #expect(model.failure == nil)
+        #expect(model.report?.message == nil)
         #expect(model.busy.isEmpty)
         #expect(!model.isBusy)
     }
@@ -460,7 +460,7 @@ struct PrefixesModelTests {
         #expect(model.outcome == "Rebuilt 2 prefixes. Each original is kept beside the game's "
             + "prefix. Check that your saves are present in the games, then delete the backups "
             + "to save space.")
-        #expect(model.failure == "1649240 refused")
+        #expect(model.report?.message == "1649240 refused")
         #expect(model.busy.isEmpty)
     }
 
@@ -506,7 +506,7 @@ struct PrefixesModelTests {
         #expect(model.outcome == "Rebuilt the prefix for \(target.title). The original is at "
             + "\(backup). Check that your save is present in the game, then delete the backup "
             + "to save space.")
-        #expect(model.failure == nil)
+        #expect(model.report?.message == nil)
     }
 
     @Test("A rebuild that parked nothing says nothing about a backup")
@@ -555,7 +555,7 @@ struct PrefixesModelTests {
         await model.deleteBackups(model.backups)
 
         #expect(model.outcome == "Deleted 4 backups across 2 prefixes.")
-        #expect(model.failure == nil)
+        #expect(model.report?.message == nil)
         #expect(model.backups.isEmpty)
         #expect(model.prefixes.allSatisfy { PrefixStore.backups(of: $0).isEmpty })
     }
@@ -607,7 +607,7 @@ struct PrefixesModelTests {
 
         #expect(model.backups.isEmpty)
         #expect(model.outcome == nil)
-        #expect(model.failure == nil)
+        #expect(model.report?.message == nil)
     }
 
     private func park(_ stamps: [String: [String]], in library: SteamLibrary) throws {
@@ -699,7 +699,7 @@ struct PrefixesModelTests {
         await model.delete(model.selectedPrefixes)
 
         #expect(model.prefixes.map(\.appID) == ["253750"])
-        #expect(model.failure == nil)
+        #expect(model.report?.message == nil)
         #expect(
                 model.outcome
                     == "Deleted 2 prefixes. Steam will make a new prefix if a game is launched again.")
@@ -751,7 +751,7 @@ struct PrefixesModelTests {
         // there and still listed.
         #expect(model.prefixes.map(\.appID) == ["253750"])
         #expect(model.outcome?.contains("Deleted the prefix for App 1574480.") == true)
-        #expect(model.failure?.contains("is running. Quit the game first.") == true)
+        #expect(model.report?.message.contains("is running. Quit the game first.") == true)
         #expect(model.busy.isEmpty)
     }
 
@@ -781,7 +781,7 @@ struct PrefixesModelTests {
 
         #expect(model.prefixes.count == 1)
         #expect(model.outcome == "untouched")
-        #expect(model.failure == nil)
+        #expect(model.report?.message == nil)
         #expect(!model.isLoading)
     }
 

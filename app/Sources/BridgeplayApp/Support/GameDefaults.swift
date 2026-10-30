@@ -203,10 +203,6 @@ enum GameDefaults {
         return lines.isEmpty ? "" : lines.joined(separator: "\n") + "\n"
     }
 
-    static func setting(_ setting: Setting, to on: Bool, in text: String, shipped: String = "") -> String {
-        Self.setting(setting, to: on ? "1" : "0", in: text, shipped: shipped)
-    }
-
     // Every setting back to Bridgeplay's defaults; lines for other keys stay.
     static func resettingAll(in text: String) -> String {
         Setting.allCases.reduce(text) { Self.setting($1, to: nil, in: $0) }

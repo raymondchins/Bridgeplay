@@ -373,10 +373,6 @@ enum NtdllPatcher {
         byBuild[build.id] ?? []
     }
 
-    static func patch(for arch: WineArch, in build: RunnerBuild) -> NtdllPatch? {
-        patches(for: build).first { $0.arch == arch }
-    }
-
     // Patch
     static func apply(_ patch: NtdllPatch, to image: Data, payload: Data) throws -> Data {
         var bytes = [UInt8](image)

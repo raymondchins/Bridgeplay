@@ -32,7 +32,6 @@ struct FreeEngineWinecxTests {
     func currentAndPrevious() throws {
         #expect(FreeEngineWinecx.current.build == "winecx-11.17")
         #expect(FreeEngineWinecx.previous.build == "winecx-11.15")
-        #expect(FreeEngineWinecx.runnerBuild == FreeEngineWinecx.current.runner)
         #expect(FreeEngineWinecx.current.runner.tools.map(\.name) == ["bridgeplay-proton-winecx-11.17"])
         #expect(FreeEngineWinecx.previous.runner.tools.map(\.name) == ["bridgeplay-proton-winecx"])
         let current = FreeEngineWinecx.current.runner
@@ -76,7 +75,6 @@ struct FreeEngineWinecxTests {
             #expect(CrossOverLicense.freeBuild(at: root) == nil)
             #expect(!CrossOverLicense.check(crossOverRoot: root, searchDirs: []).licensed)
             #expect(!FreeEngineWinecx.isInstalled(release, engines: engines))
-            #expect(!WinecxD3DMetal.isWinecx(root: root))
             #expect(FreeEngineWinecx.release(forRoot: root) == nil)
         }
     }

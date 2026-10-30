@@ -25,10 +25,6 @@ enum RunnerPatcher {
         return present.isEmpty ? ["x86_64-unix"] : present
     }
 
-    static func unixArch(in root: URL) -> String {
-        unixArches(in: root)[0]
-    }
-
     struct Outcome: Sendable {
         var ntdll: [WineArch] = []
         var builtins: [String] = []

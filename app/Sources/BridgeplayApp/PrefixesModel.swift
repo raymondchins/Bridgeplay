@@ -36,8 +36,6 @@ final class PrefixesModel {
     var outcome: String?
     private(set) var report: FailureReport?
 
-    var failure: String? { report?.message }
-
     var selection = Set<WinePrefix.ID>()
 
     var pendingConfirmation: Confirmation?
