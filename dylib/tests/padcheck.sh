@@ -167,6 +167,8 @@ $g2,Own Bluetooth,a:b0,b:b1,platform:Mac OS X," "$(grep -v '^#' "$out")"
 	is "no CR left" "" "$(tr -d -c '\r' < "$out")"
 	is "file readable by others" "-rw-r--r--" "$(stat -f %Sp "$out")"
 	is "nothing else left in the output directory" "merged.txt" "$(ls -A "$work/out")"
+else
+	echo "==> padcheck: $UPDATE not present, the update script section is skipped"
 fi
 
 if [ "$fails" -eq 0 ]; then
