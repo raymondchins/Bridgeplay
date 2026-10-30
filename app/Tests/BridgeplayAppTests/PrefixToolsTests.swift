@@ -760,6 +760,25 @@ struct PrefixToolsTests {
         #expect(text("AppData/LocalLow/other/save.txt") == "theirs")
     }
 
+    @Test("A finished rebuild clears the run script's switch record, a failed one keeps it")
+    func rebuildAnswersTheSwitchRecord() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let prefix = try usedPrefix(in: dir, home: home)
+        let record = prefix.root.appending(path: "notproton-switch")
+        try Data("1\n2\n0\n".utf8).write(to: record)
+
+        let failing = try fakeRunner(in: dir, home: home, exit: 1)
+        #expect(throws: (any Error).self) { try PrefixTools.recreate(prefix, runner: failing) }
+        #expect(fm.fileExists(atPath: record.path(percentEncoded: false)))
+
+        try PrefixTools.recreate(prefix, runner: try fakeRunner(in: dir, home: home))
+        #expect(!fm.fileExists(atPath: record.path(percentEncoded: false)))
+    }
+
     // A volume that ignores case sees one file under both names.
     @Test("Copies whose names differ only by case both survive a rebuild")
     func rebuildKeepsCopiesThatDifferOnlyByCase() throws {

@@ -122,6 +122,8 @@ extension PrefixTools {
             throw error
         }
         if let record { try writeBuildRecord(record, for: prefix) }
+        // A rebuild answers the crash the run script was tracking.
+        try? fm.removeItem(at: prefix.root.appending(path: "notproton-switch"))
         guard parked else { return nil }
         guard !discard else {
             try? fm.removeItem(at: previous)
