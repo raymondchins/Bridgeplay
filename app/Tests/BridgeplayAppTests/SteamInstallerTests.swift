@@ -104,6 +104,7 @@ struct SteamInstallerTests {
         stopped: Bool = false,
         running: Bool = false,
         recordBuild: Bool = true,
+        refusedResets: [String] = [],
         verifyRunner: (RunnerBuild, URL) throws -> Void = { _, _ in }
     ) throws -> InstallOutcome {
         let outcome = try SteamInstaller.run(
@@ -126,7 +127,7 @@ struct SteamInstallerTests {
             patchRunner: { _, _, _ in },
             stopClient: { _, onStopping in if stopped { onStopping() }; return stopped },
             register: { calls.register($0) },
-            resetInputAccess: { calls.resetInputAccess(); return [] }
+            resetInputAccess: { calls.resetInputAccess(); return refusedResets }
         )
         if recordBuild {
             try SteamInstaller.finish(outcome, deployedVersion: fixture.deployedVersion, isCurrent: { _ in true })
@@ -148,6 +149,7 @@ struct SteamInstallerTests {
         #expect(outcome.backedUpPlist)
         #expect(!outcome.stoppedClient)
         #expect(calls.inputAccessResets == 1)
+        #expect(outcome.failedInputResets == [])
 
         let files = FileManager.default
         #expect(files.fileExists(atPath: fixture.deployedDylib.path(percentEncoded: false)))
@@ -169,6 +171,18 @@ struct SteamInstallerTests {
                 == fixture.deployedDylib.path(percentEncoded: false)
         )
         #expect(calls.registrations == [fixture.app], "the bundle was not re-registered")
+    }
+
+    @Test("Only an install that reset input access reports on it")
+    func reportsInputResetsOnlyWhenTheyRan() async throws {
+        let work = try scratchDirectory("install-input-resets")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let calls = Calls()
+
+        #expect(try install(fixture, calls: calls, refusedResets: ["ListenEvent"]).failedInputResets == ["ListenEvent"])
+        #expect(try install(fixture, calls: calls).failedInputResets == nil)
+        #expect(calls.inputAccessResets == 1)
     }
 
     @Test("Setting the insert keeps the rest of Valve's environment")

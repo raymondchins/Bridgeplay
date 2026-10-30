@@ -39,8 +39,9 @@ struct InstallOutcome: Sendable {
     let signatureDatabases: Int
     let backedUpPlist: Bool
     let bridgeStaged: Int
-    // Input access services macOS refused to reset after Steam's signature changed.
-    var failedInputResets: [String] = []
+    // Input access services macOS refused to reset after Steam's signature changed. nil when
+    // the signature didn't change, so no reset ran.
+    var failedInputResets: [String]?
 }
 
 enum SteamInstaller {
@@ -193,7 +194,7 @@ enum SteamInstaller {
         try removeStaleFonts(in: fonts, keeping: payload.fonts + CJKFonts.files.keys + CJKFonts.licences)
 
         var backedUp = false
-        var failedInputResets: [String] = []
+        var failedInputResets: [String]?
         if patching {
             report(.settingInsert)
             backedUp = try backUpPlist(plist, into: backups)

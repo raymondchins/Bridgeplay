@@ -641,6 +641,7 @@ final class SystemStatus {
                 try SteamInstaller.run(holdingInstallationLock: true, stopClient: stopClient,
                                        report: { progress($0.label) })
             }.value
+            failedInputResets = result.failedInputResets
 
             var parts = [String(localized: "Bridgeplay successfully installed.")]
             if result.stoppedClient { parts.append(Self.restartHint) }
@@ -676,7 +677,6 @@ final class SystemStatus {
             try await Task.detached(priority: .userInitiated) {
                 try SteamInstaller.finish(result)
             }.value
-            failedInputResets = result.failedInputResets
 
             return parts.joined(separator: " ")
         }
@@ -684,7 +684,7 @@ final class SystemStatus {
             UserDefaults.standard.removeObject(forKey: SteamPatchKeeper.pausedKey)
         }
         // Only an install that changed Steam's signature tried a reset, so only it decides.
-        if let failedInputResets, failure == nil, !failedInputResets.isEmpty || !controllerResetFailures.isEmpty {
+        if let failedInputResets {
             controllerResetFailures = failedInputResets
         }
     }
