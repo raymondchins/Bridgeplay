@@ -221,11 +221,7 @@ struct PrefixStoreTests {
             at: profile.appending(path: "Documents"), withDestinationURL: outside)
 
         let prefix = try #require(PrefixStore.all(libraries: [library]).first)
-        let usage = PrefixStore.usage(of: prefix)
-
-        // The one real file under the profile, and neither file behind the link.
-        #expect(usage.profileFiles == 1)
-        #expect(usage.bytes > 0)
+        #expect(PrefixStore.usage(of: prefix).bytes > 0)
     }
 
     @Test("A linked folder outside the prefix adds nothing to its size")
@@ -425,7 +421,6 @@ struct PrefixStoreTests {
         let clock = PrefixStore.backupClock()
         #expect(details[0].taken == clock.date(from: "20260101-120000"))
         #expect(details[1].taken == clock.date(from: "20260102-133000"))
-        #expect(PrefixStore.usage(of: prefix).profileFiles == 1)
     }
 
     @Test("A parked prefix with no readable stamp still lists, without a date")

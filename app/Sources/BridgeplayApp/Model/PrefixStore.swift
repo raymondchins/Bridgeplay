@@ -47,7 +47,6 @@ struct WinePrefix: Sendable, Hashable, Identifiable {
 
 struct PrefixUsage: Sendable {
     let bytes: Int64
-    let profileFiles: Int
 }
 
 struct PrefixBackup: Sendable, Hashable, Identifiable {
@@ -293,15 +292,7 @@ enum PrefixStore {
     }
 
     static func usage(of prefix: WinePrefix) -> PrefixUsage {
-        let bytes = directoryBytes(prefix.pfx)
-
-        var files = 0
-        let users = prefix.pfx.appending(path: "drive_c/users").path(percentEncoded: false)
-        if let out = try? Shell.check("/usr/bin/find", [users, "-type", "f"]) {
-            files = out.split(separator: "\n").filter { !$0.isEmpty }.count
-        }
-
-        return PrefixUsage(bytes: bytes, profileFiles: files)
+        PrefixUsage(bytes: directoryBytes(prefix.pfx))
     }
 
     enum SizeMetric {
