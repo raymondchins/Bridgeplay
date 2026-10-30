@@ -346,9 +346,12 @@ private final class Carry {
         attempt(source) { try fm.copyItem(at: source, to: parent.appending(path: name)) }
     }
 
+    // Folded as the Mac default volume folds names, so two names for one file are one identity.
+    // On a volume that keeps them apart, a false match only parks a copy.
     private func identity(of landing: URL) -> String {
         landing.deletingLastPathComponent().resolvingSymlinksInPath()
             .appending(path: landing.lastPathComponent).path(percentEncoded: false)
+            .precomposedStringWithCanonicalMapping.lowercased()
     }
 
     private func isBrokenLink(_ url: URL) -> Bool {

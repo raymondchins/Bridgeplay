@@ -760,6 +760,42 @@ struct PrefixToolsTests {
         #expect(text("AppData/LocalLow/other/save.txt") == "theirs")
     }
 
+    // A volume that ignores case sees one file under both names.
+    @Test("Copies whose names differ only by case both survive a rebuild")
+    func rebuildKeepsCopiesThatDifferOnlyByCase() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let runner = try fakeRunner(in: dir, home: home)
+        let prefix = try usedPrefix(in: dir, home: home)
+        let users = prefix.pfx.appending(path: "drive_c/users")
+
+        try Data().write(to: dir.appending(path: "Probe"))
+        guard fm.fileExists(atPath: dir.appending(path: "probe").path(percentEncoded: false)) else { return }
+
+        for (path, text) in [("crossover/AppData/Roaming/Save1.sav", "crossover"),
+                             ("steamuser/AppData/Roaming/save1.sav", "steamuser"),
+                             ("crossover/AppData/Roaming/Slot/Save2.sav", "crossover"),
+                             ("steamuser/AppData/Roaming/slot/save2.sav", "steamuser")] {
+            let file = users.appending(path: path)
+            try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: file)
+        }
+
+        try PrefixTools.recreate(prefix, runner: runner, keepBackup: false)
+
+        let roaming = users.appending(path: "steamuser/AppData/Roaming")
+        func text(_ path: String) -> String? {
+            try? String(contentsOf: roaming.appending(path: path), encoding: .utf8)
+        }
+        #expect(text("Save1.sav") == "crossover")
+        #expect(text("save1.sav BACKUP") == "steamuser")
+        #expect(text("Slot/Save2.sav") == "crossover")
+        #expect(text("slot BACKUP/save2.sav") == "steamuser")
+    }
+
     // The merge keeps whichever copy the walk reaches first, never the newer date: a cloud
     // download is stamped when it arrives. crossover is the profile the game wrote under.
     @Test("Which of two profiles' copies survives does not turn on its date")
