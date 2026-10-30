@@ -2,10 +2,10 @@ import Foundation
 
 // Brings everything this Bridgeplay ships up to date in one go: the patch inside Steam, then
 // every engine that is unpacked but no longer matches this build's pins (a release that
-// rebuilt a Wine file or moved to a newer runtime). It uses the Status page's own buttons, so
-// it refuses what they refuse, and it does nothing while Steam, a game or a Wine tool runs;
-// the Status rows keep offering the update until then. An engine the user never set up is
-// left alone.
+// rebuilt a Wine file). It uses the Status page's own buttons, so it refuses what they
+// refuse, and it does nothing while Steam, a game or a Wine tool runs; the Status rows keep
+// offering the update until then. An engine the user never set up is left alone, and so is
+// a newer runtime: it has a new build id, so it reads as missing.
 extension SystemStatus {
 
     enum UpdatePlan: Equatable, Sendable {
