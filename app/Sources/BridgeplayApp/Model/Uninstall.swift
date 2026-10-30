@@ -19,8 +19,6 @@ enum UninstallPhase: Sendable {
 }
 
 struct UninstallOutcome: Sendable {
-    let stoppedClient: Bool
-    let detached: Bool
     let steamInstalled: Bool
     let restoredValveSignature: Bool
     let removed: [String]
@@ -111,9 +109,7 @@ enum Uninstall {
         let tracked = try modifications.paths()
         let targets = Set((tracked + [app]).map { $0.standardizedFileURL.path }).sorted()
             .map { URL(filePath: $0, directoryHint: .notDirectory) }
-        var stopped = false
         var checkedClient = false
-        var detached = false
         var steamInstalled = false
         var restored = true
         var missing: [URL] = []
@@ -135,10 +131,10 @@ enum Uninstall {
                 case .modified: break
                 }
                 try modifications.mark(target)
-                stopped = try stop(target) { report(.stoppingClient) } || stopped
+                _ = try stop(target) { report(.stoppingClient) }
                 checkedClient = true
                 report(.detaching)
-                detached = try detach(from: target, innerPlist: innerPlist, updateBlocks: updateBlocks) || detached
+                _ = try detach(from: target, innerPlist: innerPlist, updateBlocks: updateBlocks)
                 steamInstalled = true
                 do {
                     if let repair {
@@ -170,7 +166,7 @@ enum Uninstall {
             let bundleLock = try DeploymentContent.acquireSteamLock(for: app, holding: lock)
             defer { bundleLock.release() }
             do {
-                stopped = try stop(app) { report(.stoppingClient) }
+                _ = try stop(app) { report(.stoppingClient) }
             } catch is SteamBundle.OpenInAnotherAccount {
                 // Steam.app is left as it is from here on, and another account's Steam does
                 // not use this account's files.
@@ -202,8 +198,6 @@ enum Uninstall {
         }
         report(.finished)
         return UninstallOutcome(
-            stoppedClient: stopped,
-            detached: detached,
             steamInstalled: steamInstalled,
             restoredValveSignature: restored,
             removed: removed,

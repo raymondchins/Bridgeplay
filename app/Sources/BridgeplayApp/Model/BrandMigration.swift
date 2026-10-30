@@ -60,7 +60,6 @@ struct BrandMigration: Sendable {
         var logsRenamed = 0
         var logsLeft = 0
         var filesRewritten = 0
-        var backups: URL?
         var notes: [String] = []
 
         var description: String {
@@ -108,10 +107,8 @@ struct BrandMigration: Sendable {
         try writeMarker(done)
 
         if !done.contains(.backup) {
-            summary.backups = try backUpSteamConfig()
+            try backUpSteamConfig()
             try record(.backup)
-        } else {
-            summary.backups = support.appending(path: Self.backupFolder)
         }
         if !done.contains(.move) {
             try moveDirectories(&summary)
@@ -185,7 +182,7 @@ struct BrandMigration: Sendable {
 
     // Copies go into whichever support directory exists now, so they move along in step 2.
     // A copy already there is the older one and is kept.
-    private func backUpSteamConfig() throws -> URL {
+    private func backUpSteamConfig() throws {
         let files = FileManager.default
         let backups = markerHome.appending(path: Self.backupFolder)
         let root = steamUserData.path(percentEncoded: false)
@@ -198,7 +195,6 @@ struct BrandMigration: Sendable {
             try files.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             try files.copyItem(at: source, to: destination)
         }
-        return support.appending(path: Self.backupFolder)
     }
 
     // MARK: Step 2, moving directories

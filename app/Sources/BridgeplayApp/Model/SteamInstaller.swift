@@ -38,7 +38,6 @@ struct InstallOutcome: Sendable {
     let build: DeploymentContent.Build
     let signatureDatabases: Int
     let backedUpPlist: Bool
-    let bridgeStaged: Int
     // Input access services macOS refused to reset after Steam's signature changed. nil when
     // the signature didn't change, so no reset ran.
     var failedInputResets: [String]?
@@ -167,7 +166,7 @@ enum SteamInstaller {
                                    file: support.appending(path: "tools"), compatTools: compatTools)
 
         report(.stagingBridge)
-        let bridgeResult = try BridgePayload.stage(located: bridgeLocated, bridge: bridge)
+        _ = try BridgePayload.stage(located: bridgeLocated, bridge: bridge)
         for build in builds {
             try patchRunner(build, SupportPaths.clonedRoot(forBuild: build.id, runners: runners), bridge)
         }
@@ -258,7 +257,6 @@ enum SteamInstaller {
             build: build,
             signatureDatabases: payload.signatures.count,
             backedUpPlist: backedUp,
-            bridgeStaged: bridgeResult.staged.count,
             failedInputResets: failedInputResets
         )
     }

@@ -27,11 +27,11 @@ struct SteamRepairTests {
 
         #expect(staged.lastPathComponent == "Steam.app")
         #expect(throws: Never.self) { try SteamRepair.verifyValveSignature(staged) }
-        #expect(SteamRepair.version(of: staged) == "6.1")
 
         // The bundle Valve ships declares LC_ALL and no insert. Everything repair does to
         // the inner plist is measured against this, so it is asserted rather than assumed.
         let plist = try #require(SteamBundle.readInfoPlist(at: staged.appending(path: "Contents/Info.plist")))
+        #expect(plist["CFBundleVersion"] as? String == "6.1")
         let environment = try #require(plist[SteamBundle.environmentKey] as? [String: Any])
         #expect(environment[SteamBundle.insertKey] == nil)
         #expect(environment["LC_ALL"] as? String == "en_US.UTF-8")
@@ -290,8 +290,9 @@ struct SteamRepairTests {
         try SteamRepair.replace(destination, with: staged)
 
         #expect(throws: Never.self) { try SteamRepair.verifyValveSignature(destination) }
-        #expect(SteamRepair.version(of: destination) == "6.1")
-        #expect(SteamBundle.currentInsert(at: destination.appending(path: "Contents/Info.plist")) == nil)
+        let plist = destination.appending(path: "Contents/Info.plist")
+        #expect(SteamBundle.readInfoPlist(at: plist)?["CFBundleVersion"] as? String == "6.1")
+        #expect(SteamBundle.currentInsert(at: plist) == nil)
         #expect(
             !FileManager.default.fileExists(
                 atPath: destination.appending(path: "Contents/MacOS/notproton.dylib").path(percentEncoded: false)

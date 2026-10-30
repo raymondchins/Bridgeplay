@@ -30,10 +30,6 @@ enum RepairPhase: Sendable {
 
 struct RepairOutcome: Sendable {
     let stoppedClient: Bool
-    let bundleVersion: String?
-    let clearedInnerInsert: Bool
-    let removedUpdateBlocks: [String]
-    let removedStaleBackup: Bool
 }
 
 enum SteamRepair {
@@ -89,24 +85,18 @@ enum SteamRepair {
         _ = try modifications.retireIfClean(app)
 
         report(.clearingInsert)
-        let clearedInner = try clearInsert(at: innerPlist)
+        _ = try clearInsert(at: innerPlist)
 
         report(.removingUpdateBlock)
-        let removed = try UpdateBlock.remove(from: updateBlocks)
+        _ = try UpdateBlock.remove(from: updateBlocks)
 
         report(.registering)
         register(app)
 
-        let removedBackup = try removeStaleBackup(from: backups)
+        _ = try removeStaleBackup(from: backups)
 
         report(.finished)
-        return RepairOutcome(
-            stoppedClient: stopped,
-            bundleVersion: version(of: app),
-            clearedInnerInsert: clearedInner,
-            removedUpdateBlocks: removed,
-            removedStaleBackup: removedBackup
-        )
+        return RepairOutcome(stoppedClient: stopped)
     }
 
     static func stage(
@@ -239,11 +229,5 @@ enum SteamRepair {
             removed = true
         }
         return removed
-    }
-
-    static func version(of app: URL) -> String? {
-        guard let dict = SteamBundle.readInfoPlist(at: app.appending(path: "Contents/Info.plist"))
-        else { return nil }
-        return dict["CFBundleVersion"] as? String
     }
 }
