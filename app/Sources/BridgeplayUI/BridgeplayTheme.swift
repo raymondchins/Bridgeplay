@@ -24,10 +24,6 @@ public enum BP {
     public static let iridescentDiagonal = LinearGradient(colors: [violet, blue, pink], startPoint: .topLeading, endPoint: .bottomTrailing)
 
     public static let radius: CGFloat = 12
-    public static let controlRadius: CGFloat = 8
-
-    // cubic-bezier(0.16, 1, 0.3, 1), the site's --ease-out.
-    public static let easeOut = Animation.timingCurve(0.16, 1, 0.3, 1, duration: 0.5)
 
     public static func sans(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         registerFonts()

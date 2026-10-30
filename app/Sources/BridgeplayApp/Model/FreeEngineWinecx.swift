@@ -95,7 +95,6 @@ enum FreeEngineWinecx {
 
     // The runner build of the current release.
     static var runnerBuild: RunnerBuild { current.runner }
-    static var ntdllPatches: [NtdllPatch] { current.ntdllPatches }
     static var runnerBuilds: [RunnerBuild] { releases.map(\.runner) }
 
     static func release(build id: String) -> WinecxRelease? {
