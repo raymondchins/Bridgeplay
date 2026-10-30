@@ -707,6 +707,33 @@ struct PrefixesModelTests {
         #expect(!model.isLoading)
     }
 
+    @Test("A game in two libraries is two prefixes, and deleting one keeps the other")
+    func sameGameInTwoLibraries() async throws {
+        let (firstDir, first) = try makeLibrary(appIDs: ["1574480"])
+        let (secondDir, second) = try makeLibrary(appIDs: ["1574480"])
+        defer {
+            try? FileManager.default.removeItem(at: firstDir)
+            try? FileManager.default.removeItem(at: secondDir)
+        }
+        let saves = [first, second].map {
+            $0.compatdata.appending(path: "1574480/pfx/drive_c/users/crossover/save.dat")
+        }
+        for save in saves { try write("save", to: save) }
+        let model = PrefixesModel(libraries: { [first, second] })
+        await model.load()
+        #expect(model.prefixes.count == 2)
+
+        let stale = try #require(model.prefixes.first { $0.library == second })
+        model.selection = [stale.id]
+        #expect(model.selectedPrefixes == [stale])
+
+        await model.delete(model.selectedPrefixes)
+
+        #expect(FileManager.default.fileExists(atPath: saves[0].path(percentEncoded: false)))
+        #expect(!FileManager.default.fileExists(atPath: saves[1].path(percentEncoded: false)))
+        #expect(model.prefixes.map(\.library) == [first])
+    }
+
     @Test("Deleting one prefix says which one")
     func deleteOfOneNamesIt() async throws {
         let (dir, library) = try makeLibrary(appIDs: ["1574480"])
