@@ -51,7 +51,6 @@ final class SetupAssistant {
     // Graphics
     var gptk: WinecxD3DMetal.Payload?
     var gptkImages: [URL]
-    var skippedGraphics = false
     // "Installing the Game Porting Toolkit" once the components download is done.
     var gptkProgress: String?
     @ObservationIgnored private var componentsRate = DownloadRate()

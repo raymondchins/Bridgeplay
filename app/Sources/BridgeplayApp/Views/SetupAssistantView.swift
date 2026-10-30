@@ -483,7 +483,7 @@ struct SetupAssistantView: View {
                     .keyboardShortcut(.defaultAction)
             case .graphics:
                 if model.gptk == nil {
-                    Button("Skip") { go(forward: true) { model.skippedGraphics = true; model.advance() } }
+                    Button("Skip") { go(forward: true) { model.advance() } }
                         .buttonStyle(.pillSecondaryLarge)
                         .disabled(model.isWorking)
                 }
