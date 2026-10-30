@@ -336,6 +336,30 @@ static void test_left_alone(void) {
     uint8_t junk[300];
     for (size_t i = 0; i < sizeof junk; i++) junk[i] = (uint8_t)(i * 73 + 11);
     np_profile_free(np_profile_create_from_descriptor(junk, sizeof junk, 0x1111, 0x2222, 1, "x"));
+    // Collections nested past the parser's 32 levels, then an axis: it stays in the pad.
+    uint8_t deep[100] = {0x05, 0x01, 0x09, 0x05};
+    size_t m = 4;
+    for (int i = 0; i < 40; i++) { deep[m++] = 0xa1; deep[m++] = 0x01; }
+    static const uint8_t deep_axis[] = {0x09, 0x30, 0x15, 0x00, 0x25, 0x7f, 0x75, 0x08, 0x95, 0x01, 0x81, 0x02};
+    memcpy(deep + m, deep_axis, sizeof deep_axis);
+    m += sizeof deep_axis;
+    p = np_profile_create_from_descriptor(deep, m, 0x1111, 0x2222, 1, "Deep");
+    CHECK(p);
+    int axes, buttons, hats;
+    np_profile_counts(p, &axes, &buttons, &hats);
+    CHECK(axes == 1 && buttons == 0 && hats == 0);
+    np_profile_free(p);
+    // A hat whose Logical Maximum has no room above it.
+    static const uint8_t wide_hat[] = {
+        0x05, 0x01, 0x09, 0x05, 0xa1, 0x01,
+        0x09, 0x39, 0x15, 0x00, 0x27, 0xff, 0xff, 0xff, 0x7f, 0x75, 0x20, 0x95, 0x01, 0x81, 0x42,
+        0xc0,
+    };
+    p = np_profile_create_from_descriptor(wide_hat, sizeof wide_hat, 0x1111, 0x2222, 1, "Wide");
+    CHECK(p);
+    np_profile_counts(p, &axes, &buttons, &hats);
+    CHECK(axes == 0 && buttons == 0 && hats == 1);
+    np_profile_free(p);
     printf("ok  left alone: Sony, Microsoft, Nintendo, \"Xbox\", non-gamepads\n");
 }
 

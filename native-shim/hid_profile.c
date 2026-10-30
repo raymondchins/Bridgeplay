@@ -261,7 +261,7 @@ static void parse_descriptor(const uint8_t *d, size_t len, parse_result *o) {
                 break;
             }
         } else if (type == 0) {  // Main
-            uint8_t in_pad = depth > 0 && pad[depth - 1];
+            uint8_t in_pad = depth > 0 && pad[(depth < MAX_DEPTH ? depth : MAX_DEPTH) - 1];
             switch (tag) {
             case 8:  // Input
                 parse_input(o, &g, &l, u, in_pad, (uint32_t)bits[g.id & 0xff]);
@@ -672,7 +672,8 @@ np_profile *np_profile_create_from_descriptor(const uint8_t *descriptor, size_t 
         const hid_element *e = &p->el[p->axes[i]];
         p->raw[p->axes[i]] = (int32_t)(((int64_t)e->lmin + e->lmax + 1) / 2);
     }
-    for (int i = 0; i < p->nhats; i++) p->raw[p->hats[i]] = p->el[p->hats[i]].lmax + 1;
+    for (int i = 0; i < p->nhats; i++)
+        p->raw[p->hats[i]] = (int32_t)((uint32_t)p->el[p->hats[i]].lmax + 1u);
 
     uint8_t guid[16];
     make_guid(guid, vendor, product, version, name);
