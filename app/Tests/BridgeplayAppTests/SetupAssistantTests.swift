@@ -12,6 +12,16 @@ struct SetupAssistantTests {
         return url
     }
 
+    @Test("A disk image dropped during other work is ignored")
+    @MainActor
+    func importWaitsForOtherWork() async {
+        let model = SetupAssistant(preview: .fresh)
+        model.isWorking = true
+        await model.importGPTK(URL(filePath: "/nonexistent/Game_Porting_Toolkit.dmg"))
+        #expect(model.isWorking)
+        #expect(model.message == nil)
+    }
+
     @Test("Steam counts as signed in once loginusers.vdf names an account")
     func signIn() throws {
         let dir = try folder()

@@ -205,6 +205,8 @@ final class SetupAssistant {
     // MARK: Graphics
 
     func importGPTK(_ image: URL) async {
+        // A drop can arrive mid-import, and a second import deletes the first one's staging folder.
+        guard !isWorking else { return }
         // The toolkit is copied into the support folder, which the 3.0 move has to find untouched.
         if let refusal = MigrationLaunch.shared.refusal {
             message = refusal

@@ -225,7 +225,7 @@ struct SetupAssistantView: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first(where: { $0.pathExtension.lowercased() == "dmg" }) else { return false }
+            guard !model.isWorking, let url = urls.first(where: { $0.pathExtension.lowercased() == "dmg" }) else { return false }
             Task { await model.importGPTK(url) }
             return true
         }
