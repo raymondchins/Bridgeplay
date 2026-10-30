@@ -760,6 +760,11 @@ struct PrefixToolsTests {
         #expect(text("AppData/LocalLow/other/save.txt") == "theirs")
     }
 
+    @Test("The run script looks for the server in the folder the app does")
+    func runScriptAgreesOnTheServerFolder() throws {
+        #expect(try Self.compatSource().contains(#"/tmp/.wine-$(id -u)/server-$(printf '%x-%x'"#))
+    }
+
     @Test("A finished rebuild clears the run script's switch record, a failed one keeps it")
     func rebuildAnswersTheSwitchRecord() throws {
         let fm = FileManager.default

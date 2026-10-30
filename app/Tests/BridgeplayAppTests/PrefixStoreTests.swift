@@ -318,6 +318,9 @@ struct PrefixStoreTests {
             try PrefixTools.recreate(prefix, runner: dir.appending(path: "runner"))
         }
         #expect(rebuild.detail.contains("is running"))
+        let backup = try #require(throws: StepFailure.self) { try PrefixTools.backUp(prefix) }
+        #expect(backup.detail.contains("is running"))
+        #expect(PrefixStore.backups(of: prefix).isEmpty)
         #expect(FileManager.default.fileExists(atPath: prefix.pfx.path))
         try #require(flock(fd, LOCK_UN) == 0)
         #expect(!PrefixStore.isInUse(prefix, root: root))
@@ -389,6 +392,23 @@ struct PrefixStoreTests {
         #expect(
             try String(contentsOf: prefix.pfx.appending(path: "user.reg"), encoding: .utf8)
                 == "save")
+    }
+
+    @Test("A backup that can't finish leaves no partial copy to trust")
+    func failedBackUpLeavesNothing() throws {
+        let dir = try scratchDirectory("pfx")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let prefix = try prefix(in: dir)
+        try write("copied first", to: prefix.pfx.appending(path: "a.sav"))
+        let unreadable = prefix.pfx.appending(path: "z.sav")
+        try write("save", to: unreadable)
+        let path = unreadable.path(percentEncoded: false)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: path) }
+
+        #expect(throws: (any Error).self) { try PrefixTools.backUp(prefix) }
+
+        #expect(PrefixStore.backups(of: prefix).isEmpty)
     }
 
     @Test("Backing up refuses a game that has never made a prefix")
@@ -622,6 +642,47 @@ struct PrefixStoreTests {
         defer { try? handle.close() }
 
         #expect(PrefixStore.isInUse(prefix, root: root))
+    }
+
+    // Delete, Rebuild and Back Up go through claim, and the launch lock is gone once a game is
+    // up, so during play this is the only thing refusing them.
+    @Test("A claim is refused while the server runs or can't be checked, and given when idle")
+    func claimAnswersToTheServer() throws {
+        let (prefix, root, dir) = try prefixWithServerDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        #expect(PrefixStore.claim(
+            prefix, root: root, lsof: dir.appending(path: "absent").path(percentEncoded: false)) == nil)
+        #expect(PrefixStore.claim(
+            prefix, root: root, lsof: try stubLsof(in: dir, body: "echo trouble >&2; exit 1")) == nil)
+        #expect(PrefixStore.claim(
+            prefix, root: root, lsof: try stubLsof(in: dir, body: "sleep 3 & exit 1"),
+            drainTimeout: .milliseconds(200)) == nil)
+
+        let claim = try #require(PrefixStore.claim(prefix, root: root))
+        claim.release()
+
+        let held = try #require(PrefixStore.serverDirectory(of: prefix, root: root))
+            .appending(path: "socket")
+        try Data("s".utf8).write(to: held)
+        let handle = try FileHandle(forReadingFrom: held)
+        defer { try? handle.close() }
+        #expect(PrefixStore.claim(prefix, root: root) == nil)
+    }
+
+    // A wrong name here reads as "not running" for every game. Wine names the folder after
+    // the prefix's device and inode, in hex.
+    @Test("The server folder is the one Wine makes for the prefix")
+    func serverDirectoryIsWines() throws {
+        let dir = try scratchDirectory("pfx")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let prefix = try prefix(in: dir)
+        var info = stat()
+        try #require(stat(prefix.pfx.path(percentEncoded: false), &info) == 0)
+        let name = String(format: "server-%llx-%llx", UInt64(UInt32(bitPattern: info.st_dev)), UInt64(info.st_ino))
+
+        #expect(PrefixStore.serverDirectory(of: prefix)?.lastPathComponent == name)
+        #expect(PrefixStore.serverRoot.path(percentEncoded: false) == "/tmp/.wine-\(getuid())")
     }
 
     // Every one of these used to answer that the prefix was free, which is the answer that
