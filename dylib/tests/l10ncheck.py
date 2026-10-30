@@ -12,8 +12,6 @@ source_root = catalog.resolve().parents[2]
 
 datas = []
 for path in sorted(intermediates.rglob("*.stringsdata")):
-    if "BridgeplayAppTests" in path.parts:
-        continue
     source = pathlib.Path(json.loads(path.read_text())["source"])
     if source.exists() and source.resolve().is_relative_to(source_root):
         datas.append(str(path))
