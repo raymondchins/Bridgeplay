@@ -545,10 +545,11 @@ launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_RETINA=0 BRIDGEPLAY
 is "NOTPROTON_ wins when both spellings are set" "0" "$(got NOTPROTON_RETINA)"
 new_case
 full_engine
-user_conf 'BRIDGEPLAY_RETINA=1' 'BRIDGEPLAY_FRAMEGEN=2' 'BRIDGEPLAY_BACKEND=dxvk'
+user_conf 'BRIDGEPLAY_RETINA=1' 'BRIDGEPLAY_FRAMEGEN=2' 'BRIDGEPLAY_BACKEND=dxvk' 'BRIDGEPLAY_HIDE_WINE_EXPORTS=1'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a conf key takes the BRIDGEPLAY_ name" "1" "$(got NOTPROTON_RETINA)"
 is "and so does FRAMEGEN" "2" "$(got NOTPROTON_FRAMEGEN)"
+is "and so does HIDE_WINE_EXPORTS" "1" "$(got NOTPROTON_HIDE_WINE_EXPORTS)"
 has "BACKEND does not, it names no variable" "rejected BRIDGEPLAY_BACKEND: not on the allow-list" "$case_dir/log"
 
 echo "== FRAMEGEN"
