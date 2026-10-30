@@ -592,7 +592,6 @@ static void apply_generic(np_profile *p) {
         if (rx >= 0 && ry >= 0) { lt = rx; rt = ry; }
     } else if (rx >= 0 && ry >= 0) {
         ADD("rightx:a%d,righty:a%d,", rx, ry);
-        if (z >= 0 && rz >= 0) { lt = z; rt = rz; }
     }
     if (accel >= 0 && brake >= 0) { lt = brake; rt = accel; }
     if (lt >= 0) ADD("lefttrigger:a%d,righttrigger:a%d,", lt, rt);
