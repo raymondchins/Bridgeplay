@@ -157,6 +157,8 @@ final class SystemStatus {
         var id: Self { self }
     }
 
+    // A second ask replaces the first rather than queueing behind it, so the dialog on screen
+    // is always the one that will run if it is confirmed.
     var pendingConfirmation: Confirmation?
     var generation = 0
 
