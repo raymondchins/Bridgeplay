@@ -220,7 +220,7 @@ l10ncheck:
 
 # runcheck owns compat_run.sh, whose warnings wait for a change that can move
 # the embedded __text baseline
-SCRIPTS := $(shell git ls-files '*.sh' 2>/dev/null | grep -v '^dylib/feats/compat_run\.sh$$')
+SCRIPTS := $(shell git ls-files '*.sh' '*.command' 2>/dev/null | grep -v '^dylib/feats/compat_run\.sh$$')
 
 scriptcheck:
 	@if ! command -v shellcheck >/dev/null 2>&1; then \
