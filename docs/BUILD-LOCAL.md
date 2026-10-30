@@ -10,11 +10,12 @@ targets, in the same order, as `.github/workflows/app.yml`.
   active developer dir and you don't need `xcode-select`. To use a different Xcode, set
   `DEVELOPER_DIR` yourself.
 - Homebrew: `brew install cmake mingw-w64 bison flex fontforge gpatch` (bison must be
-  Homebrew's, at `/opt/homebrew/opt/bison/bin`), and the font tools:
-  `python3 -m pip install fonttools brotli`. `shellcheck` and `node` are optional; without
+  Homebrew's, at `/opt/homebrew/opt/bison/bin`). `shellcheck` and `node` are optional; without
   them the lint and panel checks skip.
-- Network on the first run: Dobby, Wine 11.15 (gitlab.winehq.org), the Proton tarball
-  and Sparkle.
+- Font tools: the script installs afdko and fonttools into `scratch/fontvenv`, at the versions
+  in `FONT_TOOLS` in app.yml. A direct `make fonts` needs those tools on `PATH`.
+- Network on the first run: Dobby, Wine 11.15 (gitlab.winehq.org), the Proton tarball,
+  the font tools and Sparkle.
 
 ## Commands
 
@@ -108,10 +109,10 @@ instead of about 15m. When the bridge sources differ, the Wine source is cloned 
 bridge is built in the worktree without the 8m30s clone: 3m21s, 4m05s for the whole build.
 `app/.build` is not seeded: SwiftPM records absolute paths, and a cold app build is 35s.
 
-## Local deviation from CI
+## Sparkle link for the Swift tests
 
 On Xcode 27 beta 27A5218g, SwiftPM leaves `app/.build/out/Products/Debug/PackageFrameworks`
 empty. The Swift test bundle only looks for `Sparkle.framework` there, so it fails to
-load before any test runs. With `--checks`, the script builds the tests and then links
-`PackageFrameworks/Sparkle.framework` to `../Sparkle.framework`. That link is a
-build-product fix-up; no source changes. After it, all 475 tests in 56 suites pass.
+load before any test runs. `make app-tests`, which CI and `--checks` both run, builds the
+tests and then links `PackageFrameworks/Sparkle.framework` to `../Sparkle.framework`. That
+link is a build-product fix-up; no source changes.

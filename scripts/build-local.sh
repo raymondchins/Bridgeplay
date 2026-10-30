@@ -4,7 +4,7 @@
 #   scripts/build-local.sh            build build/Bridgeplay.app and build/Bridgeplay.zip
 #   scripts/build-local.sh --checks   the same, then the CI check targets and Swift tests
 #
-# Phases run in CI order: dobby, all, overlay-shim, iconmaker+appinfo, bridge,
+# Phases run in CI order: dobby, all, overlay-shim, iconmaker+appinfo, bridge, fonts,
 # app-payload, app. Everything CI restores from actions/cache stays on disk here
 # instead, so a re-run only rebuilds what changed:
 #   vendor/dobby, build/dobby        Dobby source and build (rebuilt when the pinned commit moves)

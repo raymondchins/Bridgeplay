@@ -17,11 +17,13 @@ Homebrew packages:
 
 ```sh
 brew install cmake mingw-w64 bison flex fontforge gpatch shellcheck node
-python3 -m pip install fonttools brotli
 ```
 
 `/opt/homebrew` is assumed (Homebrew's bison and the Wine tree setup look there). Without
 `shellcheck` or `node` the lint and panel checks skip.
+
+`scripts/build-local.sh` installs the font tools (afdko and fonttools, pinned by `FONT_TOOLS` in
+`.github/workflows/app.yml`) into `scratch/fontvenv`. A direct `make fonts` needs them on `PATH`.
 
 ## Build
 
