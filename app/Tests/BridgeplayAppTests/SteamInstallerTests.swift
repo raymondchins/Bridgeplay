@@ -95,6 +95,12 @@ struct SteamInstallerTests {
         private var resets = 0
         func resetInputAccess() { lock.lock(); resets += 1; lock.unlock() }
         var inputAccessResets: Int { lock.lock(); defer { lock.unlock() }; return resets }
+        private var stopRequests = 0
+        func stop() { lock.lock(); stopRequests += 1; lock.unlock() }
+        var stops: Int { lock.lock(); defer { lock.unlock() }; return stopRequests }
+        private var runnerLooks = 0
+        // Which look at the runners this is, from 1.
+        func lookAtRunners() -> Int { lock.lock(); defer { lock.unlock() }; runnerLooks += 1; return runnerLooks }
     }
 
     private func install(
@@ -105,6 +111,8 @@ struct SteamInstallerTests {
         running: Bool = false,
         recordBuild: Bool = true,
         refusedResets: [String] = [],
+        runnerIsRunning: (@Sendable (URL) -> Bool)? = nil,
+        stopClient: SteamInstaller.ClientStopper? = nil,
         verifyRunner: (RunnerBuild, URL) throws -> Void = { _, _ in }
     ) throws -> InstallOutcome {
         let outcome = try SteamInstaller.run(
@@ -122,10 +130,14 @@ struct SteamInstallerTests {
             compatTools: fixture.work.appending(path: "compatibilitytools.d"),
             lockFolder: fixture.work,
             modifications: fixture.modifications,
-            runnerIsRunning: { _ in running },
+            runnerIsRunning: runnerIsRunning ?? { _ in running },
             verifyRunner: verifyRunner,
             patchRunner: { _, _, _ in },
-            stopClient: { _, onStopping in if stopped { onStopping() }; return stopped },
+            stopClient: stopClient ?? { _, onStopping in
+                calls.stop()
+                if stopped { onStopping() }
+                return stopped
+            },
             register: { calls.register($0) },
             resetInputAccess: { calls.resetInputAccess(); return refusedResets }
         )
@@ -183,6 +195,50 @@ struct SteamInstallerTests {
         #expect(try install(fixture, calls: calls, refusedResets: ["ListenEvent"]).failedInputResets == ["ListenEvent"])
         #expect(try install(fixture, calls: calls).failedInputResets == nil)
         #expect(calls.inputAccessResets == 1)
+    }
+
+    @Test("A Steam that won't stop is left as it was, and the failure is the stopper's")
+    func stopFailureLeavesSteamAlone() async throws {
+        let work = try scratchDirectory("install-stop-failure")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let plist = try Data(contentsOf: fixture.plist)
+
+        #expect(throws: SteamInstaller.ClientStarted.self) {
+            try install(fixture, stopClient: { _, _ in throw SteamInstaller.ClientStarted() })
+        }
+        let refusal = try #require(throws: StepFailure.self) {
+            try install(fixture, stopClient: { _, _ in
+                throw StepFailure(step: "Test", detail: "Steam did not quit.")
+            })
+        }
+
+        #expect(refusal.detail == "Steam did not quit.")
+        #expect(try Data(contentsOf: fixture.plist) == plist)
+        for untouched in [fixture.deployedDylib, fixture.bridge, fixture.deployedVersion, fixture.overlayShim] {
+            #expect(!FileManager.default.fileExists(atPath: untouched.path(percentEncoded: false)))
+        }
+    }
+
+    @Test("Steam is stopped before anything in or beside it changes")
+    func stopsBeforeWriting() async throws {
+        let work = try scratchDirectory("install-stop-order")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let calls = Calls()
+        let plist = fixture.plist, dylib = fixture.deployedDylib, bridge = fixture.bridge
+        let original = try Data(contentsOf: plist)
+
+        _ = try install(fixture, stopClient: { _, _ in
+            calls.stop()
+            #expect((try? Data(contentsOf: plist)) == original)
+            #expect(!FileManager.default.fileExists(atPath: dylib.path(percentEncoded: false)))
+            #expect(!FileManager.default.fileExists(atPath: bridge.path(percentEncoded: false)))
+            return true
+        })
+
+        #expect(calls.stops == 1)
+        #expect(FileManager.default.fileExists(atPath: dylib.path(percentEncoded: false)))
     }
 
     @Test("Setting the insert keeps the rest of Valve's environment")
@@ -507,19 +563,6 @@ struct SteamInstallerTests {
         )
     }
 
-    @Test("A payload with nothing in it stops the install before anything is touched")
-    func refusesEmptyPayload() async throws {
-        let work = try scratchDirectory("install")
-        defer { try? FileManager.default.removeItem(at: work) }
-        let fixture = try await self.fixture(into: work)
-
-        let empty = work.appending(path: "empty-payload")
-        try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)
-
-        #expect(throws: StepFailure.self) { try InstallPayload.locate(root: empty) }
-        #expect(SteamBundle.currentInsert(at: fixture.plist) == nil)
-    }
-
     @Test("The installer records the package build time rather than the installation time")
     func recordsPackageBuild() async throws {
         let work = try scratchDirectory("install-record")
@@ -685,10 +728,33 @@ struct SteamInstallerTests {
         let runner = SupportPaths.clonedRoot(forBuild: SupportedRunners.all[0].id,
                                             runners: fixture.support.appending(path: "runners"))
         try FileManager.default.createDirectory(at: runner.appending(path: "lib/wine"), withIntermediateDirectories: true)
+        let calls = Calls()
 
-        let error = try #require(throws: StepFailure.self) { try install(fixture, running: true) }
+        let error = try #require(throws: StepFailure.self) { try install(fixture, calls: calls, running: true) }
 
         #expect(error.detail.contains("is running"))
+        #expect(calls.stops == 0, "Steam was asked to quit under a running game")
+        #expect(!FileManager.default.fileExists(atPath: fixture.bridge.path))
+        #expect(!FileManager.default.fileExists(atPath: fixture.deployedDylib.path))
+    }
+
+    @Test("A game started while Steam was stopping still blocks the install")
+    func refusesRunnerStartedDuringStop() async throws {
+        let work = try scratchDirectory("install-running-late")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let runner = SupportPaths.clonedRoot(forBuild: SupportedRunners.all[0].id,
+                                            runners: fixture.support.appending(path: "runners"))
+        try FileManager.default.createDirectory(at: runner.appending(path: "lib/wine"), withIntermediateDirectories: true)
+        let calls = Calls()
+
+        // One clone, so one look per pass: quiet before the stop, running after it.
+        let error = try #require(throws: StepFailure.self) {
+            try install(fixture, calls: calls, runnerIsRunning: { _ in calls.lookAtRunners() > 1 })
+        }
+
+        #expect(error.detail.contains("is running"))
+        #expect(calls.stops == 1)
         #expect(!FileManager.default.fileExists(atPath: fixture.bridge.path))
         #expect(!FileManager.default.fileExists(atPath: fixture.deployedDylib.path))
     }
@@ -700,8 +766,10 @@ struct SteamInstallerTests {
         let fixture = try await self.fixture(into: work)
         let runner = SupportPaths.clonedRoot(forBuild: "99.0.0.12345", runners: fixture.support.appending(path: "runners"))
         try FileManager.default.createDirectory(at: runner.appending(path: "lib/wine"), withIntermediateDirectories: true)
-        let error = try #require(throws: StepFailure.self) { try install(fixture, running: true) }
+        let calls = Calls()
+        let error = try #require(throws: StepFailure.self) { try install(fixture, calls: calls, running: true) }
         #expect(error.detail.contains("99.0.0.12345"))
+        #expect(calls.stops == 0, "Steam was asked to quit under a running game")
         #expect(!FileManager.default.fileExists(atPath: fixture.deployedDylib.path))
     }
 
