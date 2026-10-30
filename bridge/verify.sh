@@ -7,8 +7,8 @@
 # It also looks for old copies of the bridge next to it, and for bridge files left
 # in Steam Play prefixes.
 #
-# The built files come from 'make bridge', the patched ntdlls from the Bridgeplay app,
-# and the Valve files from fetch-valve.sh.
+# The built files come from 'make bridge' and the Valve files from fetch-valve.sh. The app
+# stages the patched ntdlls per build under wine/, so they are neither checked nor pruned.
 set -eu
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -28,12 +28,11 @@ if [ ! -f "$MANIFEST" ]; then
     exit 1
 fi
 
-# The patched ntdlls are listed with the built files.
 origin() {
     awk -v want="$1" '$1 == want { print $2 }' "$MANIFEST"
 }
 
-built="$(origin built; origin patched)"
+built="$(origin built)"
 valve="$(origin valve)"
 
 if [ -z "$built" ] || [ -z "$valve" ]; then
@@ -69,9 +68,10 @@ report() {
 report "built here" "$built"
 report "from Valve" "$valve"
 
-# grep exits 1 when there are no strays.
+# grep exits 1 when there are no strays. wine/<build>/<arch>/ntdll.dll is live, and so is
+# the wine/<arch> copy of 1.0 while a legacy tool still uses it.
 strays="$(cd "$BRIDGE_DIR" && { find . -mindepth 1 -type f | sed 's|^\./||' \
-    | grep -Fxv "$expected" || true; })"
+    | grep -Fxv "$expected" | grep -Ev '^wine/.+/ntdll\.dll$' || true; })"
 
 unexpected=0
 [ -n "$strays" ] && unexpected="$(printf '%s\n' "$strays" | wc -l | tr -d ' ')"
