@@ -212,7 +212,7 @@ def pinned(resolve_py):
 
 
 def string_end(t, k):
-    """If a Swift string literal starts at t[k], the index just past it, else None.
+    r"""If a Swift string literal starts at t[k], the index just past it, else None.
 
     Handles raw (#"..."#), multi-line and interpolated ("\(f("x"))") strings.
     """
