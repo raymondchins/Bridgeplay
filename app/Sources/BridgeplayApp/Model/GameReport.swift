@@ -145,6 +145,8 @@ enum GameReport {
             (#"(?m)^(SteamUser|SteamAppUser|STEAMVIDEOTOKEN|DSB_TOKEN)=.*$"#, "$1=<redacted>"),
             (#"\b7656119\d{10}\b"#, "<steamid>"),
             (#"\[U:1:\d+\]"#, "[U:1:<redacted>]"),
+            // The account ID, which is the SteamID64 less a constant.
+            (#"(?i)(userdata[/\\]+)\d+"#, "$1<id>"),
             (#"[\w.+-]{1,64}@[\w-]{1,63}(\.[\w-]{1,63})+"#, "<email>"),
             (#"/Volumes/(?!Preboot/|Macintosh HD/)[^/\n:]+"#, "/Volumes/<drive>"),
             // Wine's view of a home folder whose name differs from the account name.
