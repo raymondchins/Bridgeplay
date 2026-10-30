@@ -97,6 +97,12 @@ struct RootView: View {
                     }
                     UpdateNotice(busy: status.isBusy || prefixes.isBusy)
                 }
+                // This safeAreaInset's reserved height doesn't always get recomputed once the
+                // window has already laid out, so a banner that only starts showing after
+                // launch (the patch check, a background update finishing) could render with
+                // zero height, clipped under the toolbar. An `.id()` keyed on what's actually
+                // showing forces a fresh layout pass instead of an in-place diff.
+                .id(topBannerKey)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let nudge = PlayReports.shared.nudge {
@@ -121,6 +127,23 @@ struct RootView: View {
         .font(BP.sans(13))
         .tint(BP.blue)
         .preferredColorScheme(.dark)
+    }
+
+    // What the top safeAreaInset is currently showing, as a key for `.id()`. Covers the
+    // same three sources RootView's banner VStack reads, including UpdateNotice's own
+    // stage and What's New, which it doesn't expose otherwise.
+    private var topBannerKey: String {
+        if MigrationLaunch.shared.pending, MigrationLaunch.shared.failure == nil {
+            "migration"
+        } else if let banner = status.patchBanner {
+            "patch-\(banner.kind)-\(banner.blocker)"
+        } else if let stage = AppUpdater.shared.flow.notice {
+            "update-\(stage)"
+        } else if AppUpdater.shared.whatsNew != nil {
+            "whatsNew"
+        } else {
+            "none"
+        }
     }
 
     private var credits: some View {
