@@ -189,7 +189,8 @@ enum SteamInstaller {
         } catch {
             AppLog.note("game defaults: could not split the shipped defaults out: \(error.localizedDescription)")
         }
-        try removeStaleFonts(in: fonts, keeping: payload.fonts)
+        // The CJK fonts come from their own download, so they aren't in the payload.
+        try removeStaleFonts(in: fonts, keeping: payload.fonts + CJKFonts.files.keys + CJKFonts.licences)
 
         var backedUp = false
         var failedInputResets: [String] = []

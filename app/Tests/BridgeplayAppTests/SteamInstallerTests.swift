@@ -642,6 +642,27 @@ struct SteamInstallerTests {
         #expect(left == ["alt", "alt/arial.ttf", "arial.ttf"])
     }
 
+    @Test("An install keeps the CJK fonts it doesn't ship and still drops stale ones")
+    func keepsCJKFonts() async throws {
+        let work = try scratchDirectory("install-cjk-fonts")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let seeded = ["msyh.ttf", "source-han-sans/LICENSE.txt", "old.ttf"]
+        for name in seeded {
+            let file = fixture.fonts.appending(path: name)
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("font".utf8).write(to: file)
+        }
+
+        _ = try install(fixture)
+
+        let left = FileManager.default.subpaths(atPath: fixture.fonts.path(percentEncoded: false)) ?? []
+        #expect(left.contains("msyh.ttf"))
+        #expect(left.contains("source-han-sans/LICENSE.txt"))
+        #expect(left.contains("arial.ttf"))
+        #expect(!left.contains("old.ttf"))
+    }
+
     @Test("A running game prevents file replacement before Steam is stopped")
     func refusesRunningRunner() async throws {
         let work = try scratchDirectory("install-running")
