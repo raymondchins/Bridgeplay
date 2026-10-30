@@ -72,7 +72,7 @@ public struct InstallerComponents: Sendable, Equatable {
     }
 
     /// Download to a file in `directory` and verify it. Throws without leaving the file on failure.
-    public func download(to directory: URL, session: URLSession = .shared, control: InstallerDownloadControl? = nil,
+    public func download(to directory: URL, control: InstallerDownloadControl? = nil,
                          progress: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in }) async throws -> URL {
         var request = URLRequest(url: archiveURL)
         request.timeoutInterval = 60

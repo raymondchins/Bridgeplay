@@ -151,7 +151,6 @@ public struct InstallerRelease: Sendable, Equatable {
     /// (Reading the response byte by byte held a fast connection to about 0.5 MB/s.)
     public func download(
         to destination: URL,
-        session: URLSession = .shared,
         control: InstallerDownloadControl? = nil,
         progress: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in }
     ) async throws -> URL {
@@ -173,7 +172,7 @@ public struct InstallerRelease: Sendable, Equatable {
 
         // 206: a resumed download (InstallerFileDownload).
         guard let http = response as? HTTPURLResponse, [200, 206].contains(http.statusCode),
-              let finalURL = http.url, Self.isArchiveResponseURL(finalURL) else {
+              let finalURL = http.url, Self.isGitHubResponseURL(finalURL) else {
             throw InstallerError.invalidRelease
         }
         if response.expectedContentLength > Self.maximumArchiveLength { throw InstallerError.archiveTooLarge }
@@ -239,10 +238,6 @@ public struct InstallerRelease: Sendable, Equatable {
         guard let host = url.host?.lowercased() else { return false }
         return host == "github.com" || host == "release-assets.githubusercontent.com"
             || host.hasSuffix(".githubusercontent.com")
-    }
-
-    private static func isArchiveResponseURL(_ url: URL) -> Bool {
-        isGitHubResponseURL(url)
     }
 
     private static func isVersion(_ text: String) -> Bool {
