@@ -58,6 +58,7 @@ struct BrandMigration: Sendable {
         var launchOptionsRewritten = 0
         var symlinksFixed = 0
         var logsRenamed = 0
+        var logsLeft = 0
         var filesRewritten = 0
         var backups: URL?
         var notes: [String] = []
@@ -66,6 +67,7 @@ struct BrandMigration: Sendable {
             "Moved NotProton data to Bridgeplay 3.0.0: \(toolsRenamed) compatibility tools renamed, "
                 + "\(mappingsRewritten) Steam mappings and \(launchOptionsRewritten) launch options rewritten, "
                 + "\(symlinksFixed) symlinks fixed, \(logsRenamed) logs renamed, \(filesRewritten) files rewritten."
+                + (logsLeft == 0 ? "" : " \(logsLeft) logs could not be renamed.")
                 + (notes.isEmpty ? "" : " " + notes.joined(separator: " "))
         }
     }
@@ -138,7 +140,7 @@ struct BrandMigration: Sendable {
             try record(.launchOptions)
         }
         if !done.contains(.runLogs) {
-            summary.logsRenamed += try renameRunLogs()
+            renameRunLogs(&summary)
             try record(.runLogs)
         }
         try record(.done)
@@ -417,21 +419,24 @@ struct BrandMigration: Sendable {
 
     // Renames steamapps/compatdata/<appid>/notproton-run.log in every library Steam lists.
     // One directory listing per library and one stat per game; a library on a volume that
-    // is not mounted is skipped.
-    private func renameRunLogs() throws -> Int {
-        var renamed = 0
+    // is not mounted is skipped. A log this account can't rename, in a library another user
+    // owns, stays under the old name, where PrefixLog still finds it.
+    private func renameRunLogs(_ summary: inout Summary) {
         for library in libraries() {
             let compatdata = library.appending(path: "steamapps/compatdata")
             let games = (try? FileManager.default.contentsOfDirectory(atPath: compatdata.path(percentEncoded: false))) ?? []
             for game in games.sorted() {
                 let folder = compatdata.appending(path: game)
-                if try Self.renameIfFree(folder.appending(path: "notproton-run.log"),
-                                         to: folder.appending(path: "bridgeplay-run.log")) {
-                    renamed += 1
+                do {
+                    if try Self.renameIfFree(folder.appending(path: "notproton-run.log"),
+                                             to: folder.appending(path: "bridgeplay-run.log")) {
+                        summary.logsRenamed += 1
+                    }
+                } catch {
+                    summary.logsLeft += 1
                 }
             }
         }
-        return renamed
     }
 
     // Library roots from steamapps/libraryfolders.vdf, always including Steam's own folder.
