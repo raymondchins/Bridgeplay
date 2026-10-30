@@ -377,10 +377,7 @@ final class SystemStatus {
         clearFailure()
         outcome = nil
 
-        func same(_ a: URL, _ b: URL) -> Bool {
-            a.standardizedFileURL.path(percentEncoded: false) == b.standardizedFileURL.path(percentEncoded: false)
-        }
-        guard !same(picked, current) else { return }
+        guard !CrossOverSource.same(picked, current) else { return }
         if SupportPaths.Steam.isUnreachable(current) {
             let alert = NSAlert()
             alert.messageText = String(localized: "Steam at \(current.path(percentEncoded: false)) isn't connected.")
@@ -398,7 +395,7 @@ final class SystemStatus {
                 return
             }
 
-            if same(picked, SupportPaths.Steam.defaultApp) {
+            if CrossOverSource.same(picked, SupportPaths.Steam.defaultApp) {
                 UserDefaults.standard.removeObject(forKey: SupportPaths.Steam.appPathKey)
             } else {
                 UserDefaults.standard.set(picked.path(percentEncoded: false), forKey: SupportPaths.Steam.appPathKey)

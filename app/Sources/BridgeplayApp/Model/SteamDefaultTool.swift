@@ -97,10 +97,10 @@ enum SteamDefaultTool {
         var ranges: [ClosedRange<Int>] = []
         var index = open + 1
         while index < close {
-            guard indent(lines[index]) == depth, key(lines[index]) != nil,
+            guard indent(lines[index]) == depth, BrandMigration.quotedKey(lines[index]) != nil,
                   let entryOpen = openBrace(lines, after: index), let entryClose = closeBrace(lines, open: entryOpen)
             else { index += 1; continue }
-            if key(lines[index]) != "0", lines[entryOpen + 1 ..< entryClose].contains(where: {
+            if BrandMigration.quotedKey(lines[index]) != "0", lines[entryOpen + 1 ..< entryClose].contains(where: {
                 guard let (field, value, _) = BrandMigration.keyValue($0) else { return false }
                 return field.lowercased() == "name" && ToolName.isOurs(value)
             }) { ranges.append(index ... entryClose) }
@@ -182,7 +182,7 @@ enum SteamDefaultTool {
         else { return nil }
         let entryDepth = indent(lines[mapping]) + 1
         guard let zero = (open + 1 ..< close).first(where: {
-            indent(lines[$0]) == entryDepth && key(lines[$0]) == "0"
+            indent(lines[$0]) == entryDepth && BrandMigration.quotedKey(lines[$0]) == "0"
         }), let zeroOpen = openBrace(lines, after: zero), let zeroClose = closeBrace(lines, open: zeroOpen)
         else { return nil }
         return (zero, zeroClose)
@@ -200,20 +200,11 @@ enum SteamDefaultTool {
         ]
     }
 
-    // A line holding only a quoted key (a section name), compared case-insensitively as
-    // Steam's KeyValues does.
-    private static func key(_ line: String) -> String? {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard trimmed.count >= 2, trimmed.hasPrefix("\""), trimmed.hasSuffix("\""),
-              trimmed.dropFirst().dropLast().contains("\"") == false
-        else { return nil }
-        return String(trimmed.dropFirst().dropLast())
-    }
-
+    // Section names compare case-insensitively, as Steam's KeyValues does.
     private static func keyLine(_ lines: [String], _ name: String, from start: Int) -> Int? {
         guard start < lines.count else { return nil }
         return (start ..< lines.count).first {
-            key(lines[$0])?.caseInsensitiveCompare(name) == .orderedSame
+            BrandMigration.quotedKey(lines[$0])?.caseInsensitiveCompare(name) == .orderedSame
                 && openBrace(lines, after: $0) == $0 + 1
         }
     }
