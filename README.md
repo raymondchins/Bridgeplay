@@ -62,20 +62,20 @@ Also running on the same setup: Mortal Kombat 1, The Last of Us Part I, Death St
 
 Every game tested so far, and the Mac it ran on, is at [bridgeplay.dev/compatibility](https://bridgeplay.dev/compatibility). It combines results a maintainer checked ([`compat/`](compat/)), one-tap reports from players, and CrossOver ratings from AppleGamingWiki for games nobody has tried with Bridgeplay yet.
 
-To add yours: after you play, Bridgeplay asks once per game *How did it run?* One tap posts the result, with your Mac and the game's log, to [Compatibility reports](https://github.com/raymondchins/Bridgeplay/discussions/categories/compatibility-reports). No GitHub account needed, and the log is stripped of your user, computer and Steam account details. **Report Your Games…** in the Prefix menu covers everything you've already played. Without the app, use the [Game report form](https://github.com/raymondchins/Bridgeplay/issues/new?template=game-report.yml).
+To add yours: after you play, Bridgeplay asks once per game *How did it run?* One tap posts the result, with your Mac and the game's log, to [Compatibility reports](https://github.com/raymondchins/Bridgeplay/discussions/categories/compatibility-reports). No GitHub account needed, and the log is stripped of your user, computer and Steam account details. **Report Your Games…** in the Prefix menu covers everything you've already played, and [bridgeplay.dev/privacy](https://bridgeplay.dev/privacy) lists what a report contains. Without the app, use the [Game report form](https://github.com/raymondchins/Bridgeplay/issues/new?template=game-report.yml).
 
 ## Install
 
 1. **Download Bridgeplay** from [bridgeplay.dev](https://bridgeplay.dev): `Bridgeplay.dmg`, notarized by Apple.
 2. **Drag Bridgeplay into Applications** and open it. macOS asks once whether to open an app downloaded from the internet: click **Open**. It needs an admin account.
-3. **Follow the Setup Assistant**: Rosetta, Apple's graphics (Download fetches them, and Steam from Valve if it's missing), Steam sign-in, App Management and a couple of other standard macOS prompts. Every download is checked against Bridgeplay's signature. Setup modifies your Steam app; see [What Bridgeplay changes in Steam](#what-bridgeplay-changes-in-steam).
+3. **Follow the Setup Assistant**: Rosetta, Apple's graphics (Download fetches them, and Steam from Valve if it's missing), Steam sign-in, App Management and a couple of other standard macOS prompts. Every download is verified: Bridgeplay's signature or pinned hashes for its own files and the engine, Apple's signature for the toolkit's files, Valve's for Steam. Setup modifies your Steam app; see [What Bridgeplay changes in Steam](#what-bridgeplay-changes-in-steam).
 4. **Press Play** on any Windows game in Steam. The first time you use a controller, allow Steam's Input Monitoring request.
 
 Each game's Bridgeplay settings (graphics backend, Metal HUD, DLSS, frame generation, controllers) are in Steam: right-click the game, **Properties… › Bridgeplay**.
 
 Updates install themselves: Bridgeplay, its patch in Steam and the engine. **Refresh** on the Status page checks on demand.
 
-The Setup Assistant's graphics download carries Apple's Game Porting Toolkit redistributables under Apple's license, which allows non-commercial distribution only. Bridgeplay is free and non-commercial.
+The Setup Assistant's graphics download carries Apple's Game Porting Toolkit redistributables, unmodified, under Apple's own license; [docs/GPTK-LICENSE.md](docs/GPTK-LICENSE.md) records how Bridgeplay handles it. You can use your own copy from Apple instead. Bridgeplay is free and non-commercial.
 
 <p align="center">
   <img src="docs/readme/install-v5.png" alt="The Setup Assistant working through Your Mac, Rosetta, Graphics, Steam and Set Up" width="100%">
@@ -102,8 +102,8 @@ The [guides on bridgeplay.dev](https://bridgeplay.dev/guides) cover installing B
 
 Bridgeplay runs inside the native macOS Steam client and registers itself as a Steam Play compatibility tool. Under the hood:
 
-- **Engine:** CodeWeavers' open-source WineCX 11.17 with MSync, running under Rosetta 2. Bridgeplay does not include CrossOver: its free engine is built from the LGPL source CodeWeavers publishes ([dappermint/winecx](https://github.com/dappermint/winecx)). If you own CrossOver, Bridgeplay can run games on your copy instead.
-- **Graphics:** Apple's Game Porting Toolkit 4.0 beta 3 (D3DMetal). It is not stored in this repository; the Setup Assistant downloads its redistributables, which ship under Apple's non-commercial license (see Install). DXMT and DXVK are available for games that prefer them.
+- **Engine:** dappermint's prebuilt runtime ([winecx-gptk](https://github.com/dappermint/winecx-gptk)) of CodeWeavers' open-source WineCX 11.17 ([dappermint/winecx](https://github.com/dappermint/winecx)) with MSync, running under Rosetta 2. Bridgeplay does not include CrossOver. If you own CrossOver, Bridgeplay can run games on your copy instead.
+- **Graphics:** Apple's Game Porting Toolkit 4.0 beta 3 (D3DMetal). It is not stored in this repository; the Setup Assistant downloads its redistributables, which stay under Apple's own license (see Install). DXMT and DXVK are available for games that prefer them.
 - **Extras:** NVAPI/NGX routing for DLSS on Apple's MetalFX, in-process frame generation on `CAMetalLayer`, per-game Game Mode, Retina back buffers and a controller layer for HID pads.
 
 <p align="center">
@@ -150,7 +150,7 @@ NotProton in turn thanks the people who came before it, among them Nat Brown's K
 
 ## Support Wine
 
-Wine on the Mac exists largely because of [CodeWeavers](https://www.codeweavers.com), the biggest contributor to the Wine project. They fund that work by selling [CrossOver](https://www.codeweavers.com/crossover). Bridgeplay's free engine is built from the source code CodeWeavers publishes, so every game it runs also stands on their work.
+Wine on the Mac exists largely because of [CodeWeavers](https://www.codeweavers.com), the biggest contributor to the Wine project. They fund that work by selling [CrossOver](https://www.codeweavers.com/crossover). Bridgeplay's free engine comes from the WineCX code CodeWeavers publishes, so every game it runs also stands on their work.
 
 If you can, buy CrossOver.
 
@@ -163,4 +163,4 @@ Bridgeplay is licensed under the [GPL-3.0](LICENSE). Third-party licenses, and t
   &nbsp;Built by <a href="https://github.com/raymondchins"><b>Raymond Chin</b></a>, Jakarta.
 </p>
 
-<sub>Bridgeplay is not affiliated with Apple, Valve, NVIDIA or CodeWeavers. Game Porting Toolkit is Apple software provided under Apple's license for non-commercial use. Steam is a trademark of Valve Corporation. DLSS is a trademark of NVIDIA Corporation. Game names are trademarks of their owners.</sub>
+<sub>Bridgeplay is built on NotProton and is not affiliated with or endorsed by Apple, Valve, Microsoft, NVIDIA, Sony, CodeWeavers or any game publisher. Steam is a trademark of Valve Corporation; Mac, macOS, Metal, MetalFX and Rosetta of Apple Inc.; Windows, DirectX and Xbox of Microsoft; CrossOver of CodeWeavers; DLSS and GeForce of NVIDIA; DualSense of Sony Interactive Entertainment. Game names, game art and other product names belong to their owners and are used only to identify them.</sub>

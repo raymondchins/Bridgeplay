@@ -33,7 +33,7 @@ Security > Input Monitoring).
 
 Licensing: Bridgeplay is licensed under GPL-3.0 (see LICENSE and NOTICE).
 The installer includes Apple's Game Porting Toolkit redistributables (the gptk
-folder) under Apple's license, which allows non-commercial distribution only.
-Bridgeplay is free and non-commercial. Apple's license is in GPTK-License.rtf.
+folder), unmodified, under Apple's own license, which is in GPTK-License.rtf.
+Bridgeplay is free and non-commercial.
 DXMT and DXVK (in the cache folder) keep their own licenses, in the LICENSE.*
 and COPYING.LIB.dxmt files here.

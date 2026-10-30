@@ -134,6 +134,14 @@ three years after the last release that ships them, Raymond Chin will also
 provide that source on request, for no more than the cost of providing it; open
 an issue at https://github.com/raymondchins/Bridgeplay/issues.
 
+Compatibility data
+------------------
+
+compat/reported.json holds "Should work" ratings adapted from AppleGamingWiki's
+CrossOver reports (https://www.applegamingwiki.com), licensed under CC BY-NC-SA 3.0
+(https://creativecommons.org/licenses/by-nc-sa/3.0/). The adapted ratings are offered
+under the same license, not the GPL-3.0.
+
 NotProton-WineHQ licensing
 ==========================
 

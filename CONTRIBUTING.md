@@ -47,6 +47,7 @@ exceptions:
 | `*-patch/` Wine patches and the Wine files built from them | LGPL-2.1-or-later, like Wine |
 | `fonts/` | Each font's own license; the build files under `LICENSE.fonts` |
 | `vendor/cJSON.*`, `steam-shim/jsoncpp.cpp`, `steam-shim/json/` | MIT (cJSON), public domain / MIT (JsonCpp) |
+| `compat/reported.json` | CC BY-NC-SA 3.0 (adapted from AppleGamingWiki), see [NOTICE](NOTICE) |
 
 Changes that belong upstream are better sent to [NotProton](https://github.com/NotProtonNot/NotProton).
 
