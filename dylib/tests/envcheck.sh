@@ -2,7 +2,7 @@
 # shellcheck disable=SC2034,SC2154
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "envcheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> envcheck: $SRC not present, skipped"; exit 0; }
 
 strip() { sed 's/^[[:space:]]*//'; }
 dllpath_line=$(grep 'export WINEDLLPATH=' "$SRC" | grep 'x86_64-windows' | strip)

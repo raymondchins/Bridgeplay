@@ -5,7 +5,7 @@
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 UPDATE="${2:-$(dirname "$0")/../../scripts/update-gamecontrollerdb.sh}"
-[ -f "$SRC" ] || { echo "padcheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> padcheck: $SRC not present, skipped"; exit 0; }
 
 block=$(sed -n '/^np_pad_mappings() {$/,/^}$/p' "$SRC")
 forward=$(sed -n '/^for name in $(env /,/^done$/p' "$SRC")

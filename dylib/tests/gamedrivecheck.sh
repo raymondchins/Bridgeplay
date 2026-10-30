@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016 # the sh -ec program expands its own variables
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "gamedrivecheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> gamedrivecheck: $SRC not present, skipped"; exit 0; }
 
 body=$(sed -n '/^game_drive_record() {/,/^}/p;/^record_game_drive() {/,/^}/p;/^restart_for_drive() {/,/^}/p;/^unmap_game_drive() {/,/^}/p;/^map_game_drive() {/,/^}/p' "$SRC")
 [ -n "$body" ] || { echo "FAIL: map_game_drive not found in $SRC"; exit 1; }

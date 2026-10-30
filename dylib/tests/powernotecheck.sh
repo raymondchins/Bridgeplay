@@ -5,7 +5,7 @@
 # shellcheck disable=SC2016 # the sh -ec program expands its own variables
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "powernotecheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> powernotecheck: $SRC not present, skipped"; exit 0; }
 
 body=$(sed -n '/^low_power_mode() {/,/^}/p;/^low_power_notice() {/,/^}/p' "$SRC")
 case "$body" in

@@ -3,7 +3,7 @@
 # which play reports quote.
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "exitcheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> exitcheck: $SRC not present, skipped"; exit 0; }
 
 extract() { sed -n "/^$1() {\$/,/^}\$/p" "$SRC"; }
 functions=""

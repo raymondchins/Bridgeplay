@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016 # the sh -ec programs expand their own variables
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "gamefixescheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> gamefixescheck: $SRC not present, skipped"; exit 0; }
 
 functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \

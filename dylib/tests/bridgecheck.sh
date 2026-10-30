@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016 # the sh -ec program expands its own variables
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "bridgecheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> bridgecheck: $SRC not present, skipped"; exit 0; }
 
 block=$(sed -n '/^bridge_files="steamclient64/,/^  verify_runner$/p' "$SRC")
 case "$block" in

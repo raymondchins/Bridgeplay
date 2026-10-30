@@ -3,7 +3,7 @@
 # would replace something the launch sets for itself.
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "envpasscheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> envpasscheck: $SRC not present, skipped"; exit 0; }
 
 block=$(sed -n '/^np_env_passed=/,/^done$/p' "$SRC")
 case "$block" in
