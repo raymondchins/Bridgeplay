@@ -19,7 +19,8 @@ enum InstallScriptMarkers {
         var markers: [Marker] = []
         var path: [String] = []
         var pending: String?
-        for raw in text.split(separator: "\n", omittingEmptySubsequences: true) {
+        // isNewline, as "\r\n" is one Character and a CRLF script would read as one line.
+        for raw in text.split(whereSeparator: \.isNewline) {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line == "{" {
                 if let name = pending { path.append(name) }
