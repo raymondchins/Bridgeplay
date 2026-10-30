@@ -577,7 +577,7 @@ static int find_axis(const np_profile *p, uint16_t page, uint16_t usage) {
 
 // SDL "generic" style layout from the descriptor alone.
 static void apply_generic(np_profile *p) {
-    char m[512];
+    char m[512] = "";
     size_t n = 0;
 #define ADD(...) n += (size_t)snprintf(m + n, n < sizeof m ? sizeof m - n : 0, __VA_ARGS__)
     int x = find_axis(p, PAGE_GD, 0x30), y = find_axis(p, PAGE_GD, 0x31);

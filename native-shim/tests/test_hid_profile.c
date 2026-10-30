@@ -223,6 +223,21 @@ static void test_generic(void) {
     CHECK(np_profile_decode(p, 0, up, sizeof up, &s));
     CHECK(s.buttons == (BTN(NP_BTN_B) | BTN(NP_BTN_DPAD_UP)));  // a:b1,b:b0
     np_profile_free(p);
+
+    // A Joystick with one Slider and no DB line: no standard control, so nothing is bound.
+    static const uint8_t slider_desc[] = {
+        0x05, 0x01, 0x09, 0x04, 0xa1, 0x01,
+        0x09, 0x36, 0x15, 0x00, 0x26, 0xff, 0x00, 0x75, 0x08, 0x95, 0x01, 0x81, 0x02,
+        0xc0,
+    };
+    p = np_profile_create_from_descriptor(slider_desc, sizeof slider_desc, 0x1234, 0x567b,
+                                          0x0100, "Handbrake");
+    CHECK(p && !strcmp(np_profile_name(p), "Generic HID gamepad"));
+    np_profile_counts(p, &axes, &buttons, &hats);
+    CHECK(axes == 1 && buttons == 0 && hats == 0);
+    uint8_t slider[1] = {0x40};
+    CHECK(!np_profile_decode(p, 0, slider, sizeof slider, &s));
+    np_profile_free(p);
     printf("ok  generic DInput pad: default mapping, DB fallbacks\n");
 }
 
