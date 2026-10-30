@@ -99,7 +99,8 @@ dylib: $(TARGET)
 $(APP_PAYLOAD):
 	@mkdir -p $(APP_PAYLOAD)
 
-TEST_PATHS := dylib/tests overlay-shim/tests app/Tests scripts/tests ntdll-patch/tests
+TEST_PATHS := dylib/tests overlay-shim/tests app/Tests scripts/tests ntdll-patch/tests \
+              native-launch/tests native-shim/tests installer/tests
 
 tests-list:
 	@for p in $(TEST_PATHS); do echo $$p; done
