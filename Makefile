@@ -500,9 +500,9 @@ ntdll-resolve:
 		echo "==> ntdll-resolve: $(CX_ROOT) not present, skipped (set CX_ROOT)"; exit 0; fi; \
 	python3 ntdll-patch/resolve.py "$(CX_ROOT)"
 
-$(ARM64_DYLIB): $(OBJS)
+$(ARM64_DYLIB): $(OBJS) $(DOBBY_LIBS)
 	@mkdir -p $(dir $@)
-	$(CC) $(LDFLAGS) -o $@ $^ $(DOBBY_LIBS) $(FRAMEWORKS) -lc++
+	$(CC) $(LDFLAGS) -o $@ $^ $(FRAMEWORKS) -lc++
 
 $(X86_STUB): dylib/stub_x86_64.c
 	@mkdir -p $(dir $@)
