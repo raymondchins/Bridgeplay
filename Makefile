@@ -697,6 +697,8 @@ fonts:
 	fonts/build.sh
 
 app-payload: $(TARGET) $(OVERLAY_SHIM) $(ICONMAKER) $(APPINFO)
+	@# A signature file deleted from the repo must not ship from the last payload.
+	@test -n "$(APP_PAYLOAD)" && rm -rf "$(APP_PAYLOAD)/signatures"
 	@mkdir -p "$(APP_PAYLOAD)/signatures/macos.arm64"
 	@mkdir -p "$(APP_PAYLOAD)/bridge"
 	@# Staged by 0.7.51 and earlier; left behind they fail the PAYLOAD_SIGN_IDS check.
