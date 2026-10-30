@@ -11,6 +11,13 @@ struct ComponentsPlacementTests {
         var statuses: [String] = []
     }
 
+    private final class Lines: @unchecked Sendable {
+        private let lock = NSLock()
+        private var lines: [String] = []
+        func add(_ line: String) { lock.withLock { lines.append(line) } }
+        var all: [String] { lock.withLock { lines } }
+    }
+
     private struct Fixture {
         let root: URL, source: URL, home: URL, applications: URL
         var support: URL { home.appending(path: "Library/Application Support/bridgeplay") }
@@ -92,6 +99,27 @@ struct ComponentsPlacementTests {
         placement.installSteam = { _, _ in throw InstallerError.componentsFailure("no Steam") }
         #expect(throws: InstallerError.self) { try placement.place() }
         #expect(!FileManager.default.fileExists(atPath: f.support.appending(path: "gptk").path))
+    }
+
+    @Test("A failed copy logs the tool's reason and shows the plain message")
+    func failureReasonIsLogged() throws {
+        let f = try fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        try FileManager.default.removeItem(at: f.source.appending(path: "gptk"))
+        let lines = Lines()
+        var placement = placement(f, Calls())
+        placement.log = { lines.add($0) }
+
+        let failure = try #require(throws: InstallerError.self) { try placement.place() }
+
+        guard case .componentsFailure(let message) = failure else {
+            Issue.record("Unexpected error: \(failure)")
+            return
+        }
+        #expect(message == "The Game Porting Toolkit could not be copied.")
+        #expect(lines.all.count == 1)
+        #expect(lines.all.first?.hasPrefix(message) == true)
+        #expect(lines.all.first?.contains("ditto") == true)
     }
 
     @Test("An older GPTK is replaced whole, and the user's mappings and edited confs stay")
