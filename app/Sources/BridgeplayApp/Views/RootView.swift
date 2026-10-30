@@ -35,6 +35,7 @@ struct RootView: View {
 
     @Binding var pane: Pane
     @Environment(SystemStatus.self) private var status
+    @Environment(PrefixesModel.self) private var prefixes
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -87,11 +88,14 @@ struct RootView: View {
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
-                // A failed move is reported on the Status page, with its buttons, instead.
-                if MigrationLaunch.shared.pending, MigrationLaunch.shared.failure == nil {
-                    MigrationBanner()
-                } else if let banner = status.patchBanner {
-                    PatchBanner(banner: banner)
+                VStack(spacing: 0) {
+                    // A failed move is reported on the Status page, with its buttons, instead.
+                    if MigrationLaunch.shared.pending, MigrationLaunch.shared.failure == nil {
+                        MigrationBanner()
+                    } else if let banner = status.patchBanner {
+                        PatchBanner(banner: banner)
+                    }
+                    UpdateNotice(busy: status.isBusy || prefixes.isBusy)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {

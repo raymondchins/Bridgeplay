@@ -1020,6 +1020,22 @@
         }
       }
     },
+    "A game is running, so Bridgeplay won't restart. The update installs when you quit." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "È in esecuzione un gioco, quindi Bridgeplay non si riavvierà. L'aggiornamento verrà installato quando chiudi l'app."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有游戏正在运行，因此 Bridgeplay 不会重启。退出时会安装更新。"
+          }
+        }
+      }
+    },
     "A game or Wine tool is running on build %@. Quit it before updating Bridgeplay." : {
       "localizations" : {
         "it" : {
@@ -2191,6 +2207,38 @@
     "Bridgeplay" : {
       "shouldTranslate" : false
     },
+    "Bridgeplay %@ is available" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ è disponibile"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ 现已可用"
+          }
+        }
+      }
+    },
+    "Bridgeplay %@ is ready to install" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ è pronto per l'installazione"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ 已可安装"
+          }
+        }
+      }
+    },
     "Bridgeplay Components" : {
       "localizations" : {
         "it" : {
@@ -2491,6 +2539,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 会忽略含有控制字符的值。"
+          }
+        }
+      }
+    },
+    "Bridgeplay is busy, so it won't restart yet. The update installs when you quit." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay è occupato, quindi non si riavvierà ora. L'aggiornamento verrà installato quando chiudi l'app."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 正忙，暂时不会重启。退出时会安装更新。"
           }
         }
       }
@@ -3035,6 +3099,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在检查 Steam"
+          }
+        }
+      }
+    },
+    "Checking for updates…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricerca di aggiornamenti…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查更新…"
           }
         }
       }
@@ -4386,6 +4466,22 @@
         }
       }
     },
+    "Downloading Bridgeplay %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download di Bridgeplay %@ in corso"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载 Bridgeplay %@"
+          }
+        }
+      }
+    },
     "Downloading Steam" : {
       "localizations" : {
         "it" : {
@@ -5122,6 +5218,22 @@
         }
       }
     },
+    "Getting Bridgeplay %@ ready" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparazione di Bridgeplay %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备 Bridgeplay %@"
+          }
+        }
+      }
+    },
     "Getting the game ready…" : {
       "localizations" : {
         "it" : {
@@ -5758,6 +5870,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在安装 Game Porting Toolkit"
+          }
+        }
+      }
+    },
+    "It installs when you quit Bridgeplay, or you can restart now." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verrà installato quando chiudi Bridgeplay, oppure puoi riavviare ora."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 Bridgeplay 时会自动安装，也可以现在重启。"
           }
         }
       }
@@ -8414,6 +8542,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请重启 Steam，以更新兼容工具列表。"
+          }
+        }
+      }
+    },
+    "Restart to Update" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riavvia per aggiornare"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重启以更新"
           }
         }
       }
@@ -11285,6 +11429,22 @@
         }
       }
     },
+    "Updated to Bridgeplay %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiornato a Bridgeplay %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已更新到 Bridgeplay %@"
+          }
+        }
+      }
+    },
     "Updates" : {
       "localizations" : {
         "it" : {
@@ -11493,6 +11653,22 @@
         }
       }
     },
+    "View Update…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra aggiornamento…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看更新…"
+          }
+        }
+      }
+    },
     "Vulkan in a game's own settings" : {
       "localizations" : {
         "it" : {
@@ -11569,6 +11745,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "哪里出了问题？可不填，会随报告公开。"
+          }
+        }
+      }
+    },
+    "What's New" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novità"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新功能"
+          }
+        }
+      }
+    },
+    "What's New in Bridgeplay %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novità di Bridgeplay %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ 的新功能"
           }
         }
       }
@@ -11751,6 +11959,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在处理…"
+          }
+        }
+      }
+    },
+    "You can keep using Bridgeplay while it downloads." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puoi continuare a usare Bridgeplay durante il download."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载时可以继续使用 Bridgeplay。"
           }
         }
       }
