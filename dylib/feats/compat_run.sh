@@ -237,7 +237,8 @@ fi
   echo "STEAM_COMPAT_INSTALL_PATH=$STEAM_COMPAT_INSTALL_PATH"
   echo "STEAM_COMPAT_APP_ID=$STEAM_COMPAT_APP_ID"
   echo "-- steam env passed through --"
-  env | grep -iE '^(Steam|SDL_)' | sort
+  # Players attach this log to public issues, so the login name and video token stay out.
+  env | grep -iE '^(Steam|SDL_)' | grep -ivE '^(SteamUser|SteamAppUser|STEAMVIDEOTOKEN)=' | sort
   [ -z "$np_dropped" ] || echo "ignored on arm64 Wine: $np_dropped"
 } >> "$log" 2>&1 || true
 
