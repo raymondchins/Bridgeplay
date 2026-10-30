@@ -34,6 +34,7 @@ enum InstallIntoSteamCommand {
                 _ = try await ValveFetcher.run { say($0.label) }
             }
             try SteamInstaller.finish(result)
+            UserDefaults.standard.removeObject(forKey: SteamPatchKeeper.pausedKey)
             say("Bridgeplay \(ProductVersion.short) installed into Steam.")
             return 0
         } catch {
