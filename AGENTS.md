@@ -16,7 +16,7 @@ keeps the old upstream README.
 | `signatures/macos.arm64/` | Byte signatures the dylib resolves per Steam build | Read by the dylib |
 | `lsteamclient/`, `steam-shim/`, `bridge/` | Proton's steamclient bridge and `steam.exe`, built against the Wine tree that `bridge/` sets up | Wine |
 | `ntdll-patch/` | Detours patched into the engine's `ntdll.dll`; the prebuilt `detour*.bin` live in `app/Sources/BridgeplayApp/Resources/` | Wine |
-| `*-patch/` (win32u, winemac, winebus, winecoreaudio, wined3d, ws2_32, ngx-signer) | Patches for single WineCX/WineHQ files. The rebuilt binaries are committed in `app/Sources/BridgeplayApp/Resources/` | Wine |
+| `*-patch/` (win32u, winemac, winebus, winecoreaudio, wined3d, ws2_32, ngx-signer, d3dx11, hide-wine-exports) | Patches for single WineCX/WineHQ files. The rebuilt binaries are committed in `app/Sources/BridgeplayApp/Resources/` | Wine |
 | `nvapi-shim/` | Windows `nvapi64.dll` that lets games use DLSS (answered by MetalFX) | Wine |
 | `overlay-shim/` | HDR, Metal 4 and frame generation | Game process |
 | `native-launch/`, `native-shim/` | Launch wrapper and gamepad shim for native Mac games | Native game process |
