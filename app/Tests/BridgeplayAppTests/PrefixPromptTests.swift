@@ -55,6 +55,13 @@ struct PrefixPromptTests {
         #expect(!both.contains("Agent 64"))
     }
 
+    @Test("Delete warns that the backups inside the prefix go too")
+    func deleteNamesTheBackups() {
+        #expect(PrefixPrompt.deleteMessage([agent], backups: 0) == PrefixPrompt.deleteMessage([agent]))
+        #expect(PrefixPrompt.deleteMessage([agent], backups: 1).contains("Its 1 backup will also be permanently deleted."))
+        #expect(PrefixPrompt.deleteMessage([agent, ikaruga], backups: 3).contains("All 3 backups will also be permanently deleted."))
+    }
+
     // Rebuild inits the prefix itself before the dialog closes, so deferring to Steam
     // would be describing something that does not happen.
     @Test("Rebuild does not claim Steam makes the prefix again")

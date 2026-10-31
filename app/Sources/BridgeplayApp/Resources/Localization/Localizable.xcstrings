@@ -1468,6 +1468,22 @@
         }
       }
     },
+    "All %lld backups will also be permanently deleted." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verranno eliminati definitivamente anche tutti i %lld backup."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部 %lld 个备份也将被永久删除。"
+          }
+        }
+      }
+    },
     "Allow Bridgeplay in App Management" : {
       "localizations" : {
         "it" : {
@@ -5774,6 +5790,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它会将 CrossOver 使用的 DLL 替换为与当前兼容工具匹配的版本。"
+          }
+        }
+      }
+    },
+    "Its 1 backup will also be permanently deleted." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verrà eliminato definitivamente anche il suo backup."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其 1 个备份也将被永久删除。"
           }
         }
       }
