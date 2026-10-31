@@ -11669,6 +11669,38 @@
         }
       }
     },
+    "Wine could not build a complete new prefix. The prefix has been left as it was and nothing has been lost. Try again, or use Set Up Compatibility Tool first." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine non è riuscito a creare un nuovo prefisso completo. Il prefisso è rimasto com'era e non è andato perso nulla. Riprova, oppure usa prima Set Up Compatibility Tool."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine 无法构建完整的新前缀。原前缀保持不变，没有任何数据丢失。请重试，或先使用 Set Up Compatibility Tool。"
+          }
+        }
+      }
+    },
+    "Wine did not finish building the new prefix. The prefix has been left as it was and nothing has been lost." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine non ha finito di creare il nuovo prefisso. Il prefisso è rimasto com'era e non è andato perso nulla."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine 未能完成新前缀的构建。原前缀保持不变，没有任何数据丢失。"
+          }
+        }
+      }
+    },
     "Wine syntax. A game's own conf replaces these; its launch options win per DLL." : {
       "localizations" : {
         "it" : {
