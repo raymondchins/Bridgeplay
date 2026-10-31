@@ -35,75 +35,84 @@ struct RootView: View {
 
     @Binding var pane: Pane
     @Environment(SystemStatus.self) private var status
+    @Environment(PrefixesModel.self) private var prefixes
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $pane) {
-                ForEach(Pane.allCases) { item in
-                    Label(item.label, systemImage: item.symbol)
-                        .tag(item)
-                }
+        VStack(spacing: 0) {
+            // Above NavigationSplitView, not inside its detail column: NavigationSplitView
+            // mis-reconciles its two columns' geometry once the detail column's content has
+            // resized more than once after the initial layout pass, which a banner that
+            // only starts showing after launch (the patch check, a background update
+            // finishing) and then keeps changing (an update's progress stages) reliably
+            // triggers, shifting the whole window's content — sidebar included — off-screen.
+            // Living outside the split view entirely sidesteps that.
+            if MigrationLaunch.shared.pending, MigrationLaunch.shared.failure == nil {
+                MigrationBanner()
+            } else if let banner = status.patchBanner {
+                PatchBanner(banner: banner)
             }
-            .listStyle(.sidebar)
-            .listItemTint(.monochrome)
-            .scrollContentBackground(.hidden)
-            .background(BP.bg)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                HStack(spacing: 4.4) {
-                    BridgeplayMark(size: 22)
-                    Text(verbatim: "Bridgeplay")
-                        .font(BP.display(13))
-                        .foregroundStyle(BP.iridescent)
-                    Spacer()
+            UpdateNotice(busy: status.isBusy || prefixes.isBusy)
+
+            NavigationSplitView {
+                List(selection: $pane) {
+                    ForEach(Pane.allCases) { item in
+                        Label(item.label, systemImage: item.symbol)
+                            .tag(item)
+                    }
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 6)
-                .padding(.bottom, 10)
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(alignment: .leading, spacing: 10) {
-                    credits
-                    libraryCard
-                    Text(verbatim: ProductVersion.display)
-                        .font(BP.sans(11, .medium))
-                        .foregroundStyle(BP.fg3)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 6)
+                .listStyle(.sidebar)
+                .listItemTint(.monochrome)
+                .scrollContentBackground(.hidden)
+                .background(BP.bg)
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    HStack(spacing: 4.4) {
+                        BridgeplayMark(size: 22)
+                        Text(verbatim: "Bridgeplay")
+                            .font(BP.display(13))
+                            .foregroundStyle(BP.iridescent)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 6)
+                    .padding(.bottom, 10)
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
-            }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
-        } detail: {
-            Group {
-                switch pane {
-                case .status: StatusView()
-                case .gameDefaults: GameDefaultsView()
-                case .prefixes: PrefixesView()
-                case .backups: BackupsView()
-                case .guide: GuideView()
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        credits
+                        libraryCard
+                        Text(verbatim: ProductVersion.display)
+                            .font(BP.sans(11, .medium))
+                            .foregroundStyle(BP.fg3)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 6)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
                 }
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                // A failed move is reported on the Status page, with its buttons, instead.
-                if MigrationLaunch.shared.pending, MigrationLaunch.shared.failure == nil {
-                    MigrationBanner()
-                } else if let banner = status.patchBanner {
-                    PatchBanner(banner: banner)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
+            } detail: {
+                Group {
+                    switch pane {
+                    case .status: StatusView()
+                    case .gameDefaults: GameDefaultsView()
+                    case .prefixes: PrefixesView()
+                    case .backups: BackupsView()
+                    case .guide: GuideView()
+                    }
                 }
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if let nudge = PlayReports.shared.nudge {
-                    PlayReportCard(nudge: nudge)
-                } else if PlayReports.shared.thanking {
-                    PlayReportThanks()
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if let nudge = PlayReports.shared.nudge {
+                        PlayReportCard(nudge: nudge)
+                    } else if PlayReports.shared.thanking {
+                        PlayReportThanks()
+                    }
                 }
+                .scrollContentBackground(.hidden)
+                .background(BP.bg)
+                .toolbarBackground(BP.bg, for: .windowToolbar)
             }
-            .scrollContentBackground(.hidden)
-            .background(BP.bg)
-            .toolbarBackground(BP.bg, for: .windowToolbar)
         }
         // While Report Your Games… is open, it presents the consent sheet itself.
         .sheet(isPresented: Binding(get: { PlayReports.shared.consentRequest != nil && PlayReports.shared.bulk == nil },
