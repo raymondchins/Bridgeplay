@@ -10,6 +10,7 @@ fixes, the WIP D3D12 backend).
 | Why | head of `main` when pinned; every job of its CI run is green ([run 37474938195](https://github.com/3Shain/dxmt/actions/runs/37474938195)) |
 | Tarball | `dxmt-e94c312.tar.gz`, top-level directory `e94c312/` |
 | License | LGPL-2.1-or-later since `ec357fd` (v0.80 was the last MIT release) |
+| Source | the upstream commit above, public at https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587. The currently published `dxmt-e94c312.tar.gz` predates `dxmt-<shortsha>-source.tar.gz` (below) and carries no license files or source of its own; the next rebuild publishes both on the same release, see Rebuilding |
 
 ## In Bridgeplay
 
@@ -42,10 +43,14 @@ this.
     DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
         scripts/build-dxmt.sh e94c312f5c054263acf261cfa109edf13e757587
 
-Needs Xcode with its Metal toolchain (`xcodebuild -downloadComponent MetalToolchain`),
-Homebrew `cmake bison flex mingw-w64`, and python3; the script installs meson 1.10.0 and
-ninja into a venv. Work goes to `scratch/dxmt-build/`, output to `scratch/dxmt-out/`
-(tarball plus a `.sha256` manifest). Finished stages are reused. A cold run on an M5 Max
+Add `--publish` to also create the `dxmt-<shortsha>` GitHub release once the build and its
+checks pass. Needs Xcode with its Metal toolchain (`xcodebuild -downloadComponent
+MetalToolchain`), Homebrew `cmake bison flex mingw-w64`, and python3; the script installs
+meson 1.10.0 and ninja into a venv. Work goes to `scratch/dxmt-build/`, output to
+`scratch/dxmt-out/`: the binary tarball with `COPYING.LIB`, `LICENSE` and
+`LICENSE-0.80-and-earlier.txt` inside it, `dxmt-<shortsha>-source.tar.gz` (the Corresponding
+Source: the exact worktree the build ran from, submodules included), and a `.sha256`
+manifest covering both. Finished stages are reused. A cold run on an M5 Max
 takes about 6 minutes plus clones: LLVM about 3, Wine configure about 1, DXMT about 1.
 
 It follows the gcc-release jobs of DXMT's `ci.yml` (LLVM 15.0.7 for x86_64-apple-darwin,
@@ -107,3 +112,8 @@ from the same tarball.
 | `i386-windows/winemetal.dll` | `6ddeb053c5510cffafdabfd27c8a67950f2e37308e6b9f9d1a0c44b9119ac456` |
 | `x86_64-windows-d3d12/d3d12.dll` | `30c11f6672fd59ebbe316b3b4e85efb2090c6e28df8a0bdc74befde0f02d4c27` |
 | tarball | `8de0d5b7eb2b96315f6ec8e259c05423ab43212e776196147b30d9f44927f7f0` |
+
+This table pins what `dxmt-e94c312.tar.gz` already ships; its hash does not change. The next
+pinned commit's tarball also carries `COPYING.LIB`, `LICENSE` and
+`LICENSE-0.80-and-earlier.txt` (`scripts/build-dxmt.sh`), which `FreeEngine.swift` does not
+list in `expectedFiles` and so does not need pinning here.

@@ -243,6 +243,28 @@ have them from earlier apps, so they download nothing. When `fonts/` changes:
 3. `scripts/package-fonts.sh --publish` creates the release. `release-local.sh` stops while the
    pinned archive is missing on GitHub.
 
+## WineCX patch source
+
+The Corresponding Source for the patched Wine (WineCX) binaries in `app/Sources/BridgeplayApp/Resources/`
+(NOTICE, "Patched Wine (WineCX) binaries") is winecx (`dappermint/winecx`) at the pinned
+commits plus the patches in this repository. LGPL-2.1-or-later asks whoever distributes the
+binaries to also provide that source, so `scripts/package-wine-patch-sources.sh` publishes
+both onto a `wine-patch-sources-<id>` release of this project; `<id>` comes from the pinned
+commits and the patch files, so unchanged pins and patches give the same name and sha256.
+When `docs/WINECX.md`'s winecx pins or any of the patch directories change:
+
+1. `scripts/package-wine-patch-sources.sh`. Copy the pin it prints into NOTICE.
+2. `scripts/package-wine-patch-sources.sh --publish` creates the release. `release-local.sh`
+   stops while the pinned archive is missing on GitHub.
+
+## DXMT source
+
+Every `dxmt-<commit>` release from `scripts/build-dxmt.sh --publish` on carries the license
+texts inside the binary tarball and a `dxmt-<commit>-source.tar.gz` (the exact DXMT worktree
+the build ran from, submodules included) beside it; see [DXMT.md](DXMT.md), Rebuilding. The
+currently pinned `dxmt-e94c312.tar.gz` predates this and has neither; its source is the
+upstream commit named in NOTICE and `FreeEngine.swift` until the next rebuild.
+
 ## Compatibility reports
 
 The app's one-tap reports go to `https://bridgeplay.dev/api/report` (bridgeplay-web,

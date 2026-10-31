@@ -51,6 +51,13 @@ later (LGPL-2.1-or-later); these files keep that license. Wine's license notice
 and the LGPL-2.1 text ship in the app as LICENSE.wine. Build recipes and
 sha256 pins are in docs/WINECX.md and each patch directory's README.
 
+The Corresponding Source for these binaries is winecx
+(https://github.com/dappermint/winecx) at the commits named below, plus the
+patches above. LGPL-2.1-or-later asks whoever distributes the binaries to also
+provide that source, so Bridgeplay publishes a copy of it alongside the
+patches, built by scripts/package-wine-patch-sources.sh (see the written offer
+below for the current archive's name and sha256).
+
   WineCX 11.17 (winecx e0aa380780b73e20fabcfe78fd42713b94929a53, runtime 4.7.3):
     win32u-winecx-11.17.so        win32u-patch/patch-driver-version.sh (binary
                                   string edit of the runtime's win32u.so)
@@ -90,7 +97,12 @@ in app/Sources/BridgeplayApp/Model/FreeEngine.swift) when they are not there.
 
   DXMT (dxmt-e94c312.tar.gz, built from https://github.com/3Shain/dxmt at
       e94c312f5c054263acf261cfa109edf13e757587; docs/DXMT.md), Copyright (c)
-      2023-2026 Feifan He for CodeWeavers, LGPL-2.1-or-later.
+      2023-2026 Feifan He for CodeWeavers, LGPL-2.1-or-later. scripts/build-dxmt.sh
+      packs the license texts (COPYING.LIB, LICENSE, LICENSE-0.80-and-earlier.txt)
+      and the Corresponding Source, the exact source tree the build ran from with
+      its submodules, into every DXMT build from here on, alongside the binaries on
+      the same dxmt-<commit> release (see docs/DXMT.md). dxmt-e94c312.tar.gz itself
+      predates that and carries neither; its source is the upstream commit above.
   DXVK-macOS 1.10.3 (dxvk-macOS-async-v1.10.3-20230507-repack-builtin.tar.gz from
       https://github.com/Gcenx/DXVK-macOS/releases/tag/v1.10.3-20230507-repack),
       zlib license.
@@ -133,6 +145,23 @@ WineCX runtime, including its GPL libraries, in the installers up to Bridgeplay
 three years after the last release that ships them, Raymond Chin will also
 provide that source on request, for no more than the cost of providing it; open
 an issue at https://github.com/raymondchins/Bridgeplay/issues.
+
+The LGPL and this offer ask Bridgeplay to provide that source alongside the
+binaries it distributes, so Bridgeplay also publishes a copy of the winecx
+source behind the patched Wine files, packed with the patches and recipes by
+scripts/package-wine-patch-sources.sh:
+
+  wine-patch-sources-3a3a0ee26fca.tar.gz, sha256
+  722c6efb34d4855fde2b7cb934049aef925c64700a099145b685771759384f5d, published on
+  this project's release of the same name. Covers winecx e0aa380780b73e20fabcfe78fd42713b94929a53
+  and 5b45f4564c4f87fa9c0f958733a5e9bb3918a058 (the commits named above) plus the patch
+  directories they are built from. Rebuild it (same id and sha256 for the same
+  inputs) whenever those pins or patches change, and republish with --publish.
+
+Likewise, every dxmt-<commit> release from here on carries a
+dxmt-<commit>-source.tar.gz beside the binaries (above; docs/DXMT.md). The DXMT
+commit currently pinned, e94c312, predates that and has no self-hosted source archive
+yet; its source is the upstream URL above until the next rebuild adds one.
 
 NotProton-WineHQ licensing
 ==========================

@@ -2,13 +2,18 @@
 # Build DXMT from a pinned commit and package it the way the upstream v0.80 release
 # tarball is laid out, so FreeEngine can consume it in place of that release.
 #
-#   scripts/build-dxmt.sh <commit>
+#   scripts/build-dxmt.sh [--publish] <commit>
 #
 # Output: scratch/dxmt-out/dxmt-<shortsha>.tar.gz holding
 #   <shortsha>/x86_64-unix/winemetal.so
 #   <shortsha>/x86_64-windows/{d3d10core,d3d11,dxgi,winemetal,nvapi64,nvngx}.dll
 #   <shortsha>/i386-windows/{d3d10core,d3d11,dxgi,winemetal}.dll
 #   <shortsha>/x86_64-windows-d3d12/d3d12.dll   (WIP backend, kept apart on purpose)
+#   <shortsha>/{COPYING.LIB,LICENSE,LICENSE-0.80-and-earlier.txt}
+# and scratch/dxmt-out/dxmt-<shortsha>-source.tar.gz: the Corresponding Source
+# (LGPL-2.1-or-later), the exact DXMT worktree this build ran from, submodules
+# included, as <shortsha>/. --publish also creates the dxmt-<shortsha> GitHub release
+# carrying both tarballs and the sha256 manifest.
 #
 # The toolchain follows DXMT's CI (.github/workflows/ci.yml, the gcc-release jobs that
 # feed its package step): LLVM 15.0.7 built for x86_64-apple-darwin, Homebrew mingw-w64,
@@ -21,11 +26,21 @@
 # delete the matching directory under scratch/dxmt-build to redo one.
 set -euo pipefail
 
-if [ $# -ne 1 ]; then
-    echo "usage: $0 <dxmt commit>" >&2
+PUBLISH=0
+COMMIT_ARG=""
+for arg in "$@"; do
+    case "$arg" in
+        --publish) PUBLISH=1 ;;
+        *)
+            if [ -n "$COMMIT_ARG" ]; then echo "usage: $0 [--publish] <dxmt commit>" >&2; exit 2; fi
+            COMMIT_ARG="$arg"
+            ;;
+    esac
+done
+if [ -z "$COMMIT_ARG" ]; then
+    echo "usage: $0 [--publish] <dxmt commit>" >&2
     exit 2
 fi
-COMMIT_ARG="$1"
 # A commit, never a branch or tag that can move: 7 to 40 hex digits, checked below to be
 # a prefix of what it resolves to.
 case "$COMMIT_ARG" in
@@ -275,6 +290,13 @@ for f in $files; do
         || die "$f embeds Metal code newer than macOS $MACOSX_DEPLOYMENT_TARGET"
 done
 
+# License texts beside the binaries, so a direct download (FreeEngine, not only the
+# installer path) carries them too: LGPL-2.1-or-later since ec357fd (v0.80 was the last
+# MIT release).
+cp "$repo/installer/licenses/COPYING.LIB.dxmt" "$TREE/COPYING.LIB"
+cp "$repo/installer/licenses/LICENSE.dxmt" "$TREE/LICENSE"
+cp "$repo/installer/licenses/LICENSE.dxmt-old" "$TREE/LICENSE-0.80-and-earlier.txt"
+
 # Same modes as the release, fixed owners and times, sorted entries and no macOS
 # metadata, so the same binaries always give the same tarball.
 epoch="$(git -C "$SRC" show -s --format=%ct "$COMMIT")"
@@ -297,6 +319,43 @@ MANIFEST="$OUT/dxmt-$SHORT.sha256"
     printf '%s  %s\n' "$(sha "$TARBALL")" "$(basename "$TARBALL")"
 } > "$MANIFEST"
 
+# --- source tarball ----------------------------------------------------------------
+# Corresponding Source (LGPL-2.1-or-later): the exact worktree this build ran from,
+# submodules included (DXMT vendors external/nvapi and include/native/directx that
+# way), without git's own metadata. LGPL-2.1-or-later asks whoever distributes this
+# build to also provide that source, so it ships beside the binaries.
+SRC_STAGE="$OUT/stage-source"
+SRC_TREE="$SRC_STAGE/$SHORT"
+rm -rf "$SRC_STAGE"
+mkdir -p "$SRC_TREE"
+( cd "$SRC" && find . -name .git -prune -o -type f -print ) | sed 's#^\./##' > "$OUT/.srclist"
+( cd "$SRC" && tar -cf - -T "$OUT/.srclist" ) | tar -x -C "$SRC_TREE"
+rm -f "$OUT/.srclist"
+find "$SRC_TREE" -type d -exec chmod 755 {} +
+find "$SRC_TREE" -type f -exec chmod 644 {} +
+find "$SRC_STAGE" -exec env TZ=UTC touch -h -t "$stamp" {} +
+SOURCE_TARBALL="$OUT/dxmt-$SHORT-source.tar.gz"
+( cd "$SRC_STAGE" && find "$SHORT" | LC_ALL=C sort ) > "$OUT/.srcfilelist"
+( cd "$SRC_STAGE" && COPYFILE_DISABLE=1 tar --format ustar --uid 0 --gid 0 --uname "" --gname "" \
+    --no-xattrs --no-mac-metadata --no-acls --no-fflags -c -n -T "$OUT/.srcfilelist" -f - ) \
+    | gzip -n -9 > "$SOURCE_TARBALL"
+rm -f "$OUT/.srcfilelist"
+printf '%s  %s\n' "$(sha "$SOURCE_TARBALL")" "$(basename "$SOURCE_TARBALL")" >> "$MANIFEST"
+
 log "DXMT $COMMIT built in $(( $(date +%s) - start ))s"
 log "tarball: $TARBALL (tree: $SHORT)"
+log "source tarball: $SOURCE_TARBALL"
 cat "$MANIFEST"
+
+if [ "$PUBLISH" -eq 1 ]; then
+    slug=raymondchins/Bridgeplay
+    tag="dxmt-$SHORT"
+    if gh release view "$tag" -R "$slug" >/dev/null 2>&1; then
+        log "$tag is already published"
+    else
+        gh release create "$tag" "$TARBALL" "$SOURCE_TARBALL" "$MANIFEST" -R "$slug" \
+            --prerelease --latest=false --title "DXMT $SHORT" \
+            --notes "DXMT built from https://github.com/3Shain/dxmt at $COMMIT ($(git -C "$SRC" describe --always)). LGPL-2.1-or-later since ec357fd (v0.80 was the last MIT release); license texts and the dxmt-$SHORT-source.tar.gz Corresponding Source (submodules included) ship alongside the binaries. See docs/DXMT.md."
+        log "published https://github.com/$slug/releases/tag/$tag"
+    fi
+fi
