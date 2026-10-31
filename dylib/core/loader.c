@@ -117,7 +117,7 @@ static void install_steamui(np_sigdb_t *sigdb) {
     const struct mach_header_64 *mh = NULL;
     intptr_t slide = 0;
 
-    if (np_await_image(STEAMUI_DYLIB, WAIT_TIMEOUT_MS, &mh, &slide, NULL, 0) != 0) {
+    if (np_await_image(STEAMUI_DYLIB, WAIT_TIMEOUT_MS, &mh, &slide) != 0) {
         NP_WARN("install_thread: %s absent after %d ms, its hooks stay off",
                 STEAMUI_DYLIB, WAIT_TIMEOUT_MS);
         return;
@@ -149,8 +149,7 @@ static void *install_thread(void *unused) {
     const struct mach_header_64 *mh = NULL;
     intptr_t slide = 0;
 
-    if (np_await_image(STEAMCLIENT_DYLIB, WAIT_TIMEOUT_MS, &mh, &slide,
-                             NULL, 0) != 0) {
+    if (np_await_image(STEAMCLIENT_DYLIB, WAIT_TIMEOUT_MS, &mh, &slide) != 0) {
         // The Steam bootstraper does this
         NP_LOG("install_thread: %s absent after %d ms, hooks will install in the "
                "relaunched client", STEAMCLIENT_DYLIB, WAIT_TIMEOUT_MS);

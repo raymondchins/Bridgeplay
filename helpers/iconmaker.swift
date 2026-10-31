@@ -61,12 +61,7 @@ let sizes: [(side: Int, scale: Int, name: String)] = [
 ]
 
 let fm = FileManager.default
-let iconsetURL: URL
-if #available(macOS 13.0, *) {
-    iconsetURL = URL(filePath: outputPath + ".iconset")
-} else {
-    iconsetURL = URL(fileURLWithPath: outputPath + ".iconset")
-}
+let iconsetURL = URL(filePath: outputPath + ".iconset")
 try? fm.removeItem(at: iconsetURL)
 try fm.createDirectory(at: iconsetURL, withIntermediateDirectories: true)
 
@@ -110,12 +105,7 @@ for entry in sizes {
         exit(1)
     }
 
-    let fileURL: URL
-    if #available(macOS 13.0, *) {
-        fileURL = iconsetURL.appending(path: entry.name)
-    } else {
-        fileURL = iconsetURL.appendingPathComponent(entry.name)
-    }
+    let fileURL = iconsetURL.appending(path: entry.name)
     try png.write(to: fileURL)
 }
 

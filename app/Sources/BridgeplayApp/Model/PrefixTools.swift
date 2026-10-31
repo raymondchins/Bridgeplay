@@ -48,6 +48,12 @@ enum PrefixLog: CaseIterable, Sendable {
         return current
     }
 
+    // Games print raw bytes into these logs, and one invalid UTF-8 byte must not cost the
+    // whole file. nil only when it can't be read.
+    static func text(of url: URL) -> String? {
+        (try? Data(contentsOf: url)).map { String(decoding: $0, as: UTF8.self) }
+    }
+
     var fileName: String {
         switch self {
         case .launch: "bridgeplay-run.log"

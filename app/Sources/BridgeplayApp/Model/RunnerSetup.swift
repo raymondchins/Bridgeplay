@@ -21,7 +21,6 @@ enum RunnerSetup {
     }
 
     struct Outcome: Sendable {
-        let build: RunnerBuild
         let staged: [WineArch]
         let installed: RunnerPatcher.Outcome
         var toolsChanged = false
@@ -78,7 +77,7 @@ enum RunnerSetup {
         let staged = try stage(build, root, bridge)
 
         report(.patching)
-        var outcome = Outcome(build: build, staged: staged, installed: try patch(build, root, bridge))
+        var outcome = Outcome(staged: staged, installed: try patch(build, root, bridge))
         outcome.toolsChanged = try CompatToolList.sync(
             runners: runners, bridge: bridge, file: toolList, compatTools: compatTools
         )

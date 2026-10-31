@@ -246,6 +246,8 @@ struct FreeEngineTests {
 
     @Test("Stripping the builtin marker turns a builtin PE into a native one and refuses anything else")
     func stripsBuiltinMarker() throws {
+        let dir = try scratchDirectory("pe")
+        defer { try? FileManager.default.removeItem(at: dir) }
         var image = Data(repeating: 0, count: 0x80)
         image[0] = 0x4d
         image[1] = 0x5a
@@ -255,14 +257,14 @@ struct FreeEngineTests {
         #expect(Array(stripped[0x40 ..< 0x50]) == FreeEngine.dosStub)
         #expect(stripped.count == image.count)
         #expect(stripped[0x50...] == image[0x50...])
-        #expect(!WinecxD3DMetal.isBuiltin(try write(stripped)))
-        #expect(WinecxD3DMetal.isBuiltin(try write(image)))
+        #expect(!WinecxD3DMetal.isBuiltin(try write(stripped, in: dir)))
+        #expect(WinecxD3DMetal.isBuiltin(try write(image, in: dir)))
         // Already native: refused, so a pin mismatch cannot be papered over.
         #expect(throws: StepFailure.self) { try FreeEngine.stripBuiltinMarker(&stripped) }
     }
 
-    private func write(_ data: Data) throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appending(path: "np-pe-\(UUID().uuidString).dll")
+    private func write(_ data: Data, in dir: URL) throws -> URL {
+        let url = dir.appending(path: "\(UUID().uuidString).dll")
         try data.write(to: url)
         return url
     }

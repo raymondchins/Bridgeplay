@@ -157,6 +157,8 @@ final class SystemStatus {
         var id: Self { self }
     }
 
+    // A second ask replaces the first rather than queueing behind it, so the dialog on screen
+    // is always the one that will run if it is confirmed.
     var pendingConfirmation: Confirmation?
     var generation = 0
 
@@ -377,10 +379,7 @@ final class SystemStatus {
         clearFailure()
         outcome = nil
 
-        func same(_ a: URL, _ b: URL) -> Bool {
-            a.standardizedFileURL.path(percentEncoded: false) == b.standardizedFileURL.path(percentEncoded: false)
-        }
-        guard !same(picked, current) else { return }
+        guard !CrossOverSource.same(picked, current) else { return }
         if SupportPaths.Steam.isUnreachable(current) {
             let alert = NSAlert()
             alert.messageText = String(localized: "Steam at \(current.path(percentEncoded: false)) isn't connected.")
@@ -398,7 +397,7 @@ final class SystemStatus {
                 return
             }
 
-            if same(picked, SupportPaths.Steam.defaultApp) {
+            if CrossOverSource.same(picked, SupportPaths.Steam.defaultApp) {
                 UserDefaults.standard.removeObject(forKey: SupportPaths.Steam.appPathKey)
             } else {
                 UserDefaults.standard.set(picked.path(percentEncoded: false), forKey: SupportPaths.Steam.appPathKey)
@@ -603,9 +602,7 @@ final class SystemStatus {
     private func requireInstallableContent() async throws {
         try await requireUnblockedContent()
         let running = await Task.detached(priority: .utility) {
-            RunnerStore.clonedBuilds().contains {
-                RunnerInstaller.isRunning(from: SupportPaths.runnerRoot(forBuild: $0))
-            }
+            RunnerInstaller.runningBuild() != nil
         }.value
         guard !running else {
             throw StepFailure(step: SteamInstaller.step, detail: String(localized: "A game or Wine tool is running. Quit it before updating Bridgeplay."))
@@ -632,13 +629,16 @@ final class SystemStatus {
             AppLog.note("run refused: install waits for the 3.0 folder move")
             return
         }
-        var failedInputResets: [String]?
         await perform(from: InstallPhase.checkingPayload.label) { progress in
             let lock = try DeploymentContent.acquireInstallationLock()
             defer { lock.release() }
             let stopClient = unattended ? SteamInstaller.leaveTheClient : SteamInstaller.stopTheClient
             let result = try await Task.detached(priority: .userInitiated) {
+                // Only an install that changed Steam's signature tried a reset, so only it decides.
                 try SteamInstaller.run(holdingInstallationLock: true, stopClient: stopClient,
+                                       onInputReset: { failed in
+                                           Task { @MainActor in self.controllerResetFailures = failed }
+                                       },
                                        report: { progress($0.label) })
             }.value
 
@@ -676,16 +676,11 @@ final class SystemStatus {
             try await Task.detached(priority: .userInitiated) {
                 try SteamInstaller.finish(result)
             }.value
-            failedInputResets = result.failedInputResets
 
             return parts.joined(separator: " ")
         }
         if failure == nil {
             UserDefaults.standard.removeObject(forKey: SteamPatchKeeper.pausedKey)
-        }
-        // Only an install that changed Steam's signature tried a reset, so only it decides.
-        if let failedInputResets, failure == nil, !failedInputResets.isEmpty || !controllerResetFailures.isEmpty {
-            controllerResetFailures = failedInputResets
         }
     }
 

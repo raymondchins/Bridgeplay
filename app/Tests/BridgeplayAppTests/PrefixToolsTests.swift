@@ -598,7 +598,8 @@ struct PrefixToolsTests {
             printf template > "$WINEPREFIX/drive_c/users/crossover/AppData/wine.ini"
             printf template > "$WINEPREFIX/drive_c/users/crossover/AppData/fresh.ini"
             printf 'fresh user' > "$WINEPREFIX/user.reg"
-            printf 'fresh system' > "$WINEPREFIX/system.reg"
+            { printf 'fresh system'; head -c 3000000 /dev/zero; } > "$WINEPREFIX/system.reg"
+            printf 'fresh userdef' > "$WINEPREFIX/userdef.reg"
             ln -s "\(home.path(percentEncoded: false))" "$WINEPREFIX/drive_c/users/crossover/Documents"
             \(extra)
             \(lock ? "chflags uchg \"$WINEPREFIX\"" : ":")
@@ -684,7 +685,7 @@ struct PrefixToolsTests {
 
         // HKLM does not, so the record of what is installed matches the files that are
         // actually there and the next launch reinstalls what went with the old tree.
-        #expect(text("system.reg") == "fresh system")
+        #expect(text("system.reg")?.hasPrefix("fresh system") == true)
 
         // Replaced, both the file the arch is read from and what an installer left beside it.
         #expect(text("drive_c/windows/system32/ntdll.dll") == "fresh")
@@ -758,6 +759,219 @@ struct PrefixToolsTests {
         }
         #expect(text("AppData/Roaming/game/save.dat") == "save")
         #expect(text("AppData/LocalLow/other/save.txt") == "theirs")
+    }
+
+    @Test("The run script looks for the server in the folder the app does")
+    func runScriptAgreesOnTheServerFolder() throws {
+        #expect(try Self.compatSource().contains(#"/tmp/.wine-$(id -u)/server-$(printf '%x-%x'"#))
+    }
+
+    @Test("A finished rebuild clears the run script's switch record, a failed one keeps it")
+    func rebuildAnswersTheSwitchRecord() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let prefix = try usedPrefix(in: dir, home: home)
+        let record = prefix.root.appending(path: "notproton-switch")
+        try Data("1\n2\n0\n".utf8).write(to: record)
+
+        let failing = try fakeRunner(in: dir, home: home, exit: 1)
+        #expect(throws: (any Error).self) { try PrefixTools.recreate(prefix, runner: failing) }
+        #expect(fm.fileExists(atPath: record.path(percentEncoded: false)))
+
+        try PrefixTools.recreate(prefix, runner: try fakeRunner(in: dir, home: home))
+        #expect(!fm.fileExists(atPath: record.path(percentEncoded: false)))
+    }
+
+    // A volume that ignores case sees one file under both names.
+    @Test("Copies whose names differ only by case both survive a rebuild")
+    func rebuildKeepsCopiesThatDifferOnlyByCase() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let runner = try fakeRunner(in: dir, home: home)
+        let prefix = try usedPrefix(in: dir, home: home)
+        let users = prefix.pfx.appending(path: "drive_c/users")
+
+        try Data().write(to: dir.appending(path: "Probe"))
+        guard fm.fileExists(atPath: dir.appending(path: "probe").path(percentEncoded: false)) else { return }
+
+        for (path, text) in [("crossover/AppData/Roaming/Save1.sav", "crossover"),
+                             ("steamuser/AppData/Roaming/save1.sav", "steamuser"),
+                             ("crossover/AppData/Roaming/Slot/Save2.sav", "crossover"),
+                             ("steamuser/AppData/Roaming/slot/save2.sav", "steamuser")] {
+            let file = users.appending(path: path)
+            try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: file)
+        }
+
+        try PrefixTools.recreate(prefix, runner: runner, keepBackup: false)
+
+        let roaming = users.appending(path: "steamuser/AppData/Roaming")
+        func text(_ path: String) -> String? {
+            try? String(contentsOf: roaming.appending(path: path), encoding: .utf8)
+        }
+        #expect(text("Save1.sav") == "crossover")
+        #expect(text("save1.sav BACKUP") == "steamuser")
+        #expect(text("Slot/Save2.sav") == "crossover")
+        #expect(text("slot BACKUP/save2.sav") == "steamuser")
+    }
+
+    // ς and σ are one name on APFS but not to lowercased().
+    @Test("Names only the volume folds together both survive a rebuild")
+    func rebuildKeepsCopiesTheVolumeFolds() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let runner = try fakeRunner(in: dir, home: home)
+        let prefix = try usedPrefix(in: dir, home: home)
+
+        try Data().write(to: dir.appending(path: "ς"))
+        guard fm.fileExists(atPath: dir.appending(path: "σ").path(percentEncoded: false)) else { return }
+
+        let users = prefix.pfx.appending(path: "drive_c/users")
+        for (path, text) in [("crossover/AppData/Roaming/ς.sav", "crossover"),
+                             ("steamuser/AppData/Roaming/σ.sav", "steamuser")] {
+            let file = users.appending(path: path)
+            try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: file)
+        }
+
+        try PrefixTools.recreate(prefix, runner: runner, keepBackup: false)
+
+        let roaming = users.appending(path: "steamuser/AppData/Roaming")
+        let kept = try fm.contentsOfDirectory(at: roaming, includingPropertiesForKeys: nil)
+            .compactMap { try? String(contentsOf: $0, encoding: .utf8) }
+        #expect(kept.sorted() == ["crossover", "steamuser"])
+    }
+
+    @Test("A real name ending in BACKUP does not overwrite a parked copy")
+    func rebuildKeepsARealBackupNameApart() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let runner = try fakeRunner(in: dir, home: home)
+        let prefix = try usedPrefix(in: dir, home: home)
+
+        let users = prefix.pfx.appending(path: "drive_c/users")
+        for (path, text) in [("crossover/AppData/Roaming/a.sav", "first"),
+                             ("steamuser/AppData/Roaming/a.sav", "parked"),
+                             ("steamuser/AppData/Roaming/a.sav BACKUP", "real")] {
+            let file = users.appending(path: path)
+            try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: file)
+        }
+
+        try PrefixTools.recreate(prefix, runner: runner, keepBackup: false)
+
+        let roaming = users.appending(path: "steamuser/AppData/Roaming")
+        let kept = try fm.contentsOfDirectory(at: roaming, includingPropertiesForKeys: nil)
+            .compactMap { try? String(contentsOf: $0, encoding: .utf8) }
+        #expect(kept.sorted() == ["first", "parked", "real"])
+    }
+
+    @Test("An old file the template replaces is parked unless it is the same")
+    func rebuildParksATemplateCollision() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let runner = try fakeRunner(in: dir, home: home, extra: """
+            printf template > "$WINEPREFIX/drive_c/ProgramData/save.ini"
+            printf template > "$WINEPREFIX/drive_c/ProgramData/same.ini"
+            """)
+        let prefix = try usedPrefix(in: dir, home: home)
+
+        let data = prefix.pfx.appending(path: "drive_c/ProgramData")
+        try fm.createDirectory(at: data, withIntermediateDirectories: true)
+        try Data("mine".utf8).write(to: data.appending(path: "save.ini"))
+        try Data("template".utf8).write(to: data.appending(path: "same.ini"))
+
+        try PrefixTools.recreate(prefix, runner: runner, keepBackup: false)
+
+        func text(_ name: String) -> String? {
+            try? String(contentsOf: data.appending(path: name), encoding: .utf8)
+        }
+        #expect(text("save.ini") == "template")
+        #expect(text("save.ini BACKUP") == "mine")
+        #expect(text("same.ini BACKUP") == nil)
+    }
+
+    // A killed installer leaves wineboot exiting 0 with a registry too small to be a prefix.
+    @Test("A wineboot that exits 0 with a partial registry leaves the prefix alone", arguments: [
+        #"printf small > "$WINEPREFIX/system.reg""#,
+        #"rm -f "$WINEPREFIX/userdef.reg""#,
+    ])
+    func rebuildRefusesAPartialPrefix(extra: String) throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let runner = try fakeRunner(in: dir, home: home, extra: extra)
+        let prefix = try usedPrefix(in: dir, home: home)
+        let save = prefix.pfx.appending(path: "drive_c/users/steamuser/AppData/Roaming/keep.sav")
+        try fm.createDirectory(at: save.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("save".utf8).write(to: save)
+
+        #expect(throws: StepFailure.self) {
+            try PrefixTools.recreate(prefix, runner: runner, keepBackup: false)
+        }
+        #expect(fm.fileExists(atPath: save.path(percentEncoded: false)))
+    }
+
+    // The server holds no pipe here, as when a rebuild outlasts Shell's drain, and writes user.reg
+    // into the moved folder as a real one does.
+    @Test("A rebuild waits for the server before carrying user.reg")
+    func rebuildWaitsForTheServer() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let runner = try fakeRunner(in: dir, home: home, extra: #"""
+            (cd "$WINEPREFIX"; exec >/dev/null 2>&1 </dev/null; sleep 1; printf server > user.reg) &
+            """#)
+        let server = runner.appending(path: "bin/wineserver")
+        try fm.createDirectory(at: server.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("#!/bin/sh\n[ \"$1\" = -w ] && sleep 2\nexit 0\n".utf8).write(to: server)
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: server.path(percentEncoded: false))
+        let prefix = try usedPrefix(in: dir, home: home)
+        try Data("old user".utf8).write(to: prefix.pfx.appending(path: "user.reg"))
+
+        try PrefixTools.recreate(prefix, runner: runner)
+        Thread.sleep(forTimeInterval: 1.5)
+
+        let reg = try String(contentsOf: prefix.pfx.appending(path: "user.reg"), encoding: .utf8)
+        #expect(reg.contains("old user"))
+    }
+
+    @Test("A wineboot that never exits is stopped and the prefix left alone")
+    func rebuildStopsAHungWineboot() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let runner = try fakeRunner(in: dir, home: home, extra: "exec sleep 30")
+        let prefix = try usedPrefix(in: dir, home: home)
+        try Data("old user".utf8).write(to: prefix.pfx.appending(path: "user.reg"))
+
+        let start = Date.now
+        #expect(throws: (any Error).self) {
+            try PrefixTools.recreate(prefix, runner: runner, keepBackup: false, wineTimeout: .seconds(1))
+        }
+        #expect(Date.now.timeIntervalSince(start) < 10)
+        #expect(fm.fileExists(atPath: prefix.pfx.appending(path: "user.reg").path(percentEncoded: false)))
     }
 
     // The merge keeps whichever copy the walk reaches first, never the newer date: a cloud

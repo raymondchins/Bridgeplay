@@ -378,8 +378,4 @@ enum WinecxD3DMetal {
             return nil
         }
     }
-
-    static func isWinecx(root: URL) -> Bool {
-        FreeEngineWinecx.release(forRoot: root) != nil
-    }
 }

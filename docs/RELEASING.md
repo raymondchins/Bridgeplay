@@ -125,9 +125,9 @@ Any other release in the repository (a DXMT build, say) must be created with
   the background and installs it when Bridgeplay quits (`SUAutomaticallyUpdate`). Check
   for Updates… in the app menu does it on demand.
 - On the next launch, if the patch inside Steam is from an older Bridgeplay, the app
-  re-applies it by itself once Steam and every game are closed. If Steam is open, the
-  Status row shows "Update available" until the user installs it or relaunches with Steam
-  closed.
+  re-applies it by itself once Steam and every game are closed. While Steam or a game is
+  open, a banner says so and the Status row shows "Update available". The app looks again
+  when it comes to the front and every five minutes, so no relaunch is needed.
 
 ## Signing
 

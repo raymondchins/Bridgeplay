@@ -7,15 +7,17 @@ struct CommandResult: Sendable {
     let stdout: String
     let stderr: String
     let outputLost: Bool
+    let timedOut: Bool
 
-    init(status: Int32, stdout: String, stderr: String, outputLost: Bool = false) {
+    init(status: Int32, stdout: String, stderr: String, outputLost: Bool = false, timedOut: Bool = false) {
         self.status = status
         self.stdout = stdout
         self.stderr = stderr
         self.outputLost = outputLost
+        self.timedOut = timedOut
     }
 
-    var succeeded: Bool { status == 0 }
+    var succeeded: Bool { status == 0 && !timedOut }
 }
 
 struct CommandFailure: LocalizedError {
@@ -43,7 +45,8 @@ enum Shell {
         _ arguments: [String],
         environment: [String: String]? = nil,
         currentDirectory: URL? = nil,
-        drainTimeout: DispatchTimeInterval = outputDrainTimeout
+        drainTimeout: DispatchTimeInterval = outputDrainTimeout,
+        timeout: DispatchTimeInterval? = nil
     ) throws -> CommandResult {
         let process = Process()
         process.executableURL = URL(filePath: executable)
@@ -54,6 +57,9 @@ enum Shell {
         let out = Pipe(), err = Pipe()
         process.standardOutput = out
         process.standardError = err
+
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
 
         try process.run()
 
@@ -68,18 +74,29 @@ enum Shell {
             }
         }
 
+        var timedOut = false
+        if let timeout, exited.wait(timeout: .now() + timeout) == .timedOut {
+            timedOut = true
+            AppLog.note("\(executable) did not finish in time, stopping it")
+            process.terminate()
+            if exited.wait(timeout: .now() + .seconds(5)) == .timedOut {
+                kill(process.processIdentifier, SIGKILL)
+            }
+        }
         process.waitUntilExit()
 
         if group.wait(timeout: .now() + drainTimeout) == .timedOut {
             AppLog.note("\(executable) exited but left its output open")
             return CommandResult(
-                status: process.terminationStatus, stdout: "", stderr: "", outputLost: true)
+                status: process.terminationStatus, stdout: "", stderr: "", outputLost: true,
+                timedOut: timedOut)
         }
 
         return CommandResult(
             status: process.terminationStatus,
             stdout: String(decoding: outBox.data, as: UTF8.self),
-            stderr: String(decoding: errBox.data, as: UTF8.self)
+            stderr: String(decoding: errBox.data, as: UTF8.self),
+            timedOut: timedOut
         )
     }
 
@@ -89,11 +106,12 @@ enum Shell {
         _ arguments: [String],
         environment: [String: String]? = nil,
         currentDirectory: URL? = nil,
-        drainTimeout: DispatchTimeInterval = outputDrainTimeout
+        drainTimeout: DispatchTimeInterval = outputDrainTimeout,
+        timeout: DispatchTimeInterval? = nil
     ) throws -> String {
         let result = try run(
             executable, arguments, environment: environment, currentDirectory: currentDirectory,
-            drainTimeout: drainTimeout)
+            drainTimeout: drainTimeout, timeout: timeout)
         guard result.succeeded else {
             let reason = result.stderr.isEmpty ? result.stdout : result.stderr
             throw CommandFailure(

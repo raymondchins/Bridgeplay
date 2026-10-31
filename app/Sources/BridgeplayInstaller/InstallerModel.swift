@@ -104,13 +104,14 @@ final class InstallerModel {
             components = InstallerComponents.needed() ? try await InstallerComponents.latest() : nil
             try Task.checkCancellation()
             let state = try service.state(for: fetched)
+            isCurrent = state.isCurrent
             total = (state.isCurrent ? 0 : fetched.archiveLength) + (components?.length ?? 0)
             InstallerLog.write("Release \(fetched.shortVersion), installed \(state.installedVersion ?? "none"), components \(components == nil ? "present" : "needed")")
             switch state {
             case .notInstalled: installedVersion = nil; stage = .review
             case .updateAvailable(_, let current, _): installedVersion = current; stage = .review
             case .upToDate(_, let current):
-                installedVersion = current; version = current; isCurrent = true
+                installedVersion = current; version = current
                 stage = components == nil ? .done : .review
             }
         } catch is CancellationError {
@@ -123,6 +124,7 @@ final class InstallerModel {
         operation = Task {
             defer { operation = nil }
             stage = .downloading
+            settingUp = false
             failure = nil
             InstallerLog.write("Install \(release.shortVersion) to \(destination.path)")
             received = 0

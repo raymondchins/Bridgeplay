@@ -25,10 +25,11 @@ enum RebuildProgressCommand {
                         }
                     })
                 } catch {
+                    AppLog.note("rebuild prefix failed: \(error.localizedDescription)")
                     FileHandle.standardError.write(Data("\(error.localizedDescription)\n".utf8))
                     code = 1
                 }
-                DispatchQueue.main.async { exit(code) }
+                DispatchQueue.main.async { exit(AppLog.finished(code)) }
             }
             app.run()
         }

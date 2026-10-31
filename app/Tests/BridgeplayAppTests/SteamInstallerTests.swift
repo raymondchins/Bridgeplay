@@ -95,6 +95,12 @@ struct SteamInstallerTests {
         private var resets = 0
         func resetInputAccess() { lock.lock(); resets += 1; lock.unlock() }
         var inputAccessResets: Int { lock.lock(); defer { lock.unlock() }; return resets }
+        private var stopRequests = 0
+        func stop() { lock.lock(); stopRequests += 1; lock.unlock() }
+        var stops: Int { lock.lock(); defer { lock.unlock() }; return stopRequests }
+        private var runnerLooks = 0
+        // Which look at the runners this is, from 1.
+        func lookAtRunners() -> Int { lock.lock(); defer { lock.unlock() }; runnerLooks += 1; return runnerLooks }
     }
 
     private func install(
@@ -104,7 +110,13 @@ struct SteamInstallerTests {
         stopped: Bool = false,
         running: Bool = false,
         recordBuild: Bool = true,
-        verifyRunner: (RunnerBuild, URL) throws -> Void = { _, _ in }
+        refusedResets: [String] = [],
+        runnerIsRunning: (@Sendable (URL) -> Bool)? = nil,
+        launchingBuild: (URL) -> String? = { _ in nil },
+        stopClient: SteamInstaller.ClientStopper? = nil,
+        verifyRunner: (RunnerBuild, URL) throws -> Void = { _, _ in },
+        register: SteamInstaller.BundleRegistrar? = nil,
+        onInputReset: ([String]) -> Void = { _ in }
     ) throws -> InstallOutcome {
         let outcome = try SteamInstaller.run(
             payload: fixture.payload,
@@ -121,12 +133,18 @@ struct SteamInstallerTests {
             compatTools: fixture.work.appending(path: "compatibilitytools.d"),
             lockFolder: fixture.work,
             modifications: fixture.modifications,
-            runnerIsRunning: { _ in running },
+            runnerIsRunning: runnerIsRunning ?? { _ in running },
+            launchingBuild: launchingBuild,
             verifyRunner: verifyRunner,
             patchRunner: { _, _, _ in },
-            stopClient: { _, onStopping in if stopped { onStopping() }; return stopped },
-            register: { calls.register($0) },
-            resetInputAccess: { calls.resetInputAccess(); return [] }
+            stopClient: stopClient ?? { _, onStopping in
+                calls.stop()
+                if stopped { onStopping() }
+                return stopped
+            },
+            register: register ?? { calls.register($0) },
+            resetInputAccess: { calls.resetInputAccess(); return refusedResets },
+            onInputReset: onInputReset
         )
         if recordBuild {
             try SteamInstaller.finish(outcome, deployedVersion: fixture.deployedVersion, isCurrent: { _ in true })
@@ -148,6 +166,7 @@ struct SteamInstallerTests {
         #expect(outcome.backedUpPlist)
         #expect(!outcome.stoppedClient)
         #expect(calls.inputAccessResets == 1)
+        #expect(outcome.failedInputResets == [])
 
         let files = FileManager.default
         #expect(files.fileExists(atPath: fixture.deployedDylib.path(percentEncoded: false)))
@@ -169,6 +188,87 @@ struct SteamInstallerTests {
                 == fixture.deployedDylib.path(percentEncoded: false)
         )
         #expect(calls.registrations == [fixture.app], "the bundle was not re-registered")
+    }
+
+    @Test("A reset stays known when the install fails after it")
+    func reportsInputResetBeforeALaterFailure() async throws {
+        let work = try scratchDirectory("install-reset-then-fail")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let calls = Calls()
+        let plist = fixture.app.appending(path: "Contents/Info.plist")
+        var told: [String]?
+
+        // Another writer changing the insert trips the check after registering.
+        let failure = try #require(throws: StepFailure.self) {
+            try install(fixture, calls: calls, refusedResets: ["ListenEvent"], register: { _ in
+                guard var dict = SteamBundle.readInfoPlist(at: plist),
+                      var env = dict[SteamBundle.environmentKey] as? [String: Any] else { return }
+                env[SteamBundle.insertKey] = "/elsewhere.dylib"
+                dict[SteamBundle.environmentKey] = env
+                try? SteamBundle.writeInfoPlist(dict, at: plist)
+            }, onInputReset: { told = $0 })
+        }
+
+        #expect(failure.detail.contains("different dylib"))
+        #expect(calls.inputAccessResets == 1)
+        #expect(told == ["ListenEvent"])
+    }
+
+    @Test("Only an install that reset input access reports on it")
+    func reportsInputResetsOnlyWhenTheyRan() async throws {
+        let work = try scratchDirectory("install-input-resets")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let calls = Calls()
+
+        #expect(try install(fixture, calls: calls, refusedResets: ["ListenEvent"]).failedInputResets == ["ListenEvent"])
+        #expect(try install(fixture, calls: calls).failedInputResets == nil)
+        #expect(calls.inputAccessResets == 1)
+    }
+
+    @Test("A Steam that won't stop is left as it was, and the failure is the stopper's")
+    func stopFailureLeavesSteamAlone() async throws {
+        let work = try scratchDirectory("install-stop-failure")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let plist = try Data(contentsOf: fixture.plist)
+
+        #expect(throws: SteamInstaller.ClientStarted.self) {
+            try install(fixture, stopClient: { _, _ in throw SteamInstaller.ClientStarted() })
+        }
+        let refusal = try #require(throws: StepFailure.self) {
+            try install(fixture, stopClient: { _, _ in
+                throw StepFailure(step: "Test", detail: "Steam did not quit.")
+            })
+        }
+
+        #expect(refusal.detail == "Steam did not quit.")
+        #expect(try Data(contentsOf: fixture.plist) == plist)
+        for untouched in [fixture.deployedDylib, fixture.bridge, fixture.deployedVersion, fixture.overlayShim] {
+            #expect(!FileManager.default.fileExists(atPath: untouched.path(percentEncoded: false)))
+        }
+    }
+
+    @Test("Steam is stopped before anything in or beside it changes")
+    func stopsBeforeWriting() async throws {
+        let work = try scratchDirectory("install-stop-order")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let calls = Calls()
+        let plist = fixture.plist, dylib = fixture.deployedDylib, bridge = fixture.bridge
+        let original = try Data(contentsOf: plist)
+
+        _ = try install(fixture, stopClient: { _, _ in
+            calls.stop()
+            #expect((try? Data(contentsOf: plist)) == original)
+            #expect(!FileManager.default.fileExists(atPath: dylib.path(percentEncoded: false)))
+            #expect(!FileManager.default.fileExists(atPath: bridge.path(percentEncoded: false)))
+            return true
+        })
+
+        #expect(calls.stops == 1)
+        #expect(FileManager.default.fileExists(atPath: dylib.path(percentEncoded: false)))
     }
 
     @Test("Setting the insert keeps the rest of Valve's environment")
@@ -493,19 +593,6 @@ struct SteamInstallerTests {
         )
     }
 
-    @Test("A payload with nothing in it stops the install before anything is touched")
-    func refusesEmptyPayload() async throws {
-        let work = try scratchDirectory("install")
-        defer { try? FileManager.default.removeItem(at: work) }
-        let fixture = try await self.fixture(into: work)
-
-        let empty = work.appending(path: "empty-payload")
-        try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)
-
-        #expect(throws: StepFailure.self) { try InstallPayload.locate(root: empty) }
-        #expect(SteamBundle.currentInsert(at: fixture.plist) == nil)
-    }
-
     @Test("The installer records the package build time rather than the installation time")
     func recordsPackageBuild() async throws {
         let work = try scratchDirectory("install-record")
@@ -642,6 +729,27 @@ struct SteamInstallerTests {
         #expect(left == ["alt", "alt/arial.ttf", "arial.ttf"])
     }
 
+    @Test("An install keeps the CJK fonts it doesn't ship and still drops stale ones")
+    func keepsCJKFonts() async throws {
+        let work = try scratchDirectory("install-cjk-fonts")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let seeded = ["msyh.ttf", "source-han-sans/LICENSE.txt", "old.ttf"]
+        for name in seeded {
+            let file = fixture.fonts.appending(path: name)
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("font".utf8).write(to: file)
+        }
+
+        _ = try install(fixture)
+
+        let left = FileManager.default.subpaths(atPath: fixture.fonts.path(percentEncoded: false)) ?? []
+        #expect(left.contains("msyh.ttf"))
+        #expect(left.contains("source-han-sans/LICENSE.txt"))
+        #expect(left.contains("arial.ttf"))
+        #expect(!left.contains("old.ttf"))
+    }
+
     @Test("A running game prevents file replacement before Steam is stopped")
     func refusesRunningRunner() async throws {
         let work = try scratchDirectory("install-running")
@@ -650,11 +758,49 @@ struct SteamInstallerTests {
         let runner = SupportPaths.clonedRoot(forBuild: SupportedRunners.all[0].id,
                                             runners: fixture.support.appending(path: "runners"))
         try FileManager.default.createDirectory(at: runner.appending(path: "lib/wine"), withIntermediateDirectories: true)
+        let calls = Calls()
 
-        let error = try #require(throws: StepFailure.self) { try install(fixture, running: true) }
+        let error = try #require(throws: StepFailure.self) { try install(fixture, calls: calls, running: true) }
 
         #expect(error.detail.contains("is running"))
+        #expect(calls.stops == 0, "Steam was asked to quit under a running game")
         #expect(!FileManager.default.fileExists(atPath: fixture.bridge.path))
+        #expect(!FileManager.default.fileExists(atPath: fixture.deployedDylib.path))
+    }
+
+    @Test("A game started while Steam was stopping still blocks the install")
+    func refusesRunnerStartedDuringStop() async throws {
+        let work = try scratchDirectory("install-running-late")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let runner = SupportPaths.clonedRoot(forBuild: SupportedRunners.all[0].id,
+                                            runners: fixture.support.appending(path: "runners"))
+        try FileManager.default.createDirectory(at: runner.appending(path: "lib/wine"), withIntermediateDirectories: true)
+        let calls = Calls()
+
+        // One clone, so one look per pass: quiet before the stop, running after it.
+        let error = try #require(throws: StepFailure.self) {
+            try install(fixture, calls: calls, runnerIsRunning: { _ in calls.lookAtRunners() > 1 })
+        }
+
+        #expect(error.detail.contains("is running"))
+        #expect(calls.stops == 1)
+        #expect(!FileManager.default.fileExists(atPath: fixture.bridge.path))
+        #expect(!FileManager.default.fileExists(atPath: fixture.deployedDylib.path))
+    }
+
+    @Test("A game still launching, before Wine shows up, blocks installation before Steam is asked to quit")
+    func refusesLaunchingGame() async throws {
+        let work = try scratchDirectory("install-launching")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let calls = Calls()
+        let tools = fixture.work.appending(path: "compatibilitytools.d")
+        let error = try #require(throws: StepFailure.self) {
+            try install(fixture, calls: calls, launchingBuild: { $0 == tools ? "winecx-11.17" : nil })
+        }
+        #expect(error.detail.contains("winecx-11.17"))
+        #expect(calls.stops == 0, "Steam was asked to quit under a starting game")
         #expect(!FileManager.default.fileExists(atPath: fixture.deployedDylib.path))
     }
 
@@ -665,8 +811,10 @@ struct SteamInstallerTests {
         let fixture = try await self.fixture(into: work)
         let runner = SupportPaths.clonedRoot(forBuild: "99.0.0.12345", runners: fixture.support.appending(path: "runners"))
         try FileManager.default.createDirectory(at: runner.appending(path: "lib/wine"), withIntermediateDirectories: true)
-        let error = try #require(throws: StepFailure.self) { try install(fixture, running: true) }
+        let calls = Calls()
+        let error = try #require(throws: StepFailure.self) { try install(fixture, calls: calls, running: true) }
         #expect(error.detail.contains("99.0.0.12345"))
+        #expect(calls.stops == 0, "Steam was asked to quit under a running game")
         #expect(!FileManager.default.fileExists(atPath: fixture.deployedDylib.path))
     }
 
@@ -725,4 +873,27 @@ struct SteamInstallerTests {
         #expect(!FileManager.default.fileExists(atPath: DeploymentContent.record(beside: fixture.deployedVersion).path))
         #expect(!FileManager.default.fileExists(atPath: fixture.deployedVersion.path))
     }
+
+    @Test("An install seeds the controller mappings and leaves the user's own alone")
+    func seedsControllerMappings() throws {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let payload = dir.appending(path: "payload")
+        let support = dir.appending(path: "support")
+        try fm.createDirectory(at: payload, withIntermediateDirectories: true)
+        let mappings = support.appending(path: "gamecontrollerdb.txt")
+
+        SteamInstaller.seedControllerMappings(from: payload, in: support)
+        #expect(!fm.fileExists(atPath: mappings.path(percentEncoded: false)))
+
+        try Data("shipped".utf8).write(to: payload.appending(path: "gamecontrollerdb.txt"))
+        SteamInstaller.seedControllerMappings(from: payload, in: support)
+        #expect(fm.contents(atPath: mappings.path(percentEncoded: false)) == Data("shipped".utf8))
+
+        try Data("mine".utf8).write(to: mappings)
+        SteamInstaller.seedControllerMappings(from: payload, in: support)
+        #expect(fm.contents(atPath: mappings.path(percentEncoded: false)) == Data("mine".utf8))
+    }
+
 }

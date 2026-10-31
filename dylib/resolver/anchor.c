@@ -533,10 +533,8 @@ uintptr_t np_locate_anchor(const struct mach_header_64 *mh, intptr_t slide,
     if (!ref) return 0;
 
     if (anchor->kind == NP_MATCH_INSN_AFTER_STRING) {
-        uint32_t opcode = anchor->insn      ? anchor->insn      : DEFAULT_INSN;
-        uint32_t opmask = anchor->insn_mask ? anchor->insn_mask : DEFAULT_INSN_MASK;
         int n = anchor->nth > 0 ? anchor->nth : 1;
-        return scan_for_insn(text_base, text_size, ref, opcode, opmask, n);
+        return scan_for_insn(text_base, text_size, ref, DEFAULT_INSN, DEFAULT_INSN_MASK, n);
     }
 
     if (anchor->kind != NP_MATCH_STRING &&

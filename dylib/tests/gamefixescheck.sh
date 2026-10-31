@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016 # the sh -ec programs expand their own variables
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "gamefixescheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> gamefixescheck: $SRC not present, skipped"; exit 0; }
 
 functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
@@ -116,10 +116,10 @@ launch() {
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
 				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE CX_GRAPHICS_BACKEND \
-				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS CX_FWD_COMPAT_GL_CTX gamefix_args; do
+				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
-		' launch "$target" > "$case_dir/out" 2>&1 || echo "launch exited $?" >> "$case_dir/out"
+		' launch "$target" > "$case_dir/out" 2>&1 || bad "the launch sequence ran to the end" "exit 0" "exit $? $(tail -1 "$case_dir/out")"
 }
 got() { sed -n "s/^$1=//p" "$case_dir/out"; }
 trio="steamclient=n;steamclient64=n;lsteamclient=b"
@@ -185,6 +185,7 @@ is "MTL_HUD_ENABLED is allowed" "1" "$(got MTL_HUD_ENABLED)"
 is "CX_FWD_COMPAT_GL_CTX is allowed" "1" "$(got CX_FWD_COMPAT_GL_CTX)"
 is "PATH is not on the allow-list" "0" "$(grep -c '^PATH=/evil' "$case_dir/out" || true)"
 has "PATH is logged as rejected" "line 6 rejected PATH: not on the allow-list" "$case_dir/log"
+is "DYLD_INSERT_LIBRARIES is not on the allow-list" "<unset>" "$(got DYLD_INSERT_LIBRARIES)"
 has "DYLD_INSERT_LIBRARIES is rejected" "rejected DYLD_INSERT_LIBRARIES: not on the allow-list" "$case_dir/log"
 has "a lower-case key is rejected" "line 8 rejected: not KEY=VALUE" "$case_dir/log"
 has "a line without = is rejected" "line 9 rejected: not KEY=VALUE" "$case_dir/log"
@@ -545,10 +546,11 @@ launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_RETINA=0 BRIDGEPLAY
 is "NOTPROTON_ wins when both spellings are set" "0" "$(got NOTPROTON_RETINA)"
 new_case
 full_engine
-user_conf 'BRIDGEPLAY_RETINA=1' 'BRIDGEPLAY_FRAMEGEN=2' 'BRIDGEPLAY_BACKEND=dxvk'
+user_conf 'BRIDGEPLAY_RETINA=1' 'BRIDGEPLAY_FRAMEGEN=2' 'BRIDGEPLAY_BACKEND=dxvk' 'BRIDGEPLAY_HIDE_WINE_EXPORTS=1'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a conf key takes the BRIDGEPLAY_ name" "1" "$(got NOTPROTON_RETINA)"
 is "and so does FRAMEGEN" "2" "$(got NOTPROTON_FRAMEGEN)"
+is "and so does HIDE_WINE_EXPORTS" "1" "$(got NOTPROTON_HIDE_WINE_EXPORTS)"
 has "BACKEND does not, it names no variable" "rejected BRIDGEPLAY_BACKEND: not on the allow-list" "$case_dir/log"
 
 echo "== FRAMEGEN"

@@ -7,7 +7,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/../.." && pwd)
 script="$repo/scripts/compat-reported-commit.sh"
 workflow_src="$repo/.github/workflows/compat-reported.yml"
-[ -f "$script" ] || { echo "compat-reported-commit: $script not present, skipped"; exit 0; }
+[ -f "$script" ] || { echo "==> compat-reported-commit: $script not present, skipped"; exit 0; }
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

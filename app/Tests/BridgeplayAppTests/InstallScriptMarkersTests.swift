@@ -55,6 +55,13 @@ struct InstallScriptMarkersTests {
         ])
     }
 
+    @Test("A script with Windows line endings gives the same markers")
+    func readsCRLFScript() {
+        let crlf = Self.script.replacingOccurrences(of: "\n", with: "\r\n")
+        #expect(InstallScriptMarkers.markers(inScript: crlf) == InstallScriptMarkers.markers(inScript: Self.script))
+        #expect(InstallScriptMarkers.markers(inScript: crlf).count == 1)
+    }
+
     @Test("The marker goes and the game's other settings and keys stay")
     func clearsOnlyTheMarker() {
         let result = InstallScriptMarkers.clear(

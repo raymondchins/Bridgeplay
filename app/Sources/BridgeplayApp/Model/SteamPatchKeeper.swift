@@ -73,7 +73,7 @@ enum SteamPatchKeeper {
         versionFile: URL = SupportPaths.deployedVersion
     ) -> (deployment: SteamDeployment, previouslyDeployed: Bool, steamRunning: Bool, gameRunning: Bool) {
         let gameRunning = Shell.processIsRunning(named: "wineserver")
-            || RunnerStore.clonedBuilds().contains { RunnerInstaller.isRunning(from: SupportPaths.runnerRoot(forBuild: $0)) }
+            || RunnerInstaller.runningBuild() != nil
         return (SteamBundle.deployment(bundledVersion: bundledVersion, versionFile: versionFile),
                 SteamBundle.deployedVersion(at: versionFile) != nil,
                 SteamBundle.isRunning,

@@ -58,14 +58,15 @@ struct BrandMigration: Sendable {
         var launchOptionsRewritten = 0
         var symlinksFixed = 0
         var logsRenamed = 0
+        var logsLeft = 0
         var filesRewritten = 0
-        var backups: URL?
         var notes: [String] = []
 
         var description: String {
             "Moved NotProton data to Bridgeplay 3.0.0: \(toolsRenamed) compatibility tools renamed, "
                 + "\(mappingsRewritten) Steam mappings and \(launchOptionsRewritten) launch options rewritten, "
                 + "\(symlinksFixed) symlinks fixed, \(logsRenamed) logs renamed, \(filesRewritten) files rewritten."
+                + (logsLeft == 0 ? "" : " \(logsLeft) logs could not be renamed.")
                 + (notes.isEmpty ? "" : " " + notes.joined(separator: " "))
         }
     }
@@ -106,10 +107,8 @@ struct BrandMigration: Sendable {
         try writeMarker(done)
 
         if !done.contains(.backup) {
-            summary.backups = try backUpSteamConfig()
+            try backUpSteamConfig()
             try record(.backup)
-        } else {
-            summary.backups = support.appending(path: Self.backupFolder)
         }
         if !done.contains(.move) {
             try moveDirectories(&summary)
@@ -138,7 +137,7 @@ struct BrandMigration: Sendable {
             try record(.launchOptions)
         }
         if !done.contains(.runLogs) {
-            summary.logsRenamed += try renameRunLogs()
+            renameRunLogs(&summary)
             try record(.runLogs)
         }
         try record(.done)
@@ -183,7 +182,7 @@ struct BrandMigration: Sendable {
 
     // Copies go into whichever support directory exists now, so they move along in step 2.
     // A copy already there is the older one and is kept.
-    private func backUpSteamConfig() throws -> URL {
+    private func backUpSteamConfig() throws {
         let files = FileManager.default
         let backups = markerHome.appending(path: Self.backupFolder)
         let root = steamUserData.path(percentEncoded: false)
@@ -196,7 +195,6 @@ struct BrandMigration: Sendable {
             try files.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             try files.copyItem(at: source, to: destination)
         }
-        return support.appending(path: Self.backupFolder)
     }
 
     // MARK: Step 2, moving directories
@@ -417,21 +415,24 @@ struct BrandMigration: Sendable {
 
     // Renames steamapps/compatdata/<appid>/notproton-run.log in every library Steam lists.
     // One directory listing per library and one stat per game; a library on a volume that
-    // is not mounted is skipped.
-    private func renameRunLogs() throws -> Int {
-        var renamed = 0
+    // is not mounted is skipped. A log this account can't rename, in a library another user
+    // owns, stays under the old name, where PrefixLog still finds it.
+    private func renameRunLogs(_ summary: inout Summary) {
         for library in libraries() {
             let compatdata = library.appending(path: "steamapps/compatdata")
             let games = (try? FileManager.default.contentsOfDirectory(atPath: compatdata.path(percentEncoded: false))) ?? []
             for game in games.sorted() {
                 let folder = compatdata.appending(path: game)
-                if try Self.renameIfFree(folder.appending(path: "notproton-run.log"),
-                                         to: folder.appending(path: "bridgeplay-run.log")) {
-                    renamed += 1
+                do {
+                    if try Self.renameIfFree(folder.appending(path: "notproton-run.log"),
+                                             to: folder.appending(path: "bridgeplay-run.log")) {
+                        summary.logsRenamed += 1
+                    }
+                } catch {
+                    summary.logsLeft += 1
                 }
             }
         }
-        return renamed
     }
 
     // Library roots from steamapps/libraryfolders.vdf, always including Steam's own folder.
@@ -458,7 +459,7 @@ struct BrandMigration: Sendable {
 
     // MARK: Text helpers
 
-    // A line holding only a quoted key, as in SteamDefaultTool.
+    // A line holding only a quoted key, which is a section name.
     static func quotedKey(_ line: String) -> String? {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard trimmed.count >= 2, trimmed.hasPrefix("\""), trimmed.hasSuffix("\""),

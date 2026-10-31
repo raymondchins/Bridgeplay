@@ -4,8 +4,8 @@ Bridgeplay runs Windows-only Steam games on Apple Silicon Macs inside the native
 client. It turns on Steam Play in Mac Steam and runs games through CodeWeavers' WineCX with
 Apple's Game Porting Toolkit (D3DMetal), DXMT or DXVK. It is a GPL-3.0 fork of
 [NotProton](https://github.com/NotProtonNot/NotProton). The user-facing overview is in
-[README.md](README.md). `docs/DEVELOPING.md` is still the upstream README, so don't take build
-steps from it.
+[README.md](README.md). `docs/DEVELOPING.md` is the developer guide, and `docs/UPSTREAM.md`
+keeps the old upstream README.
 
 ## Where code lives
 
@@ -16,7 +16,7 @@ steps from it.
 | `signatures/macos.arm64/` | Byte signatures the dylib resolves per Steam build | Read by the dylib |
 | `lsteamclient/`, `steam-shim/`, `bridge/` | Proton's steamclient bridge and `steam.exe`, built against the Wine tree that `bridge/` sets up | Wine |
 | `ntdll-patch/` | Detours patched into the engine's `ntdll.dll`; the prebuilt `detour*.bin` live in `app/Sources/BridgeplayApp/Resources/` | Wine |
-| `*-patch/` (win32u, winemac, winebus, winecoreaudio, wined3d, ws2_32, ngx-signer) | Patches for single WineCX/WineHQ files. The rebuilt binaries are committed in `app/Sources/BridgeplayApp/Resources/` | Wine |
+| `*-patch/` (win32u, winemac, winebus, winecoreaudio, wined3d, ws2_32, ngx-signer, d3dx11, hide-wine-exports) | Patches for single WineCX/WineHQ files. The rebuilt binaries are committed in `app/Sources/BridgeplayApp/Resources/` | Wine |
 | `nvapi-shim/` | Windows `nvapi64.dll` that lets games use DLSS (answered by MetalFX) | Wine |
 | `overlay-shim/` | HDR, Metal 4 and frame generation | Game process |
 | `native-launch/`, `native-shim/` | Launch wrapper and gamepad shim for native Mac games | Native game process |
@@ -52,15 +52,17 @@ make fonts                                      # needs fontforge, gpatch, afdko
 make app-payload app                            # out/Bridgeplay.app
 ```
 
-The checks the workflows run (`make -s <target>`):
+The checks the workflows run (`make -s <target>`). `make ci-checks` runs all of them except the
+lint targets, and its list is `CI_CHECKS` in the Makefile:
 
 - **Lint:** `scriptcheck`, `runcheck`
 - **App:** `mincheck`, `l10ncheck`, `app-tests` (the Swift tests)
-- **C and shell suites:** `sigcheck`, `callscheck`, `webpatch-fixtures`, `peicon-fixtures`,
-  `panel-behavior`, `spawn-env`, `activatecheck`, `compatcheck`, `compatsvc-check`, `prefixstate-check`,
+- **C, shell and Python suites:** `sigcheck`, `callscheck`, `np-test-batch-check`, `webpatch-fixtures`, `peicon-fixtures`,
+  `panel-behavior`, `spawn-env`, `activatecheck`, `compat-reported-import-check`, `compatcheck`, `compatsvc-check`, `prefixstate-check`,
   `shortcutcheck`, `launch-shell`, `envcheck`, `buildcheck`, `settingscheck`, `routecheck`,
-  `bridgecheck`, `envpasscheck`, `prefixnotecheck`, `powernotecheck`, `exitcheck`, `launchprogresscheck`, `gamedrivecheck`, `launchercheck`, `seedcheck`, `gamefixescheck`, `versioncheck`, `cicheck`,
-  `compat-reported-check`
+  `bridgecheck`, `envpasscheck`, `prefixnotecheck`, `powernotecheck`, `exitcheck`, `anticheatcheck`, `launchprogresscheck`, `gamedrivecheck`, `launchercheck`, `seedcheck`, `gamefixescheck`, `versioncheck`, `cicheck`,
+  `padcheck`, `detourcheck`, `compat-reported-check`, `np-inventory-check`, `np-native-tests`, `native-shim-tests`,
+  `native-installercheck`
 
 `make tests-list` prints the test paths. A check whose tool or input is missing prints
 `skipped` and exits 0: that is not a pass. Install the tool, or say the check didn't run.

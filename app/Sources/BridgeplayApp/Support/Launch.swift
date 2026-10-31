@@ -132,8 +132,6 @@ enum RebuildPrefixCommand {
             let kept = try PrefixTools.recreate(
                 request.prefix, as: request.tool, keepBackup: request.keepBackup,
                 progress: { report($0.rawValue); observe(name, $0) })
-            // A rebuild answers the crash the run script was tracking.
-            try? FileManager.default.removeItem(at: request.prefix.root.appending(path: "notproton-switch"))
             report(kept != nil ? "done-backup" : "done")
         } catch {
             report("failed")

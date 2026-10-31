@@ -40,8 +40,6 @@ enum CrossOverSource {
         SupportPaths.home.appending(path: "Applications", directoryHint: .isDirectory),
     ]
 
-    static var engineRoot: URL { SupportPaths.engines }
-
     private static let manualKey = "manualCrossOverPaths"
     // 1.0/1.0.1 kept a single chosen copy under this key.
     private static let legacyManualKey = "manualCrossOverPath"
@@ -106,7 +104,7 @@ enum CrossOverSource {
             }
         }
 
-        let engines = (try? fm.contentsOfDirectory(at: engineRoot, includingPropertiesForKeys: nil)) ?? []
+        let engines = (try? fm.contentsOfDirectory(at: SupportPaths.engines, includingPropertiesForKeys: nil)) ?? []
         for entry in engines where entry.pathExtension == "app" {
             consider(entry, isManual: false)
         }

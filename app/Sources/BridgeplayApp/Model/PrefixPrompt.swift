@@ -17,19 +17,20 @@ enum PrefixPrompt {
         targets.count > 1 ? String(localized: "Delete \(targets.count) Prefixes") : String(localized: "Delete Prefix")
     }
 
-    static func deleteMessage(_ targets: [WinePrefix]) -> String {
-        guard targets.count > 1 else {
-            return sentences([
-                String(localized: "This will DELETE the game's prefix."),
-                String(localized: "The game SAVE DATA inside the prefix WILL BE LOST."),
-                String(localized: "Are you sure you want to do this?"),
-            ])
+    // Backups live inside the folder a delete removes, so they go with it.
+    static func deleteMessage(_ targets: [WinePrefix], backups: Int = 0) -> String {
+        var lines = targets.count > 1
+            ? [String(localized: "This will DELETE the prefixes for \(targets.count) games."),
+               String(localized: "The game SAVE DATA inside them WILL BE LOST.")]
+            : [String(localized: "This will DELETE the game's prefix."),
+               String(localized: "The game SAVE DATA inside the prefix WILL BE LOST.")]
+        if backups == 1 {
+            lines.append(String(localized: "Its 1 backup will also be permanently deleted."))
+        } else if backups > 1 {
+            lines.append(String(localized: "All \(backups) backups will also be permanently deleted."))
         }
-        return sentences([
-            String(localized: "This will DELETE the prefixes for \(targets.count) games."),
-            String(localized: "The game SAVE DATA inside them WILL BE LOST."),
-            String(localized: "Are you sure you want to do this?"),
-        ])
+        lines.append(String(localized: "Are you sure you want to do this?"))
+        return sentences(lines)
     }
 
     static func rebuildTitle(_ targets: [WinePrefix], for tool: InstalledTool? = nil) -> String {

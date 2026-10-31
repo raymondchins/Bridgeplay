@@ -45,8 +45,9 @@ enum LaunchStep: String {
 
 struct LaunchProgress {
     // A later launch that shows its window within this many seconds shows nothing. Hell Maiden
-    // took 12s from the run script to its window on an M4, its first launch 27 to 76s.
-    static let laterDelay: TimeInterval = 20
+    // took 12s from the run script to its window on an M4, so most relaunches would never show
+    // the panel at 20s; 3s still skips a launch that fails straight away but catches those.
+    static let laterDelay: TimeInterval = 3
     // Long enough that a launch failing straight away does not flash the panel.
     static let firstDelay: TimeInterval = 1
     // In case the game hangs before opening anything; Steam's Stop still ends it.
@@ -152,11 +153,7 @@ final class LaunchProgressWatcher {
         let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
             as? [[String: Any]] ?? []
         for window in windows {
-            guard (window[kCGWindowLayer as String] as? Int) == 0,
-                let pid = window[kCGWindowOwnerPID as String] as? pid_t, pid != getpid(),
-                let bounds = window[kCGWindowBounds as String] as? [String: Double],
-                (bounds["Width"] ?? 0) >= 32, (bounds["Height"] ?? 0) >= 32
-            else { continue }
+            guard let pid = Self.windowOwner(window), pid != getpid() else { continue }
             let started = Self.startTime(of: pid)
             let game: Bool
             if let started, let known = owners[pid], known.started == started {
@@ -168,6 +165,17 @@ final class LaunchProgressWatcher {
             if game { return true }
         }
         return false
+    }
+
+    // A full-screen game draws above layer 0 (Megabonk is on 26), so any layer counts: whose
+    // window it is decides, and the menu bar and Dock hold no game's log.
+    nonisolated static func windowOwner(_ window: [String: Any]) -> pid_t? {
+        guard let layer = window[kCGWindowLayer as String] as? Int, layer >= 0,
+            let pid = window[kCGWindowOwnerPID as String] as? pid_t,
+            let bounds = window[kCGWindowBounds as String] as? [String: Double],
+            (bounds["Width"] ?? 0) >= 32, (bounds["Height"] ?? 0) >= 32
+        else { return nil }
+        return pid
     }
 
     // Microseconds since 1970 at which the process started, nil when it cannot be read.

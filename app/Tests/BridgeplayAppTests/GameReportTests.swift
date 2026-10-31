@@ -84,6 +84,20 @@ struct GameReportTests {
         #expect(text.contains("~/Library/x.lock"))
     }
 
+    @Test("The account ID in a Steam userdata path is hidden")
+    func userdataPaths() {
+        let raw = #"""
+            C:\Program Files (x86)\Steam\userdata\52345678\1245620\remote\save.dat
+            C:\\Program Files (x86)\\Steam\\userdata\\52345678\\730\\cfg
+            /Users/tester/Library/Application Support/Steam/userdata/52345678/730/local/cfg/config.cfg
+            """#
+        let text = GameReport.redacted(raw, home: "/Users/tester", user: "tester", computerNames: [])
+        #expect(!text.contains("52345678"))
+        #expect(text.contains(#"userdata\<id>\1245620"#))
+        #expect(text.contains(#"userdata\\<id>\\730"#))
+        #expect(text.contains("userdata/<id>/730"))
+    }
+
     @Test("A home folder that isn't spelled like this one's is hidden too")
     func otherHomes() {
         let raw = """

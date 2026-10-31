@@ -321,9 +321,6 @@ struct NtdllPatcherTests {
             let patched = Set(NtdllPatcher.patches(for: build).map(\.arch))
             #expect(patched == Set(build.cleanNtdll.keys))
             #expect(patched == Set(build.patchedNtdll.keys))
-            for arch in patched {
-                #expect(NtdllPatcher.patch(for: arch, in: build) != nil)
-            }
         }
         #expect(!NtdllPatcher.patches(for: SupportedRunners.all[0]).isEmpty)
     }

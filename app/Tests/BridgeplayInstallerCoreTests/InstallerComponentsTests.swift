@@ -58,11 +58,17 @@ struct InstallerComponentsTests {
         #expect(InstallerComponents.needed(home: home, applications: apps))
     }
 
-    @Test("A failing Install.command reports its last message")
-    func scriptFailure() throws {
-        #expect(throws: InstallerError.self) {
-            try InstallerComponents.run("/bin/sh", ["-c", "echo '==> step'; echo 'Gagal: disk full' >&2; exit 1"])
+    @Test("A failing tool reports its last message, or its exit status when it says nothing")
+    func toolFailure() throws {
+        func reason(of script: String) throws -> String? {
+            let failure = try #require(throws: InstallerError.self) {
+                try InstallerComponents.run("/bin/sh", ["-c", script])
+            }
+            if case .componentsFailure(let reason) = failure { return reason }
+            return nil
         }
+        #expect(try reason(of: "echo step; echo 'disk full' >&2; echo >&2; exit 1") == "disk full")
+        #expect(try reason(of: "exit 3") == "exit 3")
         let output = try InstallerComponents.run("/bin/sh", ["-c", "printf '==> one\\n==> two\\n'"])
         #expect(output == "==> one\n==> two\n")
     }
