@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 
@@ -120,4 +121,17 @@ struct LaunchProgressTests {
         #expect(LaunchProgressWatcher.gameName(compatdata: compatdata + "/1") == nil)
         #expect(LaunchProgressWatcher.gameName(compatdata: "/elsewhere/3372060") == nil)
     }
+
+    @Test("A full-screen game's window counts, a sliver of one does not")
+    func windowOwnerTakesFullScreenLayers() {
+        func window(layer: Int, width: Double = 1512) -> [String: Any] {
+            [kCGWindowLayer as String: layer, kCGWindowOwnerPID as String: Int32(42),
+             kCGWindowBounds as String: ["Width": width, "Height": 982.0]]
+        }
+        #expect(LaunchProgressWatcher.windowOwner(window(layer: 0)) == 42)
+        #expect(LaunchProgressWatcher.windowOwner(window(layer: 26)) == 42)
+        #expect(LaunchProgressWatcher.windowOwner(window(layer: 26, width: 10)) == nil)
+        #expect(LaunchProgressWatcher.windowOwner(window(layer: -1)) == nil)
+    }
+
 }
