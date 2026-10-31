@@ -48,6 +48,7 @@ struct BridgeplayApp: App {
                     SetupAssistantView()
                         .environment(status)
                         .interactiveDismissDisabled()
+                        .overlay(alignment: .top) { UpdateNotice(onlyWhenAsked: true) }
                 }
         }
         .defaultSize(width: 900, height: 760)
