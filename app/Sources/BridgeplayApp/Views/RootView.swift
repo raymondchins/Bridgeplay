@@ -39,81 +39,80 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $pane) {
-                ForEach(Pane.allCases) { item in
-                    Label(item.label, systemImage: item.symbol)
-                        .tag(item)
-                }
+        VStack(spacing: 0) {
+            // Above NavigationSplitView, not inside its detail column: NavigationSplitView
+            // mis-reconciles its two columns' geometry once the detail column's content has
+            // resized more than once after the initial layout pass, which a banner that
+            // only starts showing after launch (the patch check, a background update
+            // finishing) and then keeps changing (an update's progress stages) reliably
+            // triggers, shifting the whole window's content — sidebar included — off-screen.
+            // Living outside the split view entirely sidesteps that.
+            if MigrationLaunch.shared.pending, MigrationLaunch.shared.failure == nil {
+                MigrationBanner()
+            } else if let banner = status.patchBanner {
+                PatchBanner(banner: banner)
             }
-            .listStyle(.sidebar)
-            .listItemTint(.monochrome)
-            .scrollContentBackground(.hidden)
-            .background(BP.bg)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                HStack(spacing: 4.4) {
-                    BridgeplayMark(size: 22)
-                    Text(verbatim: "Bridgeplay")
-                        .font(BP.display(13))
-                        .foregroundStyle(BP.iridescent)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, 6)
-                .padding(.bottom, 10)
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(alignment: .leading, spacing: 10) {
-                    credits
-                    libraryCard
-                    Text(verbatim: ProductVersion.display)
-                        .font(BP.sans(11, .medium))
-                        .foregroundStyle(BP.fg3)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 6)
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
-            }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
-        } detail: {
-            Group {
-                switch pane {
-                case .status: StatusView()
-                case .gameDefaults: GameDefaultsView()
-                case .prefixes: PrefixesView()
-                case .backups: BackupsView()
-                case .guide: GuideView()
-                }
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                VStack(spacing: 0) {
-                    // A failed move is reported on the Status page, with its buttons, instead.
-                    if MigrationLaunch.shared.pending, MigrationLaunch.shared.failure == nil {
-                        MigrationBanner()
-                    } else if let banner = status.patchBanner {
-                        PatchBanner(banner: banner)
+            UpdateNotice(busy: status.isBusy || prefixes.isBusy)
+
+            NavigationSplitView {
+                List(selection: $pane) {
+                    ForEach(Pane.allCases) { item in
+                        Label(item.label, systemImage: item.symbol)
+                            .tag(item)
                     }
-                    UpdateNotice(busy: status.isBusy || prefixes.isBusy)
                 }
-                // This safeAreaInset's reserved height doesn't always get recomputed once the
-                // window has already laid out, so a banner that only starts showing after
-                // launch (the patch check, a background update finishing) could render with
-                // zero height, clipped under the toolbar. An `.id()` keyed on what's actually
-                // showing forces a fresh layout pass instead of an in-place diff.
-                .id(topBannerKey)
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if let nudge = PlayReports.shared.nudge {
-                    PlayReportCard(nudge: nudge)
-                } else if PlayReports.shared.thanking {
-                    PlayReportThanks()
+                .listStyle(.sidebar)
+                .listItemTint(.monochrome)
+                .scrollContentBackground(.hidden)
+                .background(BP.bg)
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    HStack(spacing: 4.4) {
+                        BridgeplayMark(size: 22)
+                        Text(verbatim: "Bridgeplay")
+                            .font(BP.display(13))
+                            .foregroundStyle(BP.iridescent)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 6)
+                    .padding(.bottom, 10)
                 }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        credits
+                        libraryCard
+                        Text(verbatim: ProductVersion.display)
+                            .font(BP.sans(11, .medium))
+                            .foregroundStyle(BP.fg3)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 6)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+                }
+                .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
+            } detail: {
+                Group {
+                    switch pane {
+                    case .status: StatusView()
+                    case .gameDefaults: GameDefaultsView()
+                    case .prefixes: PrefixesView()
+                    case .backups: BackupsView()
+                    case .guide: GuideView()
+                    }
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if let nudge = PlayReports.shared.nudge {
+                        PlayReportCard(nudge: nudge)
+                    } else if PlayReports.shared.thanking {
+                        PlayReportThanks()
+                    }
+                }
+                .scrollContentBackground(.hidden)
+                .background(BP.bg)
+                .toolbarBackground(BP.bg, for: .windowToolbar)
             }
-            .scrollContentBackground(.hidden)
-            .background(BP.bg)
-            .toolbarBackground(BP.bg, for: .windowToolbar)
         }
         // While Report Your Games… is open, it presents the consent sheet itself.
         .sheet(isPresented: Binding(get: { PlayReports.shared.consentRequest != nil && PlayReports.shared.bulk == nil },
@@ -127,23 +126,6 @@ struct RootView: View {
         .font(BP.sans(13))
         .tint(BP.blue)
         .preferredColorScheme(.dark)
-    }
-
-    // What the top safeAreaInset is currently showing, as a key for `.id()`. Covers the
-    // same three sources RootView's banner VStack reads, including UpdateNotice's own
-    // stage and What's New, which it doesn't expose otherwise.
-    private var topBannerKey: String {
-        if MigrationLaunch.shared.pending, MigrationLaunch.shared.failure == nil {
-            "migration"
-        } else if let banner = status.patchBanner {
-            "patch-\(banner.kind)-\(banner.blocker)"
-        } else if let stage = AppUpdater.shared.flow.notice {
-            "update-\(stage)"
-        } else if AppUpdater.shared.whatsNew != nil {
-            "whatsNew"
-        } else {
-            "none"
-        }
     }
 
     private var credits: some View {
