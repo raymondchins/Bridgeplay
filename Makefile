@@ -708,6 +708,7 @@ app-payload: $(TARGET) $(OVERLAY_SHIM) $(ICONMAKER) $(APPINFO)
 	cp -f signatures/macos.arm64/*.json "$(APP_PAYLOAD)/signatures/macos.arm64/"
 	@rm -rf "$(APP_PAYLOAD)/gamefixes" && mkdir -p "$(APP_PAYLOAD)/gamefixes"
 	@if ls gamefixes/*.conf >/dev/null 2>&1; then cp -f gamefixes/*.conf "$(APP_PAYLOAD)/gamefixes/"; fi
+	cp -f installer/config/gamecontrollerdb.txt "$(APP_PAYLOAD)/gamecontrollerdb.txt"
 	@set -e; for spec in $(BRIDGE_FILES); do \
 		src="$${spec%%:*}"; dst="$(APP_PAYLOAD)/bridge/$${spec##*:}"; \
 		if [ -f "$$src" ]; then cp -f "$$src" "$$dst"; \

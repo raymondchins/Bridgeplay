@@ -113,7 +113,9 @@ struct SteamInstallerTests {
         refusedResets: [String] = [],
         runnerIsRunning: (@Sendable (URL) -> Bool)? = nil,
         stopClient: SteamInstaller.ClientStopper? = nil,
-        verifyRunner: (RunnerBuild, URL) throws -> Void = { _, _ in }
+        verifyRunner: (RunnerBuild, URL) throws -> Void = { _, _ in },
+        register: SteamInstaller.BundleRegistrar? = nil,
+        onInputReset: ([String]) -> Void = { _ in }
     ) throws -> InstallOutcome {
         let outcome = try SteamInstaller.run(
             payload: fixture.payload,
@@ -138,8 +140,9 @@ struct SteamInstallerTests {
                 if stopped { onStopping() }
                 return stopped
             },
-            register: { calls.register($0) },
-            resetInputAccess: { calls.resetInputAccess(); return refusedResets }
+            register: register ?? { calls.register($0) },
+            resetInputAccess: { calls.resetInputAccess(); return refusedResets },
+            onInputReset: onInputReset
         )
         if recordBuild {
             try SteamInstaller.finish(outcome, deployedVersion: fixture.deployedVersion, isCurrent: { _ in true })
@@ -183,6 +186,31 @@ struct SteamInstallerTests {
                 == fixture.deployedDylib.path(percentEncoded: false)
         )
         #expect(calls.registrations == [fixture.app], "the bundle was not re-registered")
+    }
+
+    @Test("A reset stays known when the install fails after it")
+    func reportsInputResetBeforeALaterFailure() async throws {
+        let work = try scratchDirectory("install-reset-then-fail")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let calls = Calls()
+        let plist = fixture.app.appending(path: "Contents/Info.plist")
+        var told: [String]?
+
+        // Another writer changing the insert trips the check after registering.
+        let failure = try #require(throws: StepFailure.self) {
+            try install(fixture, calls: calls, refusedResets: ["ListenEvent"], register: { _ in
+                guard var dict = SteamBundle.readInfoPlist(at: plist),
+                      var env = dict[SteamBundle.environmentKey] as? [String: Any] else { return }
+                env[SteamBundle.insertKey] = "/elsewhere.dylib"
+                dict[SteamBundle.environmentKey] = env
+                try? SteamBundle.writeInfoPlist(dict, at: plist)
+            }, onInputReset: { told = $0 })
+        }
+
+        #expect(failure.detail.contains("different dylib"))
+        #expect(calls.inputAccessResets == 1)
+        #expect(told == ["ListenEvent"])
     }
 
     @Test("Only an install that reset input access reports on it")
@@ -828,4 +856,27 @@ struct SteamInstallerTests {
         #expect(!FileManager.default.fileExists(atPath: DeploymentContent.record(beside: fixture.deployedVersion).path))
         #expect(!FileManager.default.fileExists(atPath: fixture.deployedVersion.path))
     }
+
+    @Test("An install seeds the controller mappings and leaves the user's own alone")
+    func seedsControllerMappings() throws {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let payload = dir.appending(path: "payload")
+        let support = dir.appending(path: "support")
+        try fm.createDirectory(at: payload, withIntermediateDirectories: true)
+        let mappings = support.appending(path: "gamecontrollerdb.txt")
+
+        SteamInstaller.seedControllerMappings(from: payload, in: support)
+        #expect(!fm.fileExists(atPath: mappings.path(percentEncoded: false)))
+
+        try Data("shipped".utf8).write(to: payload.appending(path: "gamecontrollerdb.txt"))
+        SteamInstaller.seedControllerMappings(from: payload, in: support)
+        #expect(fm.contents(atPath: mappings.path(percentEncoded: false)) == Data("shipped".utf8))
+
+        try Data("mine".utf8).write(to: mappings)
+        SteamInstaller.seedControllerMappings(from: payload, in: support)
+        #expect(fm.contents(atPath: mappings.path(percentEncoded: false)) == Data("mine".utf8))
+    }
+
 }

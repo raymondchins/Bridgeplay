@@ -108,11 +108,51 @@ enum SetupChecks {
         // Staged under its own name, so a failed copy never leaves a half-copied Steam.app that
         // would pass as installed. A Steam.app that appeared meanwhile is kept.
         let fm = FileManager.default
-        let staged = app.deletingLastPathComponent().appending(path: ".Steam.app-\(UUID().uuidString)")
-        defer { try? fm.removeItem(at: staged) }
+        let staged = app.deletingLastPathComponent().appending(path: "\(stagedPrefix)\(UUID().uuidString)")
+        let stale = stages.claim(staged)
+        defer {
+            try? fm.removeItem(at: staged)
+            stages.release(staged)
+        }
+        for leftover in stale {
+            do { try fm.removeItem(at: leftover) }
+            catch { AppLog.note("setup: could not remove \(leftover.lastPathComponent): \(error.localizedDescription)") }
+        }
         try copy(mounted, staged)
         do { try fm.moveItem(at: staged, to: app) }
-        catch where fm.fileExists(atPath: app.path(percentEncoded: false)) {}
+        catch where isAppBundle(app) {}
+    }
+
+    private static let stagedPrefix = ".Steam.app-"
+    private static let stages = Stages()
+
+    private static func isAppBundle(_ app: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        let plist = app.appending(path: "Contents/Info.plist").path(percentEncoded: false)
+        return FileManager.default.fileExists(atPath: plist, isDirectory: &isDirectory) && !isDirectory.boolValue
+    }
+
+    // A force quit leaves its staged copy behind. Listed under the lock, so a copy that has
+    // claimed its name is never taken for one, and one that claims later isn't in the list yet.
+    private final class Stages: @unchecked Sendable {
+        private let lock = NSLock()
+        private var inUse: Set<String> = []
+
+        func claim(_ staged: URL) -> [URL] {
+            let folder = staged.deletingLastPathComponent()
+            return lock.withLock {
+                inUse.insert(staged.lastPathComponent)
+                let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false))) ?? []
+                return names.filter { name in
+                    name.hasPrefix(stagedPrefix) && !inUse.contains(name)
+                        && UUID(uuidString: String(name.dropFirst(stagedPrefix.count))) != nil
+                }.map { folder.appending(path: $0) }
+            }
+        }
+
+        func release(_ staged: URL) {
+            _ = lock.withLock { inUse.remove(staged.lastPathComponent) }
+        }
     }
 
     static let step = String(localized: "Install Steam")
