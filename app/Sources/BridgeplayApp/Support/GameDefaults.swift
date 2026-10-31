@@ -27,6 +27,7 @@ enum GameDefaults {
         case metalHUD
         case nvapi
         case metalFX
+        case dlssFrameGen
         case advertiseAVX
         case msync
         case vsync
@@ -47,6 +48,7 @@ enum GameDefaults {
             case .metalHUD: ["MTL_HUD_ENABLED"]
             case .nvapi: ["NVAPI"]
             case .metalFX: ["D3DM_ENABLE_METALFX"]
+            case .dlssFrameGen: ["DLSS_FG"]
             case .advertiseAVX: ["ROSETTA_ADVERTISE_AVX"]
             case .msync: ["MSYNC"]
             case .vsync: ["VSYNC", "BRIDGEPLAY_VSYNC"]
@@ -60,14 +62,14 @@ enum GameDefaults {
         }
 
         // The same setting in a game's launch options, where it wins over every conf.
-        // NVAPI has no launch-option spelling, and WINEDLLOVERRIDES adds to DLLOVERRIDES
+        // NVAPI and DLSS_FG have no launch-option spelling, and WINEDLLOVERRIDES adds to DLLOVERRIDES
         // per DLL instead of replacing it.
         var launchKeys: [String] {
             switch self {
             case .backend: ["BRIDGEPLAY_BACKEND", "NOTPROTON_BACKEND", "CX_GRAPHICS_BACKEND"]
             case .metalHUD, .metalFX, .advertiseAVX: keys
             case .msync: ["WINEMSYNC"]
-            case .nvapi, .dllOverrides: []
+            case .nvapi, .dlssFrameGen, .dllOverrides: []
             case .highResolution, .vsync, .frameGen, .frameGenQuality, .frameGenUI, .frameGenFallback, .frameGenEngine:
                 ["BRIDGEPLAY_\(keys[0])", "NOTPROTON_\(keys[0])"]
             }

@@ -23,6 +23,7 @@ struct GameDefaultsView: View {
             Section {
                 choiceRow(.backend)
                 toggleRow(.metalFX)
+                toggleRow(.dlssFrameGen)
                 toggleRow(.nvapi)
                 choiceRow(.msync)
                 toggleRow(.advertiseAVX)
@@ -188,7 +189,7 @@ struct GameDefaultsView: View {
             }
             ForEach(overrides) { item in
                 StatusRow(title: item.name ?? String(localized: "App \(item.appID)"),
-                          value: item.settings.map(Self.title).joined(separator: ", "),
+                          value: item.settings.map(Self.overrideTitle).joined(separator: ", "),
                           trailing: Self.place(item.place),
                           action: StatusAction(label: String(localized: "Open in Steam")) { Self.openInSteam(item.appID) },
                           menu: item.place == .conf
@@ -263,6 +264,7 @@ struct GameDefaultsView: View {
         case .metalHUD: String(localized: "Metal HUD")
         case .nvapi: String(localized: "Report an NVIDIA GPU")
         case .metalFX: String(localized: "DLSS through MetalFX")
+        case .dlssFrameGen: String(localized: "DLSS Frame Generation")
         case .advertiseAVX: String(localized: "Advertise AVX2 to Rosetta")
         case .msync: "MSync"
         case .vsync: String(localized: "Force VSync")
@@ -275,6 +277,15 @@ struct GameDefaultsView: View {
         }
     }
 
+    // Listed beside other settings, "Quality" alone reads as the value.
+    static func overrideTitle(_ setting: GameDefaults.Setting) -> String {
+        switch setting {
+        case .frameGenQuality: String(localized: "Frame Generation Quality")
+        case .frameGenEngine: String(localized: "Frame Generation Engine")
+        default: title(setting)
+        }
+    }
+
     static func summary(_ setting: GameDefaults.Setting) -> String {
         switch setting {
         case .backend: String(localized: "Automatic picks D3DMetal when the Game Porting Toolkit is linked, and DXMT otherwise.")
@@ -282,6 +293,7 @@ struct GameDefaultsView: View {
         case .metalHUD: String(localized: "Shows frame rate and GPU details in a corner while you play.")
         case .nvapi: String(localized: "Lets games offer DLSS, served by MetalFX. Some games take NVIDIA-only paths with it.")
         case .metalFX: String(localized: "Only takes effect when DLSS is switched on in the game.")
+        case .dlssFrameGen: String(localized: "Lets games offer DLSS frame generation. Experimental: it can freeze the Mac on some setups.")
         case .advertiseAVX: String(localized: "Many games quit without it.")
         case .msync: String(localized: "Automatic follows the engine.")
         case .vsync: String(localized: "Waits for the display even when a game turns VSync off.")

@@ -3810,6 +3810,22 @@
         }
       }
     },
+    "DLSS Frame Generation" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generazione di frame DLSS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DLSS 帧生成"
+          }
+        }
+      }
+    },
     "DLSS through MetalFX" : {
       "localizations" : {
         "it" : {
@@ -4930,6 +4946,38 @@
         }
       }
     },
+    "Frame Generation Engine" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motore della generazione di frame"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧生成引擎"
+          }
+        }
+      }
+    },
+    "Frame Generation Quality" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualità della generazione di frame"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧生成质量"
+          }
+        }
+      }
+    },
     "Free software under the GPL-3.0, with no warranty." : {
       "localizations" : {
         "it" : {
@@ -5950,6 +5998,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "允许游戏直接读取控制器（Mac 上推荐，仅在需要 Steam Input 按键映射时关闭）"
+          }
+        }
+      }
+    },
+    "Lets games offer DLSS frame generation. Experimental: it can freeze the Mac on some setups." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consente ai giochi di offrire la generazione di frame DLSS. Sperimentale: su alcune configurazioni può bloccare il Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让游戏提供 DLSS 帧生成。实验性功能：在某些配置下可能导致 Mac 卡死。"
           }
         }
       }
