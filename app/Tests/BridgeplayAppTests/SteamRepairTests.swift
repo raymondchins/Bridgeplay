@@ -167,11 +167,13 @@ struct SteamRepairTests {
 
         func repair(manifest: ValvePackageManifest? = nil, downloads: URL,
                     stopClient: @escaping SteamInstaller.ClientStopper,
+                    runningBuild: @escaping @Sendable () -> String? = { nil },
                     report: @escaping @Sendable (RepairPhase) -> Void = { _ in }) async throws {
             _ = try await SteamRepair.run(
                 manifest: manifest, app: app, innerPlist: work.appending(path: "inner.plist"), updateBlocks: [],
                 backups: work.appending(path: "support/backups"), downloads: downloads,
-                modifications: modifications, stopClient: stopClient, register: { _ in }, report: report)
+                modifications: modifications, stopClient: stopClient, register: { _ in },
+                runningBuild: runningBuild, report: report)
         }
     }
 
@@ -204,6 +206,45 @@ struct SteamRepairTests {
             try await steam.repair(downloads: try isolatedValveDownloads(in: work), stopClient: { _, _ in throw StillRunning() })
         }
 
+        #expect(steam.isUntouched)
+    }
+
+    @Test("A running game stops the repair before anything is downloaded")
+    func runningGameRefusesTheRepair() async throws {
+        let work = try scratchDirectory("repair-running-game")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let steam = try patched(from: try await stagedStockBundle(into: work), in: work)
+        let log = Log()
+
+        let refusal = try await #require(throws: StepFailure.self) {
+            try await steam.repair(downloads: try isolatedValveDownloads(in: work), stopClient: { _, _ in
+                log.add("stopped")
+                return true
+            }, runningBuild: { "27.0.0" }, report: { log.add($0.label) })
+        }
+
+        #expect(refusal.detail.contains("27.0.0"))
+        #expect(log.all.isEmpty)
+        #expect(steam.isUntouched)
+    }
+
+    @Test("A game started during the download stops the repair before Steam is touched")
+    func gameStartedDuringTheDownloadRefusesTheRepair() async throws {
+        let work = try scratchDirectory("repair-game-started")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let steam = try patched(from: try await stagedStockBundle(into: work), in: work)
+        let log = Log()
+
+        await #expect(throws: StepFailure.self) {
+            try await steam.repair(downloads: try isolatedValveDownloads(in: work), stopClient: { _, _ in
+                log.add("stopped")
+                return true
+            }, runningBuild: {
+                log.all.contains(RepairPhase.checking.label) ? "27.0.0" : nil
+            }, report: { log.add($0.label) })
+        }
+
+        #expect(!log.all.contains("stopped"))
         #expect(steam.isUntouched)
     }
 
@@ -277,7 +318,7 @@ struct SteamRepairTests {
         _ = try await SteamRepair.run(
             app: app, innerPlist: work.appending(path: "inner.plist"), updateBlocks: [],
             backups: support.appending(path: "backups"), downloads: try isolatedValveDownloads(in: work),
-            modifications: modifications, stopClient: { _, _ in false }, register: { _ in })
+            modifications: modifications, stopClient: { _, _ in false }, register: { _ in }, runningBuild: { nil })
 
         #expect(try modifications.paths().isEmpty)
         try FileManager.default.moveItem(at: drive, to: work.appending(path: "disconnected"))

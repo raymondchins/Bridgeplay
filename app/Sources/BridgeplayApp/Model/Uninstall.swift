@@ -72,6 +72,7 @@ enum Uninstall {
         var steamRunning: @Sendable () -> Bool
         // The password of Bridgeplay's signing keychain, kept in the login keychain.
         var forgetSigning: @Sendable () -> Void = {}
+        var runningBuild: @Sendable () -> String? = { nil }
 
         static var live: Leftovers {
             Leftovers(
@@ -81,7 +82,8 @@ enum Uninstall {
                 defaultToolBackup: SteamDefaultTool.backup,
                 files: [SupportPaths.homeDir],
                 steamRunning: { SteamBundle.isRunningForThisUser },
-                forgetSigning: { LocalSigning.forgetPrivateKeychain() })
+                forgetSigning: { LocalSigning.forgetPrivateKeychain() },
+                runningBuild: { RunnerInstaller.runningBuild() })
         }
     }
 
@@ -105,6 +107,10 @@ enum Uninstall {
     ) async throws -> UninstallOutcome {
         let lock = try DeploymentContent.acquireInstallationLock(in: lockFolder, steamFolder: nil)
         defer { lock.release() }
+        // Quitting Steam can take a running game with it, and its runner is deleted below.
+        if let build = leftovers.runningBuild() {
+            throw StepFailure(step: step, detail: String(localized: "A game or Wine tool is running on build \(build). Quit it before removing Bridgeplay."))
+        }
         try modifications.prepare()
         let tracked = try modifications.paths()
         let targets = Set((tracked + [app]).map { $0.standardizedFileURL.path }).sorted()
@@ -142,6 +148,7 @@ enum Uninstall {
                     } else {
                         _ = try await SteamRepair.run(app: target, innerPlist: innerPlist,
                                                      updateBlocks: updateBlocks, modifications: modifications,
+                                                     runningBuild: { nil },
                                                      report: { report(.restoring($0)) })
                     }
                 } catch { restored = false }

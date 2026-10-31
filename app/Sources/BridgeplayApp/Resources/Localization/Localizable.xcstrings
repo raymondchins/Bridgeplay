@@ -1020,6 +1020,38 @@
         }
       }
     },
+    "A game or Wine tool is running on build %@. Quit it before removing Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un gioco o uno strumento di Wine è in esecuzione sulla build %@. Chiudilo prima di rimuovere Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有游戏或 Wine 工具正在使用构建版本 %@。请先退出，再移除 Bridgeplay。"
+          }
+        }
+      }
+    },
+    "A game or Wine tool is running on build %@. Quit it before repairing Steam." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un gioco o uno strumento di Wine è in esecuzione sulla build %@. Chiudilo prima di riparare Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有游戏或 Wine 工具正在使用构建版本 %@。请先退出，再修复 Steam。"
+          }
+        }
+      }
+    },
     "A game or Wine tool is running on build %@. Quit it before updating Bridgeplay." : {
       "localizations" : {
         "it" : {

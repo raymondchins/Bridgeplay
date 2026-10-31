@@ -722,6 +722,33 @@ struct RunnerRemovalTests {
         #expect(RunnerInstaller.isRunning(from: URL(filePath: "/R/x"), ps: "/nonexistent/ps"))
     }
 
+    @Test("A clone linked to another drive reads as running, and its build is named")
+    func readsRunningThroughALink() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: try scratchDirectory("runner-link").path(percentEncoded: false)).resolvingSymlinksInPath()
+        defer { try? fm.removeItem(at: dir) }
+        let real = dir.appending(path: "external/crossover-27")
+        let runners = dir.appending(path: "runners")
+        try fm.createDirectory(at: real, withIntermediateDirectories: true)
+        try fm.createDirectory(at: runners, withIntermediateDirectories: true)
+        let link = runners.appending(path: "crossover-27")
+        try fm.createSymbolicLink(at: link, withDestinationURL: real)
+        let printed = real.path(percentEncoded: false).withCString { path in
+            realpath(path, nil).map { defer { free($0) }; return String(cString: $0) }
+        } ?? ""
+        let ps = dir.appending(path: "ps")
+        try """
+            #!/bin/sh
+            echo "\(printed)/CrossOver/bin/wineserver"
+            """.write(to: ps, atomically: true, encoding: .utf8)
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: ps.path(percentEncoded: false))
+        let path = ps.path(percentEncoded: false)
+
+        #expect(RunnerInstaller.isRunning(from: link, ps: path))
+        #expect(RunnerInstaller.runningBuild(in: runners) { RunnerInstaller.isRunning(from: $0, ps: path) } == "27")
+        #expect(RunnerInstaller.runningBuild(in: runners) { _ in false } == nil)
+    }
+
     @Test("Any build can be removed, and its tools and staged copies go with it")
     func removesBuild() throws {
         let runners = try makeRunners(cloning: [Self.rosetta.id, Self.fex.id])

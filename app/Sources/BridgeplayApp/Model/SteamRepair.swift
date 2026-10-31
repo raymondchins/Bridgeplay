@@ -51,6 +51,7 @@ enum SteamRepair {
             try SteamBundle.stopClient(app: app, step: String(localized: "Repair Steam"), onStopping: onStopping)
         },
         register: SteamInstaller.BundleRegistrar = { SteamBundle.register($0) },
+        runningBuild: @Sendable () -> String? = { RunnerInstaller.runningBuild() },
         report: @escaping @Sendable (RepairPhase) -> Void = { _ in }
     ) async throws -> RepairOutcome {
         let manifest = try suppliedManifest ?? ValvePackageManifest.bundled()
@@ -61,11 +62,20 @@ enum SteamRepair {
             )
         }
 
+        // Quitting Steam can take a running game with it.
+        func refuseRunningGame() throws {
+            guard let build = runningBuild() else { return }
+            throw StepFailure(step: step, detail: String(localized: "A game or Wine tool is running on build \(build). Quit it before repairing Steam."))
+        }
+        try refuseRunningGame()
+
         let staged = try await stage(bundle, bases: manifest.bases, downloads: downloads, report: report)
 
         report(.checking)
         try verifyValveSignature(staged)
 
+        // A game can start during the download.
+        try refuseRunningGame()
         let stopped = try stopClient(app) { report(.stoppingClient) }
 
         try modifications.prepare()
