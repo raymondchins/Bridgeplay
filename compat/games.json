@@ -359,6 +359,19 @@
     "fork_commit": null
   },
   {
+    "appid": 1547000,
+    "name": "Grand Theft Auto: San Andreas — The Definitive Edition",
+    "api": "D3D11",
+    "anticheat": null,
+    "status": "gold",
+    "backend": "dxmt",
+    "engine": "winecx-11.17",
+    "notes": "Manual opt-in required ([guide](../workarounds/1547000/README.md)). Rockstar Launcher uses DXVK; SanAndreas.exe uses app-local DXMT. Contributor-reported, not maintainer-verified: first mission completed with no gameplay issues. Later missions and FPS are unverified.",
+    "last_tested": "2026-10-31",
+    "fork_commit": null,
+    "tested_on": "M2 Pro · 16 GB · macOS 26.6.2"
+  },
+  {
     "appid": 2071280,
     "name": "Ravenswatch",
     "api": "unknown",

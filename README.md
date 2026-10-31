@@ -98,6 +98,8 @@ The Setup Assistant's graphics download carries Apple's Game Porting Toolkit red
 
 The [guides on bridgeplay.dev](https://bridgeplay.dev/guides) cover installing Bridgeplay, troubleshooting, DirectX 12, DLSS and frame generation, and anti-cheat. The [FAQ](https://bridgeplay.dev/faq) answers common questions, and the [compatibility list](https://bridgeplay.dev/compatibility) shows which games other players got running.
 
+The [GTA San Andreas Definitive Edition manual workaround](workarounds/1547000/README.md) documents an opt-in launcher and game renderer split.
+
 ## How it works
 
 Bridgeplay runs inside the native macOS Steam client and registers itself as a Steam Play compatibility tool. Under the hood:

@@ -25,6 +25,13 @@ their own terms.
 Third-party components in Bridgeplay
 ------------------------------------
 
+The optional GTA San Andreas Definitive Edition workaround includes a Windows x64
+SocialClubHelper shim source and compiled helper adapted from Matthias Schedel's
+socialclubhelper-shim.c in rdr2-crossover-apple-silicon, pinned at
+https://github.com/matthiasSchedel/rdr2-crossover-apple-silicon/commit/66215a814cb26b460ec711d9ce71ce5d31a6c090.
+These helper files are distributed under the MIT License; the full original text
+is in workarounds/1547000/LICENSE.
+
 Dobby (https://github.com/jmpews/Dobby, commit 5dfc8546), the hooking library
 linked into notproton.dylib, is licensed under the Apache License 2.0. Full
 text: LICENSE.dobby. Dobby has no NOTICE file to reproduce.
