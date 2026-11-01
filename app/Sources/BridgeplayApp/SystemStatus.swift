@@ -655,7 +655,6 @@ final class SystemStatus {
 
             var parts = [String(localized: "Bridgeplay successfully installed.")]
             if result.stoppedClient { parts.append(Self.restartHint) }
-            sealWarning = result.sealWarning
             let install = usableCrossOver
             let state = await Task.detached(priority: .userInitiated) {
                 (runner: RunnerStore.state(),
@@ -689,6 +688,8 @@ final class SystemStatus {
                 try SteamInstaller.finish(result)
             }.value
 
+            // Set last, so a step that fails above is not read as a finished install.
+            sealWarning = result.sealWarning
             return parts.joined(separator: " ")
         }
         if failure == nil {
