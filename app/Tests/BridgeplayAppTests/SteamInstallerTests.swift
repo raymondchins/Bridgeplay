@@ -420,7 +420,7 @@ struct SteamInstallerTests {
 
         #expect(throws: (any Error).self) {
             try SteamInstaller.revertPlist(Data("plist".utf8), at: missing.appending(path: "Contents/Info.plist"), app: missing,
-                                           pause: { _ in })
+                                           pause: { _ in }, mayRetry: { true })
         }
         #expect(throws: Never.self) {
             try SteamInstaller.revertPlist(nil, at: missing.appending(path: "Contents/Info.plist"), app: missing)
@@ -440,7 +440,7 @@ struct SteamInstallerTests {
         try SteamInstaller.revertPlist(Data("plist".utf8), at: plist, app: app, pause: {
             pauses.append($0)
             try? FileManager.default.createDirectory(at: plist.deletingLastPathComponent(), withIntermediateDirectories: true)
-        }, resign: { _ in signed += 1 })
+        }, mayRetry: { true }, resign: { _ in signed += 1 })
         #expect(try Data(contentsOf: plist) == Data("plist".utf8))
         #expect(pauses.count == 1)
         #expect(signed == 1)
@@ -448,10 +448,18 @@ struct SteamInstallerTests {
         // A write that keeps failing is reported after the last try, not retried forever.
         var tries = 0
         #expect(throws: (any Error).self) {
-            try SteamInstaller.revertPlist(Data("plist".utf8), at: plist, app: app, pause: { _ in },
+            try SteamInstaller.revertPlist(Data("plist".utf8), at: plist, app: app, pause: { _ in }, mayRetry: { true },
                                            resign: { _ in tries += 1; throw StepFailure(step: "s", detail: "d") })
         }
         #expect(tries == 3)
+
+        // Steam opened during the pause: its bundle is left as it is.
+        tries = 0
+        #expect(throws: (any Error).self) {
+            try SteamInstaller.revertPlist(Data("plist".utf8), at: plist, app: app, pause: { _ in }, mayRetry: { false },
+                                           resign: { _ in tries += 1; throw StepFailure(step: "s", detail: "d") })
+        }
+        #expect(tries == 1)
     }
 
     @Test("A revert that also failed names the install step once")
@@ -489,7 +497,7 @@ struct SteamInstallerTests {
         var results = [Self.codesignResult("x: internal error in Code Signing subsystem"), Self.codesignResult("")]
         var pauses = 0
         try SteamInstaller.sign(URL(filePath: "/tmp/x.dylib"), identity: "-",
-                                codesign: { _ in results.removeFirst() }, pause: { _ in pauses += 1 })
+                                codesign: { _ in results.removeFirst() }, pause: { _ in pauses += 1 }, mayRetry: { true })
         #expect(results.isEmpty)
         #expect(pauses == 1)
     }
@@ -501,9 +509,22 @@ struct SteamInstallerTests {
             try SteamInstaller.sign(URL(filePath: "/tmp/x.dylib"), identity: "-", codesign: { _ in
                 calls += 1
                 return Self.codesignResult("x: internal error in Code Signing subsystem")
-            }, pause: { _ in })
+            }, pause: { _ in }, mayRetry: { true })
         }
         #expect(calls == 1 + SteamInstaller.signingRetries)
+        #expect(failure.retryable)
+    }
+
+    @Test("A Steam that opened during the pause is not signed again")
+    func signingStopsWhenSteamOpens() throws {
+        var calls = 0
+        let failure = try #require(throws: StepFailure.self) {
+            try SteamInstaller.sign(URL(filePath: "/tmp/x.dylib"), identity: "-", codesign: { _ in
+                calls += 1
+                return Self.codesignResult("x: internal error in Code Signing subsystem")
+            }, pause: { _ in }, mayRetry: { false })
+        }
+        #expect(calls == 1)
         #expect(failure.retryable)
     }
 
@@ -514,7 +535,7 @@ struct SteamInstallerTests {
             try SteamInstaller.sign(URL(filePath: "/tmp/x.dylib"), identity: "-", codesign: { _ in
                 calls += 1
                 return Self.codesignResult("x: No such file or directory")
-            }, pause: { _ in Issue.record("paused for a failure that does not pass") })
+            }, pause: { _ in Issue.record("paused for a failure that does not pass") }, mayRetry: { true })
         }
         #expect(calls == 1)
         #expect(!failure.retryable)

@@ -477,6 +477,7 @@ enum SteamInstaller {
         _ bytes: Data?, at plist: URL, app: URL,
         attempts: Int = 3,
         pause: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) },
+        mayRetry: () -> Bool = steamStaysClosed,
         resign: (URL) throws -> Void = { try adHocSign($0) }
     ) throws {
         guard let bytes else { return }
@@ -488,11 +489,19 @@ enum SteamInstaller {
             } catch where attempt < attempts {
                 AppLog.note("install: putting the plist back failed (try \(attempt)): \(error.localizedDescription)")
                 pause(retryPause * Double(attempt))
+                guard mayRetry() else { throw error }
             }
         }
     }
 
     static let retryPause: TimeInterval = 2
+
+    // A retry waits a moment, and Steam may have opened since; its bundle is then left alone.
+    static func steamStaysClosed() -> Bool {
+        guard SteamBundle.isRunning else { return true }
+        AppLog.note("install: Steam opened, not trying again")
+        return false
+    }
 
     static func setInsert(at plist: URL, to dylib: URL) throws {
         guard var dict = SteamBundle.readInfoPlist(at: plist) else {
@@ -542,7 +551,8 @@ enum SteamInstaller {
     static func sign(
         _ url: URL, identity: String, keychain: URL? = nil, step: String = step,
         codesign: Codesign = { try Shell.run("/usr/bin/codesign", $0) },
-        pause: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }
+        pause: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) },
+        mayRetry: () -> Bool = steamStaysClosed
     ) throws {
         let path = url.path(percentEncoded: false)
         let lookup = keychain.map { ["--keychain", $0.path(percentEncoded: false)] } ?? []
@@ -565,6 +575,7 @@ enum SteamInstaller {
             retries += 1
             AppLog.note("install: codesign hit a transient error on \(url.lastPathComponent), trying again (\(retries))")
             pause(retryPause * Double(retries))
+            guard mayRetry() else { break }
             result = try attempt()
         }
         guard result.succeeded else {
