@@ -390,14 +390,16 @@ struct PrefixToolsTests {
         #expect(built.lowerBound < installed.lowerBound)
     }
 
-    // A newline inside an AppleScript string literal is a syntax error, so osascript writes
-    // nothing and the launch still stops, with no dialog ever reaching the screen to say why.
-    @Test("The alert reaches osascript as one line")
-    func alertIsOneLine() throws {
+    // Text inside an AppleScript string literal can break it, so osascript writes nothing and
+    // the launch still stops, with no dialog ever reaching the screen to say why.
+    @Test("The alert text reaches osascript as arguments")
+    func alertTextIsArguments() throws {
         let source = try Self.compatSource()
-        let opening = try #require(source.range(of: "display alert"))
-        let closing = try #require(source.range(of: #"" as critical"#))
-        #expect(!source[opening.lowerBound..<closing.lowerBound].contains("\n"))
+        let helper = try #require(source.range(of: "show_alert() {\n"))
+        let script = try #require(source.range(of: #"osascript - "$1" "$2" >/dev/null 2>&1 <<'APPLESCRIPT' || true"#))
+        let alert = try #require(source.range(of: "display alert (item 1 of argv) message (item 2 of argv) as critical"))
+        #expect(helper.upperBound < script.lowerBound)
+        #expect(script.upperBound < alert.lowerBound)
     }
 
     // Steam runs the tool twice for one launch and both passes reach the refusal, so an
