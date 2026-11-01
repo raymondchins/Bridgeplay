@@ -523,8 +523,8 @@ enum SteamInstaller {
         try SteamBundle.writeInfoPlist(dict, at: plist)
     }
 
-    static func adHocSign(_ url: URL, step: String = step) throws {
-        try sign(url, identity: "-", step: step)
+    static func adHocSign(_ url: URL, step: String = step, steamClosed: () -> Bool = steamStaysClosed) throws {
+        try sign(url, identity: "-", step: step, steamClosed: steamClosed)
     }
 
     // A self-signed code signing identity, in Bridgeplay's own keychain (or the login keychain

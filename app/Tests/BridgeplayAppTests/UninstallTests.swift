@@ -210,13 +210,33 @@ struct UninstallTests {
         try Shell.check("/usr/bin/chflags", ["uchg", dylib])
         defer { _ = try? Shell.check("/usr/bin/chflags", ["nouchg", dylib]) }
 
+        // The scratch bundle is not the Steam that may be open on this Mac.
         #expect(throws: (any Error).self) {
             try Uninstall.detach(
-                from: layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock])
+                from: layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock],
+                steamClosed: { true })
         }
 
         #expect(SteamBundle.currentInsert(at: layout.outerPlist) == nil)
         #expect(try verifies(layout.app))
+    }
+
+    @Test("A removal whose signing stopped because Steam opened leaves that Steam alone")
+    func failureWithSteamOpenLeavesItAlone() throws {
+        let layout = try layout(signable: true)
+        defer { try? FileManager.default.removeItem(at: layout.root) }
+        let dylib = layout.dylib.path(percentEncoded: false)
+        try Shell.check("/usr/bin/chflags", ["uchg", dylib])
+        defer { _ = try? Shell.check("/usr/bin/chflags", ["nouchg", dylib]) }
+        let before = try Data(contentsOf: layout.app.appending(path: "Contents/MacOS/steam_osx"))
+
+        #expect(throws: (any Error).self) {
+            try Uninstall.detach(
+                from: layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock],
+                steamClosed: { false })
+        }
+
+        #expect(try Data(contentsOf: layout.app.appending(path: "Contents/MacOS/steam_osx")) == before)
     }
 
     @Test("A restore that fails does not cancel the removal")
