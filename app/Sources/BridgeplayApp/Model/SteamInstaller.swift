@@ -102,6 +102,7 @@ enum SteamInstaller {
             _ = try RunnerPatcher.install(build: build, root: root, bridge: bridge)
         },
         stopClient: ClientStopper = stopTheClient,
+        steamClosed: () -> Bool = steamStaysClosed,
         register: BundleRegistrar = { SteamBundle.register($0) },
         resetInputAccess: () -> [String] = resetInputAccess,
         onInputReset: ([String]) -> Void = { _ in },
@@ -211,13 +212,13 @@ enum SteamInstaller {
 
                 report(.signing)
                 try LocalSigning.unlocked(signingIdentity()) { identity in
-                    try sign(dylib, identity: identity)
-                    try sign(app.appending(path: "Contents/MacOS/steam_osx"), identity: identity)
-                    try sign(app, identity: identity)
+                    try sign(dylib, identity: identity, steamClosed: steamClosed)
+                    try sign(app.appending(path: "Contents/MacOS/steam_osx"), identity: identity, steamClosed: steamClosed)
+                    try sign(app, identity: identity, steamClosed: steamClosed)
                 }
             } catch {
                 do {
-                    try revertPlist(priorPlist, at: plist, app: app)
+                    try revertPlist(priorPlist, at: plist, app: app, steamClosed: steamClosed)
                 } catch let revertFailure {
                     AppLog.note("install: putting the plist back failed: \(revertFailure.localizedDescription)")
                     throw revertFailed(error, revertFailure)
@@ -477,10 +478,13 @@ enum SteamInstaller {
         _ bytes: Data?, at plist: URL, app: URL,
         attempts: Int = 3,
         pause: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) },
-        mayRetry: () -> Bool = steamStaysClosed,
+        steamClosed: () -> Bool = steamStaysClosed,
         resign: (URL) throws -> Void = { try adHocSign($0) }
     ) throws {
         guard let bytes else { return }
+        // Signing may have stopped because Steam opened; re-signing a running Steam can get
+        // it killed, so it is left as it is and reported.
+        guard steamClosed() else { throw ClientStarted() }
         for attempt in 1... {
             do {
                 try WriteRefused.catching(plist) { try bytes.write(to: plist) }
@@ -489,7 +493,7 @@ enum SteamInstaller {
             } catch where attempt < attempts {
                 AppLog.note("install: putting the plist back failed (try \(attempt)): \(error.localizedDescription)")
                 pause(retryPause * Double(attempt))
-                guard mayRetry() else { throw error }
+                guard steamClosed() else { throw error }
             }
         }
     }
@@ -497,6 +501,7 @@ enum SteamInstaller {
     static let retryPause: TimeInterval = 2
 
     // A retry waits a moment, and Steam may have opened since; its bundle is then left alone.
+    // Checked again before putting the plist back.
     static func steamStaysClosed() -> Bool {
         guard SteamBundle.isRunning else { return true }
         AppLog.note("install: Steam opened, not trying again")
@@ -533,8 +538,9 @@ enum SteamInstaller {
         LocalSigning.existing()
     }
 
-    static func sign(_ url: URL, identity: LocalSigning.Identity?, step: String = step) throws {
-        try sign(url, identity: identity?.hash ?? "-", keychain: identity?.keychain, step: step)
+    static func sign(_ url: URL, identity: LocalSigning.Identity?, step: String = step,
+                     steamClosed: () -> Bool = steamStaysClosed) throws {
+        try sign(url, identity: identity?.hash ?? "-", keychain: identity?.keychain, step: step, steamClosed: steamClosed)
     }
 
     typealias Codesign = ([String]) throws -> CommandResult
@@ -552,7 +558,7 @@ enum SteamInstaller {
         _ url: URL, identity: String, keychain: URL? = nil, step: String = step,
         codesign: Codesign = { try Shell.run("/usr/bin/codesign", $0) },
         pause: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) },
-        mayRetry: () -> Bool = steamStaysClosed
+        steamClosed: () -> Bool = steamStaysClosed
     ) throws {
         let path = url.path(percentEncoded: false)
         let lookup = keychain.map { ["--keychain", $0.path(percentEncoded: false)] } ?? []
@@ -575,7 +581,7 @@ enum SteamInstaller {
             retries += 1
             AppLog.note("install: codesign hit a transient error on \(url.lastPathComponent), trying again (\(retries))")
             pause(retryPause * Double(retries))
-            guard mayRetry() else { break }
+            guard steamClosed() else { break }
             result = try attempt()
         }
         guard result.succeeded else {

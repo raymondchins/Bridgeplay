@@ -791,6 +791,8 @@ final class SystemStatus {
                     AppLog.note("patch keeper (\(trigger)): Steam opened before re-applying, asking instead")
                     clearFailure()
                     patchBanner = SteamPatchKeeper.Banner(kind: kind, blocker: .steamRunning)
+                    // This try changed nothing, so an earlier held-back failure still stands.
+                    heldBackRun = generation
                     return false
                 }
                 if failure == nil, let error = lastRunError {
