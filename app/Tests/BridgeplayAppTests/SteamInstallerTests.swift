@@ -469,6 +469,17 @@ struct SteamInstallerTests {
         #expect(!other.retryable)
     }
 
+    @Test("A broken seal this account can't sign again is reported, not taken as installed")
+    func brokenSealElsewhereIsReported() throws {
+        let other = try #require(SteamInstaller.brokenSealDetail(.otherAccount))
+        #expect(other.contains("may not start"))
+        #expect(other.contains("account that owns Steam"))
+        #expect(SteamInstaller.brokenSealDetail(.rootOwned(handOver: nil))?.contains("may not start") == true)
+        // These keep the write refusal, whose remedy says what to change on this Mac.
+        #expect(SteamInstaller.brokenSealDetail(.appManagement) == nil)
+        #expect(SteamInstaller.brokenSealDetail(.ownership) == nil)
+    }
+
     private static func codesignResult(_ stderr: String) -> CommandResult {
         CommandResult(status: stderr.isEmpty ? 0 : 1, stdout: "", stderr: stderr)
     }

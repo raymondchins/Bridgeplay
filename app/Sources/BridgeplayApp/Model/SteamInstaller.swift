@@ -353,12 +353,19 @@ enum SteamInstaller {
         let deployed = SteamBundle.currentInsert(at: plist) == dylib.path(percentEncoded: false)
             && SteamBundle.currentControllerBlock(at: plist) == SteamBundle.controllerBlockValue
         let file = DeploymentContent.File(source: shipping, destination: dylib, name: "notproton.dylib", allowsResigning: true)
-        // A seal that no longer matches (signing failed and the plist could not be put back,
-        // #1931) is signed again when this account can write the bundle.
-        if deployed, try file.matches(),
-           sealIsIntact(app) || (try? assertBundleIsWritable(app)) == nil {
-            AppLog.note("install: Steam already carries this dylib, installing for this account only")
-            return false
+        if deployed, try file.matches() {
+            if sealIsIntact(app) {
+                AppLog.note("install: Steam already carries this dylib, installing for this account only")
+                return false
+            }
+            // Signing failed and the plist could not be put back (#1931): sign it again.
+            do {
+                try assertBundleIsWritable(app)
+            } catch let refusal as WriteRefused {
+                guard let detail = brokenSealDetail(refusal.remedy) else { throw refusal }
+                throw StepFailure(step: step, detail: detail)
+            }
+            return true
         }
 
         do {
@@ -378,6 +385,16 @@ enum SteamInstaller {
             AppLog.note("install: Steam's signature no longer matches: \(result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))")
         }
         return result.succeeded
+    }
+
+    // What to say when Steam's seal is broken and this account can't sign it again.
+    static func brokenSealDetail(_ remedy: Remedy) -> String? {
+        let lead = String(localized: "Steam's signature no longer matches its files, so Steam may not start, and this account cannot sign it again.")
+        return switch remedy {
+        case .otherAccount: lead + " " + String(localized: "Install Bridgeplay again from the account that owns Steam.")
+        case .rootOwned: lead + " " + remedy.advice
+        case .appManagement, .ownership: nil
+        }
     }
 
     // What to say when Steam.app can't be written for a reason this account can't fix.

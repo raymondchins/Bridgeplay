@@ -5650,6 +5650,22 @@
         }
       }
     },
+    "Install Bridgeplay again from the account that owns Steam." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installa di nuovo Bridgeplay dall'account a cui appartiene Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请使用安装 Steam 的账户重新安装 Bridgeplay。"
+          }
+        }
+      }
+    },
     "Install Bridgeplay into Steam below, or run the Setup Assistant." : {
       "localizations" : {
         "it" : {
@@ -10273,6 +10289,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这是 Steam 自带的开关。它还会列出为 Linux 制作的工具，这些工具无法在 Mac 上运行。请保持关闭。"
+          }
+        }
+      }
+    },
+    "Steam's signature no longer matches its files, so Steam may not start, and this account cannot sign it again." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La firma di Steam non corrisponde più ai suoi file, quindi Steam potrebbe non avviarsi, e questo account non può firmarlo di nuovo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 的签名已与其文件不符，Steam 可能无法启动，且当前账户无法重新签名。"
           }
         }
       }

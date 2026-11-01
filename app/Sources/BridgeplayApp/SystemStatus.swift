@@ -774,17 +774,19 @@ final class SystemStatus {
             guard isIdle, !autoReapplying else { return }
             autoReapplying = true
             defer { autoReapplying = false }
+            // A failure kept back for a retry that never ran is reported after all: it can
+            // leave a Steam that still declares Bridgeplay but whose seal is broken.
+            var heldBack: Error?
+            var heldBackRun = generation
             await SteamPatchKeeper.reapply(kind) { retrying in
-                let ready = await waitForSteamToSettle(trigger: trigger, retrying: retrying)
-                if !ready, retrying {
-                    // The held-back failure stays unsaid; the next check shows what blocks it.
-                    autoReapplyFailed = true
-                    patchBanner = SteamPatchKeeper.Banner(kind: kind, blocker: .lastTryFailed)
-                }
-                return ready
+                await waitForSteamToSettle(trigger: trigger, retrying: retrying)
             } attempt: { number, mayRetry in
-                // The wait gave the user time to start something of their own.
-                guard isIdle else { return false }
+                // The wait gave the user time to start something of their own; that run
+                // reports for itself.
+                guard isIdle else {
+                    heldBack = nil
+                    return false
+                }
                 AppLog.note("patch keeper (\(trigger)): re-applying on its own, \(kind)\(number > 1 ? ", try \(number)" : "")")
                 lastAutoReapply = Date()
                 await installIntoSteam(unattended: true) { mayRetry && SteamPatchKeeper.isRetryable($0) }
@@ -795,12 +797,21 @@ final class SystemStatus {
                     patchBanner = SteamPatchKeeper.Banner(kind: kind, blocker: .steamRunning)
                     return false
                 }
-                if failure == nil, lastRunError != nil {
+                if failure == nil, let error = lastRunError {
                     AppLog.note("patch keeper (\(trigger)): Steam was still changing, trying again")
+                    heldBack = error
+                    heldBackRun = generation
                     return true
                 }
+                heldBack = nil
                 settleReapply(kind)
                 return false
+            }
+            // A run since then (Repair Steam, an install) has its own outcome on show.
+            if let heldBack, heldBackRun == generation {
+                AppLog.note("patch keeper (\(trigger)): no later try ran, reporting the held-back failure")
+                record(heldBack)
+                settleReapply(kind)
             }
         }
     }
@@ -820,13 +831,18 @@ final class SystemStatus {
         }
         let version = AppVersion.bundled
         let seen = await Task.detached(priority: .utility) { SteamPatchKeeper.capture(bundledVersion: version) }.value
+        // Repair Steam may have paused the keeper while it waited.
+        let paused = UserDefaults.standard.bool(forKey: SteamPatchKeeper.pausedKey)
+        let installBlocked = snapshot?.installContent.blocksInstallation == true
         let decision = SteamPatchKeeper.decide(SteamPatchKeeper.Inputs(
             deployment: seen.deployment,
             previouslyDeployed: seen.previouslyDeployed,
             steamRunning: seen.steamRunning,
-            gameRunning: seen.gameRunning))
+            gameRunning: seen.gameRunning,
+            paused: paused,
+            installBlocked: installBlocked))
         if case .reapply = decision { return true }
-        if retrying, !seen.steamRunning, !seen.gameRunning { return true }
+        if retrying, !paused, !installBlocked, !seen.steamRunning, !seen.gameRunning { return true }
         AppLog.note("patch keeper (\(trigger)): nothing to re-apply after waiting for Steam, \(decision)")
         return false
     }
