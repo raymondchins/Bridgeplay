@@ -142,6 +142,8 @@ struct SteamInstallerTests {
                 if stopped { onStopping() }
                 return stopped
             },
+            // The scratch bundle is not the Steam that may be open on this Mac.
+            steamClosed: { true },
             register: register ?? { calls.register($0) },
             resetInputAccess: { calls.resetInputAccess(); return refusedResets },
             onInputReset: onInputReset
@@ -419,11 +421,141 @@ struct SteamInstallerTests {
         let missing = work.appending(path: "gone/Steam.app")
 
         #expect(throws: (any Error).self) {
-            try SteamInstaller.revertPlist(Data("plist".utf8), at: missing.appending(path: "Contents/Info.plist"), app: missing)
+            try SteamInstaller.revertPlist(Data("plist".utf8), at: missing.appending(path: "Contents/Info.plist"), app: missing,
+                                           pause: { _ in }, steamClosed: { true })
         }
         #expect(throws: Never.self) {
             try SteamInstaller.revertPlist(nil, at: missing.appending(path: "Contents/Info.plist"), app: missing)
         }
+    }
+
+    @Test("Putting the plist back is tried again before it is reported")
+    func revertRetries() throws {
+        let work = try scratchDirectory("install")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let app = work.appending(path: "Steam.app")
+        let plist = app.appending(path: "Contents/Info.plist")
+        var pauses: [TimeInterval] = []
+        var signed = 0
+
+        // The folder is back by the second try, as when Steam's updater finished writing.
+        try SteamInstaller.revertPlist(Data("plist".utf8), at: plist, app: app, pause: {
+            pauses.append($0)
+            try? FileManager.default.createDirectory(at: plist.deletingLastPathComponent(), withIntermediateDirectories: true)
+        }, steamClosed: { true }, resign: { _ in signed += 1 })
+        #expect(try Data(contentsOf: plist) == Data("plist".utf8))
+        #expect(pauses.count == 1)
+        #expect(signed == 1)
+
+        // A write that keeps failing is reported after the last try, not retried forever.
+        var tries = 0
+        #expect(throws: (any Error).self) {
+            try SteamInstaller.revertPlist(Data("plist".utf8), at: plist, app: app, pause: { _ in }, steamClosed: { true },
+                                           resign: { _ in tries += 1; throw StepFailure(step: "s", detail: "d") })
+        }
+        #expect(tries == 3)
+
+        // Steam opened (signing stopped for it): its bundle is left as it is.
+        tries = 0
+        #expect(throws: SteamInstaller.ClientStarted.self) {
+            try SteamInstaller.revertPlist(Data("plist".utf8), at: plist, app: app, pause: { _ in }, steamClosed: { false },
+                                           resign: { _ in tries += 1; throw StepFailure(step: "s", detail: "d") })
+        }
+        #expect(tries == 0)
+    }
+
+    @Test("A read-only plist can still be put back")
+    func revertReplacesReadOnlyPlist() throws {
+        let work = try scratchDirectory("install")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let app = work.appending(path: "Steam.app")
+        let plist = app.appending(path: "Contents/Info.plist")
+        try FileManager.default.createDirectory(at: plist.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("changed".utf8).write(to: plist)
+        try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: plist.path(percentEncoded: false))
+
+        try SteamInstaller.revertPlist(Data("plist".utf8), at: plist, app: app, pause: { _ in }, steamClosed: { true }, resign: { _ in })
+        #expect(try Data(contentsOf: plist) == Data("plist".utf8))
+    }
+
+    @Test("A revert that also failed names the install step once")
+    func revertFailureSaysTheStepOnce() {
+        let signing = StepFailure(step: SteamInstaller.step, detail: "x could not be signed.", retryable: true)
+        let failure = SteamInstaller.revertFailed(signing, WriteRefused(path: "/x", remedy: .ownership))
+        let message = failure.localizedDescription
+        #expect(message.hasPrefix("\(SteamInstaller.step): x could not be signed."))
+        #expect(!message.contains("\(SteamInstaller.step): \(SteamInstaller.step)"))
+        #expect(failure.retryable)
+
+        // A failure from another step keeps its own name.
+        let other = SteamInstaller.revertFailed(StepFailure(step: "Keychain", detail: "locked"), WriteRefused(path: "/x", remedy: .ownership))
+        #expect(other.detail.hasPrefix("Keychain: locked"))
+        #expect(!other.retryable)
+    }
+
+    @Test("A broken seal this account can't sign again is reported, not taken as installed")
+    func brokenSealElsewhereIsReported() throws {
+        let other = try #require(SteamInstaller.brokenSealDetail(.otherAccount))
+        #expect(other.contains("may not start"))
+        #expect(other.contains("account that owns Steam"))
+        #expect(SteamInstaller.brokenSealDetail(.rootOwned(handOver: nil))?.contains("may not start") == true)
+        // These keep the write refusal, whose remedy says what to change on this Mac.
+        #expect(SteamInstaller.brokenSealDetail(.appManagement) == nil)
+        #expect(SteamInstaller.brokenSealDetail(.ownership) == nil)
+    }
+
+    private static func codesignResult(_ stderr: String) -> CommandResult {
+        CommandResult(status: stderr.isEmpty ? 0 : 1, stdout: "", stderr: stderr)
+    }
+
+    @Test("codesign's internal error is retried after a pause, and a later success counts")
+    func signingRetriesTransientError() throws {
+        var results = [Self.codesignResult("x: internal error in Code Signing subsystem"), Self.codesignResult("")]
+        var pauses = 0
+        try SteamInstaller.sign(URL(filePath: "/tmp/x.dylib"), identity: "-",
+                                codesign: { _ in results.removeFirst() }, pause: { _ in pauses += 1 }, steamClosed: { true })
+        #expect(results.isEmpty)
+        #expect(pauses == 1)
+    }
+
+    @Test("A codesign that keeps hitting its internal error gives up, and says it may pass later")
+    func signingRetriesAreBounded() throws {
+        var calls = 0
+        let failure = try #require(throws: StepFailure.self) {
+            try SteamInstaller.sign(URL(filePath: "/tmp/x.dylib"), identity: "-", codesign: { _ in
+                calls += 1
+                return Self.codesignResult("x: internal error in Code Signing subsystem")
+            }, pause: { _ in }, steamClosed: { true })
+        }
+        #expect(calls == 1 + SteamInstaller.signingRetries)
+        #expect(failure.retryable)
+    }
+
+    @Test("A Steam that opened during the pause is not signed again")
+    func signingStopsWhenSteamOpens() throws {
+        var calls = 0
+        let failure = try #require(throws: StepFailure.self) {
+            try SteamInstaller.sign(URL(filePath: "/tmp/x.dylib"), identity: "-", codesign: { _ in
+                calls += 1
+                return Self.codesignResult("x: internal error in Code Signing subsystem")
+            }, pause: { _ in }, steamClosed: { false })
+        }
+        #expect(calls == 1)
+        #expect(failure.retryable)
+    }
+
+    @Test("A real codesign failure is reported at once and not marked as passing")
+    func signingDoesNotRetryRealFailures() throws {
+        var calls = 0
+        let failure = try #require(throws: StepFailure.self) {
+            try SteamInstaller.sign(URL(filePath: "/tmp/x.dylib"), identity: "-", codesign: { _ in
+                calls += 1
+                return Self.codesignResult("x: No such file or directory")
+            }, pause: { _ in Issue.record("paused for a failure that does not pass") }, steamClosed: { true })
+        }
+        #expect(calls == 1)
+        #expect(!failure.retryable)
+        #expect(failure.detail.contains("could not be signed"))
     }
 
     @Test("The plist backup records the state before the first install only")
@@ -574,6 +706,21 @@ struct SteamInstallerTests {
         _ = try install(fixture)
         #expect(
             try !SteamInstaller.needsPatching(
+                plist: fixture.plist,
+                dylib: fixture.deployedDylib,
+                shipping: fixture.payload.dylib,
+                app: fixture.app
+            )
+        )
+
+        // Signing failed and the plist could not be put back: the insert is there but the
+        // seal no longer matches, so the next install signs Steam again.
+        var dict = try #require(SteamBundle.readInfoPlist(at: fixture.plist))
+        dict["BridgeplayTestKey"] = "changed"
+        try SteamBundle.writeInfoPlist(dict, at: fixture.plist)
+        #expect(!SteamInstaller.sealIsIntact(fixture.app))
+        #expect(
+            try SteamInstaller.needsPatching(
                 plist: fixture.plist,
                 dylib: fixture.deployedDylib,
                 shipping: fixture.payload.dylib,

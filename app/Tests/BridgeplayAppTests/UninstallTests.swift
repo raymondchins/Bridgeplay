@@ -210,13 +210,57 @@ struct UninstallTests {
         try Shell.check("/usr/bin/chflags", ["uchg", dylib])
         defer { _ = try? Shell.check("/usr/bin/chflags", ["nouchg", dylib]) }
 
+        // The scratch bundle is not the Steam that may be open on this Mac.
         #expect(throws: (any Error).self) {
             try Uninstall.detach(
-                from: layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock])
+                from: layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock],
+                steamClosed: { true })
         }
 
         #expect(SteamBundle.currentInsert(at: layout.outerPlist) == nil)
         #expect(try verifies(layout.app))
+    }
+
+    @Test("A removal whose signing stopped because Steam opened leaves that Steam alone")
+    func failureWithSteamOpenLeavesItAlone() throws {
+        let layout = try layout(signable: true)
+        defer { try? FileManager.default.removeItem(at: layout.root) }
+        let dylib = layout.dylib.path(percentEncoded: false)
+        try Shell.check("/usr/bin/chflags", ["uchg", dylib])
+        defer { _ = try? Shell.check("/usr/bin/chflags", ["nouchg", dylib]) }
+        let before = try Data(contentsOf: layout.app.appending(path: "Contents/MacOS/steam_osx"))
+
+        #expect(throws: (any Error).self) {
+            try Uninstall.detach(
+                from: layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock],
+                steamClosed: { false })
+        }
+
+        #expect(try Data(contentsOf: layout.app.appending(path: "Contents/MacOS/steam_osx")) == before)
+    }
+
+    @Test("Steam opening between the two recovery signatures stops the second")
+    func steamOpeningMidRecoveryStopsIt() throws {
+        let layout = try layout(signable: true)
+        defer { try? FileManager.default.removeItem(at: layout.root) }
+        let dylib = layout.dylib.path(percentEncoded: false)
+        try Shell.check("/usr/bin/chflags", ["uchg", dylib])
+        defer { _ = try? Shell.check("/usr/bin/chflags", ["nouchg", dylib]) }
+        let executable = layout.app.appending(path: "Contents/MacOS/steam_osx")
+        let seal = layout.app.appending(path: "Contents/_CodeSignature/CodeResources")
+        let executableBefore = try Data(contentsOf: executable)
+        let sealBefore = try Data(contentsOf: seal)
+
+        // Closed for the executable's signature, open by the time the app's would start.
+        var checks = 0
+        #expect(throws: (any Error).self) {
+            try Uninstall.detach(
+                from: layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock],
+                steamClosed: { checks += 1; return checks == 1 })
+        }
+
+        #expect(try Data(contentsOf: executable) != executableBefore)
+        #expect(try Data(contentsOf: seal) == sealBefore)
     }
 
     @Test("A restore that fails does not cancel the removal")
