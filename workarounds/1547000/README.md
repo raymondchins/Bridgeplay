@@ -76,6 +76,175 @@ the same game install. Mode-policy fixtures exercise the accepted and rejected
 owner/mode combinations, but reads and writes from a second macOS UID have not
 been verified.
 
+### Manual recovery for an orphan pending marker
+
+This is an exceptional recovery for a marker whose owner transaction journal
+is confirmed irretrievably lost. It is not part of normal setup. Bridgeplay
+fails closed because the shared marker does not identify an account or contain
+the journal's operations; automatically adopting it could lose another
+prefix's ownership or overwrite files. A different macOS account being
+temporarily unavailable does not make a marker orphaned: wait for that owner
+and let its normal `gamefix-prep prepare` or `restore` recover the transaction.
+Never wait for a timeout and unlink the marker by hand.
+
+Quit Steam, every Wine process, GTA and Rockstar Launcher in **all macOS
+accounts** that use this Steam installation. Keep them stopped through the
+recovery. In the original owner's account, try its normal recovery first. Do
+not continue while its journal exists, is inaccessible, or might still be
+recoverable. Do not copy or share private journals. Confirm that the owner
+journal is permanently missing or otherwise irretrievably lost before setting
+the acknowledgement below.
+
+Set the absolute Steam game install root and copy the lowercase transaction
+UUID from `.bridgeplay-gta-sa-de-1547000.pending.json`. Keep the three pinned
+hashes unchanged. Run the following setup and recovery blocks in the same
+shell, from a Mac with `plutil`, `shasum`, `stat` and `mv`:
+
+~~~sh
+# BEGIN GTA 1547000 ORPHAN PIN SETUP
+GTA_GAME='/absolute/path/to/GTA San Andreas - The Definitive Edition'
+GTA_EXPECTED_TRANSACTION_UUID='00000000-0000-0000-0000-000000000000'
+GTA_ORPHAN_ACK='I_CONFIRMED_THE_OWNER_JOURNAL_IS_IRRETRIEVABLY_LOST'
+GTA_PIN_D3D11='c1c8c4779686990bf343162a8804dd2d1564b2a893e64e5ddcc7db5e76ce409e'
+GTA_PIN_DXGI='1bb4939ff43e676eac8b3f3cb0583985ab8f7b1a8e11760d14931da3fc44223b'
+GTA_PIN_D3D10CORE='aeb43e1ca7d9f221b9f0070c8654fa3579fd767006272cf675a9113e27bc6e72'
+export GTA_GAME GTA_EXPECTED_TRANSACTION_UUID GTA_ORPHAN_ACK
+export GTA_PIN_D3D11 GTA_PIN_DXGI GTA_PIN_D3D10CORE
+# END GTA 1547000 ORPHAN PIN SETUP
+~~~
+
+The guarded block checks every source, schema, hash, path and destination
+before its first move. It moves only the three known app-local DLLs (when
+present), the recognized shared-state file (when present), and finally the
+pending marker. The unique mode-700 quarantine is a sibling of the game
+folder. Prefixes, saves, registry data, the game executable, unknown files and
+all `.tmp` stages are left in place.
+
+~~~sh
+# BEGIN GTA 1547000 ORPHAN RECOVERY BODY
+(
+set -eu
+gta_refuse() { printf 'Refusing orphan recovery: %s\n' "$1" >&2; exit 1; }
+gta_stop() {
+  printf 'STOP: keep Steam/Wine closed; preserve quarantine %s and follow the interruption instructions.\n' "${GTA_BACKUP-}" >&2
+  exit 1
+}
+gta_hash() { GTA_HASH_LINE=$(shasum -a 256 "$1") || return 1; printf '%s' "${GTA_HASH_LINE%% *}"; }
+[ "${GTA_ORPHAN_ACK-}" = 'I_CONFIRMED_THE_OWNER_JOURNAL_IS_IRRETRIEVABLY_LOST' ] || gta_refuse 'owner-journal loss was not acknowledged'
+case "${GTA_EXPECTED_TRANSACTION_UUID-}" in ????????-????-????-????-????????????) ;; *) gta_refuse 'invalid transaction UUID' ;; esac
+case "$GTA_EXPECTED_TRANSACTION_UUID" in *[!0123456789abcdef-]*) gta_refuse 'UUID must be lowercase hexadecimal' ;; esac
+for GTA_PIN in "${GTA_PIN_D3D11-}" "${GTA_PIN_DXGI-}" "${GTA_PIN_D3D10CORE-}"; do
+  case "$GTA_PIN" in ????????*) [ "${#GTA_PIN}" -eq 64 ] || gta_refuse 'invalid pinned hash' ;; *) gta_refuse 'missing pinned hash' ;; esac
+  case "$GTA_PIN" in *[!0123456789abcdef]*) gta_refuse 'invalid pinned hash' ;; esac
+done
+case "${GTA_GAME-}" in /*) ;; *) gta_refuse 'GTA_GAME must be absolute' ;; esac
+[ "$GTA_GAME" != / ] || gta_refuse 'GTA_GAME cannot be the filesystem root'
+while [ "$GTA_GAME" != / ] && [ "${GTA_GAME%/}" != "$GTA_GAME" ]; do GTA_GAME=${GTA_GAME%/}; done
+[ -n "$GTA_GAME" ] && [ "$GTA_GAME" != / ] || gta_refuse 'invalid game root'
+[ -d "$GTA_GAME" ] || gta_refuse 'game root is unavailable'
+GTA_GAME=$(CDPATH= cd -P "$GTA_GAME" 2>/dev/null && pwd -P) || gta_refuse 'cannot canonicalize game root'
+GTA_GAME=${GTA_GAME%/}
+[ -n "$GTA_GAME" ] && [ "$GTA_GAME" != / ] || gta_refuse 'invalid game root'
+GTA_PARENT=${GTA_GAME%/*}
+[ -d "$GTA_PARENT" ] && [ ! -L "$GTA_PARENT" ] || gta_refuse 'unsafe game-root parent'
+GTA_PHYSICAL_PARENT=$(CDPATH= cd -P "$GTA_PARENT" 2>/dev/null && pwd -P) || gta_refuse 'cannot canonicalize parent'
+[ "$GTA_PARENT" = "$GTA_PHYSICAL_PARENT" ] || gta_refuse 'game-root parent is not canonical'
+GTA_DLL_DIR="$GTA_GAME/Gameface/Binaries/Win64"
+for GTA_DIR in "$GTA_GAME/Gameface" "$GTA_GAME/Gameface/Binaries" "$GTA_DLL_DIR"; do
+  [ -d "$GTA_DIR" ] && [ ! -L "$GTA_DIR" ] || gta_refuse 'unsafe or missing game directory'
+done
+GTA_EXE="$GTA_DLL_DIR/SanAndreas.exe"
+[ -f "$GTA_EXE" ] && [ ! -L "$GTA_EXE" ] || gta_refuse 'SanAndreas.exe is not a regular game file'
+GTA_MARKER="$GTA_GAME/.bridgeplay-gta-sa-de-1547000.pending.json"
+GTA_STATE="$GTA_GAME/.bridgeplay-gta-sa-de-1547000.json"
+[ -f "$GTA_MARKER" ] && [ ! -L "$GTA_MARKER" ] || gta_refuse 'pending marker is missing, non-regular or a symlink'
+[ "$(stat -f %Lp "$GTA_MARKER")" = 644 ] || gta_refuse 'pending marker mode is not 644'
+[ "$(stat -f %z "$GTA_MARKER")" -le 4096 ] || gta_refuse 'pending marker is oversized'
+plutil -convert json -o /dev/null "$GTA_MARKER" >/dev/null 2>&1 || gta_refuse 'pending marker is not valid JSON'
+[ "$(plutil -extract version raw -o - "$GTA_MARKER" 2>/dev/null)" = 1 ] || gta_refuse 'unknown marker schema'
+[ "$(plutil -extract appid raw -o - "$GTA_MARKER" 2>/dev/null)" = 1547000 ] || gta_refuse 'wrong marker AppID'
+[ "$(plutil -extract transactionUUID raw -o - "$GTA_MARKER" 2>/dev/null)" = "$GTA_EXPECTED_TRANSACTION_UUID" ] || gta_refuse 'marker UUID does not match the confirmed transaction'
+GTA_MARKER_HASH=$(gta_hash "$GTA_MARKER") || gta_refuse 'cannot hash marker'
+GTA_STATE_HASH=absent
+if [ -e "$GTA_STATE" ] || [ -L "$GTA_STATE" ]; then
+  [ -f "$GTA_STATE" ] && [ ! -L "$GTA_STATE" ] || gta_refuse 'shared state is non-regular or a symlink'
+  [ "$(stat -f %Lp "$GTA_STATE")" = 644 ] || gta_refuse 'shared-state mode is not 644'
+  [ "$(stat -f %z "$GTA_STATE")" -le 1048576 ] || gta_refuse 'shared state is oversized'
+  plutil -convert json -o /dev/null "$GTA_STATE" >/dev/null 2>&1 || gta_refuse 'shared state is not valid JSON'
+  [ "$(plutil -extract schema raw -o - "$GTA_STATE" 2>/dev/null)" = 1 ] || gta_refuse 'unknown shared-state schema'
+  [ "$(plutil -extract appid raw -o - "$GTA_STATE" 2>/dev/null)" = 1547000 ] || gta_refuse 'wrong shared-state AppID'
+  [ "$(plutil -type references "$GTA_STATE" 2>/dev/null)" = array ] || gta_refuse 'unknown shared-state references field'
+  [ "$(plutil -type files "$GTA_STATE" 2>/dev/null)" = dictionary ] || gta_refuse 'unknown shared-state files field'
+  GTA_STATE_HASH=$(gta_hash "$GTA_STATE") || gta_refuse 'cannot hash shared state'
+fi
+for GTA_NAME in d3d11.dll dxgi.dll d3d10core.dll; do
+  case "$GTA_NAME" in d3d11.dll) GTA_PIN=$GTA_PIN_D3D11 ;; dxgi.dll) GTA_PIN=$GTA_PIN_DXGI ;; *) GTA_PIN=$GTA_PIN_D3D10CORE ;; esac
+  GTA_FILE="$GTA_DLL_DIR/$GTA_NAME"
+  if [ -e "$GTA_FILE" ] || [ -L "$GTA_FILE" ]; then
+    [ -f "$GTA_FILE" ] && [ ! -L "$GTA_FILE" ] || gta_refuse "unsafe DLL: $GTA_NAME"
+    [ "$(gta_hash "$GTA_FILE")" = "$GTA_PIN" ] || gta_refuse "unknown or modified DLL: $GTA_NAME"
+  fi
+done
+GTA_BACKUP="$GTA_PARENT/.bridgeplay-gta-sa-de-orphan-$GTA_EXPECTED_TRANSACTION_UUID"
+[ ! -e "$GTA_BACKUP" ] && [ ! -L "$GTA_BACKUP" ] || gta_refuse 'quarantine destination already exists'
+(umask 077 && mkdir -m 700 "$GTA_BACKUP") || gta_refuse 'cannot create private quarantine'
+[ -d "$GTA_BACKUP" ] && [ ! -L "$GTA_BACKUP" ] && [ "$(stat -f %Lp "$GTA_BACKUP")" = 700 ] || gta_stop
+gta_move() {
+  GTA_SOURCE=$1; GTA_NAME=$2; GTA_EXPECTED=$3; GTA_DEST="$GTA_BACKUP/$GTA_NAME"
+  if [ "$GTA_EXPECTED" = absent ]; then
+    { [ ! -e "$GTA_SOURCE" ] && [ ! -L "$GTA_SOURCE" ]; } || gta_stop
+    return
+  fi
+  [ -f "$GTA_SOURCE" ] && [ ! -L "$GTA_SOURCE" ] && [ ! -e "$GTA_DEST" ] && [ ! -L "$GTA_DEST" ] || gta_stop
+  [ "$(gta_hash "$GTA_SOURCE")" = "$GTA_EXPECTED" ] || gta_stop
+  mv -n "$GTA_SOURCE" "$GTA_DEST" || gta_stop
+  { [ ! -e "$GTA_SOURCE" ] && [ ! -L "$GTA_SOURCE" ]; } || gta_stop
+  [ -f "$GTA_DEST" ] && [ ! -L "$GTA_DEST" ] && [ "$(gta_hash "$GTA_DEST")" = "$GTA_EXPECTED" ] || gta_stop
+}
+for GTA_NAME in d3d11.dll dxgi.dll d3d10core.dll; do
+  case "$GTA_NAME" in d3d11.dll) GTA_PIN=$GTA_PIN_D3D11 ;; dxgi.dll) GTA_PIN=$GTA_PIN_DXGI ;; *) GTA_PIN=$GTA_PIN_D3D10CORE ;; esac
+  GTA_FILE="$GTA_DLL_DIR/$GTA_NAME"
+  if [ -e "$GTA_FILE" ] || [ -L "$GTA_FILE" ]; then gta_move "$GTA_FILE" "$GTA_NAME" "$GTA_PIN"; else gta_move "$GTA_FILE" "$GTA_NAME" absent; fi
+done
+gta_move "$GTA_STATE" .bridgeplay-gta-sa-de-1547000.json "$GTA_STATE_HASH"
+gta_move "$GTA_MARKER" .bridgeplay-gta-sa-de-1547000.pending.json "$GTA_MARKER_HASH"
+printf 'Quarantine complete: %s\n' "$GTA_BACKUP"
+)
+# END GTA 1547000 ORPHAN RECOVERY BODY
+~~~
+
+If any move fails or the script is interrupted, keep every account's Steam,
+Wine and game processes stopped. If the marker is missing from the game root,
+verify it in the quarantine and restore it first to reinstate the block; if it
+is still in the game root, leave it there. Then restore each quarantined DLL or
+shared-state file only after verifying its hash and confirming the destination
+is absent. Once all files are verified in their original paths, use `rmdir`
+on that exact quarantine directory only if it is empty; this permits a retry
+with the same UUID. Never recursively delete the quarantine. If you cannot
+safely finish or undo the moves, use a separate clean Steam game install and
+retain the quarantine for recovery. This manual sequence is not crash-proof or
+atomic.
+
+After a completed quarantine, restore each surviving prefix directly, from its
+own macOS account. This does not launch the game. Set `GTA_DATA` to that
+account's existing `compatdata/1547000` directory; do not create or replace
+the prefix folder. Run this in the shell where `GTA_GAME` was set above:
+
+~~~sh
+GTA_DATA='/absolute/path/to/steamapps/compatdata/1547000'
+GTA_FIX_HELPER="$HOME/Library/Application Support/bridgeplay/gamefix-prep"
+GTA_SA_APP_ID=1547000 GTA_SA_DATA_PATH="$GTA_DATA" \
+GTA_SA_PREFIX="$GTA_DATA/pfx" GTA_SA_GAME="$GTA_GAME" \
+  "$GTA_FIX_HELPER" restore
+~~~
+
+As an alternative, use `BRIDGEPLAY_GTA_SA_DE_FIX=0` once for each surviving
+prefix to clear its private ownership before enabling the fix again. The
+quarantine does not prove that any private journal is lost: inspect and
+recover each one from its owner account. The marker and shared state are public
+shared files; never put private journal paths in them or share private
+journals.
+
 After preparation, Bridgeplay selects DXVK for the Rockstar launcher and
 sets DXGI to native-first (`dxgi=n,b`) for the game-local DXMT DLLs. The stock
 prefix DXGI stays untouched. Matching files adopted as manual remain

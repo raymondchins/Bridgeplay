@@ -772,6 +772,166 @@ is "A cleanup preserves B's shared reference" "$gta_release_b_shared_before" "$(
 is "A cleanup preserves B's private state" yes "$(test -f "$gta_release_b/.bridgeplay-gta-sa-de-1547000/state.json" && echo yes || echo no)"
 is "A cleanup preserves B's shared DLLs" 3 "$(find "$gta_release_game/Gameface/Binaries/Win64" \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
 
+echo "== documented orphan-marker quarantine"
+gta_orphan_readme="$repo_root/workarounds/1547000/README.md"
+gta_orphan_manifest="$repo_root/gamefix-assets/1547000.json"
+gta_orphan_script="$gta_fixture/orphan-recovery.sh"
+sed -n '/^# BEGIN GTA 1547000 ORPHAN RECOVERY BODY$/,/^# END GTA 1547000 ORPHAN RECOVERY BODY$/p' "$gta_orphan_readme" | sed '1d;$d' > "$gta_orphan_script"
+sh -n "$gta_orphan_script"
+gta_orphan_doc_pins=$(python3 - "$gta_orphan_readme" "$gta_orphan_manifest" <<'PY'
+import json
+import re
+import sys
+
+readme = open(sys.argv[1], encoding="utf-8").read()
+manifest = json.load(open(sys.argv[2], encoding="utf-8"))
+setup = re.search(r"(?ms)^# BEGIN GTA 1547000 ORPHAN PIN SETUP\n(.*?)^# END GTA 1547000 ORPHAN PIN SETUP$", readme)
+pins = dict(re.findall(r"^GTA_PIN_(D3D11|DXGI|D3D10CORE)='([0-9a-f]{64})'$", setup.group(1), re.M)) if setup else {}
+expected = {"D3D11": "", "DXGI": "", "D3D10CORE": ""}
+for item in manifest["dxmtFiles"]:
+    expected[{"d3d11.dll": "D3D11", "dxgi.dll": "DXGI", "d3d10core.dll": "D3D10CORE"}[item["name"]]] = item["sha256"]
+print("yes" if pins == expected else "no")
+PY
+)
+is "documented orphan pins match the production manifest" yes "$gta_orphan_doc_pins"
+
+gta_orphan_game="$gta_fixture/orphan-recovery-game"
+gta_orphan_data_a="$gta_fixture/orphan-recovery-data-a"
+gta_orphan_data_b="$gta_fixture/orphan-recovery-data-b"
+gta_seed_case "$gta_orphan_game" "$gta_orphan_data_a"
+mkdir -p "$gta_orphan_data_b/pfx"
+gta_seed_vendor "$gta_orphan_data_b"
+gta_orphan_game=$(CDPATH='' cd -P "$gta_orphan_game" && pwd -P)
+gta_orphan_save="$gta_orphan_game/UserData/saves/fixture-save.dat"
+gta_orphan_stage="$gta_orphan_game/.bridgeplay-gta-sa-de-11111111-1111-4111-8111-111111111111.tmp"
+mkdir -p "$(dirname "$gta_orphan_save")"
+printf 'fixture save bytes\n' > "$gta_orphan_save"
+printf 'unowned staged bytes\n' > "$gta_orphan_stage"
+printf 'owner registry bytes\n' > "$gta_orphan_data_a/pfx/user.reg"
+printf 'second prefix registry bytes\n' > "$gta_orphan_data_b/pfx/user.reg"
+gta_orphan_initial=$(gta_helper_call "$gta_orphan_data_a" "$gta_orphan_game" prepare)
+is "orphan fixture starts prepared" prepared "$gta_orphan_initial"
+gta_orphan_owner_helper="$gta_orphan_data_a/pfx/$gta_helper_dir/SocialClubHelper.exe"
+cp "$gta_fixture/vendor-v2.exe" "$gta_orphan_owner_helper"
+gta_crash_rc=0
+gta_crash_helper_call "$gta_orphan_data_a" "$gta_orphan_game" prepare 1 >/dev/null 2>&1 || gta_crash_rc=$?
+is "SIGKILL creates the orphan marker during supported prepare" 137 "$gta_crash_rc"
+gta_orphan_marker="$gta_orphan_game/.bridgeplay-gta-sa-de-1547000.pending.json"
+gta_orphan_shared="$gta_orphan_game/.bridgeplay-gta-sa-de-1547000.json"
+gta_orphan_journal="$gta_orphan_data_a/.bridgeplay-gta-sa-de-1547000/.bridgeplay-gta-sa-de-1547000.transaction.json"
+is "orphan fixture retains the shared marker" yes "$(test -f "$gta_orphan_marker" && echo yes || echo no)"
+is "interrupted update leaves shared state and all three DLLs" 3 "$(find "$gta_orphan_game/Gameface/Binaries/Win64" -name '*.dll' | wc -l | tr -d ' ')"
+is "test owner journal exists before simulated loss" yes "$(test -f "$gta_orphan_journal" && echo yes || echo no)"
+rm "$gta_orphan_journal"
+is "test deletes only the owner transaction journal" no "$(test -e "$gta_orphan_journal" && echo yes || echo no)"
+is "other owner prefix state remains" yes "$(test -f "$gta_orphan_data_a/.bridgeplay-gta-sa-de-1547000/state.json" && echo yes || echo no)"
+
+gta_orphan_block_rc=0
+gta_orphan_block=$(gta_helper_call "$gta_orphan_data_b" "$gta_orphan_game" prepare 2>&1) || gta_orphan_block_rc=$?
+is "B remains blocked by an orphan marker before quarantine" 4 "$gta_orphan_block_rc"
+printf '%s\n' "$gta_orphan_block" > "$gta_fixture/orphan-b-blocked.log"
+has "B reports the shared transaction as busy" "transaction-shared-busy" "$gta_fixture/orphan-b-blocked.log"
+
+gta_orphan_snapshot() {
+	find "$gta_orphan_game" "$gta_orphan_data_a" "$gta_orphan_data_b" \( -type f -o -type l \) -print | LC_ALL=C sort
+	find "$gta_orphan_game" "$gta_orphan_data_a" "$gta_orphan_data_b" -type f -exec shasum -a 256 {} \; | LC_ALL=C sort
+	find "$gta_orphan_game" "$gta_orphan_data_a" "$gta_orphan_data_b" -type l -exec readlink {} \; | LC_ALL=C sort
+}
+gta_orphan_tmp_inventory() {
+	find "$gta_orphan_game" "$gta_orphan_data_a" "$gta_orphan_data_b" -type f -name '*.tmp' -exec shasum -a 256 {} \; | LC_ALL=C sort
+}
+gta_orphan_hash() { shasum -a 256 "$1" | awk '{print $1}'; }
+gta_orphan_runtime="$gta_runner/lib/notproton-backends/dxmt/x86_64-windows"
+gta_orphan_fixture_pins=$(python3 - "$gta_fixture/manifest.json" <<'PY'
+import json
+import sys
+pins = {item["name"]: item["sha256"] for item in json.load(open(sys.argv[1], encoding="utf-8"))["dxmtFiles"]}
+print(pins["d3d11.dll"], pins["dxgi.dll"], pins["d3d10core.dll"])
+PY
+)
+gta_orphan_pin_d3d11=${gta_orphan_fixture_pins%% *}
+gta_orphan_fixture_pins=${gta_orphan_fixture_pins#* }
+gta_orphan_pin_dxgi=${gta_orphan_fixture_pins%% *}
+gta_orphan_pin_d3d10core=${gta_orphan_fixture_pins#* }
+gta_orphan_uuid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["transactionUUID"])' "$gta_orphan_marker")
+gta_orphan_parent=${gta_orphan_game%/*}
+gta_orphan_backup="$gta_orphan_parent/.bridgeplay-gta-sa-de-orphan-$gta_orphan_uuid"
+gta_orphan_run() {
+	gta_orphan_expected_uuid=$1
+	gta_orphan_root=$2
+	gta_orphan_log=$3
+	gta_orphan_rc=0
+	env GTA_GAME="$gta_orphan_root" GTA_EXPECTED_TRANSACTION_UUID="$gta_orphan_expected_uuid" \
+		GTA_ORPHAN_ACK=I_CONFIRMED_THE_OWNER_JOURNAL_IS_IRRETRIEVABLY_LOST \
+		GTA_PIN_D3D11="$gta_orphan_pin_d3d11" GTA_PIN_DXGI="$gta_orphan_pin_dxgi" \
+		GTA_PIN_D3D10CORE="$gta_orphan_pin_d3d10core" sh "$gta_orphan_script" > "$gta_orphan_log" 2>&1 || gta_orphan_rc=$?
+}
+
+gta_orphan_before=$(gta_orphan_snapshot)
+case "$gta_orphan_uuid" in 0*) gta_orphan_wrong_uuid="1${gta_orphan_uuid#?}" ;; *) gta_orphan_wrong_uuid="0${gta_orphan_uuid#?}" ;; esac
+gta_orphan_run "$gta_orphan_wrong_uuid" "$gta_orphan_game" "$gta_fixture/orphan-wrong-uuid.log"
+is "wrong UUID is rejected before any change" nonzero "$([ "$gta_orphan_rc" -ne 0 ] && echo nonzero || echo 0)"
+is "wrong UUID refusal leaves every fixture file unchanged" "$gta_orphan_before" "$(gta_orphan_snapshot)"
+is "wrong UUID refusal creates no quarantine" no "$(test -e "$gta_orphan_parent/.bridgeplay-gta-sa-de-orphan-$gta_orphan_wrong_uuid" && echo yes || echo no)"
+
+gta_orphan_dll_dir="$gta_orphan_game/Gameface/Binaries/Win64"
+printf 'unrecognized modified DXMT DLL\n' > "$gta_orphan_dll_dir/d3d11.dll"
+gta_orphan_before=$(gta_orphan_snapshot)
+gta_orphan_run "$gta_orphan_uuid" "$gta_orphan_game" "$gta_fixture/orphan-unknown-dll.log"
+is "unknown DLL hash is rejected before any change" nonzero "$([ "$gta_orphan_rc" -ne 0 ] && echo nonzero || echo 0)"
+is "unknown DLL refusal leaves every fixture file unchanged" "$gta_orphan_before" "$(gta_orphan_snapshot)"
+is "unknown DLL refusal creates no quarantine" no "$(test -e "$gta_orphan_backup" && echo yes || echo no)"
+cp -p "$gta_orphan_runtime/d3d11.dll" "$gta_orphan_dll_dir/d3d11.dll"
+
+mv "$gta_orphan_dll_dir/d3d11.dll" "$gta_fixture/orphan-d3d11.saved"
+ln -s "$gta_orphan_runtime/d3d11.dll" "$gta_orphan_dll_dir/d3d11.dll"
+gta_orphan_before=$(gta_orphan_snapshot)
+gta_orphan_run "$gta_orphan_uuid" "$gta_orphan_game" "$gta_fixture/orphan-symlink.log"
+is "DLL symlink is rejected before any change" nonzero "$([ "$gta_orphan_rc" -ne 0 ] && echo nonzero || echo 0)"
+is "symlink refusal leaves every fixture file unchanged" "$gta_orphan_before" "$(gta_orphan_snapshot)"
+is "symlink refusal creates no quarantine" no "$(test -e "$gta_orphan_backup" && echo yes || echo no)"
+rm "$gta_orphan_dll_dir/d3d11.dll"
+mv "$gta_fixture/orphan-d3d11.saved" "$gta_orphan_dll_dir/d3d11.dll"
+
+printf 'occupied quarantine destination\n' > "$gta_orphan_backup"
+gta_orphan_before=$(gta_orphan_snapshot)
+gta_orphan_backup_hash=$(gta_orphan_hash "$gta_orphan_backup")
+gta_orphan_run "$gta_orphan_uuid" "$gta_orphan_game" "$gta_fixture/orphan-destination-exists.log"
+is "existing quarantine destination is refused" nonzero "$([ "$gta_orphan_rc" -ne 0 ] && echo nonzero || echo 0)"
+is "destination refusal leaves every fixture file unchanged" "$gta_orphan_before" "$(gta_orphan_snapshot)"
+is "destination refusal preserves its existing file" "$gta_orphan_backup_hash" "$(gta_orphan_hash "$gta_orphan_backup")"
+rm "$gta_orphan_backup"
+
+gta_orphan_run "$gta_orphan_uuid" / "$gta_fixture/orphan-root-path.log"
+is "filesystem root is rejected before any change" nonzero "$([ "$gta_orphan_rc" -ne 0 ] && echo nonzero || echo 0)"
+is "root refusal leaves every fixture file unchanged" "$gta_orphan_before" "$(gta_orphan_snapshot)"
+
+gta_orphan_marker_hash=$(gta_orphan_hash "$gta_orphan_marker")
+gta_orphan_shared_hash=$(gta_orphan_hash "$gta_orphan_shared")
+gta_orphan_exe_hash=$(gta_orphan_hash "$gta_orphan_dll_dir/SanAndreas.exe")
+gta_orphan_save_hash=$(gta_orphan_hash "$gta_orphan_save")
+gta_orphan_stage_inventory=$(gta_orphan_tmp_inventory)
+gta_orphan_prefix_inventory=$(find "$gta_orphan_data_a" "$gta_orphan_data_b" \( -type f -o -type l \) -print | LC_ALL=C sort)
+gta_orphan_prefix_hashes=$(find "$gta_orphan_data_a" "$gta_orphan_data_b" -type f -exec shasum -a 256 {} \; | LC_ALL=C sort)
+gta_orphan_run "$gta_orphan_uuid" "$gta_orphan_game/" "$gta_fixture/orphan-complete.log"
+is "documented recovery body completes on fixture pins" 0 "$gta_orphan_rc"
+has "documented recovery reports its quarantine" "Quarantine complete:" "$gta_fixture/orphan-complete.log"
+is "quarantine is a private sibling outside the game folder" 700 "$(stat -f %Lp "$gta_orphan_backup")"
+is "quarantine is outside the game folder" "$gta_orphan_parent" "$(dirname "$gta_orphan_backup")"
+is "quarantined marker bytes are preserved" "$gta_orphan_marker_hash" "$(gta_orphan_hash "$gta_orphan_backup/.bridgeplay-gta-sa-de-1547000.pending.json")"
+is "quarantined shared-state bytes are preserved" "$gta_orphan_shared_hash" "$(gta_orphan_hash "$gta_orphan_backup/.bridgeplay-gta-sa-de-1547000.json")"
+for gta_orphan_name in d3d11.dll dxgi.dll d3d10core.dll; do
+	is "quarantined $gta_orphan_name matches its fixture runtime" yes "$(cmp -s "$gta_orphan_runtime/$gta_orphan_name" "$gta_orphan_backup/$gta_orphan_name" && echo yes || echo no)"
+done
+is "quarantine removes only the known shared DLL destinations" 0 "$(find "$gta_orphan_dll_dir" -maxdepth 1 \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
+is "quarantine moves marker and shared state out of game root" no "$(test -e "$gta_orphan_marker" -o -L "$gta_orphan_marker" -o -e "$gta_orphan_shared" -o -L "$gta_orphan_shared" && echo yes || echo no)"
+is "game executable is unchanged" "$gta_orphan_exe_hash" "$(gta_orphan_hash "$gta_orphan_dll_dir/SanAndreas.exe")"
+is "save bytes remain unchanged" "$gta_orphan_save_hash" "$(gta_orphan_hash "$gta_orphan_save")"
+is "unknown staged files remain unchanged" "$gta_orphan_stage_inventory" "$(gta_orphan_tmp_inventory)"
+is "both prefixes and registry data remain unchanged" "$gta_orphan_prefix_hashes" "$(find "$gta_orphan_data_a" "$gta_orphan_data_b" -type f -exec shasum -a 256 {} \; | LC_ALL=C sort)"
+is "both prefix file sets remain unchanged" "$gta_orphan_prefix_inventory" "$(find "$gta_orphan_data_a" "$gta_orphan_data_b" \( -type f -o -type l \) -print | LC_ALL=C sort)"
+is "B prepares after the completed shared reset" prepared "$(gta_helper_call "$gta_orphan_data_b" "$gta_orphan_game" prepare)"
+
 echo "== recovery preserves a changed target"
 gta_crash_changed_game="$gta_fixture/crash-changed-game"
 gta_crash_changed_data="$gta_fixture/crash-changed-data"
