@@ -237,10 +237,12 @@ enum Uninstall {
             try SteamInstaller.adHocSign(executable, step: step, steamClosed: steamClosed)
             try SteamInstaller.adHocSign(app, step: step, steamClosed: steamClosed)
         } catch {
-            // Signing a Steam that opened meanwhile can get it killed, so it is left alone.
-            if cleared || droppedDylib, steamClosed() {
-                try? SteamInstaller.adHocSign(executable, step: step, steamClosed: steamClosed)
-                try? SteamInstaller.adHocSign(app, step: step, steamClosed: steamClosed)
+            // Signing a Steam that opened meanwhile can get it killed, so it is left alone;
+            // checked before each, since the first can pause for a retry.
+            if cleared || droppedDylib {
+                for target in [executable, app] where steamClosed() {
+                    try? SteamInstaller.adHocSign(target, step: step, steamClosed: steamClosed)
+                }
             }
             throw error
         }
