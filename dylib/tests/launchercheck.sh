@@ -403,17 +403,10 @@ gta_helper_call() {
 		"$gta_helper" "$3"
 }
 gta_crash_helper_call() {
-	if [ -n "${4:-}" ]; then
-		env GAMEFIX_TEST_CRASH_AFTER="$4" GTA_SA_APP_ID=1547000 \
-			GTA_SA_DATA_PATH="$1" GTA_SA_PREFIX="$1/pfx" GTA_SA_GAME="$2" \
-			GTA_SA_RUNNER="$gta_runner" GTA_SA_ENGINE_ID=winecx-11.17 \
-			"$gta_crash_helper" "$3"
-	else
-		env -u GAMEFIX_TEST_CRASH_AFTER GTA_SA_APP_ID=1547000 \
-			GTA_SA_DATA_PATH="$1" GTA_SA_PREFIX="$1/pfx" GTA_SA_GAME="$2" \
-			GTA_SA_RUNNER="$gta_runner" GTA_SA_ENGINE_ID=winecx-11.17 \
-			"$gta_crash_helper" "$3"
-	fi
+	env GAMEFIX_TEST_CRASH_AFTER="${4:-}" GAMEFIX_TEST_CRASH_PHASE="${5:-}" \
+		GTA_SA_APP_ID=1547000 GTA_SA_DATA_PATH="$1" GTA_SA_PREFIX="$1/pfx" \
+		GTA_SA_GAME="$2" GTA_SA_RUNNER="$gta_runner" GTA_SA_ENGINE_ID=winecx-11.17 \
+		"$gta_crash_helper" "$3"
 }
 gta_seed_vendor() {
 	seed_helper="$1/pfx/$gta_helper_dir"
@@ -640,8 +633,8 @@ np_support=$gta_mock_support
 : > "$log"
 gta_launch_rc=0
 (gta_sa_de_run) || gta_launch_rc=$?
-is "missing DXVK soft-skips an unowned manual setup" 0 "$gta_launch_rc"
-has "missing DXVK manual skip is logged" "no Bridgeplay-owned setup was changed" "$log"
+is "missing DXVK stops a matching manual setup" nonzero "$([ "$gta_launch_rc" -ne 0 ] && echo nonzero || echo 0)"
+has "missing DXVK manual stop is logged" "matching manual setup needs the WineCX DXVK runtime" "$log"
 for gta_mock_status in ready-owned prepared; do
   GTA_MOCK_STATUS_TEXT=$gta_mock_status
   export GTA_MOCK_STATUS_TEXT
@@ -686,6 +679,98 @@ is "next restore recovers then completes" restored "$gta_recovered_restore"
 is "restore recovery returns vendor helper" yes "$(cmp -s "$gta_crash_restore_data/pfx/$gta_helper_dir/SocialClubHelper.exe" "$gta_fixture/vendor-v1.exe" && echo yes || echo no)"
 is "restore recovery removes owned game DLLs" 0 "$(find "$gta_crash_restore_game/Gameface/Binaries/Win64" \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
 is "restore recovery removes every abandoned stage" 0 "$(find "$gta_crash_restore_game" "$gta_crash_restore_data" -name '.bridgeplay-gta-sa-de-*.tmp' | wc -l | tr -d ' ')"
+
+echo "== foreign prefix cannot recover a shared transaction"
+gta_shared_pending_game="$gta_fixture/shared-pending-game"
+gta_shared_pending_a="$gta_fixture/shared-pending-a"
+gta_shared_pending_b="$gta_fixture/shared-pending-b"
+gta_seed_case "$gta_shared_pending_game" "$gta_shared_pending_a"
+mkdir -p "$gta_shared_pending_b/pfx"
+gta_shared_pending_setup=$(gta_helper_call "$gta_shared_pending_a" "$gta_shared_pending_game" prepare)
+is "shared pending fixture starts prepared" prepared "$gta_shared_pending_setup"
+gta_crash_rc=0
+gta_crash_helper_call "$gta_shared_pending_a" "$gta_shared_pending_game" restore 5 >/dev/null 2>&1 || gta_crash_rc=$?
+is "SIGKILL interrupts restore after its first shared DLL park" 137 "$gta_crash_rc"
+gta_shared_pending_marker="$gta_shared_pending_game/.bridgeplay-gta-sa-de-1547000.pending.json"
+gta_shared_pending_journal="$gta_shared_pending_a/.bridgeplay-gta-sa-de-1547000/.bridgeplay-gta-sa-de-1547000.transaction.json"
+is "interrupted shared transaction publishes a pending marker" yes "$(test -f "$gta_shared_pending_marker" && echo yes || echo no)"
+is "interrupted owner retains its private journal" yes "$(test -f "$gta_shared_pending_journal" && echo yes || echo no)"
+gta_shared_pending_marker_valid=$(python3 -c 'import json,re,sys; d=json.load(open(sys.argv[1], encoding="utf-8")); print("yes" if d.get("version") == 1 and d.get("appid") == "1547000" and re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", d.get("transactionUUID", "")) else "no")' "$gta_shared_pending_marker")
+is "pending marker contains only its canonical transaction identity" yes "$gta_shared_pending_marker_valid"
+gta_pending_owner_uuid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["transactionUUID"])' "$gta_shared_pending_marker")
+for gta_pending_action in status prepare restore; do
+	gta_pending_rc=0
+	gta_pending_result=$(gta_helper_call "$gta_shared_pending_b" "$gta_shared_pending_game" "$gta_pending_action" 2>&1) || gta_pending_rc=$?
+	is "foreign pending marker blocks B $gta_pending_action" 4 "$gta_pending_rc"
+	printf '%s\n' "$gta_pending_result" > "$gta_fixture/foreign-pending-$gta_pending_action.log"
+	has "B $gta_pending_action identifies the foreign transaction" "transaction-shared-busy" "$gta_fixture/foreign-pending-$gta_pending_action.log"
+done
+gta_paths "$gta_shared_pending_b" "$gta_shared_pending_game"
+: > "$log"
+gta_launch_rc=0
+(gta_sa_de_run) || gta_launch_rc=$?
+is "run hook hard-stops B on a foreign pending transaction" 4 "$gta_launch_rc"
+has "run hook logs the shared transaction conflict" "status check failed (exit 4)" "$log"
+is "blocked B preparation creates no private state" 0 "$(find "$gta_shared_pending_b" -name state.json | wc -l | tr -d ' ')"
+is "blocked B leaves the parked DLL in the owner's journal" no "$(test -f "$gta_shared_pending_game/Gameface/Binaries/Win64/d3d11.dll" && echo yes || echo no)"
+is "blocked B leaves the owner's marker intact" yes "$(test -f "$gta_shared_pending_marker" && echo yes || echo no)"
+gta_pending_after_b_uuid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["transactionUUID"])' "$gta_shared_pending_marker")
+is "blocked B does not replace the pending transaction identity" "$gta_pending_owner_uuid" "$gta_pending_after_b_uuid"
+gta_shared_pending_recovered=$(gta_helper_call "$gta_shared_pending_a" "$gta_shared_pending_game" restore)
+is "original owner recovers and completes its restore" restored "$gta_shared_pending_recovered"
+is "owner recovery clears its shared marker" no "$(test -e "$gta_shared_pending_marker" && echo yes || echo no)"
+is "owner recovery removes shared DLLs" 0 "$(find "$gta_shared_pending_game/Gameface/Binaries/Win64" \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
+gta_seed_vendor "$gta_shared_pending_b"
+gta_shared_pending_b_prepared=$(gta_helper_call "$gta_shared_pending_b" "$gta_shared_pending_game" prepare)
+is "B can prepare after the original owner recovers" prepared "$gta_shared_pending_b_prepared"
+
+echo "== released recovery preserves the next owner's shared state"
+gta_release_game="$gta_fixture/released-game"
+gta_release_a="$gta_fixture/released-a"
+gta_release_b="$gta_fixture/released-b"
+gta_seed_case "$gta_release_game" "$gta_release_a"
+gta_seed_vendor "$gta_release_b"
+mkdir -p "$gta_release_b/pfx"
+gta_release_a_prepared=$(gta_helper_call "$gta_release_a" "$gta_release_game" prepare)
+is "release race fixture starts prepared" prepared "$gta_release_a_prepared"
+gta_crash_rc=0
+gta_crash_helper_call "$gta_release_a" "$gta_release_game" restore "" after-shared-release >/dev/null 2>&1 || gta_crash_rc=$?
+is "SIGKILL leaves a released private journal after clearing its marker" 137 "$gta_crash_rc"
+gta_release_marker="$gta_release_game/.bridgeplay-gta-sa-de-1547000.pending.json"
+gta_release_a_journal="$gta_release_a/.bridgeplay-gta-sa-de-1547000/.bridgeplay-gta-sa-de-1547000.transaction.json"
+is "release checkpoint removes the public pending marker" no "$(test -e "$gta_release_marker" && echo yes || echo no)"
+is "release checkpoint leaves its finished private journal" yes "$(test -f "$gta_release_a_journal" && echo yes || echo no)"
+gta_release_b_prepared=$(gta_helper_call "$gta_release_b" "$gta_release_game" prepare)
+is "B can prepare after A releases shared assets" prepared "$gta_release_b_prepared"
+gta_release_shared="$gta_release_game/.bridgeplay-gta-sa-de-1547000.json"
+gta_release_b_shared_before=$(shasum -a 256 "$gta_release_shared" | awk '{print $1}')
+is "B owns a new shared reference after preparing" yes "$(test -f "$gta_release_b/.bridgeplay-gta-sa-de-1547000/state.json" && echo yes || echo no)"
+is "B reinstalled the released shared DXMT DLLs" 3 "$(find "$gta_release_game/Gameface/Binaries/Win64" \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
+gta_crash_rc=0
+gta_crash_helper_call "$gta_release_b" "$gta_release_game" restore 1 >/dev/null 2>&1 || gta_crash_rc=$?
+is "B can publish its own pending marker while restoring" 137 "$gta_crash_rc"
+gta_release_b_marker="$gta_release_marker"
+gta_release_b_uuid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["transactionUUID"])' "$gta_release_b_marker")
+gta_release_b_marker_hash=$(shasum -a 256 "$gta_release_b_marker" | awk '{print $1}')
+for gta_release_action in status prepare restore; do
+	gta_release_rc=0
+	gta_release_result=$(gta_helper_call "$gta_release_a" "$gta_release_game" "$gta_release_action" 2>&1) || gta_release_rc=$?
+	is "A cannot enter B's pending transaction through $gta_release_action" 4 "$gta_release_rc"
+	printf '%s\n' "$gta_release_result" > "$gta_fixture/released-foreign-$gta_release_action.log"
+	has "A $gta_release_action reports B's transaction as foreign" "transaction-shared-busy" "$gta_fixture/released-foreign-$gta_release_action.log"
+	is "A $gta_release_action preserves B's marker" "$gta_release_b_marker_hash" "$(shasum -a 256 "$gta_release_b_marker" | awk '{print $1}')"
+done
+is "B's transaction identity remains stable while A is blocked" "$gta_release_b_uuid" "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["transactionUUID"])' "$gta_release_b_marker")"
+is "A blocked by B leaves its released journal for later cleanup" yes "$(test -f "$gta_release_a_journal" && echo yes || echo no)"
+gta_release_b_recovered=$(gta_helper_call "$gta_release_b" "$gta_release_game" prepare)
+is "B recovers and completes its interrupted restore" already-prepared "$gta_release_b_recovered"
+is "B recovery clears only its own pending marker" no "$(test -e "$gta_release_b_marker" && echo yes || echo no)"
+gta_release_a_cleanup=$(gta_helper_call "$gta_release_a" "$gta_release_game" restore)
+is "A cleans its released journal after B finishes" no-owned-state "$gta_release_a_cleanup"
+is "A cleanup removes its private journal" no "$(test -e "$gta_release_a_journal" && echo yes || echo no)"
+is "A cleanup preserves B's shared reference" "$gta_release_b_shared_before" "$(shasum -a 256 "$gta_release_shared" | awk '{print $1}')"
+is "A cleanup preserves B's private state" yes "$(test -f "$gta_release_b/.bridgeplay-gta-sa-de-1547000/state.json" && echo yes || echo no)"
+is "A cleanup preserves B's shared DLLs" 3 "$(find "$gta_release_game/Gameface/Binaries/Win64" \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
 
 echo "== recovery preserves a changed target"
 gta_crash_changed_game="$gta_fixture/crash-changed-game"
@@ -860,6 +945,30 @@ is "prefix ownership file remains private" 600 "$(stat -f %Lp "$gta_private_meta
 gta_shared_read_source=$(sed -n '/private func readSharedData/,/^    }/p' "$repo_root/helpers/gamefix-prep.swift")
 gta_shared_uid_check=$(printf '%s\n' "$gta_shared_read_source" | grep -q 'geteuid' && echo yes || echo no)
 is "shared metadata read has no single-UID ownership check" no "$gta_shared_uid_check"
+{
+	printf 'import Foundation\nimport Darwin\n'
+	sed -n '/^private enum SharedDataModePolicy {$/,/^}/p' "$repo_root/helpers/gamefix-prep.swift"
+	sed -n '/^private func sharedDataModePolicy(/,/^}/p' "$repo_root/helpers/gamefix-prep.swift"
+	cat <<'SWIFT'
+func policyToken(owner: uid_t, mode: mode_t, currentUID: uid_t) -> String {
+    switch sharedDataModePolicy(owner: owner, mode: mode, currentUID: currentUID) {
+    case .makePublic: return "make-public"
+    case .accept: return "accept"
+    case .reject: return "reject"
+    }
+}
+print(policyToken(owner: 501, mode: mode_t(0o600), currentUID: 501))
+print(policyToken(owner: 501, mode: mode_t(0o664), currentUID: 501))
+print(policyToken(owner: 502, mode: mode_t(0o644), currentUID: 501))
+print(policyToken(owner: 502, mode: mode_t(0o444), currentUID: 501))
+SWIFT
+} > "$gta_fixture/shared-data-mode-policy.swift"
+swiftc -O -o "$gta_fixture/shared-data-mode-policy" "$gta_fixture/shared-data-mode-policy.swift"
+gta_shared_policy_results=$("$gta_fixture/shared-data-mode-policy")
+is "shared metadata mode policy covers current and foreign owners" 'make-public
+reject
+accept
+reject' "$gta_shared_policy_results"
 gta_shared_lock_source=$(sed -n '/^private func acquireSharedLock/,/^}/p' "$repo_root/helpers/gamefix-prep.swift")
 gta_shared_lock_readonly=$(printf '%s\n' "$gta_shared_lock_source" | grep -q 'O_RDONLY' && echo yes || echo no)
 is "shared lock opens read-only" yes "$gta_shared_lock_readonly"
@@ -869,6 +978,61 @@ gta_shared_lock_public_uid_branch=$(printf '%s\n' "$gta_shared_lock_source" | gr
 is "shared lock accepts other UIDs with public mode" yes "$gta_shared_lock_public_uid_branch"
 gta_shared_status=$(gta_helper_call "$gta_data_a" "$gta_game" status)
 is "shared public metadata can be read during status" prepared "$gta_shared_status"
+
+echo "== shared DXMT state keeps a fresh prefix strict"
+gta_shared_b_data="$gta_fixture/shared-b-data"
+mkdir -p "$gta_shared_b_data/pfx"
+gta_seed_vendor "$gta_shared_b_data"
+gta_shared_b_status=$(gta_helper_call "$gta_shared_b_data" "$gta_game" status)
+is "fresh prefix sees shared managed DLLs as owned setup" ready-owned "$gta_shared_b_status"
+rm -f "$gta_fixture/runner/dxvk.available" \
+	"$gta_fixture/runner/lib/notproton-backends/dxvk/x86_64-windows/d3d10core.dll"
+gta_paths "$gta_shared_b_data" "$gta_game"
+: > "$log"
+gta_launch_rc=0
+(gta_sa_de_run) || gta_launch_rc=$?
+is "missing DXVK hard-stops a fresh prefix with shared DLLs" nonzero "$([ "$gta_launch_rc" -ne 0 ] && echo nonzero || echo 0)"
+has "shared DLL hard stop requires DXVK" "managed setup needs the WineCX DXVK runtime" "$log"
+is "shared DLL hard stop creates no B state" 0 "$(find "$gta_shared_b_data" -name state.json | wc -l | tr -d ' ')"
+is "shared DLL hard stop leaves DXMT files in place" yes "$(cmp -s "$gta_game/Gameface/Binaries/Win64/dxgi.dll" "$gta_runner/lib/notproton-backends/dxmt/x86_64-windows/dxgi.dll" && echo yes || echo no)"
+touch "$gta_fixture/runner/dxvk.available"
+printf 'fixture dxvk d3d10core' > "$gta_fixture/runner/lib/notproton-backends/dxvk/x86_64-windows/d3d10core.dll"
+
+gta_shared_unknown_vendor_data="$gta_fixture/shared-unknown-vendor-data"
+mkdir -p "$gta_shared_unknown_vendor_data/pfx/$gta_helper_dir"
+printf 'unknown Social Club helper' > "$gta_shared_unknown_vendor_data/pfx/$gta_helper_dir/SocialClubHelper.exe"
+rm -f "$gta_fixture/runner/dxvk.available" \
+	"$gta_fixture/runner/lib/notproton-backends/dxvk/x86_64-windows/d3d10core.dll"
+gta_shared_unknown_vendor_rc=0
+gta_shared_unknown_vendor_result=$(gta_helper_call "$gta_shared_unknown_vendor_data" "$gta_game" status 2>&1) || gta_shared_unknown_vendor_rc=$?
+is "unknown Social Club input is strict beside shared DLLs" 4 "$gta_shared_unknown_vendor_rc"
+printf '%s\n' "$gta_shared_unknown_vendor_result" > "$gta_fixture/shared-unknown-vendor.log"
+has "shared DLL unknown-helper status is diagnosed" "unsupported-vendor-helper" "$gta_fixture/shared-unknown-vendor.log"
+gta_paths "$gta_shared_unknown_vendor_data" "$gta_game"
+: > "$log"
+gta_launch_rc=0
+(gta_sa_de_run) || gta_launch_rc=$?
+is "unknown Social Club input cannot soft-skip beside shared DLLs" 4 "$gta_launch_rc"
+has "shared DLL unknown-helper hard stop is logged" "status check failed (exit 4)" "$log"
+is "unknown Social Club hard stop preserves the helper" "unknown Social Club helper" "$(cat "$gta_shared_unknown_vendor_data/pfx/$gta_helper_dir/SocialClubHelper.exe")"
+touch "$gta_fixture/runner/dxvk.available"
+printf 'fixture dxvk d3d10core' > "$gta_fixture/runner/lib/notproton-backends/dxvk/x86_64-windows/d3d10core.dll"
+
+gta_shared_unknown_data="$gta_fixture/shared-unknown-data"
+mkdir -p "$gta_shared_unknown_data/pfx"
+gta_shared_unknown_rc=0
+gta_shared_unknown_result=$(gta_helper_call "$gta_shared_unknown_data" "$gta_game" status 2>&1) || gta_shared_unknown_rc=$?
+is "missing Social Club input is strict beside shared DLLs" 4 "$gta_shared_unknown_rc"
+printf '%s\n' "$gta_shared_unknown_result" > "$gta_fixture/shared-unknown.log"
+has "shared DLL missing-helper status is diagnosed" "social-club-directory-unavailable" "$gta_fixture/shared-unknown.log"
+gta_paths "$gta_shared_unknown_data" "$gta_game"
+: > "$log"
+gta_launch_rc=0
+(gta_sa_de_run) || gta_launch_rc=$?
+is "missing Social Club input cannot soft-skip a fresh shared prefix" 4 "$gta_launch_rc"
+has "shared DLL missing-helper hard stop is logged" "status check failed (exit 4)" "$log"
+is "missing Social Club hard stop creates no B state" 0 "$(find "$gta_shared_unknown_data" -name state.json | wc -l | tr -d ' ')"
+
 gta_wrapper_inode=$(stat -f %i "$gta_helper_a/SocialClubHelper.exe")
 gta_dxgi_inode=$(stat -f %i "$gta_game/Gameface/Binaries/Win64/dxgi.dll")
 : > "$log"
@@ -940,6 +1104,20 @@ cp "$gta_fixture/wrapper.exe" "$gta_manual_helper/SocialClubHelper.exe"
 cp "$gta_fixture/vendor-v1.exe" "$gta_manual_helper/SocialClubHelper_real.exe"
 printf '%s  SocialClubHelper_real.exe\n' "$(cat "$gta_fixture/vendor1.sha")" > "$gta_manual_helper/SocialClubHelper_real.exe.sha256"
 cp "$gta_fixture/license.txt" "$gta_manual_helper/SocialClubHelper.bridgeplay.LICENSE"
+gta_manual_status=$(gta_helper_call "$gta_manual_data" "$gta_manual_game" status)
+is "matching manual fixture is reported as unowned manual state" manual "$gta_manual_status"
+rm -f "$gta_fixture/runner/dxvk.available" \
+	"$gta_fixture/runner/lib/notproton-backends/dxvk/x86_64-windows/d3d10core.dll"
+: > "$log"
+gta_paths "$gta_manual_data" "$gta_manual_game"
+gta_launch_rc=0
+(gta_sa_de_run) || gta_launch_rc=$?
+is "missing DXVK hard-stops actual manual matching files" nonzero "$([ "$gta_launch_rc" -ne 0 ] && echo nonzero || echo 0)"
+has "actual manual matching hard stop is logged" "matching manual setup needs the WineCX DXVK runtime" "$log"
+is "actual manual hard stop creates no private state" 0 "$(find "$gta_manual_data" -name state.json | wc -l | tr -d ' ')"
+is "actual manual hard stop preserves wrapper" yes "$(cmp -s "$gta_manual_helper/SocialClubHelper.exe" "$gta_fixture/wrapper.exe" && echo yes || echo no)"
+touch "$gta_fixture/runner/dxvk.available"
+printf 'fixture dxvk d3d10core' > "$gta_fixture/runner/lib/notproton-backends/dxvk/x86_64-windows/d3d10core.dll"
 : > "$log"
 gta_paths "$gta_manual_data" "$gta_manual_game"
 gta_sa_de_run

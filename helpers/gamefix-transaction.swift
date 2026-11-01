@@ -4,16 +4,20 @@ import Foundation
 
 private let gamefixJournalName = ".bridgeplay-gta-sa-de-1547000.transaction.json"
 private let gamefixStateDirectoryName = ".bridgeplay-gta-sa-de-1547000"
+private let gamefixSharedMarkerName = ".bridgeplay-gta-sa-de-1547000.pending.json"
 private let gamefixStagePrefix = ".bridgeplay-gta-sa-de-"
 private let gamefixJournalTempPrefix = ".bridgeplay-gta-sa-de-journal-"
+private let gamefixSharedMarkerTempPrefix = ".bridgeplay-gta-sa-de-marker-"
+private let gamefixAppID = "1547000"
 private let gamefixMaximumJournalBytes = 128 * 1024
+private let gamefixMaximumSharedMarkerBytes = 4096
 private let gamefixMaximumOperations = 256
 private let gamefixMaximumRegisteredStages = 256
 private let gamefixMaximumFileBytes = 512 * 1024 * 1024
 
 #if GTA_FIXTURE_CRASH
 private let gamefixFixtureCrashLock = NSLock()
-private var gamefixFixtureMutationCount = 0
+nonisolated(unsafe) private var gamefixFixtureMutationCount = 0
 #endif
 
 final class GamefixTransaction {
@@ -27,7 +31,10 @@ final class GamefixTransaction {
         }
     }
 
-    private enum Phase: String, Codable { case active, committed }
+    private enum Phase: String, Codable {
+        case active, committed
+        case released // Target cleanup is complete; recovery may only clean metadata.
+    }
     private enum Kind: String, Codable { case install, swap, park }
 
     private struct Operation: Codable {
@@ -46,30 +53,50 @@ final class GamefixTransaction {
 
     private struct Journal: Codable {
         let version: Int
+        var transactionUUID: String?
         var phase: Phase
         var operations: [Operation]
         var registeredStages: [RegisteredStage]
 
-        init(phase: Phase, operations: [Operation], registeredStages: [RegisteredStage] = []) {
+        init(phase: Phase, operations: [Operation], registeredStages: [RegisteredStage] = [],
+             transactionUUID: String? = UUID().uuidString.lowercased()) {
             version = 1
+            self.transactionUUID = transactionUUID
             self.phase = phase
             self.operations = operations
             self.registeredStages = registeredStages
         }
 
-        private enum CodingKeys: String, CodingKey { case version, phase, operations, registeredStages }
+        private enum CodingKeys: String, CodingKey { case version, transactionUUID, phase, operations, registeredStages }
 
         init(from decoder: Decoder) throws {
             let values = try decoder.container(keyedBy: CodingKeys.self)
             version = try values.decode(Int.self, forKey: .version)
+            transactionUUID = try values.decodeIfPresent(String.self, forKey: .transactionUUID)
             phase = try values.decode(Phase.self, forKey: .phase)
             operations = try values.decode([Operation].self, forKey: .operations)
             registeredStages = try values.decodeIfPresent([RegisteredStage].self, forKey: .registeredStages) ?? []
         }
     }
 
+    private struct SharedMarker: Codable {
+        let version: Int
+        let appid: String
+        let transactionUUID: String
+
+        init(transactionUUID: String) {
+            version = 1
+            appid = gamefixAppID
+            self.transactionUUID = transactionUUID
+        }
+    }
+
     private let journalURL: URL
     private let targets: [String: URL]
+
+    private var sharedMarkerURL: URL {
+        targets["state:shared"]!.deletingLastPathComponent().appending(path: gamefixSharedMarkerName)
+    }
 
     init(journalURL: URL, targets: [String: URL]) {
         self.journalURL = journalURL.standardizedFileURL
@@ -79,8 +106,16 @@ final class GamefixTransaction {
     static func hasPending(journalURL: URL, targets: [String: URL]) throws -> Bool {
         let transaction = GamefixTransaction(journalURL: journalURL, targets: targets)
         try transaction.validateConfiguration()
-        guard try transaction.validatePrivateDirectory(missingAllowed: true) else { return false }
-        return try transaction.readJournal() != nil
+        let marker = try transaction.readSharedMarker()
+        let directoryExists = try transaction.validatePrivateDirectory(missingAllowed: true)
+        let journal = directoryExists ? try transaction.readJournal() : nil
+        if let marker {
+            guard let journal, journal.transactionUUID == marker.transactionUUID else {
+                throw Failure("transaction-shared-busy", 4)
+            }
+            return true
+        }
+        return journal != nil
     }
 
     static func recover(journalURL: URL, targets: [String: URL]) throws {
@@ -91,6 +126,7 @@ final class GamefixTransaction {
     func registerStagedFiles(_ files: [URL: String]) throws {
         guard !files.isEmpty else { return }
         try validateConfiguration()
+        try rejectForeignSharedMarker()
         guard try validatePrivateDirectory(missingAllowed: false) else {
             throw Failure("transaction-journal-directory-unavailable", 5)
         }
@@ -110,10 +146,13 @@ final class GamefixTransaction {
             }
             journal.registeredStages.append(stage)
         }
+        _ = try ensureTransactionUUID(&journal)
         try writeJournal(journal)
     }
 
     func install(_ staging: URL, at destination: URL, hash: String) throws {
+        try validateConfiguration()
+        try rejectForeignSharedMarker()
         let key = try targetKey(for: destination)
         let destination = destination.standardizedFileURL
         let staging = try checkedStaging(staging, beside: destination)
@@ -130,6 +169,8 @@ final class GamefixTransaction {
     }
 
     func swap(_ staging: URL, with destination: URL, oldHash: String, newHash: String) throws {
+        try validateConfiguration()
+        try rejectForeignSharedMarker()
         let key = try targetKey(for: destination)
         let destination = destination.standardizedFileURL
         let staging = try checkedStaging(staging, beside: destination)
@@ -149,6 +190,8 @@ final class GamefixTransaction {
     }
 
     func park(_ destination: URL, expectedHash: String) throws {
+        try validateConfiguration()
+        try rejectForeignSharedMarker()
         let key = try targetKey(for: destination)
         let destination = destination.standardizedFileURL
         let expectedHash = try normalizedHash(expectedHash)
@@ -166,8 +209,21 @@ final class GamefixTransaction {
     func rollback() -> Bool {
         do {
             try validateConfiguration()
-            guard try validatePrivateDirectory(missingAllowed: true) else { return true }
-            guard let journal = try readJournal() else { return true }
+            let marker = try readSharedMarker()
+            guard try validatePrivateDirectory(missingAllowed: true) else {
+                return marker == nil
+            }
+            guard var journal = try readJournal() else { return marker == nil }
+            if journal.phase == .released {
+                try completeReleasedJournal(journal)
+                return true
+            }
+            if let marker {
+                guard journal.transactionUUID == marker.transactionUUID else { return false }
+            } else if !journal.operations.isEmpty {
+                _ = try ensureTransactionUUID(&journal)
+                try claimSharedMarker(transactionUUID: journal.transactionUUID!)
+            }
             guard journal.phase == .active else { return false }
             try rollback(journal)
             return true
@@ -178,8 +234,9 @@ final class GamefixTransaction {
 
     func finish() throws {
         try validateConfiguration()
-        guard let journal = try readJournal() else { return }
+        guard var journal = try readJournal() else { return }
         guard journal.phase == .active else { throw Failure("transaction-already-committed", 5) }
+        try guardOrClaimSharedMarker(&journal)
         try validateCommittedResult(journal, allowCleanedStages: false)
         var committed = journal
         committed.phase = .committed
@@ -189,7 +246,26 @@ final class GamefixTransaction {
 
     private func recover() throws {
         try validateConfiguration()
-        guard let journal = try readJournal() else { return }
+        let marker = try readSharedMarker()
+        guard try validatePrivateDirectory(missingAllowed: true) else {
+            if marker != nil { throw Failure("transaction-shared-busy", 4) }
+            return
+        }
+        guard var journal = try readJournal() else {
+            if marker != nil { throw Failure("transaction-shared-busy", 4) }
+            return
+        }
+        if journal.phase == .released {
+            try completeReleasedJournal(journal)
+            return
+        }
+        if let marker {
+            guard journal.transactionUUID == marker.transactionUUID else {
+                throw Failure("transaction-shared-busy", 4)
+            }
+        } else if !journal.operations.isEmpty {
+            try guardOrClaimSharedMarker(&journal)
+        }
         if journal.phase == .committed { try finalizeCommitted(journal) }
         else { try rollback(journal) }
     }
@@ -211,6 +287,9 @@ final class GamefixTransaction {
             throw Failure("transaction-target-reused", 5)
         }
         try validate(operation)
+        _ = try ensureTransactionUUID(&journal)
+        try writeJournal(journal)
+        try claimSharedMarker(transactionUUID: journal.transactionUUID!)
         journal.operations.append(operation)
         try writeJournal(journal)
     }
@@ -218,7 +297,7 @@ final class GamefixTransaction {
     private func rollback(_ journal: Journal) throws {
         for operation in journal.operations.reversed() { try undo(operation) }
         try cleanupRegisteredStages(journal)
-        try removeJournal()
+        try releaseTransaction(journal)
     }
 
     private func undo(_ operation: Operation) throws {
@@ -314,6 +393,24 @@ final class GamefixTransaction {
             else if try fileHash(staging) != nil { throw Failure("transaction-recovery-conflict", 5) }
         }
         try cleanupRegisteredStages(journal)
+        try releaseTransaction(journal)
+    }
+
+    private func releaseTransaction(_ journal: Journal) throws {
+        var released = journal
+        if released.transactionUUID == nil {
+            released.transactionUUID = UUID().uuidString.lowercased()
+        }
+        released.phase = .released
+        try writeJournal(released)
+        try completeReleasedJournal(released)
+    }
+
+    private func completeReleasedJournal(_ journal: Journal) throws {
+        if let transactionUUID = journal.transactionUUID,
+           try removeSharedMarker(transactionUUID: transactionUUID) {
+            gamefixAfterSharedRelease()
+        }
         try removeJournal()
     }
 
@@ -422,6 +519,175 @@ final class GamefixTransaction {
         throw Failure("transaction-staging-unavailable", 5)
     }
 
+    private func ensureTransactionUUID(_ journal: inout Journal) throws -> String {
+        if let transactionUUID = journal.transactionUUID {
+            guard isValidTransactionUUID(transactionUUID) else {
+                throw Failure("transaction-journal-invalid", 5)
+            }
+            return transactionUUID
+        }
+        let transactionUUID = UUID().uuidString.lowercased()
+        journal.transactionUUID = transactionUUID
+        try writeJournal(journal)
+        return transactionUUID
+    }
+
+    private func guardOrClaimSharedMarker(_ journal: inout Journal) throws {
+        let transactionUUID = try ensureTransactionUUID(&journal)
+        if let marker = try readSharedMarker() {
+            guard marker.transactionUUID == transactionUUID else {
+                throw Failure("transaction-shared-busy", 4)
+            }
+        } else if !journal.operations.isEmpty {
+            try claimSharedMarker(transactionUUID: transactionUUID)
+        }
+    }
+
+    private func rejectForeignSharedMarker() throws {
+        guard let marker = try readSharedMarker() else { return }
+        guard let journal = try readJournal(), journal.transactionUUID == marker.transactionUUID else {
+            throw Failure("transaction-shared-busy", 4)
+        }
+    }
+
+    private func claimSharedMarker(transactionUUID: String) throws {
+        guard isValidTransactionUUID(transactionUUID) else {
+            throw Failure("transaction-journal-invalid", 5)
+        }
+        if let marker = try readSharedMarker() {
+            guard marker.transactionUUID == transactionUUID else {
+                throw Failure("transaction-shared-busy", 4)
+            }
+            return
+        }
+        try validateTargetParent(sharedMarkerURL)
+        let data: Data
+        do { data = try JSONEncoder().encode(SharedMarker(transactionUUID: transactionUUID)) }
+        catch { throw Failure("transaction-shared-marker-write-failed", 5) }
+
+        for _ in 0..<8 {
+            let temporary = sharedMarkerURL.deletingLastPathComponent()
+                .appending(path: gamefixSharedMarkerTempPrefix + UUID().uuidString + ".tmp")
+            let fd = temporary.path.withCString {
+                open($0, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, mode_t(0o644))
+            }
+            if fd < 0 {
+                if errno == EEXIST { continue }
+                throw Failure("transaction-shared-marker-write-failed", 5)
+            }
+            do {
+                try writeAll(data, fd: fd)
+                guard fchmod(fd, mode_t(0o644)) == 0 else {
+                    throw Failure("transaction-shared-marker-write-failed", 5)
+                }
+                var info = stat()
+                guard fstat(fd, &info) == 0,
+                      info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+                      info.st_mode & mode_t(0o777) == mode_t(0o644),
+                      info.st_size >= 0, info.st_size <= off_t(gamefixMaximumSharedMarkerBytes)
+                else { throw Failure("transaction-shared-marker-unsafe", 4) }
+                guard fsync(fd) == 0 else { throw Failure("transaction-shared-marker-sync-failed", 5) }
+                close(fd)
+            } catch {
+                close(fd)
+                _ = unlink(temporary.path)
+                throw error
+            }
+
+            let result = temporary.path.withCString { from in
+                sharedMarkerURL.path.withCString { to in
+                    Darwin.renamex_np(from, to, UInt32(Darwin.RENAME_EXCL))
+                }
+            }
+            if result != 0 {
+                let renameError = errno
+                _ = unlink(temporary.path)
+                if renameError == EEXIST, let marker = try readSharedMarker() {
+                    guard marker.transactionUUID == transactionUUID else {
+                        throw Failure("transaction-shared-busy", 4)
+                    }
+                    return
+                }
+                throw Failure("transaction-shared-marker-write-failed", 5)
+            }
+            try syncDirectory(sharedMarkerURL.deletingLastPathComponent())
+            return
+        }
+        throw Failure("transaction-shared-marker-write-failed", 5)
+    }
+
+    private func readSharedMarker() throws -> SharedMarker? {
+        var pathInfo = stat()
+        let result = sharedMarkerURL.path.withCString { Darwin.lstat($0, &pathInfo) }
+        if result != 0 {
+            if errno == ENOENT { return nil }
+            throw Failure("transaction-shared-marker-unavailable", 5)
+        }
+        guard pathInfo.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+              pathInfo.st_mode & mode_t(0o777) == mode_t(0o644),
+              pathInfo.st_size >= 0, pathInfo.st_size <= off_t(gamefixMaximumSharedMarkerBytes)
+        else { throw Failure("transaction-shared-marker-unsafe", 4) }
+
+        let fd = sharedMarkerURL.path.withCString { open($0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW) }
+        guard fd >= 0 else {
+            if errno == ENOENT { return nil }
+            throw Failure("transaction-shared-marker-unavailable", 5)
+        }
+        defer { close(fd) }
+        var opened = stat()
+        guard fstat(fd, &opened) == 0,
+              opened.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+              opened.st_mode & mode_t(0o777) == mode_t(0o644),
+              opened.st_dev == pathInfo.st_dev, opened.st_ino == pathInfo.st_ino,
+              opened.st_size >= 0, opened.st_size <= off_t(gamefixMaximumSharedMarkerBytes)
+        else { throw Failure("transaction-shared-marker-unsafe", 4) }
+
+        let data: Data
+        do { data = try readBounded(fd: fd, maximum: gamefixMaximumSharedMarkerBytes) }
+        catch { throw Failure("transaction-shared-marker-unsafe", 4) }
+        let marker: SharedMarker
+        do {
+            guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  Set(object.keys) == Set(["version", "appid", "transactionUUID"])
+            else { throw Failure("transaction-shared-marker-unsafe", 4) }
+            marker = try JSONDecoder().decode(SharedMarker.self, from: data)
+        } catch { throw Failure("transaction-shared-marker-unsafe", 4) }
+        guard marker.version == 1, marker.appid == gamefixAppID,
+              isValidTransactionUUID(marker.transactionUUID)
+        else { throw Failure("transaction-shared-marker-unsafe", 4) }
+        return marker
+    }
+
+    @discardableResult
+    private func removeSharedMarker(transactionUUID: String) throws -> Bool {
+        guard let marker = try readSharedMarker(), marker.transactionUUID == transactionUUID else {
+            return false
+        }
+        var info = stat()
+        let result = sharedMarkerURL.path.withCString { Darwin.lstat($0, &info) }
+        if result != 0 {
+            if errno == ENOENT { return false }
+            throw Failure("transaction-shared-marker-unavailable", 5)
+        }
+        guard info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+              info.st_mode & mode_t(0o777) == mode_t(0o644)
+        else { throw Failure("transaction-shared-marker-unsafe", 4) }
+        guard let confirmed = try readSharedMarker(), confirmed.transactionUUID == transactionUUID else {
+            return false
+        }
+        if unlink(sharedMarkerURL.path) != 0 {
+            if errno == ENOENT { return false }
+            throw Failure("transaction-shared-marker-remove-failed", 5)
+        }
+        try syncDirectory(sharedMarkerURL.deletingLastPathComponent())
+        return true
+    }
+
+    private func isValidTransactionUUID(_ value: String) -> Bool {
+        guard let uuid = UUID(uuidString: value) else { return false }
+        return uuid.uuidString.lowercased() == value
+    }
+
     private func readJournal() throws -> Journal? {
         guard try validatePrivateDirectory(missingAllowed: true) else { return nil }
         var pathInfo = stat()
@@ -452,6 +718,12 @@ final class GamefixTransaction {
         else {
             throw Failure("transaction-journal-invalid", 5)
         }
+        if let transactionUUID = journal.transactionUUID,
+           !isValidTransactionUUID(transactionUUID) {
+            throw Failure("transaction-journal-invalid", 5)
+        }
+        // A later transaction may have changed these targets after this marker was removed.
+        if journal.phase == .released { return journal }
         var stages = Set<String>()
         var operationTargets = Set<String>()
         for operation in journal.operations {
@@ -489,6 +761,9 @@ final class GamefixTransaction {
         guard try validatePrivateDirectory(missingAllowed: false) else {
             throw Failure("transaction-journal-directory-unavailable", 5)
         }
+        guard let transactionUUID = journal.transactionUUID,
+              isValidTransactionUUID(transactionUUID)
+        else { throw Failure("transaction-journal-invalid", 5) }
         let data: Data
         do { data = try JSONEncoder().encode(journal) }
         catch { throw Failure("transaction-journal-write-failed", 5) }
@@ -563,7 +838,9 @@ final class GamefixTransaction {
               journalURL.lastPathComponent == gamefixJournalName,
               journalURL.deletingLastPathComponent().lastPathComponent == gamefixStateDirectoryName,
               let prefixState = targets["state:prefix"], prefixState.lastPathComponent == "state.json",
-              prefixState.deletingLastPathComponent().path == journalURL.deletingLastPathComponent().path
+              prefixState.deletingLastPathComponent().path == journalURL.deletingLastPathComponent().path,
+              let sharedState = targets["state:shared"],
+              sharedState.lastPathComponent == ".bridgeplay-gta-sa-de-1547000.json"
         else { throw Failure("transaction-configuration-invalid", 4) }
 
         var seenPaths = Set<String>()
@@ -815,6 +1092,15 @@ private func gamefixAfterTargetMutation() {
     gamefixFixtureCrashLock.unlock()
     if let value = ProcessInfo.processInfo.environment["GAMEFIX_TEST_CRASH_AFTER"],
        let requested = Int(value), requested > 0, count == requested {
+        _ = Darwin.kill(getpid(), SIGKILL)
+        _exit(128 + SIGKILL)
+    }
+    #endif
+}
+
+private func gamefixAfterSharedRelease() {
+    #if GTA_FIXTURE_CRASH
+    if ProcessInfo.processInfo.environment["GAMEFIX_TEST_CRASH_PHASE"] == "after-shared-release" {
         _ = Darwin.kill(getpid(), SIGKILL)
         _exit(128 + SIGKILL)
     }

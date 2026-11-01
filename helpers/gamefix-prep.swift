@@ -469,6 +469,20 @@ private func readPrivateData(_ url: URL) throws -> Data? {
     return try readRegularFile(url, maxBytes: 1024 * 1024)
 }
 
+private enum SharedDataModePolicy {
+    case makePublic
+    case accept
+    case reject
+}
+
+private func sharedDataModePolicy(
+    owner: uid_t, mode: mode_t, currentUID: uid_t
+) -> SharedDataModePolicy {
+    guard mode & mode_t(0o022) == 0 else { return .reject }
+    if owner == currentUID { return .makePublic }
+    return mode & mode_t(0o7777) == mode_t(0o644) ? .accept : .reject
+}
+
 private func decodeJSON<T: Decodable>(_ type: T.Type, data: Data) throws -> T {
     do { return try JSONDecoder().decode(type, from: data) }
     catch { throw PrepFailure("invalid-state-file", 4) }
@@ -555,7 +569,7 @@ private final class Coordinator {
     func status(environment: [String: String]) throws -> String {
         let stateContext = try Inputs(action: "restore", manifest: manifest, environment: environment)
         if try transactionHasPending(for: stateContext) { return "ready-owned" }
-        let hasOwnedState = try localStateExists(stateContext)
+        let hasExistingGraphicsSetup = try existingGraphicsSetupExists(stateContext)
         do {
             let context = try Inputs(action: "status", manifest: manifest, environment: environment)
             let plan = try makePreparePlan(context)
@@ -566,8 +580,8 @@ private final class Coordinator {
                 if plan.prefixOldData != nil { return "prepared" }
                 return plan.helper.record.ownership == .preexisting ? "manual" : "prepared"
             }
-            return plan.prefixOldData != nil ? "ready-owned" : "ready"
-        } catch let failure as PrepFailure where failure.status == 3 && hasOwnedState {
+            return plan.prefixOldData != nil || hasExistingGraphicsSetup ? "ready-owned" : "ready"
+        } catch let failure as PrepFailure where failure.status == 3 && hasExistingGraphicsSetup {
             throw PrepFailure(failure.token, 4)
         }
     }
@@ -575,16 +589,16 @@ private final class Coordinator {
     func prepare(environment: [String: String]) throws -> String {
         let stateContext = try Inputs(action: "restore", manifest: manifest, environment: environment)
         let pending = try transactionHasPending(for: stateContext)
-        var hasOwnedState = false
+        var hasExistingGraphicsSetup = false
         if !pending {
-            hasOwnedState = try localStateExists(stateContext)
+            hasExistingGraphicsSetup = try existingGraphicsSetupExists(stateContext)
             do {
                 let context = try Inputs(action: "prepare", manifest: manifest, environment: environment)
                 let plan = try makePreparePlan(context)
-                if !hasOwnedState && isNoop(plan) {
+                if plan.prefixOldData == nil && isNoop(plan) {
                     return plan.helper.record.ownership == .preexisting ? "manual" : "already-prepared"
                 }
-            } catch let failure as PrepFailure where failure.status == 3 && hasOwnedState {
+            } catch let failure as PrepFailure where failure.status == 3 && hasExistingGraphicsSetup {
                 throw PrepFailure(failure.token, 4)
             }
         }
@@ -594,7 +608,8 @@ private final class Coordinator {
         let prefixLock = try acquireLock(stateContext.prefixLock)
         defer { flock(prefixLock, LOCK_UN); close(prefixLock) }
         try recoverTransaction(for: stateContext)
-        hasOwnedState = try localStateExists(stateContext)
+        _ = try transactionHasPending(for: stateContext)
+        hasExistingGraphicsSetup = try existingGraphicsSetupExists(stateContext)
 
         do {
             let context = try Inputs(action: "prepare", manifest: manifest, environment: environment)
@@ -607,9 +622,36 @@ private final class Coordinator {
             }
             try apply(plan)
             return plan.helper.record.ownership == .preexisting ? "adopted-manual" : "prepared"
-        } catch let failure as PrepFailure where failure.status == 3 && hasOwnedState {
+        } catch let failure as PrepFailure where failure.status == 3 && hasExistingGraphicsSetup {
             throw PrepFailure(failure.token, 4)
         }
+    }
+
+    private func existingGraphicsSetupExists(_ context: Inputs) throws -> Bool {
+        let hasLocalState = try localStateExists(context)
+        var hasSharedState = false
+        if let data = try readSharedData(context.sharedState) {
+            let state: SharedState = try decodeJSON(SharedState.self, data: data)
+            try validate(state)
+            hasSharedState = true
+        }
+        if hasLocalState || hasSharedState { return true }
+
+        try validateExistingDirectoryChain(root: context.game,
+                                           relativePath: gameInstallRelativeDirectory)
+        let gameDirectory = gameInstallDirectory(context)
+        for pin in manifest.dxmtFiles {
+            let target = gameDirectory.appending(path: pin.name)
+            switch try pathInfo(target) {
+            case .absent:
+                continue
+            case let .present(info):
+                guard info.isRegular else { throw PrepFailure("game-dll-symlink-or-nonfile", 4) }
+                let data = try readRegularFile(target)
+                if sha256(data) == pin.sha256.lowercased() && peIsX64(data) { return true }
+            }
+        }
+        return false
     }
 
     private func localStateExists(_ context: Inputs) throws -> Bool {
@@ -640,6 +682,7 @@ private final class Coordinator {
         let prefixLock = try acquireLock(context.prefixLock)
         defer { flock(prefixLock, LOCK_UN); close(prefixLock) }
         try recoverTransaction(for: context)
+        _ = try transactionHasPending(for: context)
         _ = try validatePrivateStateDirectory(context)
         let stateData: Data?
         do {
@@ -932,15 +975,40 @@ private final class Coordinator {
     }
 
     private func makeSharedDataPublic(_ url: URL) throws {
+        guard case let .present(beforeOpen) = try pathInfo(url), beforeOpen.isRegular else {
+            throw PrepFailure("unsafe-shared-state-file", 4)
+        }
         let fd = url.path.withCString { open($0, O_RDONLY | O_NOFOLLOW | O_CLOEXEC) }
         guard fd >= 0 else { throw PrepFailure("unsafe-shared-state-file", 4) }
         defer { close(fd) }
         var info = stat()
         guard fstat(fd, &info) == 0,
               info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
-              info.st_uid == geteuid(), info.st_mode & mode_t(0o022) == 0
+              info.st_dev == beforeOpen.device, info.st_ino == beforeOpen.inode
         else { throw PrepFailure("unsafe-shared-state-file", 4) }
-        guard fchmod(fd, mode_t(0o644)) == 0 else {
+
+        switch sharedDataModePolicy(owner: info.st_uid, mode: info.st_mode, currentUID: geteuid()) {
+        case .makePublic:
+            guard fchmod(fd, mode_t(0o644)) == 0 else {
+                throw PrepFailure("unsafe-shared-state-file", 4)
+            }
+        case .accept:
+            break
+        case .reject:
+            throw PrepFailure("unsafe-shared-state-file", 4)
+        }
+
+        var currentPathInfo = stat()
+        let pathStillMatches = url.path.withCString { Darwin.lstat($0, &currentPathInfo) } == 0
+            && currentPathInfo.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG)
+            && currentPathInfo.st_dev == info.st_dev && currentPathInfo.st_ino == info.st_ino
+        var finalInfo = stat()
+        guard pathStillMatches, fstat(fd, &finalInfo) == 0,
+              finalInfo.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+              finalInfo.st_dev == info.st_dev, finalInfo.st_ino == info.st_ino,
+              finalInfo.st_mode & mode_t(0o022) == 0,
+              finalInfo.st_mode & mode_t(0o7777) == mode_t(0o644)
+        else {
             throw PrepFailure("unsafe-shared-state-file", 4)
         }
     }

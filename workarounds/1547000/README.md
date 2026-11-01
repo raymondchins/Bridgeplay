@@ -32,6 +32,11 @@ inconsistent state (status 4) and I/O or transaction errors (status 5) stop the
 launch with the original helper exit code. Without a DXVK runtime, the new
 setup is skipped before it changes files; an already managed setup that needs
 DXVK stops the launch rather than running with only part of its configuration.
+This strict check also applies when another prefix has no private ownership
+state but shared managed game DLLs are already present. A matching manual setup
+remains unowned, but the launch still stops if its required DXVK runtime is
+missing. Unsupported input can soft-skip only when there is no managed setup
+to preserve or update.
 A missing Bridgeplay `gamefix-prep` executable is still treated as an incomplete
 installation and stops launch. Per-prefix ownership state makes repeated
 launches, supported updates, and rollback safe around unknown files. Hash-verified
@@ -49,17 +54,27 @@ responsibility. The game executable, Steam settings, registry and saves are
 not changed.
 
 An interrupted file transaction is recovered by the next prepare or restore
-before that operation validates or changes files. Read-only status inspection
-does not perform recovery. If a journaled target or staged file has changed,
-recovery stops and leaves the changed file and journal in place for inspection.
+before that operation validates or changes files. The transaction publishes a
+shared pending marker beside the game install; it contains only the AppID,
+schema version and transaction UUID. Only the prefix whose private journal
+matches that marker may recover it. A different prefix's status, prepare or
+restore stops with status 4 and leaves the marker and files untouched. Recover
+the transaction from its original prefix before another prefix can change the
+shared setup. Read-only status inspection does not perform recovery. If a
+journaled target or staged file has changed, recovery stops and leaves the
+changed file and journal in place for inspection. Once shared release is
+complete and the marker is removed, a later prefix may prepare the same game
+install; cleanup of the original finished journal does not roll back those new
+shared files.
 During restore, missing shared ownership metadata means Bridgeplay leaves the
 shared game-local DLLs in place because it cannot verify other prefixes'
 references. If the current Social Club helper is an unrecognized vendor build,
 it is left in place while independently verified Bridgeplay-owned game DLLs
 can still be cleaned up when shared ownership metadata is intact. Shared
 ownership metadata and its read-only lock support multiple macOS accounts using
-the same game install; fixture coverage checks that mode and the absence of a
-single-UID assumption, but no second macOS account was created for testing.
+the same game install. Mode-policy fixtures exercise the accepted and rejected
+owner/mode combinations, but reads and writes from a second macOS UID have not
+been verified.
 
 After preparation, Bridgeplay selects DXVK for the Rockstar launcher and
 sets DXGI to native-first (`dxgi=n,b`) for the game-local DXMT DLLs. The stock
@@ -80,8 +95,9 @@ setting or use `GTA_SA_DE_FIX=1` to enable it again.
 The current manifest supports game build 16391096, WineCX 11.17, the DXMT
 files bundled with that engine, and the listed Rockstar helper versions. A
 game or launcher update may need a Bridgeplay update before it is supported.
-Automation fixture tests validate file lifecycle and rollback; they do not add
-gameplay verification.
+Automation fixtures cover file lifecycle, rollback, cross-prefix transaction
+recovery and mode policy; they do not provide gameplay verification or verify
+operation as a second macOS UID.
 
 ## What it changes
 

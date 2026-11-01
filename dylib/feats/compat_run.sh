@@ -1090,8 +1090,9 @@ gta_sa_de_run() {
       fi ;;
     manual)
       if ! backend_available dxvk || ! gta_sa_de_dxvk_ready; then
-        gta_sa_de_log "preparation skipped: WineCX DXVK runtime is unavailable; no Bridgeplay-owned setup was changed"
-        return 0
+        gta_sa_de_log "preparation failed: matching manual setup needs the WineCX DXVK runtime"
+        show_alert "GTA San Andreas setup needs attention" "Bridgeplay cannot safely run this manually matched GTA San Andreas setup because its WineCX DXVK runtime is unavailable. The game was not launched. Check this prefix's bridgeplay-run.log."
+        exit 1
       fi ;;
     ready|ready-owned)
       if ! backend_available dxvk || ! gta_sa_de_dxvk_ready; then
