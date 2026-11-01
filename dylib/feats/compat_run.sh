@@ -380,6 +380,8 @@ np_pad_mappings
 gamefix_keys=""
 gamefix_backend=""
 gamefix_dlloverrides=""
+gamefix_from_BACKEND=""
+gamefix_from_DLLOVERRIDES=""
 gamefix_msync=""
 gamefix_nvapi=""
 gamefix_dlss_fg=""
@@ -414,7 +416,7 @@ gamefix_reason() {
   case "$1" in
     BACKEND)
       case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
-    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK)
+    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK|GTA_SA_DE_FIX)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     FRAMEGEN)
       # 1 is the 2x of the first release.
@@ -519,6 +521,7 @@ load_gamefixes() {
       STEAMDECK) gamefix_apply_env SteamDeck "$value" "$from" ;;
       FRAMEGEN|FRAMEGEN_QUALITY|FRAMEGEN_UI|FRAMEGEN_FALLBACK|FRAMEGEN_ENGINE)
         gamefix_apply_env "NOTPROTON_$key" "$value" "$from" ;;
+      GTA_SA_DE_FIX) gamefix_apply_env NOTPROTON_GTA_SA_DE_FIX "$value" "$from" ;;
       *) gamefix_apply_env "$key" "$value" "$from" ;;
     esac
   done
@@ -929,6 +932,177 @@ compose_dll_overrides() {
     composed="${composed:+$composed;}$part"
   done
   [ -z "$composed" ] || export WINEDLLOVERRIDES="$composed"
+}
+
+gta_sa_de_log() {
+  echo "gta-sa-de: $*" >> "$log" 2>&1 || true
+}
+
+gta_sa_de_dxvk_ready() {
+  for gta_sa_de_dll in d3d11.dll d3d10core.dll; do
+    [ -f "$CX_ROOT/lib/notproton-backends/dxvk/x86_64-windows/$gta_sa_de_dll" ] \
+      && [ -r "$CX_ROOT/lib/notproton-backends/dxvk/x86_64-windows/$gta_sa_de_dll" ] || return 1
+  done
+}
+
+# Prints the last explicit DXGI override. Returns failure when none is present.
+gta_sa_de_dxgi_mode() {
+  gta_sa_de_rest=$1
+  gta_sa_de_seen=0
+  gta_sa_de_mode=""
+  while [ -n "$gta_sa_de_rest" ]; do
+    gta_sa_de_entry=${gta_sa_de_rest%%;*}
+    case "$gta_sa_de_rest" in *';'*) gta_sa_de_rest=${gta_sa_de_rest#*;} ;; *) gta_sa_de_rest="" ;; esac
+    case "$gta_sa_de_entry" in *=*)
+      gta_sa_de_names=${gta_sa_de_entry%%=*}
+      gta_sa_de_entry_mode=${gta_sa_de_entry#*=}
+      ;; *) gta_sa_de_names=$gta_sa_de_entry; gta_sa_de_entry_mode=invalid ;; esac
+    gta_sa_de_names=$(printf '%s' "$gta_sa_de_names" | tr '[:upper:]' '[:lower:]')
+    case ",$gta_sa_de_names," in
+      *,dxgi,*|*,dxgi.dll,*)
+        gta_sa_de_seen=1
+        gta_sa_de_mode=$(printf '%s' "$gta_sa_de_entry_mode" | tr '[:upper:]' '[:lower:]') ;;
+    esac
+  done
+  [ "$gta_sa_de_seen" -eq 1 ] || return 1
+  printf '%s' "$gta_sa_de_mode"
+}
+
+gta_sa_de_dxgi_conflict() {
+  gta_sa_de_mode=$(gta_sa_de_dxgi_mode "$1") || return 1
+  [ "$gta_sa_de_mode" != n,b ]
+}
+
+gta_sa_de_dxgi_match() {
+  gta_sa_de_mode=$(gta_sa_de_dxgi_mode "$1") || return 1
+  [ "$gta_sa_de_mode" = n,b ]
+}
+
+gta_sa_de_conflict() {
+  gta_sa_de_conflict_reason=""
+  case "${NOTPROTON_BACKEND:-}" in
+    ''|dxvk) ;;
+    *) gta_sa_de_conflict_reason="BRIDGEPLAY_BACKEND=${NOTPROTON_BACKEND} in launch options"; return 0 ;;
+  esac
+  case "$(printf '%s' "${CX_GRAPHICS_BACKEND:-}" | tr '[:upper:]' '[:lower:]')" in
+    ''|dxvk) ;;
+    *) gta_sa_de_conflict_reason="CX_GRAPHICS_BACKEND=${CX_GRAPHICS_BACKEND} in launch options"; return 0 ;;
+  esac
+  if [ "$gamefix_from_BACKEND" = user ] && [ -n "$gamefix_backend" ] \
+    && [ "$gamefix_backend" != dxvk ]; then
+    gta_sa_de_conflict_reason="BACKEND=$gamefix_backend from the ${gamefix_from_BACKEND:-gamefix} config"
+    return 0
+  fi
+  case "$gamefix_from_DLLOVERRIDES" in global|user)
+    if gta_sa_de_dxgi_conflict "$gamefix_dlloverrides"; then
+      gta_sa_de_conflict_reason="DLLOVERRIDES from the ${gamefix_from_DLLOVERRIDES} config"
+      return 0
+    fi
+    ;;
+  esac
+  if gta_sa_de_dxgi_conflict "${WINEDLLOVERRIDES:-}"; then
+    gta_sa_de_conflict_reason="WINEDLLOVERRIDES in launch options"
+    return 0
+  fi
+  return 1
+}
+
+gta_sa_de_run() {
+  [ "$verb" = waitforexitandrun ] && [ "$app_id" = 1547000 ] || return 0
+  case "${NOTPROTON_GTA_SA_DE_FIX:-}" in
+    '') return 0 ;;
+    0)
+      helper="$np_support/gamefix-prep"
+      if [ ! -x "$helper" ]; then
+        gta_sa_de_log "automatic fix disabled; no owned preparation helper is installed"
+        return 0
+      fi
+      if ! gta_sa_de_result=$(env GTA_SA_APP_ID="$app_id" \
+          GTA_SA_DATA_PATH="$STEAM_COMPAT_DATA_PATH" GTA_SA_PREFIX="$WINEPREFIX" \
+          GTA_SA_GAME="$STEAM_COMPAT_INSTALL_PATH" \
+          GTA_SA_RUNNER="$CX_ROOT" GTA_SA_ENGINE_ID="$np_build" \
+          "$helper" restore 2>&1); then
+        gta_sa_de_log "restore failed: $gta_sa_de_result"
+        show_alert "GTA San Andreas setup needs attention" "Bridgeplay could not restore files owned by its automatic GTA San Andreas setup. The game was not launched. Check this prefix's bridgeplay-run.log."
+        exit 1
+      fi
+      case "$gta_sa_de_result" in
+        restored|no-owned-state)
+          gta_sa_de_log "automatic fix disabled: $gta_sa_de_result; manually adopted files are left in place" ;;
+        *)
+          gta_sa_de_log "restore returned an unknown result: $gta_sa_de_result"
+          show_alert "GTA San Andreas setup needs attention" "Bridgeplay could not verify the files owned by its automatic GTA San Andreas setup. The game was not launched. Check this prefix's bridgeplay-run.log."
+          exit 1 ;;
+      esac
+      return 0 ;;
+    1) ;;
+    *)
+      gta_sa_de_log "not applied: GTA_SA_DE_FIX must be 0 or 1, got ${NOTPROTON_GTA_SA_DE_FIX}"
+      return 0 ;;
+  esac
+
+  if gta_sa_de_conflict; then
+    gta_sa_de_log "not applied because the explicit graphics choice conflicts: $gta_sa_de_conflict_reason"
+    return 0
+  fi
+  if [ "$np_build" != winecx-11.17 ]; then
+    gta_sa_de_log "not applied: automatic setup supports WineCX 11.17; this launch uses ${np_build:-unknown}"
+    return 0
+  fi
+  if ! backend_available dxvk || ! gta_sa_de_dxvk_ready; then
+    gta_sa_de_log "preparation failed: WineCX DXVK runtime is unavailable"
+    show_alert "GTA San Andreas setup needs attention" "Bridgeplay cannot apply this game's automatic setup because its WineCX DXVK runtime is unavailable. Check this prefix's bridgeplay-run.log."
+    exit 1
+  fi
+
+  helper="$np_support/gamefix-prep"
+  if [ ! -x "$helper" ]; then
+    gta_sa_de_log "preparation failed: support helper is missing at $helper"
+    show_alert "GTA San Andreas setup needs attention" "Bridgeplay's GTA San Andreas support helper is missing. The game was not launched. Update or repair Bridgeplay, then try again."
+    exit 1
+  fi
+  if ! gta_sa_de_result=$(env GTA_SA_APP_ID="$app_id" \
+      GTA_SA_DATA_PATH="$STEAM_COMPAT_DATA_PATH" GTA_SA_PREFIX="$WINEPREFIX" \
+      GTA_SA_GAME="$STEAM_COMPAT_INSTALL_PATH" \
+      GTA_SA_RUNNER="$CX_ROOT" GTA_SA_ENGINE_ID="$np_build" \
+      "$helper" status 2>&1); then
+    gta_sa_de_log "status check failed: $gta_sa_de_result"
+    show_alert "GTA San Andreas setup needs attention" "Bridgeplay could not verify this game's files for the automatic setup. It stopped the launch without changing them. Check this prefix's bridgeplay-run.log."
+    exit 1
+  fi
+  case "$gta_sa_de_result" in
+    prepared|manual) ;;
+    ready)
+      if ! gta_sa_de_result=$(env GTA_SA_APP_ID="$app_id" \
+          GTA_SA_DATA_PATH="$STEAM_COMPAT_DATA_PATH" GTA_SA_PREFIX="$WINEPREFIX" \
+          GTA_SA_GAME="$STEAM_COMPAT_INSTALL_PATH" \
+          GTA_SA_RUNNER="$CX_ROOT" GTA_SA_ENGINE_ID="$np_build" \
+          "$helper" prepare 2>&1); then
+        gta_sa_de_log "preparation failed: $gta_sa_de_result"
+        show_alert "GTA San Andreas setup needs attention" "Bridgeplay could not prepare the automatic GTA San Andreas setup. It stopped the launch without changing unknown files. Check this prefix's bridgeplay-run.log."
+        exit 1
+      fi
+      case "$gta_sa_de_result" in
+        prepared|already-prepared|adopted-manual|manual) ;;
+        *)
+          gta_sa_de_log "prepare returned an unknown result: $gta_sa_de_result"
+          show_alert "GTA San Andreas setup needs attention" "Bridgeplay could not verify the automatic GTA San Andreas setup. The game was not launched. Check this prefix's bridgeplay-run.log."
+          exit 1 ;;
+      esac ;;
+    *)
+      gta_sa_de_log "status returned an unknown result: $gta_sa_de_result"
+      show_alert "GTA San Andreas setup needs attention" "Bridgeplay could not verify the automatic GTA San Andreas setup. The game was not launched. Check this prefix's bridgeplay-run.log."
+      exit 1 ;;
+  esac
+
+  if [ "$gamefix_from_BACKEND" != user ] || [ -z "$gamefix_backend" ]; then
+    gamefix_backend=dxvk
+    gamefix_from_BACKEND="automatic GTA San Andreas setup"
+  fi
+  if ! gta_sa_de_dxgi_match "$gamefix_dlloverrides"; then
+    gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}dxgi=n,b"
+  fi
+  gta_sa_de_log "ready: $gta_sa_de_result; DXVK for the Rockstar launcher and native-first DXGI for game-local DXMT"
 }
 
 load_gamefixes || true
@@ -2529,6 +2703,8 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   map_game_drive
   stage_step="prefix check"
   refuse_broken_prefix
+  stage_step="GTA San Andreas setup"
+  gta_sa_de_run
 fi
 low_power_notice
 launch_step prepare

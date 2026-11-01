@@ -99,6 +99,7 @@ struct PayloadStateTests {
     private func state(
         missing: [PayloadEntry] = [],
         overlay: Bool = true,
+        gamefixPrep: Bool = true,
         signatures: String? = "1788400362.json",
         problem: String? = nil
     ) -> PayloadState {
@@ -109,6 +110,7 @@ struct PayloadStateTests {
             overlayShimPresent: overlay,
             iconmakerPresent: true,
             appinfoPresent: true,
+            gamefixPrepPresent: gamefixPrep,
             signatureDatabase: signatures,
             legacyCompatPresent: 6,
             legacyCompatExpected: 6,
@@ -127,6 +129,8 @@ struct PayloadStateTests {
 
         #expect(!state(missing: [entry]).isComplete)
         #expect(!state(overlay: false).isComplete)
+        #expect(!state(gamefixPrep: false).isComplete)
+        #expect(state(gamefixPrep: false).missingSteamFiles == ["gamefix-prep"])
         #expect(!state(signatures: nil).isComplete)
         #expect(!state(problem: "the manifest will not parse").isComplete)
     }
@@ -140,6 +144,7 @@ struct PayloadStateTests {
             overlayShimPresent: true,
             iconmakerPresent: true,
             appinfoPresent: true,
+            gamefixPrepPresent: true,
             signatureDatabase: "1788400362.json",
             legacyCompatPresent: 6,
             legacyCompatExpected: 6,

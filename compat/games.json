@@ -366,7 +366,7 @@
     "status": "gold",
     "backend": "dxmt",
     "engine": "winecx-11.17",
-    "notes": "Manual opt-in required ([guide](../workarounds/1547000/README.md)). Rockstar Launcher uses DXVK; SanAndreas.exe uses app-local DXMT. Contributor-reported, not maintainer-verified: first mission completed with no gameplay issues. Later missions and FPS are unverified.",
+    "notes": "Bridgeplay automatically prepares the supported launcher and renderer split on the pinned game build and WineCX 11.17; see the [guide](../workarounds/1547000/README.md). The 2026-10-31 first-mission result is a contributor-reported manual setup, not verification of the automatic path. Automation fixture tests validate file lifecycle and rollback, not gameplay; gameplay beyond the first mission and FPS remain unverified.",
     "last_tested": "2026-10-31",
     "fork_commit": null,
     "tested_on": "M2 Pro · 16 GB · macOS 26.6.2"

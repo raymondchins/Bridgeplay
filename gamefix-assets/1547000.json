@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "appid": "1547000",
+  "engine": "winecx-11.17",
+  "gameBuild": "16391096",
+  "gameExecutable": "Gameface/Binaries/Win64/SanAndreas.exe",
+  "gameExecutableSHA256": "63e633bb51c35fe35ca98f503b62e7ddb8403abe4c9d501cfa9162892453846f",
+  "gameExecutableSize": 89497064,
+  "dxmtDirectory": "lib/notproton-backends/dxmt/x86_64-windows",
+  "dxmtFiles": [
+    {
+      "name": "d3d11.dll",
+      "sha256": "c1c8c4779686990bf343162a8804dd2d1564b2a893e64e5ddcc7db5e76ce409e"
+    },
+    {
+      "name": "dxgi.dll",
+      "sha256": "1bb4939ff43e676eac8b3f3cb0583985ab8f7b1a8e11760d14931da3fc44223b"
+    },
+    {
+      "name": "d3d10core.dll",
+      "sha256": "aeb43e1ca7d9f221b9f0070c8654fa3579fd767006272cf675a9113e27bc6e72"
+    }
+  ],
+  "helperDirectory": "drive_c/Program Files/Rockstar Games/Social Club",
+  "helperName": "SocialClubHelper.exe",
+  "realHelperName": "SocialClubHelper_real.exe",
+  "helperChecksumName": "SocialClubHelper_real.exe.sha256",
+  "helperLicenseName": "SocialClubHelper.bridgeplay.LICENSE",
+  "helperWrapperSHA256": "80eced29c22d2f3fb7fc38c6c99792350a4f3ef6bacc32971830b5d2e27ad7d5",
+  "helperLicenseSHA256": "2985ef68fb7ab2e5163a39352917e271eac05ceec0aa4a9fab6e78cec917a6d6",
+  "supportedVendorHelpers": [
+    {
+      "version": "RGL 1.0.109.3031 / SocialClub 2.4.0.240",
+      "sha256": "d3bd835897a97207d26e703969232ded54fd32c4388691c7ebd95709a54f9a6d"
+    }
+  ]
+}

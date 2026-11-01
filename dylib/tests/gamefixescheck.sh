@@ -116,7 +116,7 @@ launch() {
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
 				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE CX_GRAPHICS_BACKEND \
-				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
+				NOTPROTON_GTA_SA_DE_FIX DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
 		' launch "$target" > "$case_dir/out" 2>&1 || bad "the launch sequence ran to the end" "exit 0" "exit $? $(tail -1 "$case_dir/out")"
@@ -176,7 +176,7 @@ default_conf '# shipped fix' '' '  DXVK_HUD=fps  ' "VKD3D_CONFIG=dxr$(printf '\r
 	"DXMT_A=\$(touch $case_dir/pwned)" 'DXMT_B=`touch pwned`' 'DXMT_C="quoted"' "DXMT_D='single'" \
 	'BACKEND=vulkan' 'MSYNC=2' 'RETINA=yes' 'DLLOVERRIDES=dxgi=native' 'DLLOVERRIDES=;=n' \
 	'DXMT_=1' 'MTL_HUD_ENABLED=1' 'FRAMEGEN=4' 'FRAMEGEN_QUALITY=ultra' 'FRAMEGEN_UI=2' \
-	'FRAMEGEN_FALLBACK=yes' 'FRAMEGEN_ENGINE=fsr' 'FRAMEGEN_OTHER=1' 'CX_FWD_COMPAT_GL_CTX=1'
+	'FRAMEGEN_FALLBACK=yes' 'FRAMEGEN_ENGINE=fsr' 'FRAMEGEN_OTHER=1' 'CX_FWD_COMPAT_GL_CTX=1' 'GTA_SA_DE_FIX=2'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a padded value is trimmed" "fps" "$(got DXVK_HUD)"
 is "a CRLF line ends cleanly" "dxr" "$(got VKD3D_CONFIG)"
@@ -206,8 +206,19 @@ has "FRAMEGEN_UI must be 0 or 1" "rejected FRAMEGEN_UI: not 0 or 1" "$case_dir/l
 has "FRAMEGEN_FALLBACK must be 0 or 1" "rejected FRAMEGEN_FALLBACK: not 0 or 1" "$case_dir/log"
 has "FRAMEGEN_ENGINE must be an engine" "rejected FRAMEGEN_ENGINE: not own or metalfx" "$case_dir/log"
 has "an unknown FRAMEGEN_ key is not on the allow-list" "rejected FRAMEGEN_OTHER: not on the allow-list" "$case_dir/log"
+has "GTA_SA_DE_FIX accepts only 0 or 1" "rejected GTA_SA_DE_FIX: not 0 or 1" "$case_dir/log"
 is "a rejected FRAMEGEN leaves frame generation unset" "<unset>" "$(got NOTPROTON_FRAMEGEN)"
 has "applied values are logged" "applied DXVK_HUD=fps from the default conf" "$case_dir/log"
+
+echo "== GTA San Andreas workaround setting"
+new_case
+full_engine
+default_conf 'GTA_SA_DE_FIX=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "the shipped opt-in setting maps to its internal variable" "1" "$(got NOTPROTON_GTA_SA_DE_FIX)"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_GTA_SA_DE_FIX=0
+is "BRIDGEPLAY_GTA_SA_DE_FIX launch option opts out" "0" "$(got NOTPROTON_GTA_SA_DE_FIX)"
+has "the launch option wins over the conf" "NOTPROTON_GTA_SA_DE_FIX kept from the launch options" "$case_dir/log"
 
 echo "== precedence: launch options > user conf > default conf > auto > default"
 new_case

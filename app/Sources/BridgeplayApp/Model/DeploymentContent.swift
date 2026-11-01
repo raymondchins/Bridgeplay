@@ -160,14 +160,16 @@ enum DeploymentContent {
         payload: InstallPayload.Located, bridgePayload: BridgePayload.Located,
         app: URL, bridge: URL, signatures: URL, fonts: URL, overlayShim: URL, iconmaker: URL, appinfo: URL,
         compatTools: URL, tools: [InstalledTool], runners: URL,
-        gamefixes: URL = SupportPaths.gamefixesDefault
+        gamefixes: URL = SupportPaths.gamefixesDefault, gamefixPrep: URL? = nil
     ) -> [File] {
+        let gamefixPrep = gamefixPrep ?? appinfo.deletingLastPathComponent().appending(path: "gamefix-prep")
         var files = [
             File(source: payload.dylib, destination: SupportPaths.Steam.deployedDylib(inBundle: app),
                  name: "notproton.dylib", allowsResigning: true),
             File(source: payload.overlayShim, destination: overlayShim, name: "overlay-shim.dylib"),
             File(source: payload.iconmaker, destination: iconmaker, name: "iconmaker", executable: true),
             File(source: payload.appinfo, destination: appinfo, name: "appinfo", executable: true),
+            File(source: payload.gamefixPrep, destination: gamefixPrep, name: "gamefix-prep", executable: true),
         ]
         files += payload.signatures.map {
             File(source: $0, destination: signatures.appending(path: $0.lastPathComponent),

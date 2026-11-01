@@ -1,9 +1,56 @@
 # GTA San Andreas: The Definitive Edition (Steam AppID 1547000)
 
-This is a manual, opt-in workaround for the Rockstar sign-in window and the
-D3D11 game crash seen on one Bridgeplay setup. It is not installed by
-Bridgeplay, and its sample config lives here rather than in the active
-gamefixes directory.
+Releases containing this integration prepare the workaround automatically for
+supported GTA San Andreas Definitive Edition installs. The shipped
+`gamefixes/1547000.conf` enables it by default; those releases need no
+file-copy steps.
+
+## Automatic path
+
+On the game's main `waitforexitandrun`, after Bridgeplay initializes its
+prefix and before choosing a graphics backend, it checks for an explicit
+conflicting graphics choice. A conflicting backend or DXGI override is kept,
+the workaround is skipped, and the reason is written to
+`compatdata/1547000/bridgeplay-run.log`. Steam's Rockstar prerequisites use the
+`run` verb and are left alone.
+Other compatibility engines skip this automatic path and use their normal
+graphics selection.
+
+When no conflict exists, Bridgeplay's native `gamefix-prep` helper validates
+the supported game executable/build, WineCX 11.17 DXMT DLL hashes, Social Club
+helper version, and every destination before changing files. It makes a
+read-only status check first. Unsupported or missing files, modified
+destinations, an unavailable DXVK runtime, or a missing helper stop the game
+launch with a log message. Per-prefix ownership state makes repeated launches,
+supported updates, and rollback safe around unknown files. Hash-verified
+references keep game-local DLLs in place while another managed prefix still
+uses the same Steam game install; restore removes Bridgeplay-owned DLLs only
+after the last such prefix releases them. The helper relies on atomic rename
+support for its file transactions and refuses preparation when the filesystem
+cannot provide it. The game executable, Steam settings, registry and saves
+are not changed.
+
+After preparation, Bridgeplay selects DXVK for the Rockstar launcher and
+sets DXGI to native-first (`dxgi=n,b`) for the game-local DXMT DLLs. The stock
+prefix DXGI stays untouched. Matching files adopted as manual remain
+user-owned.
+
+To opt out for one launch, add this to Steam's launch options:
+
+~~~text
+BRIDGEPLAY_GTA_SA_DE_FIX=0 %command%
+~~~
+
+Or set `GTA_SA_DE_FIX=0` in the user's per-game
+`~/Library/Application Support/bridgeplay/gamefixes/1547000.conf`. Bridgeplay
+restores files it owns; manually adopted files stay in place. Remove the
+setting or use `GTA_SA_DE_FIX=1` to enable it again.
+
+The current manifest supports game build 16391096, WineCX 11.17, the DXMT
+files bundled with that engine, and the listed Rockstar helper versions. A
+game or launcher update may need a Bridgeplay update before it is supported.
+Automation fixture tests validate file lifecycle and rollback; they do not add
+gameplay verification.
 
 ## What it changes
 
@@ -16,9 +63,9 @@ preserved SocialClubHelper_real.exe, then appends these CEF graphics switches:
 ~~~
 
 The GTA game process uses DXMT's unmodified D3D11, DXGI and D3D10Core DLLs
-beside SanAndreas.exe. The per-game Bridgeplay config keeps the launcher on
-DXVK and sets DXGI to native-then-builtin. The stock prefix DXGI remains
-untouched; it is separate from the game-local DXMT copy.
+beside SanAndreas.exe. After successful validation, the run script keeps the
+launcher on DXVK and sets DXGI to native-then-builtin. The stock prefix DXGI
+remains untouched; it is separate from the game-local DXMT copy.
 
 The wrapper does not log or transmit command-line data, alter credentials,
 bypass sign-in, or add sandbox-disabling switches. This package does not
@@ -32,11 +79,10 @@ On 2026-10-31, the contributor reported this setup: Bridgeplay 0.7.60
 16 GB, macOS 26.6.2. Rockstar sign-in completed normally, and the first
 mission completed with no gameplay problems.
 
-This is a contributor report, not a maintainer verification. Later missions,
-frame rate, other Macs, other macOS releases, other game builds and future
-launcher updates are unverified. A Rockstar update or prefix rebuild may
-replace the helper or config. The gold compatibility entry is specific to this
-manual setup; it does not mean the game works out of the box.
+This is a contributor report from the manual setup, not a maintainer
+verification of the automatic path. Later missions, frame rate, other Macs,
+other macOS releases, other game builds and future launcher updates are
+unverified. Automation fixture tests do not change that gameplay evidence.
 
 The tested diagnosis was a renderer split: D3DMetal failed during launcher
 initialization, DXMT's launcher path stopped at SwapDeviceContextState, and
@@ -58,7 +104,7 @@ installation.
 Verify the package from this directory with:
 
 ~~~sh
-shasum -a 256 -c SHA256SUMS
+shasum -a 256 -c SHA256SUMS || { echo "Package checksum verification failed"; exit 1; }
 ~~~
 
 The source is adapted from Matthias Schedel's SocialClubHelper shim in
@@ -96,7 +142,12 @@ cd build
 A rebuild may differ in the PE timestamp. The bundled executable above is the
 tested artifact; a rebuild is not promised to be byte-identical.
 
-## Apply manually
+## Legacy manual fallback for older Bridgeplay releases
+
+Use the remaining copy-and-configure recipe only with an older Bridgeplay
+release that does not ship `gamefix-prep` and the `GTA_SA_DE_FIX` setting. The
+current automatic release should not need manual copies. Do not combine this
+fallback with the automatic helper.
 
 Start the installed Steam game once through Bridgeplay so its prefix and
 Rockstar components are created. If the launcher fails, close its error dialog
@@ -115,7 +166,7 @@ the example repository, Steam library, prefix and runner paths as needed.
 
 ~~~sh
 cd /path/to/Bridgeplay/workarounds/1547000
-shasum -a 256 -c SHA256SUMS
+shasum -a 256 -c SHA256SUMS || { echo "Package checksum verification failed"; exit 1; }
 GTA_RECIPE_DIR="$PWD"
 
 BRIDGEPLAY_HOME="$HOME/Library/Application Support/bridgeplay"
@@ -169,14 +220,17 @@ for GTA_DLL in d3d11.dll dxgi.dll d3d10core.dll; do
     exit 1
   fi
 done
-(
+if ! (
   cd "$GTA_DXMT_DLLS" || exit 1
   printf '%s\n' \
     'c1c8c4779686990bf343162a8804dd2d1564b2a893e64e5ddcc7db5e76ce409e  d3d11.dll' \
     '1bb4939ff43e676eac8b3f3cb0583985ab8f7b1a8e11760d14931da3fc44223b  dxgi.dll' \
     'aeb43e1ca7d9f221b9f0070c8654fa3579fd767006272cf675a9113e27bc6e72  d3d10core.dll' \
     | shasum -a 256 -c -
-) || { echo "Refusing: tested DXMT source DLLs are missing or have changed"; exit 1; }
+); then
+  echo "Refusing: tested DXMT source DLLs are missing or have changed"
+  exit 1
+fi
 ~~~
 
 For the tested runner, the three source hashes must be:

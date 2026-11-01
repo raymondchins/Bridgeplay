@@ -143,7 +143,8 @@ struct DeploymentContentTests {
     func unavailableInstallAction() {
         let status = SystemStatus()
         let payload = PayloadState(expected: 0, present: 0, missing: [], overlayShimPresent: true,
-                                   iconmakerPresent: true, appinfoPresent: true, signatureDatabase: "fixture",
+                                   iconmakerPresent: true, appinfoPresent: true, gamefixPrepPresent: true,
+                                   signatureDatabase: "fixture",
                                    legacyCompatPresent: 0, legacyCompatExpected: 0, manifestProblem: nil)
         status.snapshot = StatusSnapshot(steam: .notInstalled, steamRunning: false, updateBlocked: false,
                                          crossOver: [], runner: .none, payload: payload,
@@ -160,7 +161,8 @@ struct DeploymentContentTests {
     func newerInstallBlocksRemoval() {
         let status = SystemStatus()
         let payload = PayloadState(expected: 0, present: 0, missing: [], overlayShimPresent: true,
-                                   iconmakerPresent: true, appinfoPresent: true, signatureDatabase: "fixture",
+                                   iconmakerPresent: true, appinfoPresent: true, gamefixPrepPresent: true,
+                                   signatureDatabase: "fixture",
                                    legacyCompatPresent: 0, legacyCompatExpected: 0, manifestProblem: nil)
         status.snapshot = StatusSnapshot(steam: .notInstalled, steamRunning: false, updateBlocked: false,
                                          crossOver: [], runner: .none, payload: payload,

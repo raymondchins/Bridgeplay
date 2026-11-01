@@ -20,6 +20,7 @@ fails=0
 ok() { printf '  ok    %s\n' "$1"; }
 bad() { printf '  FAIL  %s\n         want [%s]\n         got  [%s]\n' "$1" "$2" "$3"; fails=$((fails + 1)); }
 is() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1" "$2" "$3"; fi; }
+has() { if grep -qF -- "$2" "$3"; then ok "$1"; else bad "$1" "a line with $2" "$(cat "$3")"; fi; }
 
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
@@ -297,6 +298,408 @@ is "exit game ends the session" 143 "$rc"
 is "exit game does not wait out the shim" yes "$([ $(($(date +%s) - start)) -lt 5 ] && echo yes || echo no)"
 is "exit game tears the prefix down" yes "$(grep -q kill "$T/session.ev" && echo yes || echo no)"
 is "exit game is summed up as stopped from Steam" "summary 143 1" "$(grep summary "$T/session.ev")"
+
+echo "== GTA San Andreas automatic preparation"
+repo_root=$(cd "$(dirname "$SRC")/../.." && pwd)
+gta_functions=""
+for name in gta_sa_de_log gta_sa_de_dxvk_ready gta_sa_de_dxgi_mode gta_sa_de_dxgi_conflict gta_sa_de_dxgi_match gta_sa_de_conflict gta_sa_de_run; do
+	body=$(sed -n "/^$name() {\$/,/^}$/p" "$SRC")
+	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
+	gta_functions="$gta_functions
+$body"
+done
+hook_prefix=$(grep -n '^  refuse_broken_prefix$' "$SRC" | cut -d: -f1)
+hook_call=$(grep -n '^  gta_sa_de_run$' "$SRC" | cut -d: -f1)
+hook_backend=$(grep -n '^select_backend "\$1"$' "$SRC" | cut -d: -f1)
+hook_count=$(grep -c '^  gta_sa_de_run$' "$SRC")
+is "one workaround hook follows prefix validation before backend selection" yes \
+	"$([ "$hook_count" -eq 1 ] && [ "$hook_prefix" -lt "$hook_call" ] && [ "$hook_call" -lt "$hook_backend" ] && echo yes || echo no)"
+
+gta_fixture="$T/gta-sa-de"
+mkdir -p "$gta_fixture/support"
+cat > "$gta_fixture/make_fixture.py" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+def put(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return data
+def pe(tag):
+    image = bytearray(96 + len(tag))
+    image[0:2] = b"MZ"
+    image[60:64] = (64).to_bytes(4, "little")
+    image[64:68] = b"PE\0\0"
+    image[68:70] = (0x8664).to_bytes(2, "little")
+    image[88:90] = (0x20b).to_bytes(2, "little")
+    image[96:] = tag
+    return bytes(image)
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+exe = put(root / "game/Gameface/Binaries/Win64/SanAndreas.exe", pe(b"game"))
+runner_dir = root / "runner/lib/notproton-backends/dxmt/x86_64-windows"
+dlls = {}
+for name in ("d3d11.dll", "dxgi.dll", "d3d10core.dll"):
+    dlls[name] = put(runner_dir / name, pe(name.encode("ascii")))
+wrapper = put(root / "wrapper.exe", b"fixture-socialclub-wrapper-v1")
+license_data = put(root / "license.txt", b"fixture license text\n")
+vendor1 = put(root / "vendor-v1.exe", b"fixture-socialclub-vendor-v1")
+vendor2 = put(root / "vendor-v2.exe", b"fixture-socialclub-vendor-v2")
+(root / "vendor1.sha").write_text(sha(vendor1), encoding="ascii")
+manifest = {
+    "schema": 1,
+    "appid": "1547000",
+    "engine": "winecx-11.17",
+    "gameBuild": "16391096",
+    "gameExecutable": "Gameface/Binaries/Win64/SanAndreas.exe",
+    "gameExecutableSHA256": sha(exe),
+    "gameExecutableSize": len(exe),
+    "dxmtDirectory": "lib/notproton-backends/dxmt/x86_64-windows",
+    "dxmtFiles": [{"name": name, "sha256": sha(data)} for name, data in dlls.items()],
+    "helperDirectory": "drive_c/Program Files/Rockstar Games/Social Club",
+    "helperName": "SocialClubHelper.exe",
+    "realHelperName": "SocialClubHelper_real.exe",
+    "helperChecksumName": "SocialClubHelper_real.exe.sha256",
+    "helperLicenseName": "SocialClubHelper.bridgeplay.LICENSE",
+    "helperWrapperSHA256": sha(wrapper),
+    "helperLicenseSHA256": sha(license_data),
+    "supportedVendorHelpers": [
+        {"version": "fixture-v1", "sha256": sha(vendor1)},
+        {"version": "fixture-v2", "sha256": sha(vendor2)},
+    ],
+}
+(root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+PY
+python3 "$gta_fixture/make_fixture.py" "$gta_fixture"
+python3 "$repo_root/scripts/embed-gta-sa-assets.py" \
+	--manifest "$gta_fixture/manifest.json" --wrapper "$gta_fixture/wrapper.exe" \
+	--license "$gta_fixture/license.txt" --output "$gta_fixture/GTAFixPrepAssets.swift"
+swiftc -O -o "$gta_fixture/support/gamefix-prep" \
+	"$repo_root/helpers/gamefix-prep.swift" "$gta_fixture/GTAFixPrepAssets.swift"
+
+eval "$gta_functions"
+backend_available() { [ "$1" = dxvk ] && [ -f "$gta_fixture/runner/dxvk.available" ]; }
+show_alert() { echo "alert: $1" >> "$log"; }
+touch "$gta_fixture/runner/dxvk.available"
+mkdir -p "$gta_fixture/runner/lib/notproton-backends/dxvk/x86_64-windows"
+printf 'fixture dxvk d3d11' > "$gta_fixture/runner/lib/notproton-backends/dxvk/x86_64-windows/d3d11.dll"
+printf 'fixture dxvk d3d10core' > "$gta_fixture/runner/lib/notproton-backends/dxvk/x86_64-windows/d3d10core.dll"
+gta_game="$gta_fixture/game"
+gta_runner="$gta_fixture/runner"
+gta_helper="$gta_fixture/support/gamefix-prep"
+gta_helper_dir='drive_c/Program Files/Rockstar Games/Social Club'
+gta_helper_call() {
+	env GTA_SA_APP_ID=1547000 GTA_SA_DATA_PATH="$1" GTA_SA_PREFIX="$1/pfx" \
+		GTA_SA_GAME="$2" GTA_SA_RUNNER="$gta_runner" GTA_SA_ENGINE_ID=winecx-11.17 \
+		"$gta_helper" "$3"
+}
+gta_seed_vendor() {
+	seed_helper="$1/pfx/$gta_helper_dir"
+	mkdir -p "$seed_helper"
+	cp "$gta_fixture/vendor-v1.exe" "$seed_helper/SocialClubHelper.exe"
+}
+gta_seed_case() {
+	seed_game="$1"
+	seed_data="$2"
+	mkdir -p "$seed_game/Gameface/Binaries/Win64" "$seed_data/pfx"
+	cp "$gta_game/Gameface/Binaries/Win64/SanAndreas.exe" "$seed_game/Gameface/Binaries/Win64/SanAndreas.exe"
+	gta_seed_vendor "$seed_data"
+}
+gta_paths() {
+	STEAM_COMPAT_DATA_PATH=$1
+	WINEPREFIX="$1/pfx"
+	STEAM_COMPAT_INSTALL_PATH=$2
+	CX_ROOT=$gta_runner
+	np_build=${6:-winecx-11.17}
+	np_support="$gta_fixture/support"
+	app_id=${3:-1547000}
+	verb=${4:-waitforexitandrun}
+	NOTPROTON_GTA_SA_DE_FIX=${5:-1}
+	NOTPROTON_BACKEND=""
+	CX_GRAPHICS_BACKEND=""
+	WINEDLLOVERRIDES=""
+	gamefix_backend=""
+	gamefix_from_BACKEND=""
+	gamefix_dlloverrides=""
+	gamefix_from_DLLOVERRIDES=""
+}
+
+echo "== hook routes only the main GTA launch"
+gta_route_data="$gta_fixture/route-data"
+mkdir -p "$gta_route_data/pfx"
+gta_paths "$gta_route_data" "$gta_game" 1547000 run 1
+gta_sa_de_run
+is "Steam prerequisite verb is left untouched" 0 "$(find "$gta_route_data" -type f | wc -l | tr -d ' ')"
+gta_paths "$gta_route_data" "$gta_game" 4242 waitforexitandrun 1
+gta_sa_de_run
+is "other AppIDs are left untouched" 0 "$(find "$gta_route_data" -type f | wc -l | tr -d ' ')"
+gta_paths "$gta_route_data" "$gta_game" 1547000 waitforexitandrun 1 winehq-11.15
+gta_sa_de_run
+has "unsupported engine is skipped clearly" "supports WineCX 11.17" "$log"
+is "unsupported engine does not mutate files" 0 "$(find "$gta_route_data" -type f | wc -l | tr -d ' ')"
+
+echo "== DXVK availability is checked before preparation"
+gta_no_dxvk_game="$gta_fixture/no-dxvk-game"
+gta_no_dxvk_data="$gta_fixture/no-dxvk-data"
+gta_seed_case "$gta_no_dxvk_game" "$gta_no_dxvk_data"
+rm "$gta_fixture/runner/lib/notproton-backends/dxvk/x86_64-windows/d3d10core.dll"
+: > "$log"
+gta_paths "$gta_no_dxvk_data" "$gta_no_dxvk_game"
+gta_launch_rc=0
+(gta_sa_de_run) || gta_launch_rc=$?
+is "missing DXVK component stops preparation" nonzero "$([ "$gta_launch_rc" -ne 0 ] && echo nonzero || echo 0)"
+has "missing DXVK component is logged" "WineCX DXVK runtime is unavailable" "$log"
+is "missing DXVK component leaves helper untouched" 1 "$(find "$gta_no_dxvk_data" -type f | wc -l | tr -d ' ')"
+is "missing DXVK component installs no game DLLs" 0 "$(find "$gta_no_dxvk_game/Gameface/Binaries/Win64" -name '*.dll' | wc -l | tr -d ' ')"
+printf 'fixture dxvk d3d10core' > "$gta_fixture/runner/lib/notproton-backends/dxvk/x86_64-windows/d3d10core.dll"
+
+echo "== explicit graphics conflicts do not touch files"
+gta_conflict_data="$gta_fixture/conflict-data"
+mkdir -p "$gta_conflict_data/pfx"
+gta_paths "$gta_conflict_data" "$gta_game"
+gamefix_backend=dxmt gamefix_from_BACKEND=user
+gta_sa_de_run
+has "conflicting per-game backend is logged" "BACKEND=dxmt from the user config" "$log"
+is "per-game backend conflict causes no writes" 0 "$(find "$gta_conflict_data" -type f | wc -l | tr -d ' ')"
+gta_paths "$gta_conflict_data" "$gta_game"
+NOTPROTON_BACKEND=dxmt
+gta_sa_de_run
+has "launch backend conflict is logged" "BRIDGEPLAY_BACKEND=dxmt in launch options" "$log"
+gta_paths "$gta_conflict_data" "$gta_game"
+CX_GRAPHICS_BACKEND=d3dmetal
+gta_sa_de_run
+has "Steam graphics choice conflict is logged" "CX_GRAPHICS_BACKEND=d3dmetal in launch options" "$log"
+gta_paths "$gta_conflict_data" "$gta_game"
+gamefix_dlloverrides='dinput8=n,b;dxgi=b'
+gamefix_from_DLLOVERRIDES=user
+gta_sa_de_run
+has "user DXGI override conflict is logged" "DLLOVERRIDES from the user config" "$log"
+gta_paths "$gta_conflict_data" "$gta_game"
+WINEDLLOVERRIDES='dxgi=b;d3d9=n,b'
+gta_sa_de_run
+has "launch DXGI override conflict is logged" "WINEDLLOVERRIDES in launch options" "$log"
+is "all explicit graphics conflicts cause no writes" 0 "$(find "$gta_conflict_data" -type f | wc -l | tr -d ' ')"
+gta_sa_de_dxgi_conflict 'dxgi=b;d3d9=n,b' && dxgi_conflict_after_unrelated=yes || dxgi_conflict_after_unrelated=no
+is "unrelated trailing override does not hide DXGI conflict" yes "$dxgi_conflict_after_unrelated"
+gta_sa_de_dxgi_conflict 'dxgi=n,b;d3d9=b' && dxgi_conflict_before_unrelated=yes || dxgi_conflict_before_unrelated=no
+is "unrelated trailing override does not create DXGI conflict" no "$dxgi_conflict_before_unrelated"
+gta_sa_de_dxgi_match 'd3d11,DXGI=N,B' && grouped_match=yes || grouped_match=no
+is "grouped module names match case-insensitively" yes "$grouped_match"
+
+echo "== unknown build status is read-only"
+gta_unknown_game="$gta_fixture/unknown-game"
+mkdir -p "$gta_unknown_game/Gameface/Binaries/Win64"
+cp "$gta_game/Gameface/Binaries/Win64/SanAndreas.exe" "$gta_unknown_game/Gameface/Binaries/Win64/SanAndreas.exe"
+printf 'unknown build' >> "$gta_unknown_game/Gameface/Binaries/Win64/SanAndreas.exe"
+gta_unknown_data="$gta_fixture/unknown-data"
+mkdir -p "$gta_unknown_data/pfx"
+gta_unknown_rc=0
+gta_unknown_result=$(gta_helper_call "$gta_unknown_data" "$gta_unknown_game" status 2>&1) || gta_unknown_rc=$?
+is "unknown build status fails" nonzero "$([ "$gta_unknown_rc" -ne 0 ] && echo nonzero || echo 0)"
+printf '%s\n' "$gta_unknown_result" > "$gta_fixture/unknown.log"
+has "unknown build has a diagnostic" "unsupported-game-build" "$gta_fixture/unknown.log"
+is "unknown build status writes no state" 0 "$(find "$gta_unknown_data" -type f | wc -l | tr -d ' ')"
+gta_paths "$gta_unknown_data" "$gta_unknown_game"
+gta_launch_rc=0
+(gta_sa_de_run) || gta_launch_rc=$?
+is "unsupported game build fails the main launch" nonzero "$([ "$gta_launch_rc" -ne 0 ] && echo nonzero || echo 0)"
+has "unsupported game build is logged by the run hook" "status check failed: gta-sa-de: unsupported-game-build" "$log"
+is "failed main launch still writes no game state" 0 "$(find "$gta_unknown_data" -type f | wc -l | tr -d ' ')"
+
+echo "== unsupported vendor, conflicting DLL and symlink stop before writes"
+gta_unknown_vendor_game="$gta_fixture/unknown-vendor-game"
+gta_unknown_vendor_data="$gta_fixture/unknown-vendor-data"
+gta_seed_case "$gta_unknown_vendor_game" "$gta_unknown_vendor_data"
+printf 'unknown vendor helper' > "$gta_unknown_vendor_data/pfx/$gta_helper_dir/SocialClubHelper.exe"
+gta_before=$(find "$gta_unknown_vendor_data" -type f | wc -l | tr -d ' ')
+gta_case_rc=0
+gta_case_result=$(gta_helper_call "$gta_unknown_vendor_data" "$gta_unknown_vendor_game" prepare 2>&1) || gta_case_rc=$?
+printf '%s\n' "$gta_case_result" > "$gta_fixture/unknown-vendor.log"
+is "unsupported vendor helper fails preparation" nonzero "$([ "$gta_case_rc" -ne 0 ] && echo nonzero || echo 0)"
+has "unsupported vendor helper has a diagnostic" "unsupported-vendor-helper" "$gta_fixture/unknown-vendor.log"
+is "unsupported vendor helper causes no writes" "$gta_before" "$(find "$gta_unknown_vendor_data" -type f | wc -l | tr -d ' ')"
+
+gta_conflict_game="$gta_fixture/conflicting-dll-game"
+gta_conflict_prefix_data="$gta_fixture/conflicting-dll-data"
+gta_seed_case "$gta_conflict_game" "$gta_conflict_prefix_data"
+printf 'unknown game DLL' > "$gta_conflict_game/Gameface/Binaries/Win64/d3d11.dll"
+gta_before=$(find "$gta_conflict_prefix_data" -type f | wc -l | tr -d ' ')
+gta_case_rc=0
+gta_case_result=$(gta_helper_call "$gta_conflict_prefix_data" "$gta_conflict_game" prepare 2>&1) || gta_case_rc=$?
+printf '%s\n' "$gta_case_result" > "$gta_fixture/conflicting-dll.log"
+is "unknown game DLL fails preparation" nonzero "$([ "$gta_case_rc" -ne 0 ] && echo nonzero || echo 0)"
+has "unknown game DLL has a diagnostic" "game-dll-conflict" "$gta_fixture/conflicting-dll.log"
+is "unknown game DLL is preserved" "unknown game DLL" "$(cat "$gta_conflict_game/Gameface/Binaries/Win64/d3d11.dll")"
+is "unknown game DLL causes no writes" "$gta_before" "$(find "$gta_conflict_prefix_data" -type f | wc -l | tr -d ' ')"
+
+gta_symlink_game="$gta_fixture/symlink-game"
+gta_symlink_data="$gta_fixture/symlink-data"
+gta_seed_case "$gta_symlink_game" "$gta_symlink_data"
+printf 'symlink target' > "$gta_fixture/dll-link-target"
+ln -s "$gta_fixture/dll-link-target" "$gta_symlink_game/Gameface/Binaries/Win64/dxgi.dll"
+gta_before=$(find "$gta_symlink_data" \( -type f -o -type l \) | wc -l | tr -d ' ')
+gta_case_rc=0
+gta_case_result=$(gta_helper_call "$gta_symlink_data" "$gta_symlink_game" prepare 2>&1) || gta_case_rc=$?
+printf '%s\n' "$gta_case_result" > "$gta_fixture/symlink.log"
+is "symlink target fails preparation" nonzero "$([ "$gta_case_rc" -ne 0 ] && echo nonzero || echo 0)"
+has "symlink target has a diagnostic" "game-dll-symlink-or-nonfile" "$gta_fixture/symlink.log"
+is "game-local symlink is preserved" yes "$(test -L "$gta_symlink_game/Gameface/Binaries/Win64/dxgi.dll" && echo yes || echo no)"
+is "symlink target causes no writes" "$gta_before" "$(find "$gta_symlink_data" \( -type f -o -type l \) | wc -l | tr -d ' ')"
+
+gta_partial_game="$gta_fixture/partial-dll-game"
+gta_partial_data="$gta_fixture/partial-dll-data"
+gta_seed_case "$gta_partial_game" "$gta_partial_data"
+cp "$gta_runner/lib/notproton-backends/dxmt/x86_64-windows/dxgi.dll" "$gta_partial_game/Gameface/Binaries/Win64/dxgi.dll"
+gta_partial_before=$(find "$gta_partial_data" -type f | wc -l | tr -d ' ')
+gta_partial_rc=0
+gta_partial_result=$(gta_helper_call "$gta_partial_data" "$gta_partial_game" prepare 2>&1) || gta_partial_rc=$?
+printf '%s\n' "$gta_partial_result" > "$gta_fixture/partial-dll.log"
+is "one preexisting matching DLL refuses partial preparation" 4 "$gta_partial_rc"
+has "partial DLL set is diagnosed" "partial-game-dll-set" "$gta_fixture/partial-dll.log"
+is "the matching DLL is preserved" yes "$(cmp -s "$gta_partial_game/Gameface/Binaries/Win64/dxgi.dll" "$gta_runner/lib/notproton-backends/dxmt/x86_64-windows/dxgi.dll" && echo yes || echo no)"
+is "partial DLL set installs no other game DLLs" 1 "$(find "$gta_partial_game/Gameface/Binaries/Win64" -name '*.dll' | wc -l | tr -d ' ')"
+is "partial DLL set writes no prefix state" "$gta_partial_before" "$(find "$gta_partial_data" -type f | wc -l | tr -d ' ')"
+
+gta_ancestor_game="$gta_fixture/ancestor-game"
+gta_ancestor_target="$gta_fixture/ancestor-target/Binaries/Win64"
+gta_ancestor_data="$gta_fixture/ancestor-data"
+mkdir -p "$gta_ancestor_game/Gameface" "$gta_ancestor_target" "$gta_ancestor_data/pfx"
+cp "$gta_game/Gameface/Binaries/Win64/SanAndreas.exe" "$gta_ancestor_target/SanAndreas.exe"
+ln -s "$gta_fixture/ancestor-target/Binaries" "$gta_ancestor_game/Gameface/Binaries"
+gta_seed_vendor "$gta_ancestor_data"
+gta_ancestor_rc=0
+gta_ancestor_result=$(gta_helper_call "$gta_ancestor_data" "$gta_ancestor_game" prepare 2>&1) || gta_ancestor_rc=$?
+printf '%s\n' "$gta_ancestor_result" > "$gta_fixture/ancestor.log"
+is "symlinked game directory ancestor returns the expected error" 4 "$gta_ancestor_rc"
+has "symlinked game directory ancestor is identified" "unsafe-directory-chain" "$gta_fixture/ancestor.log"
+is "symlinked game directory ancestor installs no DLLs" 0 "$(find "$gta_ancestor_target" -name '*.dll' | wc -l | tr -d ' ')"
+is "symlinked game directory ancestor writes no state" 1 "$(find "$gta_ancestor_data" -type f | wc -l | tr -d ' ')"
+
+echo "== staging failure cleans preflighted DLL copies"
+gta_stage_game="$gta_fixture/staging-failure-game"
+gta_stage_data="$gta_fixture/staging-failure-data"
+gta_seed_case "$gta_stage_game" "$gta_stage_data"
+gta_stage_helper="$gta_stage_data/pfx/$gta_helper_dir"
+chmod 555 "$gta_stage_helper"
+gta_stage_rc=0
+gta_stage_result=$(gta_helper_call "$gta_stage_data" "$gta_stage_game" prepare 2>&1) || gta_stage_rc=$?
+chmod 755 "$gta_stage_helper"
+printf '%s\n' "$gta_stage_result" > "$gta_fixture/staging-failure.log"
+is "unwritable helper directory fails preparation" nonzero "$([ "$gta_stage_rc" -ne 0 ] && echo nonzero || echo 0)"
+is "staging failure leaves no game DLLs" 0 "$(find "$gta_stage_game/Gameface/Binaries/Win64" -name '*.dll' | wc -l | tr -d ' ')"
+is "staging failure keeps the vendor helper" yes "$(cmp -s "$gta_stage_helper/SocialClubHelper.exe" "$gta_fixture/vendor-v1.exe" && echo yes || echo no)"
+is "staging failure creates no real-helper backup" no "$(test -e "$gta_stage_helper/SocialClubHelper_real.exe" && echo yes || echo no)"
+is "staging failure writes no private state" 0 "$(find "$gta_stage_data" -name state.json | wc -l | tr -d ' ')"
+is "staging failure leaves no transaction temps" 0 "$(find "$gta_stage_game" "$gta_stage_data" -name '.bridgeplay-gta-sa-de-*.tmp' | wc -l | tr -d ' ')"
+
+echo "== fresh and idempotent preparation"
+gta_data_a="$gta_fixture/data-a"
+mkdir -p "$gta_data_a/pfx"
+gta_seed_vendor "$gta_data_a"
+: > "$log"
+gta_paths "$gta_data_a" "$gta_game"
+gta_status_files=$(find "$gta_data_a" -type f | wc -l | tr -d ' ')
+gta_initial=$(gta_helper_call "$gta_data_a" "$gta_game" status)
+is "fresh status is read-only and ready" ready "$gta_initial"
+is "fresh status creates no state" "$gta_status_files" "$(find "$gta_data_a" -type f | wc -l | tr -d ' ')"
+gamefix_backend=wined3d gamefix_from_BACKEND=global
+gta_sa_de_run
+is "automatic per-game backend overrides a global default" dxvk "$gamefix_backend"
+is "successful preparation adds native-first DXGI" dxgi=n,b "$gamefix_dlloverrides"
+has "automatic preparation is logged" "ready: prepared" "$log"
+gta_helper_a="$WINEPREFIX/$gta_helper_dir"
+is "original Social Club helper is preserved" yes "$(cmp -s "$gta_helper_a/SocialClubHelper_real.exe" "$gta_fixture/vendor-v1.exe" && echo yes || echo no)"
+is "Social Club wrapper is installed" yes "$(cmp -s "$gta_helper_a/SocialClubHelper.exe" "$gta_fixture/wrapper.exe" && echo yes || echo no)"
+is "game-local DXMT DLL is installed" yes "$(cmp -s "$gta_game/Gameface/Binaries/Win64/dxgi.dll" "$gta_runner/lib/notproton-backends/dxmt/x86_64-windows/dxgi.dll" && echo yes || echo no)"
+gta_wrapper_inode=$(stat -f %i "$gta_helper_a/SocialClubHelper.exe")
+gta_dxgi_inode=$(stat -f %i "$gta_game/Gameface/Binaries/Win64/dxgi.dll")
+: > "$log"
+gta_paths "$gta_data_a" "$gta_game"
+gta_sa_de_run
+is "repeat launch keeps the wrapper inode" "$gta_wrapper_inode" "$(stat -f %i "$WINEPREFIX/$gta_helper_dir/SocialClubHelper.exe")"
+is "repeat launch keeps the DXMT inode" "$gta_dxgi_inode" "$(stat -f %i "$gta_game/Gameface/Binaries/Win64/dxgi.dll")"
+has "repeat launch reports prepared" "ready: prepared" "$log"
+
+echo "== restore preserves a modified game DLL"
+gta_modified_game="$gta_fixture/modified-game"
+gta_modified_data="$gta_fixture/modified-data"
+gta_seed_case "$gta_modified_game" "$gta_modified_data"
+gta_modified_prepare=$(gta_helper_call "$gta_modified_data" "$gta_modified_game" prepare)
+is "modified-file fixture starts prepared" prepared "$gta_modified_prepare"
+printf 'user modification' > "$gta_modified_game/Gameface/Binaries/Win64/dxgi.dll"
+gta_modified_restore=$(gta_helper_call "$gta_modified_data" "$gta_modified_game" restore)
+is "modified-file rollback succeeds" restored "$gta_modified_restore"
+is "modified game DLL is left intact" "user modification" "$(cat "$gta_modified_game/Gameface/Binaries/Win64/dxgi.dll")"
+
+echo "== manual adoption and opt-out preserve manual files"
+gta_manual_game="$gta_fixture/manual-game"
+mkdir -p "$gta_manual_game/Gameface/Binaries/Win64"
+cp "$gta_game/Gameface/Binaries/Win64/SanAndreas.exe" "$gta_manual_game/Gameface/Binaries/Win64/SanAndreas.exe"
+gta_manual_data="$gta_fixture/manual-data"
+gta_manual_prefix="$gta_manual_data/pfx"
+gta_manual_helper="$gta_manual_prefix/$gta_helper_dir"
+mkdir -p "$gta_manual_helper"
+for name in d3d11.dll dxgi.dll d3d10core.dll; do
+	cp "$gta_runner/lib/notproton-backends/dxmt/x86_64-windows/$name" "$gta_manual_game/Gameface/Binaries/Win64/$name"
+done
+cp "$gta_fixture/wrapper.exe" "$gta_manual_helper/SocialClubHelper.exe"
+cp "$gta_fixture/vendor-v1.exe" "$gta_manual_helper/SocialClubHelper_real.exe"
+printf '%s  SocialClubHelper_real.exe\n' "$(cat "$gta_fixture/vendor1.sha")" > "$gta_manual_helper/SocialClubHelper_real.exe.sha256"
+cp "$gta_fixture/license.txt" "$gta_manual_helper/SocialClubHelper.bridgeplay.LICENSE"
+: > "$log"
+gta_paths "$gta_manual_data" "$gta_manual_game"
+gta_sa_de_run
+has "matching manual files are adopted" "ready: manual" "$log"
+is "manual adoption writes no ownership state" 0 "$(find "$gta_manual_data" -name state.json | wc -l | tr -d ' ')"
+gta_paths "$gta_manual_data" "$gta_manual_game" 1547000 waitforexitandrun 0
+gta_sa_de_run
+is "opt-out keeps manually adopted wrapper" yes "$(cmp -s "$gta_manual_helper/SocialClubHelper.exe" "$gta_fixture/wrapper.exe" && echo yes || echo no)"
+is "opt-out keeps manually adopted DXMT" yes "$(cmp -s "$gta_manual_game/Gameface/Binaries/Win64/dxgi.dll" "$gta_runner/lib/notproton-backends/dxmt/x86_64-windows/dxgi.dll" && echo yes || echo no)"
+
+echo "== two prefixes, manual shared reference, supported update and rollback"
+gta_data_b="$gta_fixture/data-b"
+gta_prefix_b="$gta_data_b/pfx"
+gta_helper_b="$gta_prefix_b/$gta_helper_dir"
+mkdir -p "$gta_helper_b"
+cp "$gta_fixture/wrapper.exe" "$gta_helper_b/SocialClubHelper.exe"
+cp "$gta_fixture/vendor-v1.exe" "$gta_helper_b/SocialClubHelper_real.exe"
+printf '%s  SocialClubHelper_real.exe\n' "$(cat "$gta_fixture/vendor1.sha")" > "$gta_helper_b/SocialClubHelper_real.exe.sha256"
+cp "$gta_fixture/license.txt" "$gta_helper_b/SocialClubHelper.bridgeplay.LICENSE"
+gta_paths "$gta_data_b" "$gta_game"
+gta_sa_de_run
+has "second prefix adopts its manual Social Club helper" "ready: adopted-manual" "$log"
+is "manual second-prefix helper stays unchanged" yes "$(cmp -s "$gta_helper_b/SocialClubHelper.exe" "$gta_fixture/wrapper.exe" && echo yes || echo no)"
+gta_paths "$gta_data_a" "$gta_game" 1547000 waitforexitandrun 0
+gta_sa_de_run
+is "restoring first prefix preserves the second reference's DLLs" yes "$(test -f "$gta_game/Gameface/Binaries/Win64/dxgi.dll" && echo yes || echo no)"
+is "first prefix returns to vendor helper" yes "$(cmp -s "$WINEPREFIX/$gta_helper_dir/SocialClubHelper.exe" "$gta_fixture/vendor-v1.exe" && echo yes || echo no)"
+gta_paths "$gta_data_b" "$gta_game" 1547000 waitforexitandrun 0
+gta_sa_de_run
+is "last rollback leaves the manual helper in place" yes "$(cmp -s "$gta_helper_b/SocialClubHelper.exe" "$gta_fixture/wrapper.exe" && echo yes || echo no)"
+is "last rollback removes owned shared game DLLs" 0 "$(find "$gta_game/Gameface/Binaries/Win64" \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
+
+echo "== supported launcher update and rollback"
+gta_data_c="$gta_fixture/data-c"
+mkdir -p "$gta_data_c/pfx"
+gta_seed_vendor "$gta_data_c"
+gta_paths "$gta_data_c" "$gta_game"
+gta_sa_de_run
+is "fresh prefix after shared restore prepares" prepared "$gta_sa_de_result"
+gta_prefix_c="$gta_data_c/pfx"
+gta_helper_c="$gta_prefix_c/$gta_helper_dir"
+cp "$gta_fixture/vendor-v2.exe" "$gta_helper_c/SocialClubHelper.exe"
+gta_paths "$gta_data_c" "$gta_game"
+gta_sa_de_run
+is "supported helper update is wrapped" yes "$(cmp -s "$gta_helper_c/SocialClubHelper.exe" "$gta_fixture/wrapper.exe" && echo yes || echo no)"
+is "supported helper update preserves the new vendor binary" yes "$(cmp -s "$gta_helper_c/SocialClubHelper_real.exe" "$gta_fixture/vendor-v2.exe" && echo yes || echo no)"
+gta_paths "$gta_data_c" "$gta_game" 1547000 waitforexitandrun 0
+gta_sa_de_run
+is "rollback restores the updated vendor helper" yes "$(cmp -s "$gta_helper_c/SocialClubHelper.exe" "$gta_fixture/vendor-v2.exe" && echo yes || echo no)"
+is "last rollback removes owned game DLLs" 0 "$(find "$gta_game/Gameface/Binaries/Win64" \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
 
 [ "$fails" -eq 0 ] || { echo "launchercheck: $fails failed"; exit 1; }
 echo "launchercheck: all passed"

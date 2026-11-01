@@ -84,7 +84,7 @@ DEPS := $(OBJS:.o=.d)
         anchorcheck callscheck sigdb-fixtures webpatch-fixtures peicon-fixtures panel-behavior app-tests \
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
-        appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
+        appinfo gamefix-prep helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
         compatsvc-check prefixstate-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck \
         gamefixescheck launchercheck padcheck launch-shell activatecheck stamp-check versioncheck cicheck compat-reported-check FORCE
 
@@ -608,6 +608,24 @@ $(ICONMAKER): helpers/iconmaker.swift helpers/iconmaker.h dylib/util/peicon.c dy
 
 APPINFO := $(OUT_DIR)/appinfo
 
+GAMEFIX_PREP := $(OUT_DIR)/gamefix-prep
+GAMEFIX_PREP_ASSETS := $(OUT_DIR)/GamefixPrepAssets.swift
+GAMEFIX_PREP_MANIFEST := gamefix-assets/1547000.json
+GAMEFIX_PREP_WRAPPER := workarounds/1547000/SocialClubHelper.exe
+GAMEFIX_PREP_LICENSE := workarounds/1547000/LICENSE
+
+gamefix-prep: $(GAMEFIX_PREP)
+
+$(GAMEFIX_PREP_ASSETS): scripts/embed-gta-sa-assets.py $(GAMEFIX_PREP_MANIFEST) $(GAMEFIX_PREP_WRAPPER) $(GAMEFIX_PREP_LICENSE)
+	@mkdir -p $(OUT_DIR)
+	python3 scripts/embed-gta-sa-assets.py --manifest $(GAMEFIX_PREP_MANIFEST) \
+		--wrapper $(GAMEFIX_PREP_WRAPPER) --license $(GAMEFIX_PREP_LICENSE) --output $@
+
+$(GAMEFIX_PREP): helpers/gamefix-prep.swift $(GAMEFIX_PREP_ASSETS)
+	@mkdir -p $(OUT_DIR)
+	swiftc -O -target arm64-apple-macos15.0 -o $@ $^
+	@echo "==> Built $@"
+
 appinfo: $(APPINFO)
 
 $(APPINFO): helpers/appinfo.swift
@@ -615,10 +633,11 @@ $(APPINFO): helpers/appinfo.swift
 	swiftc -O -target $(ARCH)-apple-macos$(MIN_VER) -o $@ $<
 	@echo "==> Built $@"
 
-helpers-install: $(ICONMAKER) $(APPINFO)
+helpers-install: $(ICONMAKER) $(APPINFO) $(GAMEFIX_PREP)
 	$(call install_atomically,$(ICONMAKER),$(SUPPORT_DIR)/iconmaker)
 	$(call install_atomically,$(APPINFO),$(SUPPORT_DIR)/appinfo)
-	@echo "==> Installed: $(SUPPORT_DIR)/{iconmaker,appinfo}"
+	$(call install_atomically,$(GAMEFIX_PREP),$(SUPPORT_DIR)/gamefix-prep)
+	@echo "==> Installed: $(SUPPORT_DIR)/{iconmaker,appinfo,gamefix-prep}"
 
 dobby:
 	@mkdir -p $(DOBBY_DIR)
@@ -696,7 +715,7 @@ bridge:
 fonts:
 	fonts/build.sh
 
-app-payload: $(TARGET) $(OVERLAY_SHIM) $(ICONMAKER) $(APPINFO)
+app-payload: $(TARGET) $(OVERLAY_SHIM) $(ICONMAKER) $(APPINFO) $(GAMEFIX_PREP)
 	@# A signature file deleted from the repo must not ship from the last payload.
 	@test -n "$(APP_PAYLOAD)" && rm -rf "$(APP_PAYLOAD)/signatures"
 	@mkdir -p "$(APP_PAYLOAD)/signatures/macos.arm64"
@@ -707,6 +726,7 @@ app-payload: $(TARGET) $(OVERLAY_SHIM) $(ICONMAKER) $(APPINFO)
 	cp -f $(OVERLAY_SHIM) "$(APP_PAYLOAD)/overlay-shim.dylib"
 	cp -f $(ICONMAKER) "$(APP_PAYLOAD)/iconmaker"
 	cp -f $(APPINFO) "$(APP_PAYLOAD)/appinfo"
+	cp -f $(GAMEFIX_PREP) "$(APP_PAYLOAD)/gamefix-prep"
 	cp -f dylib/feats/compat_run.sh "$(APP_PAYLOAD)/run"
 	cp -f signatures/macos.arm64/*.json "$(APP_PAYLOAD)/signatures/macos.arm64/"
 	@rm -rf "$(APP_PAYLOAD)/gamefixes" && mkdir -p "$(APP_PAYLOAD)/gamefixes"
@@ -753,6 +773,7 @@ PAYLOAD_SIGN_IDS := \
 	overlay-shim.dylib:com.bridgeplay.overlay-shim \
 	iconmaker:com.bridgeplay.iconmaker \
 	appinfo:com.bridgeplay.appinfo \
+	gamefix-prep:com.bridgeplay.gamefix-prep \
 	bridge/x86_64-unix-lsteamclient.so:com.bridgeplay.lsteamclient \
 	bridge/aarch64-unix-lsteamclient.so:com.bridgeplay.lsteamclient
 

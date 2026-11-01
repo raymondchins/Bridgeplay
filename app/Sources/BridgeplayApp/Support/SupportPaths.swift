@@ -73,6 +73,7 @@ enum SupportPaths {
     static var overlayShim: URL { support.appending(path: "overlay-shim.dylib") }
     static var iconmaker: URL { support.appending(path: "iconmaker") }
     static var appinfo: URL { support.appending(path: "appinfo") }
+    static var gamefixPrep: URL { support.appending(path: "gamefix-prep") }
 
     static var packageDownloads: URL { caches.appending(path: "valve-packages") }
 
