@@ -106,7 +106,7 @@ lib/libSDL2-2.0.0.dylib                           SDL 2.32.10, x86_64, for wineb
 ```
 
 DXMT comes from `dxmt-e94c312.tar.gz` (the WineHQ engine's pin, shared download cache).
-`winemetal.so` and both `winemetal.dll` are replaced together, since they share one unix-call
+`winemetal.so` and both `winemetal.dll` files are replaced together, since they share one unix-call
 table and never mix with 0.80. The D3D DLLs get the 16 bytes of the Wine builtin marker at
 0x40 overwritten with a DOS stub, the same bytes winecx-gptk writes, so they load as natives
 from a prefix: Wine swaps a marked DLL found in a prefix for the `lib/wine` builtin of the
