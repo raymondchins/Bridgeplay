@@ -34,6 +34,7 @@ enum InstallIntoSteamCommand {
             try SteamInstaller.finish(result)
             UserDefaults.standard.removeObject(forKey: SteamPatchKeeper.pausedKey)
             say("Bridgeplay \(ProductVersion.short) installed into Steam.")
+            if let warning = result.sealWarning { say(warning) }
             return 0
         } catch {
             AppLog.note("command line failed: \(RemoveEverythingCommand.failureMessage(error))")

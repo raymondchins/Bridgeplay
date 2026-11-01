@@ -214,7 +214,8 @@ enum Uninstall {
         )
     }
 
-    static func detach(from app: URL, innerPlist: URL, updateBlocks: [URL]) throws -> Bool {
+    static func detach(from app: URL, innerPlist: URL, updateBlocks: [URL],
+                       steamClosed: () -> Bool = SteamInstaller.steamStaysClosed) throws -> Bool {
         let files = FileManager.default
         let plist = app.appending(path: "Contents/Info.plist")
         let dylib = app.appending(path: "Contents/MacOS/\(SupportPaths.dylibName)")
@@ -233,12 +234,15 @@ enum Uninstall {
 
             guard cleared || droppedDylib else { return false }
 
-            try SteamInstaller.adHocSign(executable, step: step)
-            try SteamInstaller.adHocSign(app, step: step)
+            try SteamInstaller.adHocSign(executable, step: step, steamClosed: steamClosed)
+            try SteamInstaller.adHocSign(app, step: step, steamClosed: steamClosed)
         } catch {
+            // Signing a Steam that opened meanwhile can get it killed, so it is left alone;
+            // checked before each, since the first can pause for a retry.
             if cleared || droppedDylib {
-                try? SteamInstaller.adHocSign(executable, step: step)
-                try? SteamInstaller.adHocSign(app, step: step)
+                for target in [executable, app] where steamClosed() {
+                    try? SteamInstaller.adHocSign(target, step: step, steamClosed: steamClosed)
+                }
             }
             throw error
         }

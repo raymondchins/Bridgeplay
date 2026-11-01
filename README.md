@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://bridgeplay.dev"><img src="docs/readme/banner-v5.png" alt="Bridgeplay: Windows games, in your Mac's Steam" width="100%"></a>
+  <a href="https://bridgeplay.dev"><img src="docs/readme/banner-v6.png" alt="Bridgeplay: Windows games, in your Mac's Steam" width="100%"></a>
 </p>
 
 <p align="center">
@@ -36,14 +36,14 @@
 | **Guided install** | A Setup Assistant walks you through Rosetta, Steam and permissions. |
 
 <p align="center">
-  <img src="docs/readme/tour-v4.png" alt="Mac gaming, unleashed: a Windows game in the Mac Steam library, ready to Play" width="100%">
+  <img src="docs/readme/tour-v6.png" alt="Mac gaming, unleashed: 007 First Light running on Direct3D 12 through D3DMetal, with the Metal HUD at 90 fps" width="100%">
 </p>
 <p align="center"><sub>Illustrations of the real screens.</sub></p>
 
 ## Already playing
 
 <p align="center">
-  <img src="docs/readme/games-v5.png" alt="Games running with Bridgeplay: Resident Evil Requiem, Marvel's Spider-Man 2, 007 First Light and more" width="100%">
+  <img src="docs/readme/games-v6.png" alt="Games running with Bridgeplay: Resident Evil Requiem, Marvel's Spider-Man 2, 007 First Light and more" width="100%">
 </p>
 
 Developer's tests on an M5 Max MacBook Pro with Game Porting Toolkit 4.0 beta 3: 90+ fps, with MetalFX upscaling and frame generation where listed. Settings come from each game's launch log.
@@ -78,13 +78,13 @@ Updates install themselves: Bridgeplay, its patch in Steam and the engine. **Ref
 The Setup Assistant's graphics download carries Apple's Game Porting Toolkit redistributables, unmodified, under Apple's own license; [docs/GPTK-LICENSE.md](docs/GPTK-LICENSE.md) records how Bridgeplay handles it. You can use your own copy from Apple instead. Bridgeplay is free and non-commercial.
 
 <p align="center">
-  <img src="docs/readme/install-v5.png" alt="The Setup Assistant working through Your Mac, Rosetta, Graphics, Steam and Set Up" width="100%">
+  <img src="docs/readme/install-v6.png" alt="The Setup Assistant working through Your Mac, Rosetta, Graphics, Steam and Set Up" width="100%">
 </p>
 
 ## Requirements
 
 <p align="center">
-  <a href="https://bridgeplay.dev/#specs"><img src="docs/readme/specs-v5.png" alt="Check your Mac in one click on bridgeplay.dev, next to the minimum requirements" width="100%"></a>
+  <a href="https://bridgeplay.dev/#specs"><img src="docs/readme/specs-v6.png" alt="Check your Mac in one click on bridgeplay.dev, next to the minimum requirements" width="100%"></a>
 </p>
 
 | | |

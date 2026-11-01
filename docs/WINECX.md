@@ -106,7 +106,7 @@ lib/libSDL2-2.0.0.dylib                           SDL 2.32.10, x86_64, for wineb
 ```
 
 DXMT comes from `dxmt-e94c312.tar.gz` (the WineHQ engine's pin, shared download cache).
-`winemetal.so` and both `winemetal.dll` are replaced together, since they share one unix-call
+`winemetal.so` and both `winemetal.dll` files are replaced together, since they share one unix-call
 table and never mix with 0.80. The D3D DLLs get the 16 bytes of the Wine builtin marker at
 0x40 overwritten with a DOS stub, the same bytes winecx-gptk writes, so they load as natives
 from a prefix: Wine swaps a marked DLL found in a prefix for the `lib/wine` builtin of the
@@ -411,6 +411,16 @@ every other shipped file are in [Shipped binaries](#shipped-binaries).
 The unpack test (`FreeEngineWinecxTests.unpacksRealArchive`, once per release) checks all of
 this against the real archive when `NOTPROTON_WINECX_ARCHIVE` points at it, or when it sits in
 Bridgeplay's download cache.
+
+## Corresponding Source
+
+Every patched binary below (LGPL-2.1-or-later) is built from winecx (`dappermint/winecx`) at
+the commit pinned at the top of this page plus one of the patches above. The license asks
+whoever distributes these binaries to also provide that source, so
+`scripts/package-wine-patch-sources.sh` publishes winecx's source at those commits with the
+patches and recipes onto a `wine-patch-sources-<id>` release of this project, pinned in
+NOTICE. See [RELEASING.md](RELEASING.md), WineCX patch source, for when to rebuild and
+republish it.
 
 ## Shipped binaries
 

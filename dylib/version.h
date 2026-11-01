@@ -14,7 +14,7 @@
 // build stamps its X.Y.Z-beta.N label, build number and channel in at build time
 // (scripts/stamp-beta.sh); those are never committed.
 // Change both with scripts/bump-version.sh, see docs/RELEASING.md.
-#define BRIDGEPLAY_VERSION "0.7.60"
-#define BRIDGEPLAY_BUILD 77
+#define BRIDGEPLAY_VERSION "0.7.61"
+#define BRIDGEPLAY_BUILD 78
 
 #endif // NOTPROTON_VERSION_H
