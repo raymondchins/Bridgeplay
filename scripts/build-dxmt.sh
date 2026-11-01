@@ -355,9 +355,17 @@ if [ "$PUBLISH" -eq 1 ]; then
         # Never replace an asset: the app pins the published binary tarball by sha256.
         assets="$(gh release view "$tag" -R "$slug" --json assets -q '.assets[].name')"
         missing=()
-        for f in "$TARBALL" "$SOURCE_TARBALL" "$MANIFEST"; do
+        for f in "$TARBALL" "$SOURCE_TARBALL"; do
             grep -qxF "$(basename "$f")" <<<"$assets" || missing+=("$f")
         done
+        # The manifest lists this build's tarball, so it only fits a release holding that one.
+        if ! grep -qxF "$(basename "$MANIFEST")" <<<"$assets"; then
+            published="$(gh release view "$tag" -R "$slug" --json assets \
+                -q ".assets[] | select(.name == \"$(basename "$TARBALL")\") | .digest")"
+            if [ -z "$published" ] || [ "$published" = "sha256:$(sha "$TARBALL")" ]; then
+                missing+=("$MANIFEST")
+            fi
+        fi
         if [ "${#missing[@]}" -gt 0 ]; then
             gh release upload "$tag" "${missing[@]}" -R "$slug"
             log "added ${#missing[@]} asset(s) to https://github.com/$slug/releases/tag/$tag"
