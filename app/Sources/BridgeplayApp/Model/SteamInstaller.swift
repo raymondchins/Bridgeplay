@@ -487,7 +487,9 @@ enum SteamInstaller {
         guard steamClosed() else { throw ClientStarted() }
         for attempt in 1... {
             do {
-                try WriteRefused.catching(plist) { try bytes.write(to: plist) }
+                // Atomic like the write being undone: a read-only plist can be replaced but
+                // not opened, so a plain write fails every time.
+                try WriteRefused.catching(plist) { try bytes.write(to: plist, options: .atomic) }
                 try resign(app)
                 return
             } catch where attempt < attempts {

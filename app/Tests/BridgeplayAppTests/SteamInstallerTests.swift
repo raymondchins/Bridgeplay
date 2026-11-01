@@ -464,6 +464,20 @@ struct SteamInstallerTests {
         #expect(tries == 0)
     }
 
+    @Test("A read-only plist can still be put back")
+    func revertReplacesReadOnlyPlist() throws {
+        let work = try scratchDirectory("install")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let app = work.appending(path: "Steam.app")
+        let plist = app.appending(path: "Contents/Info.plist")
+        try FileManager.default.createDirectory(at: plist.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("changed".utf8).write(to: plist)
+        try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: plist.path(percentEncoded: false))
+
+        try SteamInstaller.revertPlist(Data("plist".utf8), at: plist, app: app, pause: { _ in }, steamClosed: { true }, resign: { _ in })
+        #expect(try Data(contentsOf: plist) == Data("plist".utf8))
+    }
+
     @Test("A revert that also failed names the install step once")
     func revertFailureSaysTheStepOnce() {
         let signing = StepFailure(step: SteamInstaller.step, detail: "x could not be signed.", retryable: true)
