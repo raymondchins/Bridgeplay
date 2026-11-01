@@ -86,6 +86,13 @@ below for the current archive's name and sha256).
 All files above are in app/Sources/BridgeplayApp/Resources/. The engine's ntdll
 is patched at setup with detours built from ntdll-patch/ (detour*.bin in the
 same folder). nvapi64-shim.dll is Bridgeplay's own code, built from nvapi-shim/.
+version-rockstar-shim.dll is Bridgeplay's own code, built from rockstar-shim/.
+dxgi-dxvk-macos-1.10.3.dll is x64/dxgi.dll from DXVK-macOS 1.10.3
+(dxvk-macOS-async-v1.10.3-20230507.tar.gz from
+https://github.com/Gcenx/DXVK-macOS/releases/tag/v1.10.3-20230507, sha256
+f67d99d0a8eeedd7d406b283a3df9f939b5965acb00efcb33d0c6235c195a516), unmodified,
+zlib/libpng license (Copyright (c) 2017-2021 Philip Rebohle, (c) 2019-2021
+Joshua Ashton; LICENSE in that repository; the tarball carries no license text).
 
 Shipped in the one-click installer (Bridgeplay-Installer.zip)
 -------------------------------------------------------------

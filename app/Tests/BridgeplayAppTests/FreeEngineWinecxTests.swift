@@ -275,6 +275,24 @@ struct FreeEngineWinecxTests {
         }
     }
 
+    // rockstar-shim: 11.17 ships the shim and DXVK's dxgi beside the backends, outside any
+    // backend folder the run script stages into system32.
+    @Test("rockstar-shim ships with the app and is pinned for 11.17",
+          arguments: FreeEngineWinecx.releases.map(\.build))
+    func rockstar(id: String) throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
+        let expected: Set<String> = release.build == "winecx-11.17"
+            ? ["lib/notproton-backends/rockstar-shim/x86_64-windows/version.dll",
+               "lib/notproton-backends/rockstar-shim/x86_64-windows/dxgx.dll"] : []
+        #expect(Set(release.rockstar.map(\.path)) == expected)
+        let table = FreeEngineWinecx.expectedFiles(release)
+        for file in release.rockstar {
+            let bundled = try #require(Bundle.module.url(forResource: file.resource, withExtension: file.ext))
+            #expect(Digest.sha256IfPresent(bundled) == file.sha256, "\(file.resource)")
+            #expect(table[file.path] == file.sha256, "\(file.path)")
+        }
+    }
+
     @Test("Each free engine is current, outdated or missing on its own pins")
     func perEngineState() throws {
         let winehqBuild = try #require(SupportedRunners.build(id: FreeEngine.current.build))
