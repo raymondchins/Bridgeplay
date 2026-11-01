@@ -9,6 +9,15 @@ detach_images() {
   done
 }
 trap 'detach_images; chmod -R u+rwX "$work"; rm -rf "$work"' EXIT
+# A volume just written to can stay busy for a moment, and CI then fails with EBUSY.
+detach_image() {
+  tries=0
+  until /usr/bin/hdiutil detach -quiet -force "$1"; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 5 ] || return 1
+    sleep 1
+  done
+}
 cut_block() {
   from="$1" to="$2" keep="$3" awk '
     BEGIN { from = ENVIRON["from"]; to = ENVIRON["to"]; keep = ENVIRON["keep"] }
@@ -410,7 +419,7 @@ else
   check test "$(stat -f %l "$WINEPREFIX/drive_c/windows/ntdll.dll")" = 1
   printf changed > "$WINEPREFIX/drive_c/windows/ntdll.dll"
   check test "$(cat "$template_dir/pfx/drive_c/windows/ntdll.dll")" = dll
-  /usr/bin/hdiutil detach -quiet -force "$work/mnt.hfs"
+  detach_image "$work/mnt.hfs"
 fi
 
 # An external drive can come back with another device number: a seed killed on it is still
@@ -426,7 +435,7 @@ else
   { kill_seed_after 1; } 2>/dev/null || true
   check test ! -e "$WINEPREFIX/system.reg"
   plugged=$(stat -f %d "$work/mnt.drive")
-  /usr/bin/hdiutil detach -quiet -force "$work/mnt.drive"
+  detach_image "$work/mnt.drive"
   # Another disk takes the drive's old device node while it is away.
   attach_image HFS+ other || true
   if ! attach_image HFS+ drive; then
@@ -436,7 +445,7 @@ else
     finish_dead_seeds
     check seeded_whole
     check grep -q 'finished seeding this prefix' "$log"
-    /usr/bin/hdiutil detach -quiet -force "$work/mnt.drive"
+    detach_image "$work/mnt.drive"
   fi
   [ ! -d "$work/mnt.other" ] || /usr/bin/hdiutil detach -quiet -force "$work/mnt.other" 2>/dev/null || true
 fi
@@ -469,7 +478,7 @@ else
   check test -z "$(ls -A "$WINEPREFIX")"
   check test "$(grep -c 'finished seeding this prefix' "$log" || true)" = 0
   check test "$(find "$STEAM_COMPAT_DATA_PATH" -maxdepth 1 -name 'pfx.seeding.*' | wc -l | tr -d ' ')" = 0
-  /usr/bin/hdiutil detach -quiet -force "$work/mnt.exfat"
+  detach_image "$work/mnt.exfat"
 fi
 
 # A conflict anywhere moves nothing in.
