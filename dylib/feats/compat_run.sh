@@ -938,6 +938,16 @@ gta_sa_de_log() {
   echo "gta-sa-de: $*" >> "$log" 2>&1 || true
 }
 
+gta_sa_de_call() {
+  gta_sa_de_result=$(env GTA_SA_APP_ID="$app_id" \
+      GTA_SA_DATA_PATH="$STEAM_COMPAT_DATA_PATH" GTA_SA_PREFIX="$WINEPREFIX" \
+      GTA_SA_GAME="$STEAM_COMPAT_INSTALL_PATH" \
+      GTA_SA_RUNNER="$CX_ROOT" GTA_SA_ENGINE_ID="$np_build" \
+      "$helper" "$1" 2>&1)
+  gta_sa_de_rc=$?
+  return "$gta_sa_de_rc"
+}
+
 gta_sa_de_dxvk_ready() {
   for gta_sa_de_dll in d3d11.dll d3d10core.dll; do
     [ -f "$CX_ROOT/lib/notproton-backends/dxvk/x86_64-windows/$gta_sa_de_dll" ] \
@@ -1017,14 +1027,15 @@ gta_sa_de_run() {
         gta_sa_de_log "automatic fix disabled; no owned preparation helper is installed"
         return 0
       fi
-      if ! gta_sa_de_result=$(env GTA_SA_APP_ID="$app_id" \
-          GTA_SA_DATA_PATH="$STEAM_COMPAT_DATA_PATH" GTA_SA_PREFIX="$WINEPREFIX" \
-          GTA_SA_GAME="$STEAM_COMPAT_INSTALL_PATH" \
-          GTA_SA_RUNNER="$CX_ROOT" GTA_SA_ENGINE_ID="$np_build" \
-          "$helper" restore 2>&1); then
-        gta_sa_de_log "restore failed: $gta_sa_de_result"
+      if gta_sa_de_call restore; then
+        gta_sa_de_restore_rc=0
+      else
+        gta_sa_de_restore_rc=$?
+      fi
+      if [ "$gta_sa_de_restore_rc" -ne 0 ]; then
+        gta_sa_de_log "restore failed (exit $gta_sa_de_restore_rc): $gta_sa_de_result"
         show_alert "GTA San Andreas setup needs attention" "Bridgeplay could not restore files owned by its automatic GTA San Andreas setup. The game was not launched. Check this prefix's bridgeplay-run.log."
-        exit 1
+        exit "$gta_sa_de_restore_rc"
       fi
       case "$gta_sa_de_result" in
         restored|no-owned-state)
@@ -1049,38 +1060,62 @@ gta_sa_de_run() {
     gta_sa_de_log "not applied: automatic setup supports WineCX 11.17; this launch uses ${np_build:-unknown}"
     return 0
   fi
-  if ! backend_available dxvk || ! gta_sa_de_dxvk_ready; then
-    gta_sa_de_log "preparation failed: WineCX DXVK runtime is unavailable"
-    show_alert "GTA San Andreas setup needs attention" "Bridgeplay cannot apply this game's automatic setup because its WineCX DXVK runtime is unavailable. Check this prefix's bridgeplay-run.log."
-    exit 1
-  fi
-
   helper="$np_support/gamefix-prep"
   if [ ! -x "$helper" ]; then
     gta_sa_de_log "preparation failed: support helper is missing at $helper"
     show_alert "GTA San Andreas setup needs attention" "Bridgeplay's GTA San Andreas support helper is missing. The game was not launched. Update or repair Bridgeplay, then try again."
     exit 1
   fi
-  if ! gta_sa_de_result=$(env GTA_SA_APP_ID="$app_id" \
-      GTA_SA_DATA_PATH="$STEAM_COMPAT_DATA_PATH" GTA_SA_PREFIX="$WINEPREFIX" \
-      GTA_SA_GAME="$STEAM_COMPAT_INSTALL_PATH" \
-      GTA_SA_RUNNER="$CX_ROOT" GTA_SA_ENGINE_ID="$np_build" \
-      "$helper" status 2>&1); then
-    gta_sa_de_log "status check failed: $gta_sa_de_result"
-    show_alert "GTA San Andreas setup needs attention" "Bridgeplay could not verify this game's files for the automatic setup. It stopped the launch without changing them. Check this prefix's bridgeplay-run.log."
-    exit 1
+  if gta_sa_de_call status; then
+    gta_sa_de_status_rc=0
+  else
+    gta_sa_de_status_rc=$?
   fi
+  if [ "$gta_sa_de_status_rc" -eq 3 ]; then
+    gta_sa_de_log "automatic setup skipped: unsupported input (exit 3): $gta_sa_de_result"
+    return 0
+  fi
+  if [ "$gta_sa_de_status_rc" -ne 0 ]; then
+    gta_sa_de_log "status check failed (exit $gta_sa_de_status_rc): $gta_sa_de_result"
+    show_alert "GTA San Andreas setup needs attention" "Bridgeplay could not verify this game's files for the automatic setup. It stopped the launch without changing them. Check this prefix's bridgeplay-run.log."
+    exit "$gta_sa_de_status_rc"
+  fi
+  gta_sa_de_status_result=$gta_sa_de_result
   case "$gta_sa_de_result" in
-    prepared|manual) ;;
-    ready)
-      if ! gta_sa_de_result=$(env GTA_SA_APP_ID="$app_id" \
-          GTA_SA_DATA_PATH="$STEAM_COMPAT_DATA_PATH" GTA_SA_PREFIX="$WINEPREFIX" \
-          GTA_SA_GAME="$STEAM_COMPAT_INSTALL_PATH" \
-          GTA_SA_RUNNER="$CX_ROOT" GTA_SA_ENGINE_ID="$np_build" \
-          "$helper" prepare 2>&1); then
-        gta_sa_de_log "preparation failed: $gta_sa_de_result"
-        show_alert "GTA San Andreas setup needs attention" "Bridgeplay could not prepare the automatic GTA San Andreas setup. It stopped the launch without changing unknown files. Check this prefix's bridgeplay-run.log."
+    prepared)
+      if ! backend_available dxvk || ! gta_sa_de_dxvk_ready; then
+        gta_sa_de_log "preparation failed: managed setup needs the WineCX DXVK runtime"
+        show_alert "GTA San Andreas setup needs attention" "Bridgeplay cannot safely run this managed GTA San Andreas setup because its WineCX DXVK runtime is unavailable. Check this prefix's bridgeplay-run.log."
         exit 1
+      fi ;;
+    manual)
+      if ! backend_available dxvk || ! gta_sa_de_dxvk_ready; then
+        gta_sa_de_log "preparation skipped: WineCX DXVK runtime is unavailable; no Bridgeplay-owned setup was changed"
+        return 0
+      fi ;;
+    ready|ready-owned)
+      if ! backend_available dxvk || ! gta_sa_de_dxvk_ready; then
+        if [ "$gta_sa_de_status_result" = ready ]; then
+          gta_sa_de_log "preparation skipped: WineCX DXVK runtime is unavailable; no Bridgeplay-owned setup was changed"
+          return 0
+        fi
+        gta_sa_de_log "preparation failed: managed setup needs the WineCX DXVK runtime"
+        show_alert "GTA San Andreas setup needs attention" "Bridgeplay cannot safely update this managed GTA San Andreas setup because its WineCX DXVK runtime is unavailable. Check this prefix's bridgeplay-run.log."
+        exit 1
+      fi
+      if gta_sa_de_call prepare; then
+        gta_sa_de_prepare_rc=0
+      else
+        gta_sa_de_prepare_rc=$?
+      fi
+      if [ "$gta_sa_de_prepare_rc" -eq 3 ]; then
+        gta_sa_de_log "automatic setup skipped after revalidation: unsupported input (exit 3): $gta_sa_de_result"
+        return 0
+      fi
+      if [ "$gta_sa_de_prepare_rc" -ne 0 ]; then
+        gta_sa_de_log "preparation failed (exit $gta_sa_de_prepare_rc): $gta_sa_de_result"
+        show_alert "GTA San Andreas setup needs attention" "Bridgeplay could not prepare the automatic GTA San Andreas setup. It stopped the launch without changing unknown files. Check this prefix's bridgeplay-run.log."
+        exit "$gta_sa_de_prepare_rc"
       fi
       case "$gta_sa_de_result" in
         prepared|already-prepared|adopted-manual|manual) ;;

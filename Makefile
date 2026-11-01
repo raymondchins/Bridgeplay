@@ -621,7 +621,7 @@ $(GAMEFIX_PREP_ASSETS): scripts/embed-gta-sa-assets.py $(GAMEFIX_PREP_MANIFEST) 
 	python3 scripts/embed-gta-sa-assets.py --manifest $(GAMEFIX_PREP_MANIFEST) \
 		--wrapper $(GAMEFIX_PREP_WRAPPER) --license $(GAMEFIX_PREP_LICENSE) --output $@
 
-$(GAMEFIX_PREP): helpers/gamefix-prep.swift $(GAMEFIX_PREP_ASSETS)
+$(GAMEFIX_PREP): helpers/gamefix-prep.swift helpers/gamefix-transaction.swift $(GAMEFIX_PREP_ASSETS)
 	@mkdir -p $(OUT_DIR)
 	swiftc -O -target arm64-apple-macos15.0 -o $@ $^
 	@echo "==> Built $@"

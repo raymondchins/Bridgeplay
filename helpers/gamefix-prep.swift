@@ -2,15 +2,12 @@ import CryptoKit
 import Darwin
 import Foundation
 
-@_silgen_name("renamex_np")
-private func bridgeplayRenamex(_ from: UnsafePointer<CChar>, _ to: UnsafePointer<CChar>, _ flags: UInt32) -> Int32
-
-private let renameSwap: UInt32 = 0x0000_0002
 private let renameExclusive: UInt32 = 0x0000_0004
 private let sharedStateName = ".bridgeplay-gta-sa-de-1547000.json"
 private let sharedLockName = ".bridgeplay-gta-sa-de-1547000.lock"
 private let privateStateName = ".bridgeplay-gta-sa-de-1547000"
 private let privateLockName = ".bridgeplay-gta-sa-de-1547000.lock"
+private let transactionJournalName = ".bridgeplay-gta-sa-de-1547000.transaction.json"
 private let stateSchema = 1
 
 private struct PrepFailure: Error {
@@ -121,6 +118,12 @@ private func isSafeRelative(_ value: String) -> Bool {
     return !value.split(separator: "/").contains { $0 == "." || $0 == ".." }
 }
 
+private func isSafeAbsolutePath(_ value: String) -> Bool {
+    guard !value.isEmpty, value.hasPrefix("/"), !value.contains("\0") else { return false }
+    let standardized = URL(fileURLWithPath: value).standardizedFileURL.path
+    return standardized == value || (value.hasSuffix("/") && standardized + "/" == value)
+}
+
 private func sha256(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
 }
@@ -214,6 +217,7 @@ private struct Inputs {
     let game: URL
     let runner: URL?
     let prefixID: String
+    let prefixLocation: String
     let appid: String
     let engine: String
 
@@ -240,11 +244,13 @@ private struct Inputs {
         }
 
         let canonicalPrefix = self.prefix.path(percentEncoded: false)
+        prefixLocation = canonicalPrefix
         prefixID = sha256(Data(canonicalPrefix.utf8))
     }
 
     var stateDirectory: URL { dataRoot.appending(path: privateStateName, directoryHint: .isDirectory) }
     var stateFile: URL { stateDirectory.appending(path: "state.json") }
+    var journalFile: URL { stateDirectory.appending(path: transactionJournalName) }
     var prefixLock: URL { dataRoot.appending(path: privateLockName) }
     var sharedState: URL { game.appending(path: sharedStateName) }
     var sharedLock: URL { game.appending(path: sharedLockName) }
@@ -300,85 +306,14 @@ private struct PrefixState: Codable, Equatable {
     var prefixID: String
     var sharedReference: Bool
     var helper: HelperState?
-}
+    var prefixLocation: String? = nil
+    var sharedReferences: [String]? = nil
+    var referenceLocations: [String: String]? = nil
 
-private enum Change {
-    case installed(URL, String)
-    case swapped(URL, URL, String, String)
-    case parked(URL, URL, String)
-}
-
-private final class Transaction {
-    private(set) var changes: [Change] = []
-
-    func install(_ staging: URL, at destination: URL, hash: String) throws {
-        try rename(staging, destination, flags: renameExclusive, failure: "target-appeared")
-        changes.append(.installed(destination, hash))
-        guard try fileHash(destination) == hash else {
-            throw PrepFailure("installed-file-mismatch", 5)
-        }
+    var managedReferences: [String] {
+        if let sharedReferences { return sharedReferences }
+        return sharedReference ? [prefixID] : []
     }
-
-    func swap(_ staging: URL, with destination: URL, oldHash: String, newHash: String) throws {
-        guard try fileHash(destination) == oldHash else { throw PrepFailure("target-changed", 4) }
-        guard try fileHash(staging) == newHash else { throw PrepFailure("staged-file-mismatch", 5) }
-        try rename(staging, destination, flags: renameSwap, failure: "atomic-swap-unavailable")
-        if (try? fileHash(destination)) != newHash || (try? fileHash(staging)) != oldHash {
-            _ = try? rename(staging, destination, flags: renameSwap, failure: "rollback-failed")
-            throw PrepFailure("target-changed-during-swap", 4)
-        }
-        changes.append(.swapped(destination, staging, newHash, oldHash))
-    }
-
-    func park(_ destination: URL, expectedHash: String) throws {
-        guard try fileHash(destination) == expectedHash else { throw PrepFailure("owned-file-changed", 4) }
-        let staging = temporaryURL(beside: destination)
-        try rename(destination, staging, flags: renameExclusive, failure: "atomic-remove-unavailable")
-        guard (try? fileHash(staging)) == expectedHash else {
-            _ = try? rename(staging, destination, flags: renameExclusive, failure: "rollback-failed")
-            throw PrepFailure("owned-file-changed-during-remove", 4)
-        }
-        changes.append(.parked(destination, staging, expectedHash))
-    }
-
-    func rollback() -> Bool {
-        var success = true
-        for change in changes.reversed() {
-            switch change {
-            case let .installed(destination, hash):
-                if removeOwned(destination, expectedHash: hash) == false { success = false }
-            case let .swapped(destination, staging, newHash, oldHash):
-                guard (try? fileHash(destination)) == newHash,
-                      (try? fileHash(staging)) == oldHash,
-                      (try? rename(staging, destination, flags: renameSwap, failure: "rollback-failed")) != nil
-                else { success = false; continue }
-                _ = removeOwned(staging, expectedHash: newHash)
-            case let .parked(destination, staging, hash):
-                guard (try? fileHash(staging)) == hash,
-                      pathIsAbsent(destination),
-                      (try? rename(staging, destination, flags: renameExclusive, failure: "rollback-failed")) != nil
-                else { success = false; continue }
-            }
-        }
-        return success
-    }
-
-    func finish() {
-        for change in changes {
-            switch change {
-            case .installed:
-                break
-            case let .swapped(_, staging, _, oldHash), let .parked(_, staging, oldHash):
-                _ = removeOwned(staging, expectedHash: oldHash)
-            }
-        }
-    }
-}
-
-private func pathIsAbsent(_ url: URL) -> Bool {
-    guard let presence = try? pathInfo(url) else { return false }
-    if case .absent = presence { return true }
-    return false
 }
 
 private func fileHash(_ url: URL) throws -> String {
@@ -405,7 +340,7 @@ private func temporaryURL(beside destination: URL) -> URL {
 
 private func rename(_ from: URL, _ to: URL, flags: UInt32, failure: String) throws {
     let result = from.path.withCString { source in
-        to.path.withCString { destination in bridgeplayRenamex(source, destination, flags) }
+        to.path.withCString { destination in Darwin.renamex_np(source, destination, flags) }
     }
     guard result == 0 else { throw PrepFailure(failure, 5) }
 }
@@ -477,6 +412,55 @@ private func acquireLock(_ url: URL) throws -> Int32 {
     return fd
 }
 
+private func acquireSharedLock(_ url: URL) throws -> Int32 {
+    if case .absent = try pathInfo(url) {
+        let createFD = url.path.withCString {
+            open($0, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, mode_t(0o644))
+        }
+        if createFD >= 0 {
+            var created = stat()
+            guard fstat(createFD, &created) == 0,
+                  created.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+                  created.st_uid == geteuid(), fchmod(createFD, mode_t(0o644)) == 0
+            else {
+                close(createFD)
+                throw PrepFailure("unsafe-lock-file", 4)
+            }
+            close(createFD)
+        } else if errno != EEXIST {
+            throw PrepFailure("lock-unavailable", 5)
+        }
+    }
+    guard case let .present(beforeOpen) = try pathInfo(url), beforeOpen.isRegular else {
+        throw PrepFailure("unsafe-lock-file", 4)
+    }
+    let fd = url.path.withCString { open($0, O_RDONLY | O_NOFOLLOW | O_CLOEXEC) }
+    guard fd >= 0 else { throw PrepFailure("lock-unavailable", 5) }
+    var info = stat()
+    guard fstat(fd, &info) == 0,
+          info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+          info.st_dev == beforeOpen.device, info.st_ino == beforeOpen.inode,
+          info.st_mode & mode_t(0o022) == 0
+    else {
+        close(fd)
+        throw PrepFailure("unsafe-lock-file", 4)
+    }
+    if info.st_uid == geteuid() {
+        guard fchmod(fd, mode_t(0o644)) == 0 else {
+            close(fd)
+            throw PrepFailure("unsafe-lock-file", 4)
+        }
+    } else if info.st_mode & mode_t(0o777) != mode_t(0o644) {
+        close(fd)
+        throw PrepFailure("unsafe-lock-file", 4)
+    }
+    guard flock(fd, LOCK_EX | LOCK_NB) == 0 else {
+        close(fd)
+        throw PrepFailure("another-preparation-is-running", 4)
+    }
+    return fd
+}
+
 private func readPrivateData(_ url: URL) throws -> Data? {
     guard case let .present(info) = try pathInfo(url) else { return nil }
     guard info.isRegular, info.uid == geteuid(), info.mode & mode_t(0o077) == 0 else {
@@ -513,7 +497,14 @@ private struct DLLPlan {
     var records: [String: SharedFile]
     var toInstall: [String]
     var sharedReference: Bool
+    var managedReferences: [String]
     var sharedNew: SharedState?
+}
+
+private struct PrefixReferencePlan {
+    var references: [String]
+    var locations: [String: String]
+    var safeToMigrate: Set<String>
 }
 
 private struct HelperPlan {
@@ -562,49 +553,108 @@ private final class Coordinator {
     }
 
     func status(environment: [String: String]) throws -> String {
-        let context = try Inputs(action: "status", manifest: manifest, environment: environment)
-        let plan = try makePreparePlan(context)
-        if plan.prefixNewData == nil && plan.sharedNewData == nil
-            && plan.dll.toInstall.isEmpty
-            && (plan.helper.action == .none || plan.helper.action == .manual) {
-            return plan.helper.record.ownership == .preexisting ? "manual" : "prepared"
+        let stateContext = try Inputs(action: "restore", manifest: manifest, environment: environment)
+        if try transactionHasPending(for: stateContext) { return "ready-owned" }
+        let hasOwnedState = try localStateExists(stateContext)
+        do {
+            let context = try Inputs(action: "status", manifest: manifest, environment: environment)
+            let plan = try makePreparePlan(context)
+            let isNoop = plan.prefixNewData == nil && plan.sharedNewData == nil
+                && plan.dll.toInstall.isEmpty
+                && (plan.helper.action == .none || plan.helper.action == .manual)
+            if isNoop {
+                if plan.prefixOldData != nil { return "prepared" }
+                return plan.helper.record.ownership == .preexisting ? "manual" : "prepared"
+            }
+            return plan.prefixOldData != nil ? "ready-owned" : "ready"
+        } catch let failure as PrepFailure where failure.status == 3 && hasOwnedState {
+            throw PrepFailure(failure.token, 4)
         }
-        return "ready"
     }
 
     func prepare(environment: [String: String]) throws -> String {
-        let context = try Inputs(action: "prepare", manifest: manifest, environment: environment)
-        _ = try makePreparePlan(context) // Full read-only validation before creating locks.
-        let gameLock = try acquireLock(context.game.appending(path: sharedLockName))
-        defer { flock(gameLock, LOCK_UN); close(gameLock) }
-        let prefixLock = try acquireLock(context.dataRoot.appending(path: privateLockName))
-        defer { flock(prefixLock, LOCK_UN); close(prefixLock) }
-
-        let plan = try makePreparePlan(context) // Revalidate under both locks.
-        if plan.prefixNewData == nil && plan.sharedNewData == nil
-            && plan.dll.toInstall.isEmpty
-            && (plan.helper.action == .none || plan.helper.action == .manual) {
-            return plan.helper.record.ownership == .preexisting ? "manual" : "already-prepared"
+        let stateContext = try Inputs(action: "restore", manifest: manifest, environment: environment)
+        let pending = try transactionHasPending(for: stateContext)
+        var hasOwnedState = false
+        if !pending {
+            hasOwnedState = try localStateExists(stateContext)
+            do {
+                let context = try Inputs(action: "prepare", manifest: manifest, environment: environment)
+                let plan = try makePreparePlan(context)
+                if !hasOwnedState && isNoop(plan) {
+                    return plan.helper.record.ownership == .preexisting ? "manual" : "already-prepared"
+                }
+            } catch let failure as PrepFailure where failure.status == 3 && hasOwnedState {
+                throw PrepFailure(failure.token, 4)
+            }
         }
-        try apply(plan)
-        return plan.helper.record.ownership == .preexisting ? "adopted-manual" : "prepared"
+
+        let gameLock = try acquireSharedLock(stateContext.sharedLock)
+        defer { flock(gameLock, LOCK_UN); close(gameLock) }
+        let prefixLock = try acquireLock(stateContext.prefixLock)
+        defer { flock(prefixLock, LOCK_UN); close(prefixLock) }
+        try recoverTransaction(for: stateContext)
+        hasOwnedState = try localStateExists(stateContext)
+
+        do {
+            let context = try Inputs(action: "prepare", manifest: manifest, environment: environment)
+            let plan = try makePreparePlan(context)
+            if plan.sharedOldData != nil {
+                try makeSharedDataPublic(context.sharedState)
+            }
+            if isNoop(plan) {
+                return plan.helper.record.ownership == .preexisting ? "manual" : "already-prepared"
+            }
+            try apply(plan)
+            return plan.helper.record.ownership == .preexisting ? "adopted-manual" : "prepared"
+        } catch let failure as PrepFailure where failure.status == 3 && hasOwnedState {
+            throw PrepFailure(failure.token, 4)
+        }
+    }
+
+    private func localStateExists(_ context: Inputs) throws -> Bool {
+        _ = try validatePrivateStateDirectory(context)
+        guard case .present(_) = try pathInfo(context.stateFile) else { return false }
+        do {
+            return try readPrivateData(context.stateFile) != nil
+        } catch let failure as PrepFailure where failure.status == 3 {
+            throw PrepFailure(failure.token, 4)
+        }
+    }
+
+    private func isNoop(_ plan: PreparePlan) -> Bool {
+        plan.prefixNewData == nil && plan.sharedNewData == nil
+            && plan.dll.toInstall.isEmpty
+            && (plan.helper.action == .none || plan.helper.action == .manual)
     }
 
     func restore(environment: [String: String]) throws -> String {
         let context = try Inputs(action: "restore", manifest: manifest, environment: environment)
-        _ = try validatePrivateStateDirectory(context)
-        guard try readPrivateData(context.stateFile) != nil else { return "no-owned-state" }
-        try validateDirectoryChains(context)
-        let gameLock = try acquireLock(context.game.appending(path: sharedLockName))
+        let pending = try transactionHasPending(for: context)
+        if !pending {
+            let hasOwnedState = try localStateExists(context)
+            if !hasOwnedState { return "no-owned-state" }
+        }
+        let gameLock = try acquireSharedLock(context.sharedLock)
         defer { flock(gameLock, LOCK_UN); close(gameLock) }
-        let prefixLock = try acquireLock(context.dataRoot.appending(path: privateLockName))
+        let prefixLock = try acquireLock(context.prefixLock)
         defer { flock(prefixLock, LOCK_UN); close(prefixLock) }
+        try recoverTransaction(for: context)
         _ = try validatePrivateStateDirectory(context)
-        let stateData = try readPrivateData(context.stateFile)
+        let stateData: Data?
+        do {
+            stateData = try readPrivateData(context.stateFile)
+        } catch let failure as PrepFailure where failure.status == 3 {
+            throw PrepFailure(failure.token, 4)
+        }
         guard let stateData else { return "no-owned-state" }
         let state: PrefixState = try decodeJSON(PrefixState.self, data: stateData)
         try validate(state, context: context)
-        try restore(state: state, stateData: stateData, context: context)
+        do {
+            try restore(state: state, stateData: stateData, context: context)
+        } catch let failure as PrepFailure where failure.status == 3 {
+            throw PrepFailure(failure.token, 4)
+        }
         return "restored"
     }
 
@@ -785,20 +835,114 @@ private final class Coordinator {
     }
 
     private func validate(_ state: PrefixState, context: Inputs) throws {
+        let references = state.managedReferences
         guard state.schema == stateSchema, state.appid == manifest.appid,
-              state.prefixID == context.prefixID
+              isHash(state.prefixID), Set(references).count == references.count,
+              references.allSatisfy(isHash),
+              state.sharedReferences == nil || state.sharedReference == !references.isEmpty
         else { throw PrepFailure("invalid-prefix-ownership-state", 4) }
-        if state.sharedReference {
-            guard state.prefixID.count == 64 else { throw PrepFailure("invalid-prefix-reference", 4) }
+        if let location = state.prefixLocation {
+            guard isSafeAbsolutePath(location),
+                  sha256(Data(location.utf8)) == state.prefixID
+            else { throw PrepFailure("invalid-prefix-ownership-state", 4) }
         }
+        if let locations = state.referenceLocations {
+            guard locations.allSatisfy({ id, path in
+                references.contains(id) && isSafeAbsolutePath(path)
+                    && sha256(Data(path.utf8)) == id
+            }) else { throw PrepFailure("invalid-prefix-reference", 4) }
+        }
+        if let helper = state.helper {
+            guard isHash(helper.vendorSHA256), isHash(helper.wrapperSHA256),
+                  Set(helper.archives.map(\.filename)).count == helper.archives.count,
+                  helper.archives.allSatisfy({ isSafeFilename($0.filename) && isHash($0.sha256) })
+            else { throw PrepFailure("invalid-prefix-ownership-state", 4) }
+        }
+    }
+
+    private func prefixReferencePlan(_ state: PrefixState?, context: Inputs) throws -> PrefixReferencePlan {
+        guard let state, state.sharedReference else {
+            return PrefixReferencePlan(references: [], locations: [:], safeToMigrate: [])
+        }
+        guard case let .present(currentInfo) = try pathInfo(context.prefix), currentInfo.isDirectory else {
+            throw PrepFailure("prefix-directory-unavailable", 4)
+        }
+
+        var references = Set<String>()
+        var locations: [String: String] = [:]
+        var safeToMigrate = Set<String>()
+        for reference in state.managedReferences {
+            if reference == context.prefixID {
+                references.insert(reference)
+                locations[reference] = context.prefixLocation
+                continue
+            }
+            let location = state.referenceLocations?[reference]
+                ?? (reference == state.prefixID ? state.prefixLocation : nil)
+            guard let location else {
+                references.insert(reference)
+                continue
+            }
+            let oldPresence: FilePresence
+            do {
+                oldPresence = try pathInfo(URL(fileURLWithPath: location, isDirectory: true))
+            } catch {
+                references.insert(reference)
+                locations[reference] = location
+                continue
+            }
+            switch oldPresence {
+            case .absent:
+                safeToMigrate.insert(reference)
+            case let .present(oldInfo):
+                var comparable = oldInfo
+                if oldInfo.isSymlink {
+                    let fd = location.withCString { open($0, O_RDONLY | O_DIRECTORY | O_CLOEXEC) }
+                    if fd >= 0 {
+                        var followed = stat()
+                        if fstat(fd, &followed) == 0 {
+                            comparable = FileInfo(mode: followed.st_mode, uid: followed.st_uid,
+                                                  device: followed.st_dev, inode: followed.st_ino)
+                        }
+                        close(fd)
+                    }
+                }
+                if comparable.isDirectory && comparable.device == currentInfo.device
+                    && comparable.inode == currentInfo.inode {
+                    safeToMigrate.insert(reference)
+                } else {
+                    references.insert(reference)
+                    locations[reference] = location
+                }
+            }
+        }
+
+        references.insert(context.prefixID)
+        locations[context.prefixID] = context.prefixLocation
+        return PrefixReferencePlan(references: references.sorted(), locations: locations,
+                                   safeToMigrate: safeToMigrate)
     }
 
     private func readSharedData(_ url: URL) throws -> Data? {
         guard case let .present(info) = try pathInfo(url) else { return nil }
-        guard info.isRegular, info.uid == geteuid(), info.mode & mode_t(0o077) == 0 else {
+        guard info.isRegular, info.mode & mode_t(0o022) == 0 else {
             throw PrepFailure("unsafe-shared-state-file", 4)
         }
         return try readRegularFile(url, maxBytes: 1024 * 1024)
+    }
+
+    private func makeSharedDataPublic(_ url: URL) throws {
+        let fd = url.path.withCString { open($0, O_RDONLY | O_NOFOLLOW | O_CLOEXEC) }
+        guard fd >= 0 else { throw PrepFailure("unsafe-shared-state-file", 4) }
+        defer { close(fd) }
+        var info = stat()
+        guard fstat(fd, &info) == 0,
+              info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+              info.st_uid == geteuid(), info.st_mode & mode_t(0o022) == 0
+        else { throw PrepFailure("unsafe-shared-state-file", 4) }
+        guard fchmod(fd, mode_t(0o644)) == 0 else {
+            throw PrepFailure("unsafe-shared-state-file", 4)
+        }
     }
 
     private var gameInstallRelativeDirectory: String {
@@ -809,6 +953,41 @@ private final class Coordinator {
         gameInstallRelativeDirectory.isEmpty
             ? context.game
             : context.game.appending(path: gameInstallRelativeDirectory)
+    }
+
+    private func transactionTargets(_ context: Inputs) -> [String: URL] {
+        let helperDirectory = context.helperDirectory(manifest)
+        var targets: [String: URL] = [
+            "helper:wrapper": helperDirectory.appending(path: manifest.helperName),
+            "helper:real": helperDirectory.appending(path: manifest.realHelperName),
+            "helper:checksum": helperDirectory.appending(path: manifest.helperChecksumName),
+            "helper:license": helperDirectory.appending(path: manifest.helperLicenseName),
+            "state:shared": context.sharedState,
+            "state:prefix": context.stateFile
+        ]
+        let gameDirectory = gameInstallDirectory(context)
+        for pin in manifest.dxmtFiles {
+            targets["dll:\(pin.name)"] = gameDirectory.appending(path: pin.name)
+        }
+        for vendor in manifest.supportedVendorHelpers {
+            let filename = "SocialClubHelper_real.previous.\(vendor.sha256.lowercased().prefix(16)).exe"
+            targets["helper:archive:\(filename)"] = helperDirectory.appending(path: filename)
+        }
+        return targets
+    }
+
+    private func transaction(for context: Inputs) -> GamefixTransaction {
+        GamefixTransaction(journalURL: context.journalFile, targets: transactionTargets(context))
+    }
+
+    private func recoverTransaction(for context: Inputs) throws {
+        try GamefixTransaction.recover(journalURL: context.journalFile,
+                                       targets: transactionTargets(context))
+    }
+
+    private func transactionHasPending(for context: Inputs) throws -> Bool {
+        try GamefixTransaction.hasPending(journalURL: context.journalFile,
+                                          targets: transactionTargets(context))
     }
 
     private func validateDirectoryChains(_ context: Inputs) throws {
@@ -838,7 +1017,8 @@ private final class Coordinator {
         _ = try validatePrivateStateDirectory(context)
     }
 
-    private func planDLLs(context: Inputs, existing: SharedState?) throws -> DLLPlan {
+    private func planDLLs(context: Inputs, existing: SharedState?,
+                          prefixReferences: PrefixReferencePlan) throws -> DLLPlan {
         let gameDirectory = gameInstallDirectory(context)
         var present: [String: String] = [:]
         for pin in manifest.dxmtFiles {
@@ -871,12 +1051,16 @@ private final class Coordinator {
                     toInstall.append(pin.name)
                 }
             }
+            updated.references.removeAll { prefixReferences.safeToMigrate.contains($0) }
             if !updated.references.contains(context.prefixID) {
                 updated.references.append(context.prefixID)
                 updated.references.sort()
             }
+            var managedReferences = Set(prefixReferences.references.filter(updated.references.contains))
+            managedReferences.insert(context.prefixID)
             return DLLPlan(records: existing.files, toInstall: toInstall,
                            sharedReference: true,
+                           managedReferences: managedReferences.sorted(),
                            sharedNew: updated == existing ? nil : updated)
         }
 
@@ -887,13 +1071,15 @@ private final class Coordinator {
             let records = Dictionary(uniqueKeysWithValues: manifest.dxmtFiles.map {
                 ($0.name, SharedFile(sha256: $0.sha256.lowercased(), ownership: .preexisting))
             })
-            return DLLPlan(records: records, toInstall: [], sharedReference: false, sharedNew: nil)
+            return DLLPlan(records: records, toInstall: [], sharedReference: false,
+                           managedReferences: [], sharedNew: nil)
         }
         let records = Dictionary(uniqueKeysWithValues: manifest.dxmtFiles.map {
             ($0.name, SharedFile(sha256: $0.sha256.lowercased(), ownership: .bridgeplay))
         })
         return DLLPlan(records: records, toInstall: manifest.dxmtFiles.map(\.name),
                        sharedReference: true,
+                       managedReferences: [context.prefixID],
                        sharedNew: SharedState(schema: stateSchema, appid: manifest.appid,
                                               references: [context.prefixID], files: records))
     }
@@ -923,6 +1109,7 @@ private final class Coordinator {
         let prefixOldData = try readPrivateData(context.stateFile)
         let prefixState = try prefixOldData.map { try decodeJSON(PrefixState.self, data: $0) }
         if let prefixState { try validate(prefixState, context: context) }
+        let prefixReferences = try prefixReferencePlan(prefixState, context: context)
         let sharedOldData = try readSharedData(context.sharedState)
         let sharedState = try sharedOldData.map { try decodeJSON(SharedState.self, data: $0) }
         if let sharedState { try validate(sharedState) }
@@ -930,20 +1117,35 @@ private final class Coordinator {
             throw PrepFailure("missing-shared-ownership-state", 4)
         }
 
-        let dll = try planDLLs(context: context, existing: sharedState)
+        let dll = try planDLLs(context: context, existing: sharedState,
+                               prefixReferences: prefixReferences)
         let helper = try planHelper(context: context, existing: prefixState?.helper)
 
         var prefixNew: PrefixState?
         if let prefixState {
             var updated = prefixState
+            updated.prefixID = context.prefixID
+            updated.prefixLocation = context.prefixLocation
             updated.sharedReference = dll.sharedReference
+            updated.sharedReferences = dll.managedReferences
+            updated.referenceLocations = Dictionary(uniqueKeysWithValues:
+                dll.managedReferences.compactMap { id in
+                    guard let location = prefixReferences.locations[id]
+                            ?? (id == context.prefixID ? context.prefixLocation : nil)
+                    else { return nil }
+                    return (id, location)
+                })
             updated.helper = helper.record
             prefixNew = updated
         } else if helper.action != .manual || dll.sharedReference {
             prefixNew = PrefixState(schema: stateSchema, appid: manifest.appid,
                                     prefixID: context.prefixID,
                                     sharedReference: dll.sharedReference,
-                                    helper: helper.record)
+                                    helper: helper.record,
+                                    prefixLocation: context.prefixLocation,
+                                    sharedReferences: dll.managedReferences,
+                                    referenceLocations: dll.sharedReference
+                                        ? [context.prefixID: context.prefixLocation] : [:])
         }
         let prefixNewData: Data?
         if let prefixNew {
@@ -967,14 +1169,14 @@ private final class Coordinator {
         let context = plan.context
         try validateDirectoryChains(context)
         let stateDirectoryWasPresent = try validatePrivateStateDirectory(context)
-        if plan.prefixNewData != nil && !stateDirectoryWasPresent {
+        if !stateDirectoryWasPresent {
             let result = context.stateDirectory.path.withCString { mkdir($0, mode_t(0o700)) }
             guard result == 0 else { throw PrepFailure("prefix-state-directory-unavailable", 5) }
             _ = try validatePrivateStateDirectory(context)
         }
         var staged: [URL: String] = [:]
         var dllStages: [String: URL] = [:]
-        let transaction = Transaction()
+        let transaction = self.transaction(for: context)
         do {
             let gameDirectory = gameInstallDirectory(context)
             for name in plan.dll.toInstall {
@@ -1051,7 +1253,7 @@ private final class Coordinator {
 
             var sharedStage: URL?
             if let data = plan.sharedNewData {
-                let stage = try stageData(data, beside: context.sharedState, mode: mode_t(0o600))
+                let stage = try stageData(data, beside: context.sharedState, mode: mode_t(0o644))
                 staged[stage] = sha256(data)
                 sharedStage = stage
             }
@@ -1062,6 +1264,7 @@ private final class Coordinator {
                 prefixStage = stage
             }
 
+            try transaction.registerStagedFiles(staged)
             for name in plan.dll.toInstall {
                 guard let pin = manifest.dxmtFiles.first(where: { $0.name == name }),
                       let stage = dllStages[name]
@@ -1142,13 +1345,13 @@ private final class Coordinator {
                 }
                 staged.removeValue(forKey: prefixStage)
             }
-            transaction.finish()
+            try transaction.finish()
             for (stage, hash) in staged { _ = removeOwned(stage, expectedHash: hash) }
         } catch {
             let rollbackSucceeded = transaction.rollback()
             if rollbackSucceeded {
                 for (stage, hash) in staged { _ = removeOwned(stage, expectedHash: hash) }
-                if !stateDirectoryWasPresent, plan.prefixNewData != nil {
+                if !stateDirectoryWasPresent {
                     _ = rmdir(context.stateDirectory.path)
                 }
             } else {
@@ -1166,91 +1369,124 @@ private final class Coordinator {
         let realURL = helperDirectory.appending(path: manifest.realHelperName)
         let checksumURL = helperDirectory.appending(path: manifest.helperChecksumName)
         let licenseURL = helperDirectory.appending(path: manifest.helperLicenseName)
-        let helperData = try readRegularFile(helperURL)
-        let helperHash = sha256(helperData)
+        let helperState = state.helper.flatMap { $0.ownership == .bridgeplay ? $0 : nil }
+        var helperAbsent = false
+        var helperHash: String?
+        if helperState != nil {
+            switch try pathInfo(helperURL) {
+            case .absent:
+                helperAbsent = true
+            case let .present(info):
+                guard info.isRegular else { throw PrepFailure("helper-not-regular", 4) }
+                helperHash = sha256(try readRegularFile(helperURL))
+            }
+        }
 
         var currentSharedData: Data?
         var currentShared: SharedState?
+        var referencesToRemove = Set<String>()
         if state.sharedReference {
             currentSharedData = try readSharedData(context.sharedState)
-            guard let currentSharedData else { throw PrepFailure("missing-shared-ownership-state", 4) }
-            currentShared = try decodeJSON(SharedState.self, data: currentSharedData)
-            guard let currentShared, currentShared.references.contains(context.prefixID) else {
-                throw PrepFailure("missing-prefix-reference", 4)
-            }
-            try validate(currentShared)
-        }
-
-        var realData: Data?
-        var realHash: String?
-        if let helperState = state.helper, helperState.ownership == .bridgeplay {
-            realData = try readRegularFile(realURL)
-            realHash = sha256(realData!)
-            guard realHash == helperState.vendorSHA256,
-                  supportedVendor(realHash!, manifest: manifest)
-            else { throw PrepFailure("real-helper-changed", 4) }
-            let checksumData = try readRegularFile(checksumURL, maxBytes: 4096)
-            guard validateChecksumFile(checksumData, hash: realHash!,
-                                       filename: manifest.realHelperName)
-            else { throw PrepFailure("helper-checksum-changed", 4) }
-            if helperState.licenseOwned {
-                let currentLicense = try readRegularFile(licenseURL, maxBytes: 64 * 1024)
-                guard sha256(currentLicense) == manifest.helperLicenseSHA256.lowercased() else {
-                    throw PrepFailure("helper-license-changed", 4)
+            if let currentSharedData {
+                currentShared = try decodeJSON(SharedState.self, data: currentSharedData)
+                if let currentShared { try validate(currentShared) }
+                let references = try prefixReferencePlan(state, context: context)
+                referencesToRemove = references.safeToMigrate
+                if state.managedReferences.contains(context.prefixID) {
+                    referencesToRemove.insert(context.prefixID)
                 }
             }
-            guard helperHash == helperState.wrapperSHA256
-                    || supportedVendor(helperHash, manifest: manifest)
-            else { throw PrepFailure("helper-changed", 4) }
         }
 
-        let transaction = Transaction()
+        let realData: Data?
+        if case let .present(info) = try pathInfo(realURL), info.isRegular {
+            realData = try? readRegularFile(realURL)
+        } else {
+            realData = nil
+        }
+        let realHash = realData.map(sha256)
+        let restoreWrapper = helperState != nil && helperHash == helperState?.wrapperSHA256
+        let verifiedBackup = helperState != nil && realHash == helperState?.vendorSHA256
+            && realHash.map { supportedVendor($0, manifest: manifest) } == true
+        let restoreMissingHelper = helperState != nil && helperAbsent
+        if (restoreWrapper || restoreMissingHelper) && !verifiedBackup {
+            throw PrepFailure("helper-backup-unverified", 4)
+        }
+        let cleanupBackup = verifiedBackup
+
+        let transaction = self.transaction(for: context)
         var pendingStages: [URL: String] = [:]
         do {
-            if let helperState = state.helper, helperState.ownership == .bridgeplay {
-                if helperHash == helperState.wrapperSHA256 {
+            if let helperState {
+                if restoreMissingHelper {
+                    let stage = try stageCopy(realURL, beside: helperURL,
+                                              expectedHash: helperState.vendorSHA256)
+                    pendingStages[stage] = helperState.vendorSHA256
+                    try transaction.registerStagedFiles([stage: helperState.vendorSHA256])
+                    try transaction.install(stage, at: helperURL, hash: helperState.vendorSHA256)
+                    pendingStages.removeValue(forKey: stage)
+                } else if restoreWrapper {
                     let stage = try stageCopy(realURL, beside: helperURL, expectedHash: helperState.vendorSHA256)
                     pendingStages[stage] = helperState.vendorSHA256
+                    try transaction.registerStagedFiles([stage: helperState.vendorSHA256])
                     try transaction.swap(stage, with: helperURL,
                                          oldHash: helperState.wrapperSHA256,
                                          newHash: helperState.vendorSHA256)
                     pendingStages.removeValue(forKey: stage)
                 }
-                if let realHash { try transaction.park(realURL, expectedHash: realHash) }
-                if helperState.checksumOwned {
-                    let sidecar = try readRegularFile(checksumURL, maxBytes: 4096)
-                    try transaction.park(checksumURL, expectedHash: sha256(sidecar))
+
+                if cleanupBackup, let realHash {
+                    try transaction.park(realURL, expectedHash: realHash)
                 }
-                if helperState.licenseOwned {
+                if helperState.checksumOwned,
+                   (try? fileHash(checksumURL)) == sha256(sidecarData(
+                       helperState.vendorSHA256, filename: manifest.realHelperName)) {
+                    try transaction.park(checksumURL,
+                                         expectedHash: sha256(sidecarData(
+                                            helperState.vendorSHA256, filename: manifest.realHelperName)))
+                }
+                if helperState.licenseOwned,
+                   (try? fileHash(licenseURL)) == manifest.helperLicenseSHA256.lowercased() {
                     try transaction.park(licenseURL, expectedHash: manifest.helperLicenseSHA256.lowercased())
+                }
+                for archive in helperState.archives {
+                    let archiveURL = helperDirectory.appending(path: archive.filename)
+                    if transactionTargets(context)["helper:archive:\(archive.filename)"] != nil,
+                       (try? fileHash(archiveURL)) == archive.sha256 {
+                        try transaction.park(archiveURL, expectedHash: archive.sha256)
+                    }
                 }
             }
 
             if let oldData = currentSharedData, var shared = currentShared {
-                shared.references.removeAll { $0 == context.prefixID }
-                if shared.references.isEmpty {
-                    let gameDirectory = gameInstallDirectory(context)
-                    for pin in manifest.dxmtFiles {
-                        guard let file = shared.files[pin.name], file.ownership == .bridgeplay else { continue }
-                        let target = gameDirectory.appending(path: pin.name)
-                        if case let .present(info) = try pathInfo(target), info.isRegular,
-                           (try? fileHash(target)) == file.sha256 {
-                            try transaction.park(target, expectedHash: file.sha256)
+                let originalCount = shared.references.count
+                shared.references.removeAll { referencesToRemove.contains($0) }
+                if shared.references.count != originalCount {
+                    if shared.references.isEmpty {
+                        let gameDirectory = gameInstallDirectory(context)
+                        for pin in manifest.dxmtFiles {
+                            guard let file = shared.files[pin.name], file.ownership == .bridgeplay else { continue }
+                            let target = gameDirectory.appending(path: pin.name)
+                            if case let .present(info) = try pathInfo(target), info.isRegular,
+                               (try? fileHash(target)) == file.sha256 {
+                                try transaction.park(target, expectedHash: file.sha256)
+                            }
                         }
+                        try transaction.park(context.sharedState, expectedHash: sha256(oldData))
+                    } else {
+                        let updated = try encodeJSON(shared)
+                        let stage = try stageData(updated, beside: context.sharedState, mode: mode_t(0o644))
+                        pendingStages[stage] = sha256(updated)
+                    try transaction.registerStagedFiles([stage: sha256(updated)])
+                        try transaction.swap(stage, with: context.sharedState,
+                                             oldHash: sha256(oldData), newHash: sha256(updated))
+                        pendingStages.removeValue(forKey: stage)
                     }
-                    try transaction.park(context.sharedState, expectedHash: sha256(oldData))
-                } else {
-                    let updated = try encodeJSON(shared)
-                    let stage = try stageData(updated, beside: context.sharedState, mode: mode_t(0o600))
-                    pendingStages[stage] = sha256(updated)
-                    try transaction.swap(stage, with: context.sharedState,
-                                         oldHash: sha256(oldData), newHash: sha256(updated))
-                    pendingStages.removeValue(forKey: stage)
                 }
             }
 
             try transaction.park(context.stateFile, expectedHash: sha256(stateData))
-            transaction.finish()
+            try transaction.finish()
         } catch {
             if transaction.rollback() {
                 for (stage, hash) in pendingStages { _ = removeOwned(stage, expectedHash: hash) }
@@ -1292,6 +1528,9 @@ private struct GamefixPrepCLI {
             print(result)
             exit(0)
         } catch let failure as PrepFailure {
+            writeError(failure.token)
+            exit(failure.status)
+        } catch let failure as GamefixTransaction.Failure {
             writeError(failure.token)
             exit(failure.status)
         } catch {

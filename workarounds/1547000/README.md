@@ -9,20 +9,32 @@ file-copy steps.
 
 On the game's main `waitforexitandrun`, after Bridgeplay initializes its
 prefix and before choosing a graphics backend, it checks for an explicit
-conflicting graphics choice. A conflicting backend or DXGI override is kept,
-the workaround is skipped, and the reason is written to
-`compatdata/1547000/bridgeplay-run.log`. Steam's Rockstar prerequisites use the
-`run` verb and are left alone.
+conflicting graphics choice. The per-game fix selects DXVK even if a global
+`BACKEND` gamefix sets another default. A conflicting launch-option or
+per-game backend, or an effective conflicting DXGI override (including one
+from a global config), is kept; the workaround is skipped and the reason is
+written to `compatdata/1547000/bridgeplay-run.log`. Unrelated DLL overrides
+remain in effect. Steam's Rockstar prerequisites use the `run` verb and are
+left alone.
 Other compatibility engines skip this automatic path and use their normal
 graphics selection.
 
 When no conflict exists, Bridgeplay's native `gamefix-prep` helper validates
 the supported game executable/build, WineCX 11.17 DXMT DLL hashes, Social Club
 helper version, and every destination before changing files. It makes a
-read-only status check first. Unsupported or missing files, modified
-destinations, an unavailable DXVK runtime, or a missing helper stop the game
-launch with a log message. Per-prefix ownership state makes repeated launches,
-supported updates, and rollback safe around unknown files. Hash-verified
+read-only status check first. Unsupported setup input with no managed state to
+change, reported as status 3 (such as an unknown game build, unsupported
+Social Club helper, or missing runtime/helper files), is logged and skipped so
+it does not block an otherwise normal launch. Preparation revalidates its
+inputs; if they become unsupported between status and prepare, the same
+status-3 fallback applies only when no managed state needs changing. Unsafe or
+inconsistent state (status 4) and I/O or transaction errors (status 5) stop the
+launch with the original helper exit code. Without a DXVK runtime, the new
+setup is skipped before it changes files; an already managed setup that needs
+DXVK stops the launch rather than running with only part of its configuration.
+A missing Bridgeplay `gamefix-prep` executable is still treated as an incomplete
+installation and stops launch. Per-prefix ownership state makes repeated
+launches, supported updates, and rollback safe around unknown files. Hash-verified
 references keep game-local DLLs in place while another managed prefix still
 uses the same Steam game install; restore removes Bridgeplay-owned DLLs only
 after the last such prefix releases them. The helper relies on atomic rename
@@ -35,6 +47,19 @@ removes the shared DLLs after every managed prefix releases its reference.
 Matching files adopted as manual remain the user's
 responsibility. The game executable, Steam settings, registry and saves are
 not changed.
+
+An interrupted file transaction is recovered by the next prepare or restore
+before that operation validates or changes files. Read-only status inspection
+does not perform recovery. If a journaled target or staged file has changed,
+recovery stops and leaves the changed file and journal in place for inspection.
+During restore, missing shared ownership metadata means Bridgeplay leaves the
+shared game-local DLLs in place because it cannot verify other prefixes'
+references. If the current Social Club helper is an unrecognized vendor build,
+it is left in place while independently verified Bridgeplay-owned game DLLs
+can still be cleaned up when shared ownership metadata is intact. Shared
+ownership metadata and its read-only lock support multiple macOS accounts using
+the same game install; fixture coverage checks that mode and the absence of a
+single-UID assumption, but no second macOS account was created for testing.
 
 After preparation, Bridgeplay selects DXVK for the Rockstar launcher and
 sets DXGI to native-first (`dxgi=n,b`) for the game-local DXMT DLLs. The stock
@@ -289,6 +314,13 @@ fi
 cp -p "$GTA_CONF" "$GTA_CONF_BACKUP"
 open -e "$GTA_CONF"
 ~~~
+
+Before using the manual fallback, inspect the game's Steam launch options and
+per-game graphics choice for a conflicting backend or DXGI override. Remove or
+change only a conflicting `BRIDGEPLAY_BACKEND`/`NOTPROTON_BACKEND` or
+`CX_GRAPHICS_BACKEND` choice. In `WINEDLLOVERRIDES` or `DLLOVERRIDES`, update
+only the conflicting `dxgi` entry. Preserve unrelated launch arguments and DLL
+module entries.
 
 Keep exactly one BACKEND=dxvk and one DLLOVERRIDES line. If an existing
 DLLOVERRIDES value has other semicolon-separated module overrides, preserve

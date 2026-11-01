@@ -90,6 +90,12 @@ The backend is picked in this order:
 
 A backend the engine lacks falls back: `dxvk` → `dxmt` → `wined3d`, and `d3dmetal` → `dxmt`.
 
+The automatic GTA San Andreas fix is enabled by its shipped per-game setting. For AppID
+1547000, it selects DXVK even when a global `BACKEND` gamefix sets another default. An
+explicit launch-option or per-game backend choice that conflicts with DXVK skips the fix.
+An effective conflicting DXGI override also skips it, including one from a global config;
+other DLL overrides are preserved. See the [GTA San Andreas guide](../workarounds/1547000/README.md).
+
 ### WineCX with D3DMetal
 
 When a Game Porting Toolkit is linked into the WineCX engine
