@@ -180,6 +180,18 @@ struct SteamPatchKeeperTests {
         #expect(tries == 0)
     }
 
+    @Test("A failed re-apply stands while Steam's signature stays broken")
+    func failureStandsOnBrokenSeal() {
+        #expect(SteamPatchKeeper.failureStands(.installed(version: nil), lastAttemptFailed: true) { false })
+        #expect(!SteamPatchKeeper.failureStands(.installed(version: nil), lastAttemptFailed: true) { true })
+
+        // Nothing failed, or Steam isn't installed: the signature is not read at all.
+        var read = false
+        #expect(!SteamPatchKeeper.failureStands(.installed(version: nil), lastAttemptFailed: false) { read = true; return false })
+        #expect(!SteamPatchKeeper.failureStands(.notInstalled, lastAttemptFailed: true) { read = true; return false })
+        #expect(!read)
+    }
+
     @Test("Only a failure marked as passing is retried")
     func retryableFailures() {
         #expect(SteamPatchKeeper.isRetryable(StepFailure(step: "s", detail: "d", retryable: true)))

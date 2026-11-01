@@ -629,12 +629,17 @@ final class SystemStatus {
 
     // unattended: nobody pressed anything, so a Steam that opened since the decision to
     // install is left running and the install stops instead.
+    // Steam's signature is broken and only another account can sign it again. The install
+    // itself finished, so Setup carries on, but it shows as a failure until an install clears it.
+    private(set) var sealWarning: String?
+
     func installIntoSteam(unattended: Bool = false, holdBack: (Error) -> Bool = { _ in false }) async {
         if let refusal = MigrationLaunch.shared.refusal {
             setFailure(refusal)
             AppLog.note("run refused: install waits for the 3.0 folder move")
             return
         }
+        sealWarning = nil
         await perform(from: InstallPhase.checkingPayload.label, holdBack: holdBack) { progress in
             let lock = try DeploymentContent.acquireInstallationLock()
             defer { lock.release() }
@@ -683,10 +688,13 @@ final class SystemStatus {
                 try SteamInstaller.finish(result)
             }.value
 
+            // Set last, so a step that fails above is not read as a finished install.
+            sealWarning = result.sealWarning
             return parts.joined(separator: " ")
         }
         if failure == nil {
             UserDefaults.standard.removeObject(forKey: SteamPatchKeeper.pausedKey)
+            if let sealWarning { setFailure(sealWarning) }
         }
     }
 
@@ -763,6 +771,15 @@ final class SystemStatus {
 
         switch decision {
         case .nothing:
+            let deployment = seen.deployment
+            let failed = autoReapplyFailed
+            let app = SupportPaths.Steam.app
+            let stands = await Task.detached(priority: .utility) {
+                SteamPatchKeeper.failureStands(deployment, lastAttemptFailed: failed) {
+                    SteamInstaller.sealIsIntact(app)
+                }
+            }.value
+            if stands { return }
             if patchBanner != nil { AppLog.note("patch keeper (\(trigger)): Steam carries Bridgeplay again") }
             patchBanner = nil
             autoReapplyFailed = false
