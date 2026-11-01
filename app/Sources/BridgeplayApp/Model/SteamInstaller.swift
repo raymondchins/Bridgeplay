@@ -41,6 +41,8 @@ struct InstallOutcome: Sendable {
     // Input access services macOS refused to reset after Steam's signature changed. nil when
     // the signature didn't change, so no reset ran.
     var failedInputResets: [String]?
+    // Steam's signature is broken and only another account can sign it again.
+    var sealWarning: String?
 }
 
 enum SteamInstaller {
@@ -154,7 +156,9 @@ enum SteamInstaller {
             try verifyRunner(build, SupportPaths.clonedRoot(forBuild: build.id, runners: runners))
         }
         try modifications.mark(app)
-        let patching = try needsPatching(plist: plist, dylib: dylib, shipping: payload.dylib, app: app)
+        var sealWarning: String?
+        let patching = try needsPatching(plist: plist, dylib: dylib, shipping: payload.dylib, app: app,
+                                         onBrokenSeal: { sealWarning = $0 })
         let replacingFiles = try files.contains {
             try $0.needsClientStopped && !$0.matches() && FileManager.default.fileExists(atPath: $0.destination.path(percentEncoded: false))
         }
@@ -267,7 +271,8 @@ enum SteamInstaller {
             build: build,
             signatureDatabases: payload.signatures.count,
             backedUpPlist: backedUp,
-            failedInputResets: failedInputResets
+            failedInputResets: failedInputResets,
+            sealWarning: sealWarning
         )
     }
 
@@ -350,7 +355,11 @@ enum SteamInstaller {
         }
     }
 
-    static func needsPatching(plist: URL, dylib: URL, shipping: URL, app: URL) throws -> Bool {
+    static func needsPatching(
+        plist: URL, dylib: URL, shipping: URL, app: URL,
+        checkWritable: (URL) throws -> Void = assertBundleIsWritable,
+        onBrokenSeal: (String) -> Void = { _ in }
+    ) throws -> Bool {
         let deployed = SteamBundle.currentInsert(at: plist) == dylib.path(percentEncoded: false)
             && SteamBundle.currentControllerBlock(at: plist) == SteamBundle.controllerBlockValue
         let file = DeploymentContent.File(source: shipping, destination: dylib, name: "notproton.dylib", allowsResigning: true)
@@ -361,10 +370,13 @@ enum SteamInstaller {
             }
             // Signing failed and the plist could not be put back (#1931): sign it again.
             do {
-                try assertBundleIsWritable(app)
+                try checkWritable(app)
             } catch let refusal as WriteRefused {
                 guard let detail = brokenSealDetail(refusal.remedy) else { throw refusal }
-                throw StepFailure(step: step, detail: detail)
+                // This account's own install doesn't depend on the seal, so it carries on.
+                AppLog.note("install: Steam's signature no longer matches and this account can't sign it")
+                onBrokenSeal(detail)
+                return false
             }
             return true
         }

@@ -650,6 +650,7 @@ final class SystemStatus {
 
             var parts = [String(localized: "Bridgeplay successfully installed.")]
             if result.stoppedClient { parts.append(Self.restartHint) }
+            if let warning = result.sealWarning { parts.append(warning) }
             let install = usableCrossOver
             let state = await Task.detached(priority: .userInitiated) {
                 (runner: RunnerStore.state(),
@@ -763,6 +764,15 @@ final class SystemStatus {
 
         switch decision {
         case .nothing:
+            let deployment = seen.deployment
+            let failed = autoReapplyFailed
+            let app = SupportPaths.Steam.app
+            let stands = await Task.detached(priority: .utility) {
+                SteamPatchKeeper.failureStands(deployment, lastAttemptFailed: failed) {
+                    SteamInstaller.sealIsIntact(app)
+                }
+            }.value
+            if stands { return }
             if patchBanner != nil { AppLog.note("patch keeper (\(trigger)): Steam carries Bridgeplay again") }
             patchBanner = nil
             autoReapplyFailed = false

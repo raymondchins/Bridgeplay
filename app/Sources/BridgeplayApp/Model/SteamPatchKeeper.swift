@@ -68,6 +68,15 @@ enum SteamPatchKeeper {
         return .reapply(kind)
     }
 
+    // A failed re-apply can leave the insert in a bundle it never signed, which reads as
+    // installed, so the failure stands until the signature is good again.
+    static func failureStands(
+        _ deployment: SteamDeployment, lastAttemptFailed: Bool, sealIsIntact: () -> Bool
+    ) -> Bool {
+        guard lastAttemptFailed, case .installed = deployment else { return false }
+        return !sealIsIntact()
+    }
+
     // Reads only what decide() needs: the plist, two process lists and one small file.
     static func capture(
         bundledVersion: String,

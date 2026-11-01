@@ -740,6 +740,33 @@ struct SteamInstallerTests {
         )
     }
 
+    @Test("A broken seal this account can't sign again doesn't stop its own install")
+    func brokenSealElsewhereKeepsInstalling() async throws {
+        let work = try scratchDirectory("install")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+
+        _ = try install(fixture)
+        var dict = try #require(SteamBundle.readInfoPlist(at: fixture.plist))
+        dict["BridgeplayTestKey"] = "changed"
+        try SteamBundle.writeInfoPlist(dict, at: fixture.plist)
+
+        var warning: String?
+        let patching = try SteamInstaller.needsPatching(
+            plist: fixture.plist, dylib: fixture.deployedDylib, shipping: fixture.payload.dylib, app: fixture.app,
+            checkWritable: { throw WriteRefused(path: $0.path(percentEncoded: false), remedy: .otherAccount) },
+            onBrokenSeal: { warning = $0 })
+        #expect(!patching)
+        #expect(warning == SteamInstaller.brokenSealDetail(.otherAccount))
+
+        // A refusal this account can fix itself is still reported.
+        #expect(throws: WriteRefused.self) {
+            try SteamInstaller.needsPatching(
+                plist: fixture.plist, dylib: fixture.deployedDylib, shipping: fixture.payload.dylib, app: fixture.app,
+                checkWritable: { throw WriteRefused(path: $0.path(percentEncoded: false), remedy: .ownership) })
+        }
+    }
+
     @Test("The installer records the package build time rather than the installation time")
     func recordsPackageBuild() async throws {
         let work = try scratchDirectory("install-record")
