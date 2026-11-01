@@ -27,7 +27,7 @@ case "${1:-}" in
 esac
 
 # Keep this list in step with the "Patched Wine (WineCX) binaries" section of NOTICE.
-patch_dirs="win32u-patch winemac-patch winebus-patch winecoreaudio-patch wined3d-patch ws2_32-patch d3dx11-patch ngx-signer-patch hide-wine-exports-patch"
+patch_dirs="win32u-patch winemac-patch winebus-patch winecoreaudio-patch wined3d-patch ws2_32-patch d3dx11-patch ngx-signer-patch hide-wine-exports-patch ntdll-patch"
 for d in $patch_dirs; do
 	[ -d "$d" ] || die "missing $d; update patch_dirs in $0 to match NOTICE"
 done
@@ -36,6 +36,10 @@ winecx_url=https://github.com/dappermint/winecx.git
 sha_1117=$(sed -n 's/^  WineCX 11\.17 (winecx \([0-9a-f]\{40\}\), runtime.*/\1/p' NOTICE)
 sha_1115=$(sed -n 's/^  WineCX 11\.15 (winecx \([0-9a-f]\{40\}\), runtime.*/\1/p' NOTICE)
 [ -n "$sha_1117" ] && [ -n "$sha_1115" ] || die "could not read the winecx pins from NOTICE"
+# docs/WINECX.md holds the pins the binaries are built from, so NOTICE must agree with it.
+for sha in "$sha_1117" "$sha_1115"; do
+	grep -qF "winecx \`$sha\`" docs/WINECX.md || die "winecx $sha in NOTICE is not pinned in docs/WINECX.md"
+done
 
 # The id covers every input that determines the archive's bytes (except the generated
 # README.md, whose only variables -- $id and the two short shas -- are themselves already
@@ -43,12 +47,13 @@ sha_1115=$(sed -n 's/^  WineCX 11\.15 (winecx \([0-9a-f]\{40\}\), runtime.*/\1/p
 # recipe/license files copied in below, and this script itself (its README template and
 # winecx_url are otherwise invisible to the hash). So any of them changing gives a new id,
 # and --publish never mistakes stale content for what's already published under an
-# unchanged name.
+# unchanged name. Only tracked files count, so build output left in a patch directory can't
+# change the id or end up in the archive.
 id=$(
 	{
 		printf '%s\n%s\n' "$sha_1117" "$sha_1115"
 		for d in $patch_dirs; do
-			find "$d" -type f | LC_ALL=C sort | while read -r f; do
+			git ls-files "$d" | LC_ALL=C sort | while read -r f; do
 				stat -f '%Lp' "$f"
 				shasum -a 256 "$f"
 			done
@@ -75,7 +80,10 @@ done
 stage="$work/$name"
 mkdir -p "$stage/patches"
 for d in $patch_dirs; do
-	cp -R "$d" "$stage/patches/$d"
+	git ls-files "$d" | while read -r f; do
+		mkdir -p "$stage/patches/$(dirname "$f")"
+		cp "$f" "$stage/patches/$f"
+	done
 done
 # Not NOTICE: it names this archive's own sha256, so bundling it would make the archive's
 # bytes, and so its sha256, depend on what was last pasted into NOTICE.
@@ -142,7 +150,13 @@ echo "    release tag: $name"
 [ "$publish" -eq 1 ] || exit 0
 slug=raymondchins/Bridgeplay
 if gh release view "$name" -R "$slug" >/dev/null 2>&1; then
-	echo "==> $name is already published"
+	if gh release view "$name" -R "$slug" --json assets -q '.assets[].name' | grep -qxF "$name.tar.gz"; then
+		echo "==> $name is already published"
+	else
+		# A release left without its asset by a failed upload.
+		gh release upload "$name" "$archive" -R "$slug"
+		echo "==> uploaded $name.tar.gz to https://github.com/$slug/releases/tag/$name"
+	fi
 	exit 0
 fi
 gh release create "$name" "$archive" -R "$slug" --prerelease --latest=false \

@@ -351,7 +351,19 @@ if [ "$PUBLISH" -eq 1 ]; then
     slug=raymondchins/Bridgeplay
     tag="dxmt-$SHORT"
     if gh release view "$tag" -R "$slug" >/dev/null 2>&1; then
-        log "$tag is already published"
+        # Add what the release lacks, such as the source of a release that predates it.
+        # Never replace an asset: the app pins the published binary tarball by sha256.
+        assets="$(gh release view "$tag" -R "$slug" --json assets -q '.assets[].name')"
+        missing=()
+        for f in "$TARBALL" "$SOURCE_TARBALL" "$MANIFEST"; do
+            grep -qxF "$(basename "$f")" <<<"$assets" || missing+=("$f")
+        done
+        if [ "${#missing[@]}" -gt 0 ]; then
+            gh release upload "$tag" "${missing[@]}" -R "$slug"
+            log "added ${#missing[@]} asset(s) to https://github.com/$slug/releases/tag/$tag"
+        else
+            log "$tag is already published"
+        fi
     else
         gh release create "$tag" "$TARBALL" "$SOURCE_TARBALL" "$MANIFEST" -R "$slug" \
             --prerelease --latest=false --title "DXMT $SHORT" \
