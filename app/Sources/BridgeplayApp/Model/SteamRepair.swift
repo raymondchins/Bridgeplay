@@ -30,10 +30,6 @@ enum RepairPhase: Sendable {
 
 struct RepairOutcome: Sendable {
     let stoppedClient: Bool
-    let bundleVersion: String?
-    let clearedInnerInsert: Bool
-    let removedUpdateBlocks: [String]
-    let removedStaleBackup: Bool
 }
 
 enum SteamRepair {
@@ -55,6 +51,7 @@ enum SteamRepair {
             try SteamBundle.stopClient(app: app, step: String(localized: "Repair Steam"), onStopping: onStopping)
         },
         register: SteamInstaller.BundleRegistrar = { SteamBundle.register($0) },
+        runningBuild: @Sendable () -> String? = { RunnerInstaller.runningBuild() },
         report: @escaping @Sendable (RepairPhase) -> Void = { _ in }
     ) async throws -> RepairOutcome {
         let manifest = try suppliedManifest ?? ValvePackageManifest.bundled()
@@ -65,11 +62,20 @@ enum SteamRepair {
             )
         }
 
+        // Quitting Steam can take a running game with it.
+        func refuseRunningGame() throws {
+            guard let build = runningBuild() else { return }
+            throw StepFailure(step: step, detail: String(localized: "A game or Wine tool is running on build \(build). Quit it before repairing Steam."))
+        }
+        try refuseRunningGame()
+
         let staged = try await stage(bundle, bases: manifest.bases, downloads: downloads, report: report)
 
         report(.checking)
         try verifyValveSignature(staged)
 
+        // A game can start during the download.
+        try refuseRunningGame()
         let stopped = try stopClient(app) { report(.stoppingClient) }
 
         try modifications.prepare()
@@ -89,24 +95,18 @@ enum SteamRepair {
         _ = try modifications.retireIfClean(app)
 
         report(.clearingInsert)
-        let clearedInner = try clearInsert(at: innerPlist)
+        _ = try clearInsert(at: innerPlist)
 
         report(.removingUpdateBlock)
-        let removed = try UpdateBlock.remove(from: updateBlocks)
+        _ = try UpdateBlock.remove(from: updateBlocks)
 
         report(.registering)
         register(app)
 
-        let removedBackup = try removeStaleBackup(from: backups)
+        _ = try removeStaleBackup(from: backups)
 
         report(.finished)
-        return RepairOutcome(
-            stoppedClient: stopped,
-            bundleVersion: version(of: app),
-            clearedInnerInsert: clearedInner,
-            removedUpdateBlocks: removed,
-            removedStaleBackup: removedBackup
-        )
+        return RepairOutcome(stoppedClient: stopped)
     }
 
     static func stage(
@@ -239,11 +239,5 @@ enum SteamRepair {
             removed = true
         }
         return removed
-    }
-
-    static func version(of app: URL) -> String? {
-        guard let dict = SteamBundle.readInfoPlist(at: app.appending(path: "Contents/Info.plist"))
-        else { return nil }
-        return dict["CFBundleVersion"] as? String
     }
 }

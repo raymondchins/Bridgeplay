@@ -667,7 +667,28 @@ wait "$builder"
 check test -f "$first_prefix/system.reg"
 seed_prefix_from_template
 check test -f "$WINEPREFIX/system.reg"
-check test "$(find "$template_dir/pfx" -name 'pfx.building.*' | wc -l | tr -d ' ')" = 0
+check test "$(find "$template_dir" -maxdepth 2 -name 'pfx.building.*' | wc -l | tr -d ' ')" = 0
+
+# A template that lands while this one builds is kept, and the build leaves nothing behind.
+fixture
+export ready_pipe="$case_root/ready" resume_pipe="$case_root/resume"
+mkfifo "$ready_pipe" "$resume_pipe"
+env functions="$functions" /bin/sh -ec "
+  eval \"\$functions\"
+  eval \"\$fake_initializer\"
+  rm -rf \"\$template_dir/pfx\"
+  build_prefix_template
+" &
+builder=$!
+read -r ready < "$ready_pipe" || true
+check test "$ready" = ready
+mkdir -p "$template_dir/pfx"
+printf existing > "$template_dir/pfx/system.reg"
+printf 'continue\n' > "$case_root/resume"
+wait "$builder"
+unset ready_pipe resume_pipe
+check test "$(cat "$template_dir/pfx/system.reg")" = existing
+check test "$(find "$template_dir" -maxdepth 2 -name 'pfx.building.*' | wc -l | tr -d ' ')" = 0
 
 fixture
 chmod 500 "$case_root"

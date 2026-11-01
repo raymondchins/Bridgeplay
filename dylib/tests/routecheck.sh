@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016 # the sh -ec program expands its own variables
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "routecheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> routecheck: $SRC not present, skipped"; exit 0; }
 
 body=$(sed -n '/^target="\$1"$/,/^fi$/p' "$SRC")
 [ -n "$body" ] || { echo "FAIL: the launch routing not found in $SRC"; exit 1; }

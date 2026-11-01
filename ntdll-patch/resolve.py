@@ -3,6 +3,7 @@
 # all archs. Internal development tool, ugly
 import hashlib, pathlib, struct, sys, re, bisect, capstone
 from capstone import x86 as X86, arm64 as A64
+from wmguard import refuse_unsafe, refuse_writes
 
 ARCH = {0x8664: 'x86_64-windows', 0x14c: 'i386-windows', 0xaa64: 'aarch64-windows'}
 
@@ -341,6 +342,12 @@ def steal(insns, k, need=5):
     return taken, total
 
 
+def window(insns):
+    """What wmguard.refuse_writes needs from each capstone instruction."""
+    return [(i.address, f"{i.mnemonic} {i.op_str}".strip(), i.mnemonic,
+             [i.reg_name(r) for r in i.regs_access()[1]]) for i in insns]
+
+
 def resolve_amd64(pe):
     md = pe.cs()
     tvrva, text = pe.text()
@@ -368,19 +375,22 @@ def resolve_amd64(pe):
     if len(calls) != 1:
         raise SystemExit(f"{pe.path}: {len(calls)} alloc_module calls in build_module, want 1")
 
-    k, wm = calls[0] + 1, None
+    k, wm, wm_k = calls[0] + 1, None, None
     while True:
         i = body[k]
         if i.mnemonic == 'test' and i.op_str == 'rax, rax':
             k += 1
         elif i.mnemonic == 'mov' and i.op_str.endswith(', rax'):
-            wm = i.op_str.split(',')[0].strip()
+            wm, wm_k = i.op_str.split(',')[0].strip(), k
             k += 1
         elif i.mnemonic in ('je', 'jz'):
             k += 1
         else:
             break
     hook = body[k]
+    refuse_unsafe(pe.path, 'x86_64', wm)
+    refuse_writes(pe.path, 'x86_64', wm, window(body[wm_k + 1:k]),
+                  f"between the move at {body[wm_k].address:#x} and the hook at {hook.address:#x}")
     slot = amd64_load_path(pe, body, hook.address)
     return {'build_module': bm, 'alloc_module': am, 'wm': wm, 'load_path': slot,
             'hookRVA': hook.address, 'stolen': hook.bytes.hex(), 'insn': f"{hook.mnemonic} {hook.op_str}"}
@@ -494,6 +504,11 @@ def resolve_i386(pe):
     flags_slot = mem[0].mem.disp
 
     taken, total = steal(body, hook_k)
+    # The shim reads wm at the hook, but it is found at the MODREF test below it.
+    refuse_unsafe(pe.path, 'i386', wm)
+    refuse_writes(pe.path, 'i386', wm, window(body[hook_k:anchor]),
+                  f"between the hook at {body[hook_k].address:#x} and the MODREF test at "
+                  f"{body[anchor].address:#x}")
 
     jk = None
     for k in range(gate + 1, min(gate + 8, len(body))):

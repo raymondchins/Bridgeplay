@@ -16,6 +16,7 @@ struct ComponentsPlacement {
         _ = try? InstallerComponents.run("/usr/bin/defaults", ["delete", "com.bridgeplay.Bridgeplay", "setupAssistantFinished"])
     }
     var oldConfs = ComponentsPlacement.oldInstallerConfs
+    var log: (String) -> Void = { InstallerLog.write($0) }
 
     static let steamStatus = "Installing Steam from Valve"
     static let copyStatus = "Copying the Game Porting Toolkit, DXMT, DXVK and configs"
@@ -114,7 +115,10 @@ struct ComponentsPlacement {
     static func hex(_ digest: SHA256.Digest) -> String { digest.map { String(format: "%02x", $0) }.joined() }
 
     private func fail(_ message: String, _ body: () throws -> Void) throws {
-        do { try body() } catch { throw InstallerError.componentsFailure(message) }
+        do { try body() } catch {
+            log("\(message) \(error)")
+            throw InstallerError.componentsFailure(message)
+        }
     }
 }
 
@@ -137,6 +141,7 @@ enum ValveSteam {
                 if let meter = InstallerDownloadProgress(curlMeter: line) { download(meter) }
             }
         } catch {
+            InstallerLog.write("Steam download failed: \(error)")
             throw InstallerError.componentsFailure("Steam could not be downloaded. Check the internet connection and try again.")
         }
         // A UDIF disk image ends with a 512-byte trailer that starts with "koly".
@@ -148,6 +153,7 @@ enum ValveSteam {
             try InstallerComponents.run("/usr/bin/hdiutil", ["attach", "-nobrowse", "-readonly", "-noautoopen", "-quiet",
                                                              "-mountpoint", mount.path, dmg.path])
         } catch {
+            InstallerLog.write("Opening the Steam installer failed: \(error)")
             throw InstallerError.componentsFailure("The Steam installer could not be opened.")
         }
         defer { _ = try? InstallerComponents.run("/usr/bin/hdiutil", ["detach", "-quiet", mount.path]) }
@@ -160,6 +166,7 @@ enum ValveSteam {
         do {
             try ComponentsPlacement.put(steam, at: applications.appending(path: "Steam.app"), replacing: false)
         } catch {
+            InstallerLog.write("Copying Steam failed: \(error)")
             throw InstallerError.componentsFailure("Steam could not be copied to Applications.")
         }
     }

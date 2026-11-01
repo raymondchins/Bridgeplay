@@ -35,7 +35,7 @@ struct RunnerPatcherTests {
         guard let (root, build) = try Self.healthyClone() else { return }
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let arch = RunnerPatcher.unixArch(in: root)
+        let arch = RunnerPatcher.unixArches(in: root)[0]
         let builtin = root.appending(path: "lib/wine/\(arch)/lsteamclient.so")
         try Data("not the bridge copy".utf8).write(to: builtin)
 
@@ -181,10 +181,10 @@ struct RunnerPatcherTests {
         }
 
         try write("lib/wine/x86_64-unix/wine")
-        #expect(RunnerPatcher.unixArch(in: root) == "x86_64-unix")
+        #expect(RunnerPatcher.unixArches(in: root)[0] == "x86_64-unix")
 
         try write("lib/wine/aarch64-unix/wine.app/Contents/MacOS/wine")
-        #expect(RunnerPatcher.unixArch(in: root) == "aarch64-unix")
+        #expect(RunnerPatcher.unixArches(in: root)[0] == "aarch64-unix")
 
         #expect(RunnerPatcher.unixArches(in: root) == ["aarch64-unix", "x86_64-unix"])
 

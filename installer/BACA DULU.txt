@@ -33,7 +33,7 @@ Security > Input Monitoring).
 
 Lisensi: Bridgeplay gratis dan non-komersial, berlisensi GPL-3.0 (lihat
 LICENSE dan NOTICE). Installer ini menyertakan redistributable Game Porting
-Toolkit milik Apple (folder gptk) di bawah lisensi Apple, yang hanya
-mengizinkan distribusi non-komersial. Lisensinya ada di GPTK-License.rtf.
+Toolkit milik Apple (folder gptk) tanpa diubah, di bawah lisensi Apple
+sendiri, yang ada di GPTK-License.rtf.
 DXMT dan DXVK (folder cache) memakai lisensinya sendiri, ada di file LICENSE.*
 dan COPYING.LIB.dxmt di sini.

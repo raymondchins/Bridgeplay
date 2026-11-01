@@ -41,23 +41,6 @@ struct RunActivityTests {
         #expect(status.isIdle)
     }
 
-    @Test("A confirmation is remembered until it is answered")
-    func pendingConfirmationSurvivesUntilCleared() {
-        let status = SystemStatus()
-        #expect(status.pendingConfirmation == nil)
-
-        status.pendingConfirmation = .blockUpdates
-        #expect(status.pendingConfirmation == .blockUpdates)
-
-        // A second ask replaces the first rather than queueing behind it, so the dialog
-        // on screen is always the one that will run if it is confirmed.
-        status.pendingConfirmation = .replaceSteam
-        #expect(status.pendingConfirmation == .replaceSteam)
-
-        status.pendingConfirmation = nil
-        #expect(status.pendingConfirmation == nil)
-    }
-
     @Test("A finished run is not busy")
     func finishedRunIsIdle() {
         let status = SystemStatus()

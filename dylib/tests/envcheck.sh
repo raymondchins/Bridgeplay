@@ -2,7 +2,7 @@
 # shellcheck disable=SC2034,SC2154
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "envcheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> envcheck: $SRC not present, skipped"; exit 0; }
 
 strip() { sed 's/^[[:space:]]*//'; }
 dllpath_line=$(grep 'export WINEDLLPATH=' "$SRC" | grep 'x86_64-windows' | strip)
@@ -193,6 +193,20 @@ is "an empty BRIDGEPLAY_ value is still a value" "|unset" "$(mapped BRIDGEPLAY_R
 is "a value holding a quote and a newline is copied as is" "a'b
 c|unset" "$(mapped "BRIDGEPLAY_RETINA=a'b
 c")"
+
+echo "== the run log and the Steam login =="
+logged=$(grep -F "env | grep -iE '^(Steam|SDL_)'" "$SRC" | strip)
+[ -n "$logged" ] || { echo "FAIL: the Steam environment log line not found"; exit 1; }
+# shellcheck disable=SC2016 # the inner sh expands it
+run_log() { env -i PATH="$PATH" "$@" logged="$logged" sh -ec 'eval "$logged"'; }
+is "the login name and video token stay out, the rest stays" "SDL_JOYSTICK_MFI=0
+SteamAppId=4242
+SteamGameId=4242" "$(run_log SteamUser=login SteamAppUser=login STEAMVIDEOTOKEN=1002 \
+  SteamAppId=4242 SteamGameId=4242 SDL_JOYSTICK_MFI=0)"
+is "a log with only those lines is empty, not a stopped script" "" "$(run_log SteamUser=login)"
+# shellcheck disable=SC2016 # the inner sh expands them
+is "the game still gets them" "login|1002" "$(env -i PATH="$PATH" SteamUser=login STEAMVIDEOTOKEN=1002 \
+  logged="$logged" sh -ec 'eval "$logged" > /dev/null; printf "%s|%s" "$SteamUser" "$STEAMVIDEOTOKEN"')"
 
 if [ "$fails" -eq 0 ]; then
 	echo "==> envcheck: all assertions hold"

@@ -10,7 +10,7 @@ typedef enum {
     NP_MATCH_NONE = 0,
     NP_MATCH_STRING,             // entry point that loads one unique C string
     NP_MATCH_VTABLE_SLOT,        // pointer parked at a fixed data address
-    NP_MATCH_INSN_AFTER_STRING,  // the instruction one past the Nth chosen opcode,
+    NP_MATCH_INSN_AFTER_STRING,  // the instruction one past the Nth BLR,
                                   // counting from a string load
     NP_MATCH_INSN_PAIR_IN_FN,    // the sole adjacent opcode pair inside the function
                                   // a string reference identifies
@@ -37,8 +37,6 @@ typedef struct {
     np_match_kind_t kind;
     char             str[256];   // the referenced string, for the two string kinds
     uintptr_t        va;         // unslid data address of the vtable slot
-    uint32_t         insn;       // opcode bits to match against (0 selects BLR)
-    uint32_t         insn_mask;  // which opcode bits are significant (0 selects BLR)
     int              nth;        // 1-based index of the wanted opcode match
 
     int              nth_xref;

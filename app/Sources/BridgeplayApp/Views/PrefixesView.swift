@@ -74,7 +74,9 @@ struct PrefixesView: View {
             Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
                 .keyboardShortcut(.defaultAction)
         } message: {
-            Text(PrefixPrompt.deleteMessage(deleting))
+            Text(PrefixPrompt.deleteMessage(
+                deleting,
+                backups: model.backups.filter { backup in deleting.contains { $0.id == backup.prefix.id } }.count))
         }
         .confirmationDialog(
             PrefixPrompt.rebuildTitle(rebuilding, for: rebuildTool),

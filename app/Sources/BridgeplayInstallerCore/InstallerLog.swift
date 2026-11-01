@@ -44,7 +44,7 @@ public enum InstallerLog {
         return [sysctl("hw.model"), sysctl("machdep.cpu.brand_string"), version].compactMap { $0 }.joined(separator: ", ")
     }
 
-    static func redact(_ text: String) -> String {
+    public static func redact(_ text: String) -> String {
         text.replacingOccurrences(of: NSHomeDirectory(), with: "~")
     }
 

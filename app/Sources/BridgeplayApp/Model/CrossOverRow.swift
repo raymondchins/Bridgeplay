@@ -19,7 +19,6 @@ struct CrossOverRow: Identifiable, Equatable {
     let unsupportedVersion: String?
 
     var id: String { install?.id ?? buildID }
-    var build: RunnerBuild? { SupportedRunners.build(id: buildID) }
 
     var title: String {
         if let install { return install.name }

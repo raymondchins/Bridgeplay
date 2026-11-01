@@ -221,6 +221,40 @@ struct PinnedDownloadTests {
         #expect(try String(contentsOf: got, encoding: .utf8) == body)
     }
 
+    @Test("A cached archive that fails its pin is fetched again and replaced")
+    func replacesBadCache() async throws {
+        let work = try scratchDirectory("pinned")
+        defer { try? FileManager.default.removeItem(at: work) }
+
+        let body = "the real package"
+        let serving = try host(work, named: "package.tar", serving: body)
+        let downloads = work.appending(path: "downloads")
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        try Data("the real pack".utf8).write(to: downloads.appending(path: "package.tar"))
+
+        let got = try await obtain(
+            bases: [serving], into: downloads, sha256: Digest.sha256(of: Data(body.utf8))
+        )
+
+        #expect(try String(contentsOf: got, encoding: .utf8) == body)
+    }
+
+    @Test("A cached archive that fails its pin is refused when no host can replace it")
+    func refusesBadCacheWithNoHost() async throws {
+        let work = try scratchDirectory("pinned")
+        defer { try? FileManager.default.removeItem(at: work) }
+
+        let downloads = work.appending(path: "downloads")
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        try Data("the real pack".utf8).write(to: downloads.appending(path: "package.tar"))
+
+        await #expect(throws: StepFailure.self) {
+            try await obtain(
+                bases: [], into: downloads, sha256: Digest.sha256(of: Data("the real package".utf8))
+            )
+        }
+    }
+
     @Test("An archive already on disk that matches is not fetched again")
     func reusesMatchingArchive() async throws {
         let work = try scratchDirectory("pinned")

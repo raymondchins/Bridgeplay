@@ -45,8 +45,9 @@ refuses an active Bridgeplay/updater process, and keeps the prior app in the hid
 locally before release discovery, including when the network is unavailable. Unexpected
 backup contents are preserved and reported instead of deleted. An older recovery bundle is
 rotated by rename before replacement. Retired copies owned by another account or containing
-read-only directories stay intact as `.Bridgeplay.app.previous-<UUID>` siblings; an
-administrator can remove them in Finder. They do not block subsequent updates.
+read-only directories stay intact as hidden `.Bridgeplay.app.previous-<UUID>` siblings; an
+administrator can remove them from Terminal, or in Finder after showing hidden files with
+Cmd-Shift-Period. They do not block subsequent updates.
 
 Prefixes, saves and Steam libraries are never touched. The components step writes `gptk/`,
 `gamefixes-default/`, the cached DXMT/DXVK archives, and `gamecontrollerdb.txt` when there is
@@ -89,7 +90,8 @@ For an isolated GUI test, a debug build also accepts `--test-destination` with a
 `Bridgeplay.app` path inside the macOS temporary directory. Release builds always use
 Applications. Do not open the installed test app unless you intend to exercise real setup.
 
-States are `review`, `update`, `download`, `install`, `done`, `current`, and `error`.
+States are `review`, `update`, `download`, `paused`, `components`, `install`, `steam`, `done`,
+`current`, and `error`.
 Preview screenshots establish appearance; they do not establish install/update success.
 
 Before public rollout, exercise a fresh install, older/current/newer app, real component

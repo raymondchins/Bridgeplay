@@ -106,7 +106,7 @@ lib/libSDL2-2.0.0.dylib                           SDL 2.32.10, x86_64, for wineb
 ```
 
 DXMT comes from `dxmt-e94c312.tar.gz` (the WineHQ engine's pin, shared download cache).
-`winemetal.so` and both `winemetal.dll` are replaced together, since they share one unix-call
+`winemetal.so` and both `winemetal.dll` files are replaced together, since they share one unix-call
 table and never mix with 0.80. The D3D DLLs get the 16 bytes of the Wine builtin marker at
 0x40 overwritten with a DOS stub, the same bytes winecx-gptk writes, so they load as natives
 from a prefix: Wine swaps a marked DLL found in a prefix for the `lib/wine` builtin of the
@@ -384,6 +384,8 @@ python3 resolve.py ../Libraries/Wine          # self-tests against PINNED
 ./build32.sh ../Libraries/Wine/lib/wine/i386-windows/ntdll.dll  winecx-<11.17|11.15>
 python3 apply.py <ntdll.dll> <out> <detour bin>   # patched hashes
 ```
+
+- Any new or bumped engine needs a 32-bit game smoke test: launch a 32-bit game from Steam on it and check that it reaches Steam. `make detourcheck` only proves each detour reads the register its pin names.
 
 4.7.3 (`winecx-11.17`): both detours fit in `.text` padding. The detour payloads and
 every other shipped file are in [Shipped binaries](#shipped-binaries).

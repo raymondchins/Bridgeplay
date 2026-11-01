@@ -6,8 +6,7 @@
 #include <mach-o/loader.h>
 
 int np_await_image(const char *name, int timeout_ms,
-                         const struct mach_header_64 **out_mh, intptr_t *out_slide,
-                         char *out_path, size_t path_size);
+                         const struct mach_header_64 **out_mh, intptr_t *out_slide);
 
 void np_await_stop(void);
 

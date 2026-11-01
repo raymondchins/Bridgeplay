@@ -50,8 +50,8 @@ record once to trim the user's file down to their own changes.
 Never shipped: Valve's Steam client and the Steam packages in `valve-packages/` (the app
 downloads those from Valve's CDN) and the WineCX runtime (the app downloads it from
 dappermint/winecx-gptk). GPTK is never committed. GPTK's `/redist` files are
-Apple software that Apple allows to be redistributed for non-commercial use only; Bridgeplay
-is free and non-commercial.
+Apple software under Apple's own license (docs/GPTK-LICENSE.md); Bridgeplay is free and
+non-commercial.
 
 `BACA DULU.txt` (Indonesian) and `README.txt` (English) are the user guides in the zip. macOS
 15 and later no longer opens unsigned scripts from right-click > Open, so step 1 sends users to

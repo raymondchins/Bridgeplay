@@ -349,6 +349,25 @@ struct BrandMigrationTests {
         try expectMigrated(f)
     }
 
+    @Test("A run log that can't be renamed stays put and the move still finishes")
+    func runLogThatCannotBeRenamed() throws {
+        let f = try fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        let locked = f.runLogGames[1]
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: f.path(locked))
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: f.path(locked)) }
+
+        let summary = try f.migration.run()
+
+        #expect(summary.logsRenamed == 3)
+        #expect(summary.logsLeft == 1)
+        #expect(summary.notes.isEmpty)
+        #expect(try f.read(locked.appending(path: "notproton-run.log")) == "run log\n")
+        #expect(!f.exists(locked.appending(path: "bridgeplay-run.log")))
+        #expect(try f.read(f.support.appending(path: BrandMigration.markerName)).contains("done"))
+        #expect(!f.migration.isNeeded)
+    }
+
     @Test("A crash after the move resumes from the marker")
     func resumesAfterMove() throws {
         let f = try fixture()

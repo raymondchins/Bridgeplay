@@ -512,14 +512,47 @@ struct UninstallTests {
     }
 
     private func remove(_ layout: Layout, app: URL? = nil,
+                         leftovers: Uninstall.Leftovers? = nil,
                          repair: @escaping Uninstall.Repair = { _, _ in },
                          stop: Uninstall.Stop = { _, _ in false }) async throws -> UninstallOutcome {
         try await Uninstall.run(
             app: app ?? layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock],
             legacyCompat: layout.legacyCompat, compatTools: layout.compatTools,
             directories: [layout.support, layout.caches], libraries: [],
-            modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
+            modifications: layout.modifications, lockFolder: layout.root, leftovers: leftovers ?? layout.leftovers,
             repair: repair, stop: stop)
+    }
+
+    @Test("A running game stops the removal before Steam is touched")
+    func refusesWhileAGameRuns() async throws {
+        let layout = try layout()
+        defer { try? FileManager.default.removeItem(at: layout.root) }
+        var leftovers = layout.leftovers
+        leftovers.runningBuild = { "27.0.0" }
+        let stops = Flag()
+
+        let failure = try await #require(throws: StepFailure.self) {
+            try await remove(layout, leftovers: leftovers, stop: { _, _ in stops.set(); return false })
+        }
+
+        #expect(failure.detail.contains("27.0.0"))
+        #expect(!stops.value)
+        #expect(FileManager.default.fileExists(atPath: layout.support.path))
+        #expect(try SteamModifications.inspect(layout.app) == .modified)
+    }
+
+    @Test("--remove-everything fails while a game runs")
+    func commandRefusesWhileAGameRuns() async throws {
+        let layout = try layout()
+        defer { try? FileManager.default.removeItem(at: layout.root) }
+        var leftovers = layout.leftovers
+        leftovers.runningBuild = { "27.0.0" }
+        let captured = leftovers
+
+        let exitCode = await RemoveEverythingCommand.perform { _ in try await remove(layout, leftovers: captured) }
+
+        #expect(exitCode == 1)
+        #expect(FileManager.default.fileExists(atPath: layout.support.path))
     }
 
     @Test("Removal cleans both tracked copies when the first drive returns")

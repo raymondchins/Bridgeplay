@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016,SC2034,SC2154
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "launchercheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> launchercheck: $SRC not present, skipped"; exit 0; }
 
 funcs=$(sed -n '/^bundle_listing() {$/,/^install_bundle$/p' "$SRC" | sed '$d')
 name_lines=$(sed -n '/^bundle_name=\$(printf/,/^\[ -n "\$bundle_name" \] || bundle_name=/p' "$SRC")

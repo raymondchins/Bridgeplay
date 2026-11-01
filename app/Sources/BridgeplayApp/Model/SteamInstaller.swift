@@ -38,9 +38,9 @@ struct InstallOutcome: Sendable {
     let build: DeploymentContent.Build
     let signatureDatabases: Int
     let backedUpPlist: Bool
-    let bridgeStaged: Int
-    // Input access services macOS refused to reset after Steam's signature changed.
-    var failedInputResets: [String] = []
+    // Input access services macOS refused to reset after Steam's signature changed. nil when
+    // the signature didn't change, so no reset ran.
+    var failedInputResets: [String]?
 }
 
 enum SteamInstaller {
@@ -95,6 +95,7 @@ enum SteamInstaller {
         lockFolder: URL = SupportPaths.applicationSupport,
         modifications: SteamModifications = .shared,
         runnerIsRunning: @Sendable (URL) -> Bool = { RunnerInstaller.isRunning(from: $0) },
+        launchingBuild: (URL) -> String? = { RunnerInstaller.launchingBuild(tools: SupportPaths.Steam.ourTools(in: $0)) },
         verifyRunner: (RunnerBuild, URL) throws -> Void = RunnerInstaller.verifyClone,
         patchRunner: (RunnerBuild, URL, URL) throws -> Void = { build, root, bridge in
             _ = try NtdllPatcher.stage(build: build, runnerRoot: root, bridge: bridge)
@@ -103,6 +104,7 @@ enum SteamInstaller {
         stopClient: ClientStopper = stopTheClient,
         register: BundleRegistrar = { SteamBundle.register($0) },
         resetInputAccess: () -> [String] = resetInputAccess,
+        onInputReset: ([String]) -> Void = { _ in },
         report: @escaping @Sendable (InstallPhase) -> Void = { _ in }
     ) throws -> InstallOutcome {
         report(.checkingPayload)
@@ -141,6 +143,9 @@ enum SteamInstaller {
             for id in RunnerStore.clonedBuilds(in: runners) where runnerIsRunning(SupportPaths.runnerRoot(forBuild: id, runners: runners)) {
                 throw StepFailure(step: step, detail: String(localized: "A game or Wine tool is running on build \(id). Quit it before updating Bridgeplay."))
             }
+            if let id = launchingBuild(compatTools) {
+                throw StepFailure(step: step, detail: String(localized: "A game or Wine tool is running on build \(id). Quit it before updating Bridgeplay."))
+            }
         }
         try refuseRunningRunners()
         let builds = RunnerStore.installedBuilds(in: runners)
@@ -166,7 +171,7 @@ enum SteamInstaller {
                                    file: support.appending(path: "tools"), compatTools: compatTools)
 
         report(.stagingBridge)
-        let bridgeResult = try BridgePayload.stage(located: bridgeLocated, bridge: bridge)
+        _ = try BridgePayload.stage(located: bridgeLocated, bridge: bridge)
         for build in builds {
             try patchRunner(build, SupportPaths.clonedRoot(forBuild: build.id, runners: runners), bridge)
         }
@@ -183,16 +188,18 @@ enum SteamInstaller {
         }
         pruneGamefixes(keeping: payload.gamefixes.map(\.lastPathComponent),
                        in: deployedVersion.deletingLastPathComponent().appending(path: "gamefixes-default"))
+        seedControllerMappings(from: payload.dylib.deletingLastPathComponent(), in: support)
         // The shipped defaults now sit in gamefixes-default/, so the user's file keeps only their own.
         do {
             try GameDefaults.splitShipped(in: support)
         } catch {
             AppLog.note("game defaults: could not split the shipped defaults out: \(error.localizedDescription)")
         }
-        try removeStaleFonts(in: fonts, keeping: payload.fonts)
+        // The CJK fonts come from their own download, so they aren't in the payload.
+        try removeStaleFonts(in: fonts, keeping: payload.fonts + CJKFonts.files.keys + CJKFonts.licences)
 
         var backedUp = false
-        var failedInputResets: [String] = []
+        var failedInputResets: [String]?
         if patching {
             report(.settingInsert)
             backedUp = try backUpPlist(plist, into: backups)
@@ -221,7 +228,10 @@ enum SteamInstaller {
             // cdhash, which every new dylib changes; signed with the local identity it is the
             // certificate, so the approval survives updates and is only cleared on a change.
             if designatedRequirement(of: app) != priorRequirement {
-                failedInputResets = resetInputAccess()
+                let failed = resetInputAccess()
+                failedInputResets = failed
+                // Told now: the reset stays done even if the install throws below.
+                onInputReset(failed)
             }
         }
 
@@ -256,7 +266,6 @@ enum SteamInstaller {
             build: build,
             signatureDatabases: payload.signatures.count,
             backedUpPlist: backedUp,
-            bridgeStaged: bridgeResult.staged.count,
             failedInputResets: failedInputResets
         )
     }
@@ -294,6 +303,23 @@ enum SteamInstaller {
                 continue
             }
             try WriteRefused.catching(url) { try files.removeItem(at: url) }
+        }
+    }
+
+    // The user's own mappings, so an existing file stays. Without one a pad SDL does not know,
+    // such as the GameSir G7 Pro, reaches games in its raw button order.
+    static func seedControllerMappings(from payload: URL, in support: URL) {
+        let fm = FileManager.default
+        let source = payload.appending(path: "gamecontrollerdb.txt")
+        let mappings = support.appending(path: "gamecontrollerdb.txt")
+        guard fm.fileExists(atPath: source.path(percentEncoded: false)),
+            !fm.fileExists(atPath: mappings.path(percentEncoded: false))
+        else { return }
+        do {
+            try fm.createDirectory(at: support, withIntermediateDirectories: true)
+            try fm.copyItem(at: source, to: mappings)
+        } catch {
+            AppLog.note("controllers: could not seed the mappings: \(error.localizedDescription)")
         }
     }
 

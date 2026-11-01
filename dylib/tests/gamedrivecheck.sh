@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016 # the sh -ec program expands its own variables
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "gamedrivecheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> gamedrivecheck: $SRC not present, skipped"; exit 0; }
 
 body=$(sed -n '/^game_drive_record() {/,/^}/p;/^record_game_drive() {/,/^}/p;/^restart_for_drive() {/,/^}/p;/^unmap_game_drive() {/,/^}/p;/^map_game_drive() {/,/^}/p' "$SRC")
 [ -n "$body" ] || { echo "FAIL: map_game_drive not found in $SRC"; exit 1; }
@@ -78,6 +78,20 @@ is "no S:" none "$(target)"
 is "the record is gone" no "$([ -e "$compat/notproton-game-drive" ] && echo yes || echo no)"
 is "wine restarts to drop S:" "wineserver -k wineserver -w " "$(restarted)"
 is "the launch continues" reached "$(tail -1 "$work/out")"
+
+echo "== no library paths from Steam leave S: alone"
+run "$lib/steamapps/common/Some Game" "$libs"
+for none in "" ":" "::"; do
+	run "$lib/steamapps/common/Some Game" "$none"
+	is "S: still points at the library root ($none)" "$lib" "$(target)"
+	is "the mapping is still recorded ($none)" "$lib" "$(cat "$compat/notproton-game-drive")"
+	is "wine is not restarted ($none)" "" "$(restarted)"
+	is "the launch continues ($none)" reached "$(tail -1 "$work/out")"
+done
+rm -f "$drive" "$compat/notproton-game-drive"
+run "$lib/steamapps/common/Some Game" ""
+is "no S: is made without library paths" none "$(target)"
+is "wine is not restarted without library paths" "" "$(restarted)"
 
 echo "== a game outside every library gets no S:"
 run "$work/loose/Some Game" "$libs"

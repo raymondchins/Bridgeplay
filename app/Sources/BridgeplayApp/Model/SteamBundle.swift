@@ -141,7 +141,8 @@ enum SteamBundle {
         onStopping()
 
         func quits(within attempts: Int) -> Bool {
-            for _ in 0..<attempts where client.runningHere() {
+            for _ in 0..<attempts {
+                guard client.runningHere() else { return true }
                 client.pause()
             }
             return !client.runningHere()

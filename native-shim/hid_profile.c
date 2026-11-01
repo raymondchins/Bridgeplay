@@ -261,7 +261,7 @@ static void parse_descriptor(const uint8_t *d, size_t len, parse_result *o) {
                 break;
             }
         } else if (type == 0) {  // Main
-            uint8_t in_pad = depth > 0 && pad[depth - 1];
+            uint8_t in_pad = depth > 0 && pad[(depth < MAX_DEPTH ? depth : MAX_DEPTH) - 1];
             switch (tag) {
             case 8:  // Input
                 parse_input(o, &g, &l, u, in_pad, (uint32_t)bits[g.id & 0xff]);
@@ -577,7 +577,7 @@ static int find_axis(const np_profile *p, uint16_t page, uint16_t usage) {
 
 // SDL "generic" style layout from the descriptor alone.
 static void apply_generic(np_profile *p) {
-    char m[512];
+    char m[512] = "";
     size_t n = 0;
 #define ADD(...) n += (size_t)snprintf(m + n, n < sizeof m ? sizeof m - n : 0, __VA_ARGS__)
     int x = find_axis(p, PAGE_GD, 0x30), y = find_axis(p, PAGE_GD, 0x31);
@@ -592,7 +592,6 @@ static void apply_generic(np_profile *p) {
         if (rx >= 0 && ry >= 0) { lt = rx; rt = ry; }
     } else if (rx >= 0 && ry >= 0) {
         ADD("rightx:a%d,righty:a%d,", rx, ry);
-        if (z >= 0 && rz >= 0) { lt = z; rt = rz; }
     }
     if (accel >= 0 && brake >= 0) { lt = brake; rt = accel; }
     if (lt >= 0) ADD("lefttrigger:a%d,righttrigger:a%d,", lt, rt);
@@ -672,7 +671,8 @@ np_profile *np_profile_create_from_descriptor(const uint8_t *descriptor, size_t 
         const hid_element *e = &p->el[p->axes[i]];
         p->raw[p->axes[i]] = (int32_t)(((int64_t)e->lmin + e->lmax + 1) / 2);
     }
-    for (int i = 0; i < p->nhats; i++) p->raw[p->hats[i]] = p->el[p->hats[i]].lmax + 1;
+    for (int i = 0; i < p->nhats; i++)
+        p->raw[p->hats[i]] = (int32_t)((uint32_t)p->el[p->hats[i]].lmax + 1u);
 
     uint8_t guid[16];
     make_guid(guid, vendor, product, version, name);

@@ -225,7 +225,7 @@ struct SetupAssistantView: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first(where: { $0.pathExtension.lowercased() == "dmg" }) else { return false }
+            guard !model.isWorking, let url = urls.first(where: { $0.pathExtension.lowercased() == "dmg" }) else { return false }
             Task { await model.importGPTK(url) }
             return true
         }
@@ -483,7 +483,7 @@ struct SetupAssistantView: View {
                     .keyboardShortcut(.defaultAction)
             case .graphics:
                 if model.gptk == nil {
-                    Button("Skip") { go(forward: true) { model.skippedGraphics = true; model.advance() } }
+                    Button("Skip") { go(forward: true) { model.advance() } }
                         .buttonStyle(.pillSecondaryLarge)
                         .disabled(model.isWorking)
                 }

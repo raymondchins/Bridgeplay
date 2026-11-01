@@ -8,12 +8,14 @@ import Sparkle
 // once, and only when nothing would be interrupted or asked: Steam is closed, no game or
 // Wine tool is running, a compatibility tool exists (so no activation question), and the
 // installed content does not block installation. Otherwise the Status row keeps showing
-// "Update available" with its install button, as before.
+// "Update available" with its install button. While Steam or a game runs, SteamPatchKeeper
+// also shows a banner and re-applies by itself once both close, with no relaunch.
 enum PostUpdateRefresh {
 
     enum Decision: Equatable, Sendable {
         case install
-        // Steam or a game is running; try again on the next launch.
+        // Steam or a game is running. SteamPatchKeeper re-applies once both close, and this
+        // tries again on the next launch.
         case wait
         case nothing
     }
@@ -57,9 +59,7 @@ enum PostUpdateRefresh {
         // pgrep and ps can take seconds, so neither runs on the main actor.
         let (steamRunning, workloadRunning) = await Task.detached(priority: .utility) {
             (SteamBundle.isRunning,
-             RunnerStore.clonedBuilds().contains {
-                 RunnerInstaller.isRunning(from: SupportPaths.runnerRoot(forBuild: $0))
-             })
+             RunnerInstaller.runningBuild() != nil)
         }.value
         let decision = decide(
             steam: snapshot.steam,

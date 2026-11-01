@@ -30,10 +30,6 @@ struct ValvePackageManifest: Sendable {
     let files: [ValveFile]
     let bundle: ValveBundle?
 
-    func package(id: String) -> ValvePackage? {
-        packages.first { $0.id == id }
-    }
-
     func innerPaths(package id: String) -> [String] {
         var seen = Set<String>()
         return files.filter { $0.package == id }.compactMap { seen.insert($0.innerPath).inserted ? $0.innerPath : nil }

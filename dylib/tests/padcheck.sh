@@ -5,7 +5,7 @@
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 UPDATE="${2:-$(dirname "$0")/../../scripts/update-gamecontrollerdb.sh}"
-[ -f "$SRC" ] || { echo "padcheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> padcheck: $SRC not present, skipped"; exit 0; }
 
 block=$(sed -n '/^np_pad_mappings() {$/,/^}$/p' "$SRC")
 forward=$(sed -n '/^for name in $(env /,/^done$/p' "$SRC")
@@ -167,6 +167,8 @@ $g2,Own Bluetooth,a:b0,b:b1,platform:Mac OS X," "$(grep -v '^#' "$out")"
 	is "no CR left" "" "$(tr -d -c '\r' < "$out")"
 	is "file readable by others" "-rw-r--r--" "$(stat -f %Sp "$out")"
 	is "nothing else left in the output directory" "merged.txt" "$(ls -A "$work/out")"
+else
+	echo "==> padcheck: $UPDATE not present, the update script section is skipped"
 fi
 
 if [ "$fails" -eq 0 ]; then

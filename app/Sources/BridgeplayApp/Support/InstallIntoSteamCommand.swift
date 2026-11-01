@@ -16,9 +16,7 @@ enum InstallIntoSteamCommand {
                 throw StepFailure(step: SteamInstaller.step,
                                   detail: "Installation is blocked. Use the Bridgeplay app that installed this build.")
             }
-            if RunnerStore.clonedBuilds().contains(where: {
-                RunnerInstaller.isRunning(from: SupportPaths.runnerRoot(forBuild: $0))
-            }) {
+            if RunnerInstaller.runningBuild() != nil {
                 throw StepFailure(step: SteamInstaller.step,
                                   detail: "A game or Wine tool is running. Quit it before updating Bridgeplay.")
             }
@@ -34,6 +32,7 @@ enum InstallIntoSteamCommand {
                 _ = try await ValveFetcher.run { say($0.label) }
             }
             try SteamInstaller.finish(result)
+            UserDefaults.standard.removeObject(forKey: SteamPatchKeeper.pausedKey)
             say("Bridgeplay \(ProductVersion.short) installed into Steam.")
             return 0
         } catch {

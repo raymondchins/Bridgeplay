@@ -73,6 +73,7 @@ struct SteamBundleTests {
         private let stuck: Bool
         private(set) var requests: [Request] = []
         private(set) var swept: [String] = []
+        private(set) var hereChecks = 0
 
         init(here: Bool, elsewhere: Bool = false, quitsOn: Request = .exitURL, stuck: Bool = false) {
             self.here = here
@@ -91,7 +92,7 @@ struct SteamBundleTests {
         var client: SteamBundle.Client {
             SteamBundle.Client(
                 runningAnywhere: { self.lock.withLock { self.here || self.elsewhere } },
-                runningHere: { self.lock.withLock { self.here } },
+                runningHere: { self.lock.withLock { self.hereChecks += 1; return self.here } },
                 askToQuit: { self.receive(.exitURL) },
                 requestQuit: { self.receive(.quit) },
                 stuckExiting: { _ in self.stuck },
@@ -106,6 +107,13 @@ struct SteamBundleTests {
     private func stop(_ steam: FakeSteam) throws -> Bool {
         try SteamBundle.stopClient(
             app: URL(filePath: "/tmp/Steam.app"), helpers: [], step: "Test", client: steam.client)
+    }
+
+    @Test("Each look for Steam starts a process, so it stops as soon as Steam has quit")
+    func stopsLookingOnceQuit() throws {
+        let steam = FakeSteam(here: true)
+        #expect(try stop(steam))
+        #expect(steam.hereChecks == 2)
     }
 
     @Test("A closed Steam is left alone")

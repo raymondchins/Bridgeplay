@@ -72,7 +72,7 @@ public struct InstallerComponents: Sendable, Equatable {
     }
 
     /// Download to a file in `directory` and verify it. Throws without leaving the file on failure.
-    public func download(to directory: URL, session: URLSession = .shared, control: InstallerDownloadControl? = nil,
+    public func download(to directory: URL, control: InstallerDownloadControl? = nil,
                          progress: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in }) async throws -> URL {
         var request = URLRequest(url: archiveURL)
         request.timeoutInterval = 60
@@ -124,21 +124,13 @@ public struct InstallerComponents: Sendable, Equatable {
     /// place (ComponentsPlacement). `status` gets each step as it starts.
     public static func install(archive: URL, work: URL, status: @escaping @Sendable (String) -> Void = { _ in },
                                download: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in }) throws {
-        try install(archive: archive, work: work, status: status, download: download) { _ in }
-    }
-
-    static func install(archive: URL, work: URL, status: @escaping @Sendable (String) -> Void,
-                        download: @escaping @Sendable (InstallerDownloadProgress) -> Void,
-                        configure: (inout ComponentsPlacement) -> Void) throws {
         let unpacked = work.appending(path: "components")
         try? FileManager.default.removeItem(at: unpacked)
         try FileManager.default.createDirectory(at: unpacked, withIntermediateDirectories: true)
         try run("/usr/bin/ditto", ["-x", "-k", archive.path, unpacked.path])
         let source = unpacked.appending(path: "Bridgeplay")
         try verifyAppleSigned(gptk: source.appending(path: "gptk"))
-        var placement = ComponentsPlacement(source: source)
-        configure(&placement)
-        try placement.place(status: status, download: download)
+        try ComponentsPlacement(source: source).place(status: status, download: download)
     }
 
     /// GPTK ships unmodified: D3DMetal.framework and every other Mach-O file must carry Apple's
@@ -176,12 +168,11 @@ public struct InstallerComponents: Sendable, Equatable {
     }
 
     @discardableResult
-    static func run(_ executable: String, _ arguments: [String], environment: [String: String]? = nil,
+    static func run(_ executable: String, _ arguments: [String],
                     line: @escaping @Sendable (String) -> Void = { _ in }) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
-        if let environment { process.environment = environment }
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
@@ -190,9 +181,7 @@ public struct InstallerComponents: Sendable, Equatable {
         var all = ""
         var pending = ""
         while case let chunk = pipe.fileHandleForReading.availableData, !chunk.isEmpty {
-            // Strip the script's colour codes before reading its lines.
             let text = String(decoding: chunk, as: UTF8.self)
-                .replacingOccurrences(of: #"\u{1B}\[[0-9;]*m"#, with: "", options: .regularExpression)
             all += text
             pending += text
             while let newline = pending.firstIndex(where: { $0 == "\n" || $0 == "\r" }) {
@@ -202,8 +191,8 @@ public struct InstallerComponents: Sendable, Equatable {
         }
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            let reason = all.split(separator: "\n").last { $0.contains("Gagal:") || !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-            throw InstallerError.componentsFailure(reason.map { String($0).replacingOccurrences(of: "Gagal: ", with: "") } ?? "exit \(process.terminationStatus)")
+            let reason = all.split(separator: "\n").last { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            throw InstallerError.componentsFailure(reason.map(String.init) ?? "exit \(process.terminationStatus)")
         }
         return all
     }

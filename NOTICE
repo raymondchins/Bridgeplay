@@ -163,6 +163,14 @@ dxmt-<commit>-source.tar.gz beside the binaries (above; docs/DXMT.md). The DXMT
 commit currently pinned, e94c312, predates that and has no self-hosted source archive
 yet; its source is the upstream URL above until the next rebuild adds one.
 
+Compatibility data
+------------------
+
+compat/reported.json holds "Should work" ratings adapted from AppleGamingWiki's
+CrossOver reports (https://www.applegamingwiki.com), licensed under CC BY-NC-SA 3.0
+(https://creativecommons.org/licenses/by-nc-sa/3.0/). The adapted ratings are offered
+under the same license, not the GPL-3.0.
+
 NotProton-WineHQ licensing
 ==========================
 

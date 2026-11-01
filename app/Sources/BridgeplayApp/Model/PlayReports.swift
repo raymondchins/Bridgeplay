@@ -370,7 +370,7 @@ final class PlayReports {
             let found = await Task.detached { () -> GameSession? in
                 let url = PrefixLog.launch.url(for: prefix)
                 guard let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
-                      let log = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+                      let log = PrefixLog.text(of: url) else { return nil }
                 return GameSession.last(in: log, modified: modified)
             }.value
             nudges.removeAll { $0.prefix.id == prefix.id }
@@ -414,9 +414,9 @@ final class PlayReports {
             let url = PrefixLog.launch.url(for: prefix)
             guard let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
                   maxAge.map({ now.timeIntervalSince(modified) < $0 }) ?? true,
-                  let log = try? String(contentsOf: url, encoding: .utf8),
+                  let log = PrefixLog.text(of: url),
                   let session = GameSession.last(in: log, modified: modified) else { return nil }
-            let wineLog = try? String(contentsOf: PrefixLog.wine.url(for: prefix), encoding: .utf8)
+            let wineLog = PrefixLog.text(of: PrefixLog.wine.url(for: prefix))
             guard !onlyWorthAsking || session.worthAsking(now: now, wineLog: wineLog) else { return nil }
             return Found(prefix: prefix, session: session, log: log, wineLog: wineLog)
         }
@@ -459,8 +459,8 @@ final class PlayReports {
         let prefix = nudge.prefix, session = nudge.session
         Task {
             let logs = await Task.detached {
-                (try? String(contentsOf: PrefixLog.launch.url(for: prefix), encoding: .utf8),
-                 try? String(contentsOf: PrefixLog.wine.url(for: prefix), encoding: .utf8))
+                (PrefixLog.text(of: PrefixLog.launch.url(for: prefix)),
+                 PrefixLog.text(of: PrefixLog.wine.url(for: prefix)))
             }.value
             submitAll([(Found(prefix: prefix, session: session, log: logs.0 ?? "", wineLog: logs.1), status)],
                       source: source, note: note, issue: issue)

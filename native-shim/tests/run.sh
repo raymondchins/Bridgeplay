@@ -4,7 +4,7 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 out=${TMPDIR:-/tmp}/np_hid_profile_tests
 clang -arch arm64 -std=c11 -D_DARWIN_C_SOURCE -g -O1 -Wall -Wextra -Werror \
-    -fsanitize=address,undefined -fno-sanitize-recover=all \
+    -fsanitize=address,undefined -fno-sanitize-recover=all -ftrivial-auto-var-init=pattern \
     -framework IOKit -framework CoreFoundation \
     -o "$out" "$here/../hid_profile.c" "$here/test_hid_profile.c"
 "$out" "$here/fixtures"

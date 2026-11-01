@@ -12,6 +12,16 @@ struct SetupAssistantTests {
         return url
     }
 
+    @Test("A disk image dropped during other work is ignored")
+    @MainActor
+    func importWaitsForOtherWork() async {
+        let model = SetupAssistant(preview: .fresh)
+        model.isWorking = true
+        await model.importGPTK(URL(filePath: "/nonexistent/Game_Porting_Toolkit.dmg"))
+        #expect(model.isWorking)
+        #expect(model.message == nil)
+    }
+
     @Test("Steam counts as signed in once loginusers.vdf names an account")
     func signIn() throws {
         let dir = try folder()
@@ -315,6 +325,131 @@ struct SetupAssistantTests {
 
 @Suite("Setup checks")
 struct SetupChecksTests {
+
+    @Test("Steam reaches Applications whole or not at all")
+    func steamCopyIsStaged() throws {
+        let fm = FileManager.default
+        let dir = try scratchDirectory("setup-steam")
+        defer { try? fm.removeItem(at: dir) }
+        let applications = dir.appending(path: "Applications")
+        try fm.createDirectory(at: applications, withIntermediateDirectories: true)
+        let app = applications.appending(path: "Steam.app")
+        let image = dir.appending(path: "image")
+        try fm.createDirectory(at: image.appending(path: "Steam.app/Contents"), withIntermediateDirectories: true)
+        try Data("valve".utf8).write(to: image.appending(path: "Steam.app/Contents/Info.plist"))
+
+        struct DiskFull: Error {}
+        #expect(throws: DiskFull.self) {
+            try SetupChecks.copySteam(from: image, to: app, verify: { _ in }) { _, target in
+                try fm.createDirectory(at: target, withIntermediateDirectories: true)
+                throw DiskFull()
+            }
+        }
+        #expect(try fm.contentsOfDirectory(atPath: applications.path(percentEncoded: false)).isEmpty)
+
+        try SetupChecks.copySteam(from: image, to: app, verify: { _ in })
+        let plist = app.appending(path: "Contents/Info.plist")
+        #expect(try Data(contentsOf: plist) == Data("valve".utf8))
+        #expect(try fm.contentsOfDirectory(atPath: applications.path(percentEncoded: false)) == ["Steam.app"])
+
+        try Data("other".utf8).write(to: plist)
+        try SetupChecks.copySteam(from: image, to: app, verify: { _ in })
+        #expect(try Data(contentsOf: plist) == Data("other".utf8))
+        #expect(try fm.contentsOfDirectory(atPath: applications.path(percentEncoded: false)) == ["Steam.app"])
+    }
+
+    private func steamImage(in dir: URL) throws -> (image: URL, applications: URL) {
+        let fm = FileManager.default
+        let applications = dir.appending(path: "Applications")
+        try fm.createDirectory(at: applications, withIntermediateDirectories: true)
+        let image = dir.appending(path: "image")
+        try fm.createDirectory(at: image.appending(path: "Steam.app/Contents"), withIntermediateDirectories: true)
+        try Data("valve".utf8).write(to: image.appending(path: "Steam.app/Contents/Info.plist"))
+        return (image, applications)
+    }
+
+    @Test("A copy a force quit left is swept, and nothing else with a similar name")
+    func staleStagedCopiesAreSwept() throws {
+        let fm = FileManager.default
+        let dir = try scratchDirectory("setup-steam-stale")
+        defer { try? fm.removeItem(at: dir) }
+        let (image, applications) = try steamImage(in: dir)
+        func stage(_ name: String) throws {
+            try fm.createDirectory(at: applications.appending(path: "\(name)/Contents"), withIntermediateDirectories: true)
+        }
+        // A lock file nobody holds, a lock file alone, and a lock-less copy from an older build.
+        let unlocked = ".Steam.app-\(UUID().uuidString)"
+        try stage(unlocked)
+        try Data().write(to: applications.appending(path: "\(unlocked).lock"))
+        try Data().write(to: applications.appending(path: ".Steam.app-\(UUID().uuidString).lock"))
+        let old = ".Steam.app-\(UUID().uuidString)"
+        try stage(old)
+        try fm.setAttributes([.creationDate: Date.now.addingTimeInterval(-7200)],
+                             ofItemAtPath: applications.appending(path: old).path(percentEncoded: false))
+        let kept = [".Steam.app-notes", ".Steam.app-\(UUID().uuidString)x", "Steam.app-\(UUID().uuidString)"]
+        for name in kept { try Data().write(to: applications.appending(path: name)) }
+
+        try SetupChecks.copySteam(from: image, to: applications.appending(path: "Steam.app"), verify: { _ in })
+
+        #expect(try fm.contentsOfDirectory(atPath: applications.path(percentEncoded: false)).sorted()
+            == (kept + ["Steam.app"]).sorted())
+    }
+
+    // Another process's lock, or an older build's copy that may still be under way.
+    @Test("A copy another process holds, or a recent lock-less one, is kept")
+    func liveStagedCopiesAreKept() throws {
+        let fm = FileManager.default
+        let dir = try scratchDirectory("setup-steam-live")
+        defer { try? fm.removeItem(at: dir) }
+        let (image, applications) = try steamImage(in: dir)
+        let held = ".Steam.app-\(UUID().uuidString)"
+        let recent = ".Steam.app-\(UUID().uuidString)"
+        for name in [held, recent] {
+            try fm.createDirectory(at: applications.appending(path: "\(name)/Contents"), withIntermediateDirectories: true)
+        }
+        let lock = open(applications.appending(path: "\(held).lock").path(percentEncoded: false),
+                        O_RDONLY | O_CREAT | O_EXLOCK, 0o644)
+        #expect(lock >= 0)
+        defer { close(lock) }
+
+        try SetupChecks.copySteam(from: image, to: applications.appending(path: "Steam.app"), verify: { _ in })
+
+        #expect(try fm.contentsOfDirectory(atPath: applications.path(percentEncoded: false)).sorted()
+            == [held, "\(held).lock", recent, "Steam.app"].sorted())
+    }
+
+    @Test("A staged copy still being written is not swept by another install")
+    func stagedCopyInUseIsKept() throws {
+        let fm = FileManager.default
+        let dir = try scratchDirectory("setup-steam-in-use")
+        defer { try? fm.removeItem(at: dir) }
+        let (image, applications) = try steamImage(in: dir)
+        let app = applications.appending(path: "Steam.app")
+
+        try SetupChecks.copySteam(from: image, to: app, verify: { _ in }) { source, target in
+            try fm.copyItem(at: source, to: target)
+            try SetupChecks.copySteam(from: image, to: applications.appending(path: "Other.app"), verify: { _ in })
+            #expect(fm.fileExists(atPath: target.path(percentEncoded: false)))
+        }
+
+        #expect(fm.fileExists(atPath: app.appending(path: "Contents/Info.plist").path(percentEncoded: false)))
+    }
+
+    @Test("A plain file at Steam.app is not taken for a Steam that appeared meanwhile")
+    func plainFileIsNotAnInstall() throws {
+        let fm = FileManager.default
+        let dir = try scratchDirectory("setup-steam-file")
+        defer { try? fm.removeItem(at: dir) }
+        let (image, applications) = try steamImage(in: dir)
+        let app = applications.appending(path: "Steam.app")
+
+        #expect(throws: (any Error).self) {
+            try SetupChecks.copySteam(from: image, to: app, verify: { _ in }) { source, target in
+                try fm.copyItem(at: source, to: target)
+                try Data("not a bundle".utf8).write(to: app)
+            }
+        }
+    }
 
     @Test("Downloads is not read when a Game Porting Toolkit is already installed")
     func downloadsScanGated() {

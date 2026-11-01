@@ -40,6 +40,14 @@ const app = (id, o, over) => Object.assign(
 (async () => {
   const t = runner('migration');
 
+  // A hung migration leaves a promise that never settles, and Node then exits 0 here.
+  let finished = false;
+  process.on('exit', () => {
+    if (finished) return;
+    console.error('migration: stopped before the last check');
+    process.exitCode = 1;
+  });
+
   const rule = [
     ['MTL_HUD_ENABLED=1 -dx11', 'MTL_HUD_ENABLED=1 %command% -dx11'],
     ['-dx11 WINEMSYNC=1', 'WINEMSYNC=1 %command% -dx11'],
@@ -122,5 +130,6 @@ const app = (id, o, over) => Object.assign(
   t.ok(many.written.filter(x => x.appid).length === 45 && many.store.size === 1,
        'checks every app when there are more than one batch');
 
+  finished = true;
   if (t.failed) process.exit(1);
 })();

@@ -84,7 +84,7 @@ DEPS := $(OBJS:.o=.d)
         anchorcheck callscheck sigdb-fixtures webpatch-fixtures peicon-fixtures panel-behavior app-tests \
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
-        appinfo helpers-install ntdll-resolve bridge runcheck compatcheck \
+        appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
         compatsvc-check prefixstate-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck \
         gamefixescheck launchercheck padcheck launch-shell activatecheck stamp-check versioncheck cicheck compat-reported-check FORCE
 
@@ -99,7 +99,8 @@ dylib: $(TARGET)
 $(APP_PAYLOAD):
 	@mkdir -p $(APP_PAYLOAD)
 
-TEST_PATHS := dylib/tests overlay-shim/tests app/Tests scripts/tests
+TEST_PATHS := dylib/tests overlay-shim/tests app/Tests scripts/tests ntdll-patch/tests \
+              native-launch/tests native-shim/tests installer/tests
 
 tests-list:
 	@for p in $(TEST_PATHS); do echo $$p; done
@@ -219,7 +220,7 @@ l10ncheck:
 
 # runcheck owns compat_run.sh, whose warnings wait for a change that can move
 # the embedded __text baseline
-SCRIPTS := $(shell git ls-files '*.sh' 2>/dev/null | grep -v '^dylib/feats/compat_run\.sh$$')
+SCRIPTS := $(shell git ls-files '*.sh' '*.command' 2>/dev/null | grep -v '^dylib/feats/compat_run\.sh$$')
 
 scriptcheck:
 	@if ! command -v shellcheck >/dev/null 2>&1; then \
@@ -483,6 +484,13 @@ panel-behavior:
 
 CX_ROOT ?= /Applications/CrossOver Preview.app
 
+# Every shipped x86 detour payload hands the detour the register its ntdll keeps wm in,
+# and resolve.py refuses a wm the shims cannot read. No capstone needed; the two tests
+# that disassemble skip without it.
+detourcheck:
+	@if [ ! -f ntdll-patch/shimcheck.py ]; then $(call SKIP,detourcheck,ntdll-patch/shimcheck.py); exit 0; fi; \
+	python3 ntdll-patch/shimcheck.py && python3 -m unittest discover -s ntdll-patch/tests
+
 ntdll-resolve:
 	@if [ ! -f ntdll-patch/resolve.py ]; then \
 		$(call SKIP,ntdll-resolve,ntdll-patch/resolve.py); exit 0; fi; \
@@ -492,9 +500,9 @@ ntdll-resolve:
 		echo "==> ntdll-resolve: $(CX_ROOT) not present, skipped (set CX_ROOT)"; exit 0; fi; \
 	python3 ntdll-patch/resolve.py "$(CX_ROOT)"
 
-$(ARM64_DYLIB): $(OBJS)
+$(ARM64_DYLIB): $(OBJS) $(DOBBY_LIBS)
 	@mkdir -p $(dir $@)
-	$(CC) $(LDFLAGS) -o $@ $^ $(DOBBY_LIBS) $(FRAMEWORKS) -lc++
+	$(CC) $(LDFLAGS) -o $@ $^ $(FRAMEWORKS) -lc++
 
 $(X86_STUB): dylib/stub_x86_64.c
 	@mkdir -p $(dir $@)
@@ -689,6 +697,8 @@ fonts:
 	fonts/build.sh
 
 app-payload: $(TARGET) $(OVERLAY_SHIM) $(ICONMAKER) $(APPINFO)
+	@# A signature file deleted from the repo must not ship from the last payload.
+	@test -n "$(APP_PAYLOAD)" && rm -rf "$(APP_PAYLOAD)/signatures"
 	@mkdir -p "$(APP_PAYLOAD)/signatures/macos.arm64"
 	@mkdir -p "$(APP_PAYLOAD)/bridge"
 	@# Staged by 0.7.51 and earlier; left behind they fail the PAYLOAD_SIGN_IDS check.
@@ -701,6 +711,7 @@ app-payload: $(TARGET) $(OVERLAY_SHIM) $(ICONMAKER) $(APPINFO)
 	cp -f signatures/macos.arm64/*.json "$(APP_PAYLOAD)/signatures/macos.arm64/"
 	@rm -rf "$(APP_PAYLOAD)/gamefixes" && mkdir -p "$(APP_PAYLOAD)/gamefixes"
 	@if ls gamefixes/*.conf >/dev/null 2>&1; then cp -f gamefixes/*.conf "$(APP_PAYLOAD)/gamefixes/"; fi
+	cp -f installer/config/gamecontrollerdb.txt "$(APP_PAYLOAD)/gamecontrollerdb.txt"
 	@set -e; for spec in $(BRIDGE_FILES); do \
 		src="$${spec%%:*}"; dst="$(APP_PAYLOAD)/bridge/$${spec##*:}"; \
 		if [ -f "$$src" ]; then cp -f "$$src" "$$dst"; \
@@ -917,7 +928,7 @@ CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck compat-reported-import-check compatcheck compatsvc-check prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck launchercheck \
-	seedcheck gamefixescheck versioncheck cicheck padcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
+	seedcheck gamefixescheck versioncheck cicheck padcheck detourcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
 	app-tests native-installercheck
 
 # app.yml runs the checks that need the built app in its build job and the rest in a

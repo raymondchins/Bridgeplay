@@ -23,8 +23,7 @@ static int image_index_by_name(const char *needle) {
 }
 
 int np_await_image(const char *name, int timeout_ms,
-                         const struct mach_header_64 **out_mh, intptr_t *out_slide,
-                         char *out_path, size_t path_size) {
+                         const struct mach_header_64 **out_mh, intptr_t *out_slide) {
     for (int waited = 0; waited < timeout_ms; waited += 100) {
         if (g_await_stop) return -1;
 
@@ -32,13 +31,6 @@ int np_await_image(const char *name, int timeout_ms,
         if (idx >= 0) {
             *out_mh    = (const struct mach_header_64 *)_dyld_get_image_header((uint32_t)idx);
             *out_slide = _dyld_get_image_vmaddr_slide((uint32_t)idx);
-            if (out_path && path_size) {
-                const char *p = _dyld_get_image_name((uint32_t)idx);
-                size_t len = strlen(p);
-                if (len >= path_size) len = path_size - 1;
-                memcpy(out_path, p, len);
-                out_path[len] = '\0';
-            }
             return 0;
         }
         usleep(100000);

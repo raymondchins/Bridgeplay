@@ -21,9 +21,7 @@ enum SetupWinecxCommand {
                 throw StepFailure(step: FreeEngineWinecx.step,
                                   detail: "Installation is blocked. Use the Bridgeplay app that installed this build.")
             }
-            if RunnerStore.clonedBuilds().contains(where: {
-                RunnerInstaller.isRunning(from: SupportPaths.runnerRoot(forBuild: $0))
-            }) {
+            if RunnerInstaller.runningBuild() != nil {
                 throw StepFailure(step: FreeEngineWinecx.step,
                                   detail: "A game or Wine tool is running. Quit it before setting WineCX up.")
             }

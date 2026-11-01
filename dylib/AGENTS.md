@@ -23,7 +23,7 @@ down for the user. The constructor in `core/loader.c` only does work in `steam_o
     a passing `make gamefixescheck`.
   - Checks for the run script: `runcheck`, `envcheck`, `settingscheck`, `routecheck`,
     `gamedrivecheck`, `prefixnotecheck`, `powernotecheck`, `exitcheck`, `launchprogresscheck`,
-    `launchercheck`, `gamefixescheck`.
+    `launchercheck`, `gamefixescheck`, `anticheatcheck`, `padcheck`.
 - **Tests** live in `dylib/tests/`. They run without Steam or Dobby; several `#include` the
-  `.c` file under test for that reason. Add a new check as a Makefile target and to the
-  check list in `.github/workflows/app.yml`.
+  `.c` file under test for that reason. Add a new check as a Makefile target and to
+  `CI_CHECKS` in the Makefile.

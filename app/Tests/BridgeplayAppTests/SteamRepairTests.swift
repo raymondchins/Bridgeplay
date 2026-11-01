@@ -27,11 +27,11 @@ struct SteamRepairTests {
 
         #expect(staged.lastPathComponent == "Steam.app")
         #expect(throws: Never.self) { try SteamRepair.verifyValveSignature(staged) }
-        #expect(SteamRepair.version(of: staged) == "6.1")
 
         // The bundle Valve ships declares LC_ALL and no insert. Everything repair does to
         // the inner plist is measured against this, so it is asserted rather than assumed.
         let plist = try #require(SteamBundle.readInfoPlist(at: staged.appending(path: "Contents/Info.plist")))
+        #expect(plist["CFBundleVersion"] as? String == "6.1")
         let environment = try #require(plist[SteamBundle.environmentKey] as? [String: Any])
         #expect(environment[SteamBundle.insertKey] == nil)
         #expect(environment["LC_ALL"] as? String == "en_US.UTF-8")
@@ -158,6 +158,148 @@ struct SteamRepairTests {
         }
     }
 
+    // A patched Steam in scratch, for the runs below. Every path a repair defaults to is
+    // passed in, since those are the real Steam's.
+    private struct Patched {
+        let work: URL, app: URL, modifications: SteamModifications
+        var marker: URL { SupportPaths.Steam.deployedDylib(inBundle: app) }
+        var isUntouched: Bool { FileManager.default.contents(atPath: marker.path(percentEncoded: false)) == Data("patched".utf8) }
+
+        func repair(manifest: ValvePackageManifest? = nil, downloads: URL,
+                    stopClient: @escaping SteamInstaller.ClientStopper,
+                    runningBuild: @escaping @Sendable () -> String? = { nil },
+                    report: @escaping @Sendable (RepairPhase) -> Void = { _ in }) async throws {
+            _ = try await SteamRepair.run(
+                manifest: manifest, app: app, innerPlist: work.appending(path: "inner.plist"), updateBlocks: [],
+                backups: work.appending(path: "support/backups"), downloads: downloads,
+                modifications: modifications, stopClient: stopClient, register: { _ in },
+                runningBuild: runningBuild, report: report)
+        }
+    }
+
+    private func patched(from stock: URL, in work: URL) throws -> Patched {
+        let app = work.appending(path: "installed/Steam.app")
+        try FileManager.default.createDirectory(at: app.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: stock, to: app)
+        let patched = Patched(work: work, app: app, modifications: SteamModifications(
+            file: work.appending(path: "steam-bundles.json"), legacyRecord: work.appending(path: "support/install-build.json")))
+        try Data("patched".utf8).write(to: patched.marker)
+        try patched.modifications.mark(app)
+        return patched
+    }
+
+    private final class Log: @unchecked Sendable {
+        private let lock = NSLock()
+        private var lines: [String] = []
+        func add(_ line: String) { lock.withLock { lines.append(line) } }
+        var all: [String] { lock.withLock { lines } }
+    }
+
+    @Test("A Steam that won't stop is not replaced")
+    func stopFailureKeepsTheBundle() async throws {
+        let work = try scratchDirectory("repair-stop-failure")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let steam = try patched(from: try await stagedStockBundle(into: work), in: work)
+
+        struct StillRunning: Error {}
+        await #expect(throws: StillRunning.self) {
+            try await steam.repair(downloads: try isolatedValveDownloads(in: work), stopClient: { _, _ in throw StillRunning() })
+        }
+
+        #expect(steam.isUntouched)
+    }
+
+    @Test("A running game stops the repair before anything is downloaded")
+    func runningGameRefusesTheRepair() async throws {
+        let work = try scratchDirectory("repair-running-game")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let steam = try patched(from: try await stagedStockBundle(into: work), in: work)
+        let log = Log()
+
+        let refusal = try await #require(throws: StepFailure.self) {
+            try await steam.repair(downloads: try isolatedValveDownloads(in: work), stopClient: { _, _ in
+                log.add("stopped")
+                return true
+            }, runningBuild: { "27.0.0" }, report: { log.add($0.label) })
+        }
+
+        #expect(refusal.detail.contains("27.0.0"))
+        #expect(log.all.isEmpty)
+        #expect(steam.isUntouched)
+    }
+
+    @Test("A game started during the download stops the repair before Steam is touched")
+    func gameStartedDuringTheDownloadRefusesTheRepair() async throws {
+        let work = try scratchDirectory("repair-game-started")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let steam = try patched(from: try await stagedStockBundle(into: work), in: work)
+        let log = Log()
+
+        await #expect(throws: StepFailure.self) {
+            try await steam.repair(downloads: try isolatedValveDownloads(in: work), stopClient: { _, _ in
+                log.add("stopped")
+                return true
+            }, runningBuild: {
+                log.all.contains(RepairPhase.checking.label) ? "27.0.0" : nil
+            }, report: { log.add($0.label) })
+        }
+
+        #expect(!log.all.contains("stopped"))
+        #expect(steam.isUntouched)
+    }
+
+    @Test("The staged bundle is checked and Steam stopped before the old bundle goes")
+    func stopsBeforeReplacing() async throws {
+        let work = try scratchDirectory("repair-stop-order")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let steam = try patched(from: try await stagedStockBundle(into: work), in: work)
+        let log = Log()
+
+        try await steam.repair(downloads: try isolatedValveDownloads(in: work), stopClient: { _, onStopping in
+            onStopping()
+            #expect(steam.isUntouched)
+            return true
+        }, report: { log.add($0.label) })
+
+        #expect(!steam.isUntouched)
+        let checked = try #require(log.all.firstIndex(of: RepairPhase.checking.label))
+        let stopped = try #require(log.all.firstIndex(of: RepairPhase.stoppingClient.label))
+        #expect(checked < stopped)
+    }
+
+    @Test("A staged bundle Valve didn't sign stops the repair before Steam is touched")
+    func unsignedBundleNeverStopsSteam() async throws {
+        let work = try scratchDirectory("repair-unsigned")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let steam = try patched(from: try await stagedStockBundle(into: work), in: work)
+
+        // Laid out as Valve's package is: a zip holding a tar.gz of the bundle.
+        let host = work.appending(path: "host")
+        let contents = host.appending(path: "Steam.app/Contents")
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        try Data("<plist/>".utf8).write(to: contents.appending(path: "Info.plist"))
+        let path = host.path(percentEncoded: false)
+        try Shell.check("/usr/bin/tar", ["-czf", path + "/inner.tar.gz", "-C", path, "Steam.app"])
+        try Shell.check("/usr/bin/zip", ["-q", "-j", path + "/package.zip", path + "/inner.tar.gz"])
+        let package = host.appending(path: "package.zip")
+        let manifest = ValvePackageManifest(
+            bases: [host], packages: [], files: [],
+            bundle: ValveBundle(file: "package.zip", sha256: try Digest.sha256(of: package),
+                                innerArchive: "inner.tar.gz", bundleName: "Steam.app"))
+        let log = Log()
+
+        let refusal = try await #require(throws: StepFailure.self) {
+            try await steam.repair(manifest: manifest, downloads: work.appending(path: "unsigned-downloads"), stopClient: { _, _ in
+                log.add("stopped")
+                return true
+            })
+        }
+
+        #expect(refusal.detail.contains("does not verify against its own signature"))
+        #expect(log.all.isEmpty)
+        #expect(steam.isUntouched)
+    }
+
     @Test("A repaired Steam is not outstanding after its drive disconnects")
     func retiresRepairedSteamBeforeDisconnect() async throws {
         let work = try scratchDirectory("repair-tracking")
@@ -176,7 +318,7 @@ struct SteamRepairTests {
         _ = try await SteamRepair.run(
             app: app, innerPlist: work.appending(path: "inner.plist"), updateBlocks: [],
             backups: support.appending(path: "backups"), downloads: try isolatedValveDownloads(in: work),
-            modifications: modifications, stopClient: { _, _ in false }, register: { _ in })
+            modifications: modifications, stopClient: { _, _ in false }, register: { _ in }, runningBuild: { nil })
 
         #expect(try modifications.paths().isEmpty)
         try FileManager.default.moveItem(at: drive, to: work.appending(path: "disconnected"))
@@ -290,8 +432,9 @@ struct SteamRepairTests {
         try SteamRepair.replace(destination, with: staged)
 
         #expect(throws: Never.self) { try SteamRepair.verifyValveSignature(destination) }
-        #expect(SteamRepair.version(of: destination) == "6.1")
-        #expect(SteamBundle.currentInsert(at: destination.appending(path: "Contents/Info.plist")) == nil)
+        let plist = destination.appending(path: "Contents/Info.plist")
+        #expect(SteamBundle.readInfoPlist(at: plist)?["CFBundleVersion"] as? String == "6.1")
+        #expect(SteamBundle.currentInsert(at: plist) == nil)
         #expect(
             !FileManager.default.fileExists(
                 atPath: destination.appending(path: "Contents/MacOS/notproton.dylib").path(percentEncoded: false)

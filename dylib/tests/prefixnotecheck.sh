@@ -4,7 +4,7 @@
 # shellcheck disable=SC2016 # the sh -ec program expands its own variables
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
-[ -f "$SRC" ] || { echo "prefixnotecheck: $SRC not present, skipped"; exit 0; }
+[ -f "$SRC" ] || { echo "==> prefixnotecheck: $SRC not present, skipped"; exit 0; }
 
 body=$(sed -n '/^volume_type() {/,/^}/p;/^note_prefix_volume() {/,/^}/p;/^steam_libraries() {/,/^}/p;/^note_other_prefixes() {/,/^}/p;/^refuse_broken_prefix() {/,/^}/p' "$SRC")
 case "$body" in

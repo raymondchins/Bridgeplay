@@ -248,11 +248,66 @@ enum RunnerInstaller {
     static func isRunning(from clone: URL, ps: String = "/bin/ps") -> Bool {
         guard let result = try? Shell.run(ps, ["-axww", "-o", "comm="]), result.succeeded
         else { return true }
+        // ps prints the resolved path, and a clone can be a link to another drive.
         let root = clone.standardizedFileURL.path(percentEncoded: false)
-        let prefix = root.hasSuffix("/") ? root : root + "/"
-        return result.stdout.split(separator: "\n").contains {
-            $0.trimmingCharacters(in: .whitespaces).hasPrefix(prefix)
+        let prefixes = [root, realpath(root, nil).map { defer { free($0) }; return String(cString: $0) }]
+            .compactMap { $0 }
+            .map { $0.hasSuffix("/") ? $0 : $0 + "/" }
+        return result.stdout.split(separator: "\n").contains { line in
+            let command = line.trimmingCharacters(in: .whitespaces)
+            return prefixes.contains { command.hasPrefix($0) }
         }
+    }
+
+    static func runningBuild(
+        in runners: URL = SupportPaths.runners,
+        running: (URL) -> Bool = { RunnerInstaller.isRunning(from: $0) },
+        launching: () -> String? = { RunnerInstaller.launchingBuild() }
+    ) -> String? {
+        RunnerStore.clonedBuilds(in: runners).first { running(SupportPaths.runnerRoot(forBuild: $0, runners: runners)) }
+            ?? launching()
+    }
+
+    // Steam keeps a tool's run script going from Play until the game exits. Early in a launch
+    // Wine renames its processes and only the script shows a game is starting. ps prints the
+    // arguments of this user's processes only.
+    static func launchingBuild(
+        tools: [URL] = SupportPaths.Steam.ourTools(), ps: String = "/bin/ps"
+    ) -> String? {
+        guard !tools.isEmpty,
+              let result = try? Shell.run(ps, ["-axww", "-o", "args="]), result.succeeded
+        else { return nil }
+        // Steam starts the script as <tool>/./run.
+        let lines = result.stdout.split(separator: "\n").map { line in
+            var line = line.trimmingCharacters(in: .whitespaces)
+            while line.contains("/./") { line = line.replacingOccurrences(of: "/./", with: "/") }
+            return line
+        }
+        for tool in tools {
+            let root = tool.standardizedFileURL.path(percentEncoded: false)
+            let scripts = Set([root, realpath(root, nil).map { defer { free($0) }; return String(cString: $0) }]
+                .compactMap { $0 }
+                .map { ($0.hasSuffix("/") ? $0 : $0 + "/") + "run" })
+            // Only the script being run counts: as the command itself or as a shell's first
+            // argument, not a path some other process (tail, an editor) was given.
+            func runs(_ command: Substring) -> Bool {
+                scripts.contains { command == $0 || command.hasPrefix($0 + " ") }
+            }
+            let launching = lines.contains { line in
+                let line = Substring(line)
+                if runs(line) { return true }
+                guard let space = line.firstIndex(of: " "),
+                      ["sh", "bash", "dash", "zsh"].contains(line[..<space].split(separator: "/").last ?? "")
+                else { return false }
+                return runs(line[line.index(after: space)...])
+            }
+            if launching {
+                let build = (try? String(contentsOf: tool.appending(path: "build"), encoding: .utf8))?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return build.flatMap { $0.isEmpty ? nil : $0 } ?? tool.lastPathComponent
+            }
+        }
+        return nil
     }
 
     static func hasClone(forBuild build: String, runners: URL = SupportPaths.runners) -> Bool {
