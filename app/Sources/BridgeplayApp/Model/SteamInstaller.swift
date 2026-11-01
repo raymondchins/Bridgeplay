@@ -220,7 +220,7 @@ enum SteamInstaller {
                     try revertPlist(priorPlist, at: plist, app: app)
                 } catch let revertFailure {
                     AppLog.note("install: putting the plist back failed: \(revertFailure.localizedDescription)")
-                    throw StepFailure(step: step, detail: error.localizedDescription + " " + String(localized: "Putting Steam back as it was also failed, so Steam may not start: \(revertFailure.localizedDescription) Use Repair Steam to restore it."))
+                    throw revertFailed(error, revertFailure)
                 }
                 throw error
             }
@@ -353,7 +353,10 @@ enum SteamInstaller {
         let deployed = SteamBundle.currentInsert(at: plist) == dylib.path(percentEncoded: false)
             && SteamBundle.currentControllerBlock(at: plist) == SteamBundle.controllerBlockValue
         let file = DeploymentContent.File(source: shipping, destination: dylib, name: "notproton.dylib", allowsResigning: true)
-        if deployed, try file.matches() {
+        // A seal that no longer matches (signing failed and the plist could not be put back,
+        // #1931) is signed again when this account can write the bundle.
+        if deployed, try file.matches(),
+           sealIsIntact(app) || (try? assertBundleIsWritable(app)) == nil {
             AppLog.note("install: Steam already carries this dylib, installing for this account only")
             return false
         }
@@ -365,6 +368,16 @@ enum SteamInstaller {
             throw StepFailure(step: step, detail: detail)
         }
         return true
+    }
+
+    // A codesign that can't run says nothing about the seal, so it counts as intact.
+    static func sealIsIntact(_ app: URL) -> Bool {
+        guard let result = try? Shell.run("/usr/bin/codesign", ["--verify", app.path(percentEncoded: false)])
+        else { return true }
+        if !result.succeeded {
+            AppLog.note("install: Steam's signature no longer matches: \(result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))")
+        }
+        return result.succeeded
     }
 
     // What to say when Steam.app can't be written for a reason this account can't fix.
@@ -428,13 +441,41 @@ enum SteamInstaller {
         return true
     }
 
-    // Throws when either half fails: a plist that still declares the insert, or a bundle
-    // whose seal no longer matches it, is a Steam that does not start.
-    static func revertPlist(_ bytes: Data?, at plist: URL, app: URL) throws {
-        guard let bytes else { return }
-        try WriteRefused.catching(plist) { try bytes.write(to: plist) }
-        try adHocSign(app)
+    // The signing failure already names this step, so it is not said twice. Retryable as
+    // the signing failure was: a later install puts the plist and signature right.
+    static func revertFailed(_ error: Error, _ revertFailure: Error) -> StepFailure {
+        let own = error as? StepFailure
+        let cause = own.flatMap { $0.step == step ? $0.detail : nil } ?? error.localizedDescription
+        return StepFailure(
+            step: step,
+            detail: cause + " " + String(localized: "Putting Steam back as it was also failed, so Steam may not start: \(revertFailure.localizedDescription) Use Repair Steam to restore it."),
+            retryable: own?.retryable == true)
     }
+
+    // Throws when either half fails: a plist that still declares the insert, or a bundle
+    // whose seal no longer matches it, is a Steam that does not start. Tried again after a
+    // pause first, since what made signing fail (Steam's updater still writing, #1931) can
+    // refuse this write for a moment too.
+    static func revertPlist(
+        _ bytes: Data?, at plist: URL, app: URL,
+        attempts: Int = 3,
+        pause: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) },
+        resign: (URL) throws -> Void = { try adHocSign($0) }
+    ) throws {
+        guard let bytes else { return }
+        for attempt in 1... {
+            do {
+                try WriteRefused.catching(plist) { try bytes.write(to: plist) }
+                try resign(app)
+                return
+            } catch where attempt < attempts {
+                AppLog.note("install: putting the plist back failed (try \(attempt)): \(error.localizedDescription)")
+                pause(retryPause * Double(attempt))
+            }
+        }
+    }
+
+    static let retryPause: TimeInterval = 2
 
     static func setInsert(at plist: URL, to dylib: URL) throws {
         guard var dict = SteamBundle.readInfoPlist(at: plist) else {
@@ -470,24 +511,51 @@ enum SteamInstaller {
         try sign(url, identity: identity?.hash ?? "-", keychain: identity?.keychain, step: step)
     }
 
-    static func sign(_ url: URL, identity: String, keychain: URL? = nil, step: String = step) throws {
+    typealias Codesign = ([String]) throws -> CommandResult
+
+    // codesign says this when a file in the bundle changes under it, as when Steam's updater
+    // is still writing into Steam.app (#1931). Another try a moment later usually works.
+    static let transientSigningErrors = ["internal error in Code Signing subsystem"]
+    static let signingRetries = 2
+
+    static func isTransientSigningError(_ stderr: String) -> Bool {
+        transientSigningErrors.contains { stderr.contains($0) }
+    }
+
+    static func sign(
+        _ url: URL, identity: String, keychain: URL? = nil, step: String = step,
+        codesign: Codesign = { try Shell.run("/usr/bin/codesign", $0) },
+        pause: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }
+    ) throws {
         let path = url.path(percentEncoded: false)
         let lookup = keychain.map { ["--keychain", $0.path(percentEncoded: false)] } ?? []
-        var result = try Shell.run("/usr/bin/codesign", ["-f", "-s", identity] + lookup + [path])
-        // Fixes codesign refusing a Steam.app that carries Finder info or a resource fork.
-        if !result.succeeded, result.stderr.contains("detritus not allowed") {
-            clearFinderData(in: enclosingBundle(of: url))
-            result = try Shell.run("/usr/bin/codesign", ["-f", "-s", identity] + lookup + [path])
+        func attempt() throws -> CommandResult {
+            var result = try codesign(["-f", "-s", identity] + lookup + [path])
+            // Fixes codesign refusing a Steam.app that carries Finder info or a resource fork.
+            if !result.succeeded, result.stderr.contains("detritus not allowed") {
+                clearFinderData(in: enclosingBundle(of: url))
+                result = try codesign(["-f", "-s", identity] + lookup + [path])
+            }
+            // A keychain that refuses the identity must not leave Steam unsigned.
+            if !result.succeeded, identity != "-" {
+                result = try codesign(["-f", "-s", "-", path])
+            }
+            return result
         }
-        // A keychain that refuses the identity must not leave Steam unsigned.
-        if !result.succeeded, identity != "-" {
-            result = try Shell.run("/usr/bin/codesign", ["-f", "-s", "-", path])
+        var result = try attempt()
+        var retries = 0
+        while !result.succeeded, isTransientSigningError(result.stderr), retries < signingRetries {
+            retries += 1
+            AppLog.note("install: codesign hit a transient error on \(url.lastPathComponent), trying again (\(retries))")
+            pause(retryPause * Double(retries))
+            result = try attempt()
         }
         guard result.succeeded else {
             throw StepFailure(
                 step: step,
                 detail: String(localized: "\(path) could not be signed. ")
-                    + result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+                    + result.stderr.trimmingCharacters(in: .whitespacesAndNewlines),
+                retryable: isTransientSigningError(result.stderr)
             )
         }
     }
