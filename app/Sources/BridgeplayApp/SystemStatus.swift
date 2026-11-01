@@ -779,14 +779,10 @@ final class SystemStatus {
             var heldBack: Error?
             var heldBackRun = generation
             await SteamPatchKeeper.reapply(kind) { retrying in
-                await waitForSteamToSettle(trigger: trigger, retrying: retrying)
+                await waitForSteamToSettle(trigger: trigger, retryingAfter: retrying ? heldBackRun : nil)
             } attempt: { number, mayRetry in
-                // The wait gave the user time to start something of their own; that run
-                // reports for itself.
-                guard isIdle else {
-                    heldBack = nil
-                    return false
-                }
+                // The wait gave the user time to start something of their own.
+                guard isIdle else { return false }
                 AppLog.note("patch keeper (\(trigger)): re-applying on its own, \(kind)\(number > 1 ? ", try \(number)" : "")")
                 lastAutoReapply = Date()
                 await installIntoSteam(unattended: true) { mayRetry && SteamPatchKeeper.isRetryable($0) }
@@ -807,20 +803,26 @@ final class SystemStatus {
                 settleReapply(kind)
                 return false
             }
-            // A run since then (Repair Steam, an install) has its own outcome on show.
-            if let heldBack, heldBackRun == generation {
-                AppLog.note("patch keeper (\(trigger)): no later try ran, reporting the held-back failure")
-                record(heldBack)
-                settleReapply(kind)
+            // A run since then, or one still going (Repair Steam, an install, Remove
+            // Everything), has its own outcome on show. A refresh is not a run.
+            if let heldBack {
+                if heldBackRun == generation, !runInFlight {
+                    AppLog.note("patch keeper (\(trigger)): no later try ran, reporting the held-back failure")
+                    record(heldBack)
+                    settleReapply(kind)
+                } else {
+                    AppLog.note("patch keeper (\(trigger)): another run followed, dropping the held-back failure")
+                }
             }
         }
     }
 
     // False when Steam.app is still changing after the wait, or no longer needs Bridgeplay
     // put back (Steam or a game started, or the user installed it meanwhile). A retry goes
-    // ahead even when the plist still declares Bridgeplay: a failed try can leave it there
-    // with the signature broken, which the install signs again.
-    private func waitForSteamToSettle(trigger: String, retrying: Bool) async -> Bool {
+    // ahead even when the plist still declares Bridgeplay, since a failed try can leave it
+    // there with the signature broken, but only if no run (Repair Steam, Remove Everything)
+    // has happened since the try that failed.
+    private func waitForSteamToSettle(trigger: String, retryingAfter failedRun: Int?) async -> Bool {
         let app = SupportPaths.Steam.app
         let settled = await SteamPatchKeeper.waitForSteamToSettle {
             await Task.detached(priority: .utility) { SteamPatchKeeper.lastChange(in: app) }.value
@@ -842,7 +844,10 @@ final class SystemStatus {
             paused: paused,
             installBlocked: installBlocked))
         if case .reapply = decision { return true }
-        if retrying, !paused, !installBlocked, !seen.steamRunning, !seen.gameRunning { return true }
+        if let failedRun, failedRun == generation, !runInFlight, seen.previouslyDeployed,
+           !paused, !installBlocked, !seen.steamRunning, !seen.gameRunning {
+            return true
+        }
         AppLog.note("patch keeper (\(trigger)): nothing to re-apply after waiting for Steam, \(decision)")
         return false
     }
