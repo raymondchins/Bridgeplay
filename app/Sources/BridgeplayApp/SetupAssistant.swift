@@ -375,7 +375,7 @@ final class SetupAssistant {
 
         set("steam", .running)
         await status.installIntoSteam()
-        if let failure = status.failure {
+        if let failure = status.failure, status.sealWarning == nil {
             if status.failureRemedy == .appManagement {
                 askForAppManagement(status)
             } else if let tool = (status.lastRunError as? SteamInstaller.ForeignInsert)?.tool {
@@ -411,6 +411,8 @@ final class SetupAssistant {
             return
         }
 
+        // The later steps cleared it, so the Status page shows it again after Setup.
+        if let warning = status.sealWarning { status.setFailure(warning) }
         UserDefaults.standard.set(true, forKey: Self.finishedKey)
         step = .done
     }
