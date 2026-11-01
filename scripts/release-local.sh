@@ -129,9 +129,12 @@ gh release view "$fonts_tag" -R "$slug" --json assets -q '.assets[].name' 2>/dev
 # (scripts/package-wine-patch-sources.sh).
 wine_src_archive=$(sed -n 's/^  \(wine-patch-sources-[0-9a-f]*\.tar\.gz\), sha256$/\1/p' NOTICE)
 [ -n "$wine_src_archive" ] || die "no wine-patch-sources archive pinned in NOTICE"
+wine_src_sha=$(sed -n '/^  wine-patch-sources-[0-9a-f]*\.tar\.gz, sha256$/{n;s/^  \([0-9a-f]\{64\}\),.*/\1/p;}' NOTICE)
+[ -n "$wine_src_sha" ] || die "no wine-patch-sources sha256 pinned in NOTICE"
 wine_src_tag=${wine_src_archive%.tar.gz}
-gh release view "$wine_src_tag" -R "$slug" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "$wine_src_archive" \
-	|| check "$wine_src_tag has no $wine_src_archive on GitHub; run scripts/package-wine-patch-sources.sh --publish"
+gh release view "$wine_src_tag" -R "$slug" --json assets -q ".assets[] | select(.name == \"$wine_src_archive\") | .digest" 2>/dev/null \
+	| grep -qx "sha256:$wine_src_sha" \
+	|| check "$wine_src_tag has no $wine_src_archive matching NOTICE's sha256 on GitHub; run scripts/package-wine-patch-sources.sh --publish"
 
 sparkle=app/.build/artifacts/sparkle/Sparkle/bin
 [ -x "$sparkle/generate_appcast" ] || swift build --package-path app >/dev/null
