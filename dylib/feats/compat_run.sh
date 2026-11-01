@@ -1010,8 +1010,10 @@ show_alert() {
   [ "$verb" != run ] || return 0
   launch_step dialog
   exec 8>&- 9>&-
-  osascript >/dev/null 2>&1 <<APPLESCRIPT || true
-display alert "$1" message "$2" as critical
+  osascript - "$1" "$2" >/dev/null 2>&1 <<'APPLESCRIPT' || true
+on run argv
+  display alert (item 1 of argv) message (item 2 of argv) as critical
+end run
 APPLESCRIPT
 }
 
