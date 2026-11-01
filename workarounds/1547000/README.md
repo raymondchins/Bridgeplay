@@ -27,8 +27,14 @@ references keep game-local DLLs in place while another managed prefix still
 uses the same Steam game install; restore removes Bridgeplay-owned DLLs only
 after the last such prefix releases them. The helper relies on atomic rename
 support for its file transactions and refuses preparation when the filesystem
-cannot provide it. The game executable, Steam settings, registry and saves
-are not changed.
+cannot provide it. These game-local DLLs persist between sessions in the Steam
+install. Before switching that install to another compatibility tool or native
+Windows, or removing Bridgeplay, use
+`BRIDGEPLAY_GTA_SA_DE_FIX=0 %command%` for each managed prefix. Bridgeplay
+removes the shared DLLs after every managed prefix releases its reference.
+Matching files adopted as manual remain the user's
+responsibility. The game executable, Steam settings, registry and saves are
+not changed.
 
 After preparation, Bridgeplay selects DXVK for the Rockstar launcher and
 sets DXGI to native-first (`dxgi=n,b`) for the game-local DXMT DLLs. The stock
