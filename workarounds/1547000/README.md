@@ -98,7 +98,7 @@ the acknowledgement below.
 Set the absolute Steam game install root and copy the lowercase transaction
 UUID from `.bridgeplay-gta-sa-de-1547000.pending.json`. Keep the three pinned
 hashes unchanged. Run the following setup and recovery blocks in the same
-shell, from a Mac with `plutil`, `shasum`, `stat` and `mv`:
+shell, from a Mac with `plutil`, `shasum`, `stat`, `mv`, `mktemp`, `cmp` and `id`:
 
 ~~~sh
 # BEGIN GTA 1547000 ORPHAN PIN SETUP
@@ -114,11 +114,17 @@ export GTA_PIN_D3D11 GTA_PIN_DXGI GTA_PIN_D3D10CORE
 ~~~
 
 The guarded block checks every source, schema, hash, path and destination
-before its first move. It moves only the three known app-local DLLs (when
-present), the recognized shared-state file (when present), and finally the
-pending marker. The unique mode-700 quarantine is a sibling of the game
-folder. Prefixes, saves, registry data, the game executable, unknown files and
-all `.tmp` stages are left in place.
+before its first move. It quarantines game DLLs only when the shared state's
+`files` metadata proves Bridgeplay ownership and pins the hashes of all three
+DLLs. A complete pinned triplet with absent, preexisting or uncertain ownership
+stays in the game folder as user-owned. A partial pinned triplet without that
+ownership proof stops before any move; use the checks in
+“5. Install the helper and game-local DXMT files” in the manual recipe below
+to complete a verified set, or coordinate a backup of the affected files
+before retrying. The block also moves the recognized shared-state file (when
+present) and finally the pending marker. The unique mode-700 quarantine is a
+sibling of the game folder. Prefixes, saves, registry data, the game
+executable, unknown files and all `.tmp` stages are left in place.
 
 ~~~sh
 # BEGIN GTA 1547000 ORPHAN RECOVERY BODY
@@ -177,14 +183,32 @@ if [ -e "$GTA_STATE" ] || [ -L "$GTA_STATE" ]; then
   [ "$(plutil -type files "$GTA_STATE" 2>/dev/null)" = dictionary ] || gta_refuse 'unknown shared-state files field'
   GTA_STATE_HASH=$(gta_hash "$GTA_STATE") || gta_refuse 'cannot hash shared state'
 fi
+GTA_DLLS_OWNED=no
+if [ "$GTA_STATE_HASH" != absent ]; then
+  GTA_DLLS_OWNED=yes
+  for GTA_NAME in d3d11.dll dxgi.dll d3d10core.dll; do
+    case "$GTA_NAME" in d3d11.dll) GTA_PIN=$GTA_PIN_D3D11 ;; dxgi.dll) GTA_PIN=$GTA_PIN_DXGI ;; *) GTA_PIN=$GTA_PIN_D3D10CORE ;; esac
+    GTA_KEY="files.${GTA_NAME%.dll}\\.dll"
+    GTA_FILE_OWNER=$(plutil -extract "$GTA_KEY.ownership" raw -o - "$GTA_STATE" 2>/dev/null) || GTA_FILE_OWNER=unknown
+    GTA_FILE_HASH=$(plutil -extract "$GTA_KEY.sha256" raw -o - "$GTA_STATE" 2>/dev/null) || GTA_FILE_HASH=unknown
+    if [ "$GTA_FILE_OWNER" != bridgeplay ] || [ "$GTA_FILE_HASH" != "$GTA_PIN" ]; then
+      GTA_DLLS_OWNED=no
+    fi
+  done
+fi
+GTA_DLL_PRESENT_COUNT=0
 for GTA_NAME in d3d11.dll dxgi.dll d3d10core.dll; do
   case "$GTA_NAME" in d3d11.dll) GTA_PIN=$GTA_PIN_D3D11 ;; dxgi.dll) GTA_PIN=$GTA_PIN_DXGI ;; *) GTA_PIN=$GTA_PIN_D3D10CORE ;; esac
   GTA_FILE="$GTA_DLL_DIR/$GTA_NAME"
   if [ -e "$GTA_FILE" ] || [ -L "$GTA_FILE" ]; then
     [ -f "$GTA_FILE" ] && [ ! -L "$GTA_FILE" ] || gta_refuse "unsafe DLL: $GTA_NAME"
     [ "$(gta_hash "$GTA_FILE")" = "$GTA_PIN" ] || gta_refuse "unknown or modified DLL: $GTA_NAME"
+    GTA_DLL_PRESENT_COUNT=$((GTA_DLL_PRESENT_COUNT + 1))
   fi
 done
+if [ "$GTA_DLL_PRESENT_COUNT" -gt 0 ] && [ "$GTA_DLL_PRESENT_COUNT" -lt 3 ] && [ "$GTA_DLLS_OWNED" != yes ]; then
+  gta_refuse 'partial DLL set has no verified Bridgeplay ownership; complete manual recipe section 5 or coordinate a backup'
+fi
 GTA_BACKUP="$GTA_PARENT/.bridgeplay-gta-sa-de-orphan-$GTA_EXPECTED_TRANSACTION_UUID"
 [ ! -e "$GTA_BACKUP" ] && [ ! -L "$GTA_BACKUP" ] || gta_refuse 'quarantine destination already exists'
 (umask 077 && mkdir -m 700 "$GTA_BACKUP") || gta_refuse 'cannot create private quarantine'
@@ -201,11 +225,13 @@ gta_move() {
   { [ ! -e "$GTA_SOURCE" ] && [ ! -L "$GTA_SOURCE" ]; } || gta_stop
   [ -f "$GTA_DEST" ] && [ ! -L "$GTA_DEST" ] && [ "$(gta_hash "$GTA_DEST")" = "$GTA_EXPECTED" ] || gta_stop
 }
-for GTA_NAME in d3d11.dll dxgi.dll d3d10core.dll; do
-  case "$GTA_NAME" in d3d11.dll) GTA_PIN=$GTA_PIN_D3D11 ;; dxgi.dll) GTA_PIN=$GTA_PIN_DXGI ;; *) GTA_PIN=$GTA_PIN_D3D10CORE ;; esac
-  GTA_FILE="$GTA_DLL_DIR/$GTA_NAME"
-  if [ -e "$GTA_FILE" ] || [ -L "$GTA_FILE" ]; then gta_move "$GTA_FILE" "$GTA_NAME" "$GTA_PIN"; else gta_move "$GTA_FILE" "$GTA_NAME" absent; fi
-done
+if [ "$GTA_DLLS_OWNED" = yes ]; then
+  for GTA_NAME in d3d11.dll dxgi.dll d3d10core.dll; do
+    case "$GTA_NAME" in d3d11.dll) GTA_PIN=$GTA_PIN_D3D11 ;; dxgi.dll) GTA_PIN=$GTA_PIN_DXGI ;; *) GTA_PIN=$GTA_PIN_D3D10CORE ;; esac
+    GTA_FILE="$GTA_DLL_DIR/$GTA_NAME"
+    if [ -e "$GTA_FILE" ] || [ -L "$GTA_FILE" ]; then gta_move "$GTA_FILE" "$GTA_NAME" "$GTA_PIN"; else gta_move "$GTA_FILE" "$GTA_NAME" absent; fi
+  done
+fi
 gta_move "$GTA_STATE" .bridgeplay-gta-sa-de-1547000.json "$GTA_STATE_HASH"
 gta_move "$GTA_MARKER" .bridgeplay-gta-sa-de-1547000.pending.json "$GTA_MARKER_HASH"
 printf 'Quarantine complete: %s\n' "$GTA_BACKUP"
@@ -236,6 +262,150 @@ GTA_FIX_HELPER="$HOME/Library/Application Support/bridgeplay/gamefix-prep"
 GTA_SA_APP_ID=1547000 GTA_SA_DATA_PATH="$GTA_DATA" \
 GTA_SA_PREFIX="$GTA_DATA/pfx" GTA_SA_GAME="$GTA_GAME" \
   "$GTA_FIX_HELPER" restore
+~~~
+
+#### Manual recovery for an orphaned Social Club helper backup
+
+Use this only after the orphan game quarantine above is complete and only for
+the original owner prefix whose transaction journal is irretrievably lost.
+First try that prefix's normal `gamefix-prep restore`; run this only when it
+reports `no-owned-state` and both its `state.json` and transaction journal
+are absent. Keep Steam, Wine, GTA and Rockstar Launcher stopped in every
+macOS account using this install. The acknowledgement records that you checked
+the original owner prefix, confirmed the journal is irretrievably lost, and
+stopped all those sessions.
+
+This covers the fresh-install interruption after the vendor helper was copied
+to `SocialClubHelper_real.exe` but before the wrapper replaced the active
+helper, including checkpoints where the checksum and license were installed
+first. The script leaves the active helper in place. It quarantines the
+duplicate real helper only when both files are regular, non-symlink files,
+byte-identical, and match the pinned supported vendor build. It also
+quarantines the checksum only when its exact expected bytes match, and the
+license only when its pinned hash matches. Changed files, symlinks, unknown
+vendor builds, a current wrapper, or any present owner state/journal stop the
+script before its first move. The unique mode-700 quarantine is beside this
+one prefix's `pfx` directory, outside it. Do not run this against every
+account's backup. It does not touch saves, authentication data, registry data,
+or the active helper. After it completes, retry normal preparation for this
+prefix.
+
+Set `GTA_GAME` to the game root and `GTA_DATA` to this original owner's
+existing `compatdata/1547000` directory, and set the acknowledgement exactly
+as shown. Keep all three pinned helper hashes unchanged.
+
+~~~sh
+GTA_GAME='/absolute/path/to/GTA San Andreas - The Definitive Edition'
+GTA_DATA='/absolute/path/to/compatdata/1547000'
+GTA_HELPER_ORPHAN_ACK='I_CONFIRMED_ORIGINAL_OWNER_PREFIX_JOURNAL_LOST_AND_ALL_STEAM_WINE_SESSIONS_STOPPED'
+export GTA_GAME GTA_DATA GTA_HELPER_ORPHAN_ACK
+
+# BEGIN GTA 1547000 ORPHAN HELPER PIN SETUP
+GTA_PIN_VENDOR='d3bd835897a97207d26e703969232ded54fd32c4388691c7ebd95709a54f9a6d'
+GTA_PIN_WRAPPER='80eced29c22d2f3fb7fc38c6c99792350a4f3ef6bacc32971830b5d2e27ad7d5'
+GTA_PIN_LICENSE='2985ef68fb7ab2e5163a39352917e271eac05ceec0aa4a9fab6e78cec917a6d6'
+export GTA_PIN_VENDOR GTA_PIN_WRAPPER GTA_PIN_LICENSE
+# END GTA 1547000 ORPHAN HELPER PIN SETUP
+
+# BEGIN GTA 1547000 ORPHAN HELPER RECOVERY BODY
+(
+set -eu
+gta_helper_refuse() { printf 'Refusing orphan helper recovery: %s\n' "$1" >&2; exit 1; }
+gta_helper_stop() {
+  printf 'STOP: keep Steam/Wine closed; preserve quarantine %s and inspect every file.\n' "${GTA_BACKUP-}" >&2
+  exit 1
+}
+gta_helper_hash() { GTA_HASH_LINE=$(shasum -a 256 "$1") || return 1; printf '%s' "${GTA_HASH_LINE%% *}"; }
+[ "${GTA_HELPER_ORPHAN_ACK-}" = 'I_CONFIRMED_ORIGINAL_OWNER_PREFIX_JOURNAL_LOST_AND_ALL_STEAM_WINE_SESSIONS_STOPPED' ] || gta_helper_refuse 'original-owner journal loss and stopped sessions were not acknowledged'
+for GTA_PIN in "${GTA_PIN_VENDOR-}" "${GTA_PIN_WRAPPER-}" "${GTA_PIN_LICENSE-}"; do
+  case "$GTA_PIN" in ????????*) [ "${#GTA_PIN}" -eq 64 ] || gta_helper_refuse 'invalid pinned helper hash' ;; *) gta_helper_refuse 'missing pinned helper hash' ;; esac
+  case "$GTA_PIN" in *[!0123456789abcdef]*) gta_helper_refuse 'pinned helper hash must be lowercase hexadecimal' ;; esac
+done
+case "${GTA_GAME-}" in /*) ;; *) gta_helper_refuse 'GTA_GAME must be absolute' ;; esac
+case "${GTA_DATA-}" in /*) ;; *) gta_helper_refuse 'GTA_DATA must be absolute' ;; esac
+[ "$GTA_GAME" != / ] && [ "$GTA_DATA" != / ] || gta_helper_refuse 'game and data roots cannot be /'
+[ -d "$GTA_GAME" ] && [ ! -L "$GTA_GAME" ] || gta_helper_refuse 'game root is unavailable or a symlink'
+[ -d "$GTA_DATA" ] && [ ! -L "$GTA_DATA" ] || gta_helper_refuse 'prefix data root is unavailable or a symlink'
+GTA_GAME_PHYSICAL=$(CDPATH= cd -P "$GTA_GAME" 2>/dev/null && pwd -P) || gta_helper_refuse 'cannot canonicalize game root'
+GTA_DATA_PHYSICAL=$(CDPATH= cd -P "$GTA_DATA" 2>/dev/null && pwd -P) || gta_helper_refuse 'cannot canonicalize prefix data root'
+GTA_GAME=$GTA_GAME_PHYSICAL
+GTA_DATA=$GTA_DATA_PHYSICAL
+[ "$GTA_GAME" != / ] && [ "$GTA_DATA" != / ] || gta_helper_refuse 'canonical game and data roots cannot be /'
+GTA_PREFIX="$GTA_DATA/pfx"
+[ "$(id -u)" = "$(stat -f %u "$GTA_DATA")" ] || gta_helper_refuse 'prefix data root is not owned by this account'
+[ -d "$GTA_PREFIX" ] && [ ! -L "$GTA_PREFIX" ] || gta_helper_refuse 'prefix root is unavailable or a symlink'
+[ "$(id -u)" = "$(stat -f %u "$GTA_PREFIX")" ] || gta_helper_refuse 'prefix root is not owned by this account'
+for GTA_DIR in "$GTA_PREFIX" "$GTA_PREFIX/drive_c" "$GTA_PREFIX/drive_c/Program Files" \
+  "$GTA_PREFIX/drive_c/Program Files/Rockstar Games" \
+  "$GTA_PREFIX/drive_c/Program Files/Rockstar Games/Social Club"; do
+  [ -d "$GTA_DIR" ] && [ ! -L "$GTA_DIR" ] || gta_helper_refuse "unsafe or missing prefix directory: $GTA_DIR"
+done
+GTA_MARKER="$GTA_GAME/.bridgeplay-gta-sa-de-1547000.pending.json"
+[ ! -e "$GTA_MARKER" ] && [ ! -L "$GTA_MARKER" ] || gta_helper_refuse 'complete orphan game quarantine before helper recovery'
+GTA_STATE_DIR="$GTA_DATA/.bridgeplay-gta-sa-de-1547000"
+if [ -e "$GTA_STATE_DIR" ] || [ -L "$GTA_STATE_DIR" ]; then
+  [ -d "$GTA_STATE_DIR" ] && [ ! -L "$GTA_STATE_DIR" ] || gta_helper_refuse 'unsafe prefix state directory'
+  [ "$(id -u)" = "$(stat -f %u "$GTA_STATE_DIR")" ] || gta_helper_refuse 'prefix state directory belongs to another account'
+  [ "$(stat -f %Lp "$GTA_STATE_DIR")" = 700 ] || gta_helper_refuse 'prefix state directory mode is not 700'
+  [ -r "$GTA_STATE_DIR" ] && [ -x "$GTA_STATE_DIR" ] || gta_helper_refuse 'prefix state directory is not readable and searchable'
+fi
+GTA_STATE="$GTA_STATE_DIR/state.json"
+GTA_JOURNAL="$GTA_STATE_DIR/.bridgeplay-gta-sa-de-1547000.transaction.json"
+for GTA_FILE in "$GTA_STATE" "$GTA_JOURNAL"; do
+  { [ ! -e "$GTA_FILE" ] && [ ! -L "$GTA_FILE" ]; } || gta_helper_refuse 'prefix state or owner journal is present; recover it normally'
+done
+GTA_HELPER_DIR="$GTA_PREFIX/drive_c/Program Files/Rockstar Games/Social Club"
+GTA_HELPER="$GTA_HELPER_DIR/SocialClubHelper.exe"
+GTA_REAL="$GTA_HELPER_DIR/SocialClubHelper_real.exe"
+GTA_CHECKSUM="$GTA_HELPER_DIR/SocialClubHelper_real.exe.sha256"
+GTA_LICENSE="$GTA_HELPER_DIR/SocialClubHelper.bridgeplay.LICENSE"
+[ -f "$GTA_HELPER" ] && [ ! -L "$GTA_HELPER" ] || gta_helper_refuse 'active helper is not a regular file'
+[ -f "$GTA_REAL" ] && [ ! -L "$GTA_REAL" ] || gta_helper_refuse 'saved real helper is not a regular file'
+GTA_HELPER_HASH=$(gta_helper_hash "$GTA_HELPER") || gta_helper_refuse 'cannot hash active helper'
+GTA_REAL_HASH=$(gta_helper_hash "$GTA_REAL") || gta_helper_refuse 'cannot hash saved real helper'
+[ "$GTA_HELPER_HASH" != "$GTA_PIN_WRAPPER" ] || gta_helper_refuse 'active helper is already the Bridgeplay wrapper'
+[ "$GTA_HELPER_HASH" = "$GTA_PIN_VENDOR" ] && [ "$GTA_REAL_HASH" = "$GTA_PIN_VENDOR" ] || gta_helper_refuse 'active and saved helpers are not the pinned supported vendor build'
+cmp -s "$GTA_HELPER" "$GTA_REAL" || gta_helper_refuse 'active and saved helpers are not byte-identical'
+GTA_CHECKSUM_PRESENT=no
+GTA_CHECKSUM_HASH=$(printf '%s  SocialClubHelper_real.exe\n' "$GTA_PIN_VENDOR" | shasum -a 256) || gta_helper_refuse 'cannot hash expected checksum bytes'
+GTA_CHECKSUM_HASH=${GTA_CHECKSUM_HASH%% *}
+if [ -e "$GTA_CHECKSUM" ] || [ -L "$GTA_CHECKSUM" ]; then
+  [ -f "$GTA_CHECKSUM" ] && [ ! -L "$GTA_CHECKSUM" ] || gta_helper_refuse 'checksum is not a regular file'
+  printf '%s  SocialClubHelper_real.exe\n' "$GTA_PIN_VENDOR" | cmp -s "$GTA_CHECKSUM" - || gta_helper_refuse 'checksum bytes are unknown'
+  GTA_CHECKSUM_PRESENT=yes
+fi
+GTA_LICENSE_PRESENT=no
+if [ -e "$GTA_LICENSE" ] || [ -L "$GTA_LICENSE" ]; then
+  [ -f "$GTA_LICENSE" ] && [ ! -L "$GTA_LICENSE" ] || gta_helper_refuse 'license is not a regular file'
+  [ "$(gta_helper_hash "$GTA_LICENSE")" = "$GTA_PIN_LICENSE" ] || gta_helper_refuse 'license hash is unknown'
+  GTA_LICENSE_PRESENT=yes
+fi
+GTA_BACKUP=$(umask 077 && mktemp -d "$GTA_DATA/.bridgeplay-gta-sa-de-helper-orphan.XXXXXXXX") || gta_helper_refuse 'cannot create a unique private quarantine'
+[ -d "$GTA_BACKUP" ] && [ ! -L "$GTA_BACKUP" ] && [ "$(stat -f %Lp "$GTA_BACKUP")" = 700 ] || gta_helper_stop
+case "$GTA_BACKUP" in "$GTA_PREFIX"/*) gta_helper_stop ;; esac
+gta_helper_move() {
+  GTA_SOURCE=$1; GTA_NAME=$2; GTA_EXPECTED=$3; GTA_DEST="$GTA_BACKUP/$GTA_NAME"
+  [ -f "$GTA_SOURCE" ] && [ ! -L "$GTA_SOURCE" ] && [ ! -e "$GTA_DEST" ] && [ ! -L "$GTA_DEST" ] || gta_helper_stop
+  [ "$(gta_helper_hash "$GTA_SOURCE")" = "$GTA_EXPECTED" ] || gta_helper_stop
+  mv -n "$GTA_SOURCE" "$GTA_DEST" || gta_helper_stop
+  { [ ! -e "$GTA_SOURCE" ] && [ ! -L "$GTA_SOURCE" ]; } || gta_helper_stop
+  [ -f "$GTA_DEST" ] && [ ! -L "$GTA_DEST" ] && [ "$(gta_helper_hash "$GTA_DEST")" = "$GTA_EXPECTED" ] || gta_helper_stop
+}
+[ "$(gta_helper_hash "$GTA_HELPER")" = "$GTA_PIN_VENDOR" ] && cmp -s "$GTA_HELPER" "$GTA_REAL" || gta_helper_stop
+gta_helper_move "$GTA_REAL" SocialClubHelper_real.exe "$GTA_PIN_VENDOR"
+if [ "$GTA_CHECKSUM_PRESENT" = yes ]; then
+  gta_helper_move "$GTA_CHECKSUM" SocialClubHelper_real.exe.sha256 "$GTA_CHECKSUM_HASH"
+else
+  { [ ! -e "$GTA_CHECKSUM" ] && [ ! -L "$GTA_CHECKSUM" ]; } || gta_helper_stop
+fi
+if [ "$GTA_LICENSE_PRESENT" = yes ]; then
+  gta_helper_move "$GTA_LICENSE" SocialClubHelper.bridgeplay.LICENSE "$GTA_PIN_LICENSE"
+else
+  { [ ! -e "$GTA_LICENSE" ] && [ ! -L "$GTA_LICENSE" ]; } || gta_helper_stop
+fi
+printf 'Orphan helper files quarantined for this prefix: %s\n' "$GTA_BACKUP"
+)
+# END GTA 1547000 ORPHAN HELPER RECOVERY BODY
 ~~~
 
 As an alternative, use `BRIDGEPLAY_GTA_SA_DE_FIX=0` once for each surviving

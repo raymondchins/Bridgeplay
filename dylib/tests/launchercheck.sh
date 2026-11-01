@@ -795,6 +795,42 @@ PY
 )
 is "documented orphan pins match the production manifest" yes "$gta_orphan_doc_pins"
 
+gta_orphan_helper_script="$gta_fixture/orphan-helper-recovery.sh"
+sed -n '/^# BEGIN GTA 1547000 ORPHAN HELPER RECOVERY BODY$/,/^# END GTA 1547000 ORPHAN HELPER RECOVERY BODY$/p' "$gta_orphan_readme" | sed '1d;$d' > "$gta_orphan_helper_script"
+sh -n "$gta_orphan_helper_script"
+gta_orphan_helper_doc_pins=$(python3 - "$gta_orphan_readme" "$gta_orphan_manifest" <<'PY'
+import json
+import re
+import sys
+
+readme = open(sys.argv[1], encoding="utf-8").read()
+manifest = json.load(open(sys.argv[2], encoding="utf-8"))
+setup = re.search(r"(?ms)^# BEGIN GTA 1547000 ORPHAN HELPER PIN SETUP\n(.*?)^# END GTA 1547000 ORPHAN HELPER PIN SETUP$", readme)
+pins = dict(re.findall(r"^GTA_PIN_(VENDOR|WRAPPER|LICENSE)='([0-9a-f]{64})'$", setup.group(1), re.M)) if setup else {}
+expected = {
+    "VENDOR": manifest["supportedVendorHelpers"][0]["sha256"],
+    "WRAPPER": manifest["helperWrapperSHA256"],
+    "LICENSE": manifest["helperLicenseSHA256"],
+}
+print("yes" if pins == expected else "no")
+PY
+)
+is "documented helper recovery pins match the production manifest" yes "$gta_orphan_helper_doc_pins"
+gta_orphan_helper_fixture_pins=$(python3 - "$gta_fixture/manifest.json" <<'PY'
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+print(manifest["supportedVendorHelpers"][0]["sha256"],
+      manifest["helperWrapperSHA256"], manifest["helperLicenseSHA256"])
+PY
+)
+gta_orphan_helper_fixture_vendor=${gta_orphan_helper_fixture_pins%% *}
+gta_orphan_helper_fixture_pins=${gta_orphan_helper_fixture_pins#* }
+gta_orphan_helper_fixture_wrapper=${gta_orphan_helper_fixture_pins%% *}
+gta_orphan_helper_fixture_license=${gta_orphan_helper_fixture_pins#* }
+gta_orphan_helper_script_fixture="$gta_orphan_helper_script"
+
 gta_orphan_game="$gta_fixture/orphan-recovery-game"
 gta_orphan_data_a="$gta_fixture/orphan-recovery-data-a"
 gta_orphan_data_b="$gta_fixture/orphan-recovery-data-b"
@@ -810,21 +846,21 @@ printf 'unowned staged bytes\n' > "$gta_orphan_stage"
 printf 'owner registry bytes\n' > "$gta_orphan_data_a/pfx/user.reg"
 printf 'second prefix registry bytes\n' > "$gta_orphan_data_b/pfx/user.reg"
 gta_orphan_initial=$(gta_helper_call "$gta_orphan_data_a" "$gta_orphan_game" prepare)
-is "orphan fixture starts prepared" prepared "$gta_orphan_initial"
-gta_orphan_owner_helper="$gta_orphan_data_a/pfx/$gta_helper_dir/SocialClubHelper.exe"
-cp "$gta_fixture/vendor-v2.exe" "$gta_orphan_owner_helper"
+is "orphan fixture A starts prepared" prepared "$gta_orphan_initial"
+gta_orphan_b_initial=$(gta_helper_call "$gta_orphan_data_b" "$gta_orphan_game" prepare)
+is "orphan fixture B starts prepared" prepared "$gta_orphan_b_initial"
 gta_crash_rc=0
-gta_crash_helper_call "$gta_orphan_data_a" "$gta_orphan_game" prepare 1 >/dev/null 2>&1 || gta_crash_rc=$?
-is "SIGKILL creates the orphan marker during supported prepare" 137 "$gta_crash_rc"
+gta_crash_helper_call "$gta_orphan_data_a" "$gta_orphan_game" restore 5 >/dev/null 2>&1 || gta_crash_rc=$?
+is "SIGKILL interrupts A restore after shared-state update with B present" 137 "$gta_crash_rc"
 gta_orphan_marker="$gta_orphan_game/.bridgeplay-gta-sa-de-1547000.pending.json"
 gta_orphan_shared="$gta_orphan_game/.bridgeplay-gta-sa-de-1547000.json"
 gta_orphan_journal="$gta_orphan_data_a/.bridgeplay-gta-sa-de-1547000/.bridgeplay-gta-sa-de-1547000.transaction.json"
 is "orphan fixture retains the shared marker" yes "$(test -f "$gta_orphan_marker" && echo yes || echo no)"
-is "interrupted update leaves shared state and all three DLLs" 3 "$(find "$gta_orphan_game/Gameface/Binaries/Win64" -name '*.dll' | wc -l | tr -d ' ')"
+is "interrupted A restore leaves shared state and all three DLLs" 3 "$(find "$gta_orphan_game/Gameface/Binaries/Win64" -name '*.dll' | wc -l | tr -d ' ')"
 is "test owner journal exists before simulated loss" yes "$(test -f "$gta_orphan_journal" && echo yes || echo no)"
 rm "$gta_orphan_journal"
 is "test deletes only the owner transaction journal" no "$(test -e "$gta_orphan_journal" && echo yes || echo no)"
-is "other owner prefix state remains" yes "$(test -f "$gta_orphan_data_a/.bridgeplay-gta-sa-de-1547000/state.json" && echo yes || echo no)"
+is "surviving B prefix state remains" yes "$(test -f "$gta_orphan_data_b/.bridgeplay-gta-sa-de-1547000/state.json" && echo yes || echo no)"
 
 gta_orphan_block_rc=0
 gta_orphan_block=$(gta_helper_call "$gta_orphan_data_b" "$gta_orphan_game" prepare 2>&1) || gta_orphan_block_rc=$?
@@ -865,6 +901,17 @@ gta_orphan_run() {
 		GTA_ORPHAN_ACK=I_CONFIRMED_THE_OWNER_JOURNAL_IS_IRRETRIEVABLY_LOST \
 		GTA_PIN_D3D11="$gta_orphan_pin_d3d11" GTA_PIN_DXGI="$gta_orphan_pin_dxgi" \
 		GTA_PIN_D3D10CORE="$gta_orphan_pin_d3d10core" sh "$gta_orphan_script" > "$gta_orphan_log" 2>&1 || gta_orphan_rc=$?
+}
+gta_orphan_helper_run_for() {
+	gta_orphan_helper_test_game=$1
+	gta_orphan_helper_test_data=$2
+	gta_orphan_helper_test_log=$3
+	gta_orphan_helper_rc=0
+	env GTA_GAME="$gta_orphan_helper_test_game" GTA_DATA="$gta_orphan_helper_test_data" \
+		GTA_HELPER_ORPHAN_ACK=I_CONFIRMED_ORIGINAL_OWNER_PREFIX_JOURNAL_LOST_AND_ALL_STEAM_WINE_SESSIONS_STOPPED \
+		GTA_PIN_VENDOR="$gta_orphan_helper_fixture_vendor" GTA_PIN_WRAPPER="$gta_orphan_helper_fixture_wrapper" \
+		GTA_PIN_LICENSE="$gta_orphan_helper_fixture_license" \
+		sh "$gta_orphan_helper_script_fixture" > "$gta_orphan_helper_test_log" 2>&1 || gta_orphan_helper_rc=$?
 }
 
 gta_orphan_before=$(gta_orphan_snapshot)
@@ -930,7 +977,227 @@ is "save bytes remain unchanged" "$gta_orphan_save_hash" "$(gta_orphan_hash "$gt
 is "unknown staged files remain unchanged" "$gta_orphan_stage_inventory" "$(gta_orphan_tmp_inventory)"
 is "both prefixes and registry data remain unchanged" "$gta_orphan_prefix_hashes" "$(find "$gta_orphan_data_a" "$gta_orphan_data_b" -type f -exec shasum -a 256 {} \; | LC_ALL=C sort)"
 is "both prefix file sets remain unchanged" "$gta_orphan_prefix_inventory" "$(find "$gta_orphan_data_a" "$gta_orphan_data_b" \( -type f -o -type l \) -print | LC_ALL=C sort)"
-is "B prepares after the completed shared reset" prepared "$(gta_helper_call "$gta_orphan_data_b" "$gta_orphan_game" prepare)"
+gta_orphan_b_restore=$(gta_helper_call "$gta_orphan_data_b" "$gta_orphan_game" restore)
+is "B restores after orphan shared metadata quarantine" restored "$gta_orphan_b_restore"
+is "B restore keeps quarantined DLL destinations absent without shared metadata" 0 "$(find "$gta_orphan_dll_dir" \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
+is "B restore leaves missing shared metadata absent" no "$(test -e "$gta_orphan_shared" && echo yes || echo no)"
+gta_orphan_b_prepared=$(gta_helper_call "$gta_orphan_data_b" "$gta_orphan_game" prepare)
+is "B prepares after restore with missing shared metadata" prepared "$gta_orphan_b_prepared"
+is "B reprepare reinstalls the owned shared DLL set" 3 "$(find "$gta_orphan_dll_dir" \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
+
+echo "== orphan quarantine refuses an unowned partial DLL set"
+gta_partial_orphan_game="$gta_fixture/orphan-partial-game"
+gta_partial_orphan_data="$gta_fixture/orphan-partial-data"
+gta_seed_case "$gta_partial_orphan_game" "$gta_partial_orphan_data"
+gta_partial_orphan_game=$(CDPATH='' cd -P "$gta_partial_orphan_game" && pwd -P)
+gta_partial_orphan_dll_dir="$gta_partial_orphan_game/Gameface/Binaries/Win64"
+gta_partial_orphan_uuid='22222222-2222-4222-8222-222222222222'
+gta_partial_orphan_marker="$gta_partial_orphan_game/.bridgeplay-gta-sa-de-1547000.pending.json"
+gta_partial_orphan_parent=$(dirname "$gta_partial_orphan_game")
+gta_partial_orphan_backup="$gta_partial_orphan_parent/.bridgeplay-gta-sa-de-orphan-$gta_partial_orphan_uuid"
+cp -p "$gta_orphan_runtime/d3d11.dll" "$gta_partial_orphan_dll_dir/d3d11.dll"
+printf '{"version":1,"appid":"1547000","transactionUUID":"%s"}\n' "$gta_partial_orphan_uuid" > "$gta_partial_orphan_marker"
+chmod 644 "$gta_partial_orphan_marker"
+gta_partial_orphan_snapshot() {
+	find "$gta_partial_orphan_game" "$gta_partial_orphan_data" \( -type f -o -type l \) -print | LC_ALL=C sort
+	find "$gta_partial_orphan_game" "$gta_partial_orphan_data" -type f -exec shasum -a 256 {} \; | LC_ALL=C sort
+	find "$gta_partial_orphan_game" "$gta_partial_orphan_data" -type l -exec readlink {} \; | LC_ALL=C sort
+}
+gta_partial_orphan_before=$(gta_partial_orphan_snapshot)
+gta_orphan_run "$gta_partial_orphan_uuid" "$gta_partial_orphan_game" "$gta_fixture/orphan-partial-refused.log"
+is "orphan quarantine refuses partial DLLs without ownership proof" nonzero "$([ "$gta_orphan_rc" -ne 0 ] && echo nonzero || echo 0)"
+has "partial DLL refusal points to manual recovery" "complete manual recipe section 5" "$gta_fixture/orphan-partial-refused.log"
+is "partial DLL refusal happens before any file move" "$gta_partial_orphan_before" "$(gta_partial_orphan_snapshot)"
+is "partial DLL refusal creates no quarantine" no "$(test -e "$gta_partial_orphan_backup" && echo yes || echo no)"
+cp -p "$gta_orphan_runtime/dxgi.dll" "$gta_partial_orphan_dll_dir/dxgi.dll"
+cp -p "$gta_orphan_runtime/d3d10core.dll" "$gta_partial_orphan_dll_dir/d3d10core.dll"
+gta_orphan_run "$gta_partial_orphan_uuid" "$gta_partial_orphan_game" "$gta_fixture/orphan-partial-completed.log"
+is "complete manually verified set permits shared reset" 0 "$gta_orphan_rc"
+is "completed manual set leaves no ownership metadata" no "$(test -e "$gta_partial_orphan_game/.bridgeplay-gta-sa-de-1547000.json" && echo yes || echo no)"
+is "completed manual set leaves its three user DLLs active" 3 "$(find "$gta_partial_orphan_dll_dir" \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
+for gta_partial_orphan_name in d3d11.dll dxgi.dll d3d10core.dll; do
+	is "manual $gta_partial_orphan_name matches the pinned runtime" yes "$(cmp -s "$gta_orphan_runtime/$gta_partial_orphan_name" "$gta_partial_orphan_dll_dir/$gta_partial_orphan_name" && echo yes || echo no)"
+done
+
+echo "== lost first helper checkpoint keeps the active vendor helper"
+gta_helper_first_game="$gta_fixture/helper-orphan-real-only-game"
+gta_helper_first_data_a="$gta_fixture/helper-orphan-real-only-data-a"
+gta_helper_first_data_b="$gta_fixture/helper-orphan-real-only-data-b"
+gta_seed_case "$gta_helper_first_game" "$gta_helper_first_data_a"
+mkdir -p "$gta_helper_first_data_b/pfx"
+gta_seed_vendor "$gta_helper_first_data_b"
+gta_helper_first_game=$(CDPATH='' cd -P "$gta_helper_first_game" && pwd -P)
+gta_helper_first_data_a=$(CDPATH='' cd -P "$gta_helper_first_data_a" && pwd -P)
+gta_helper_first_dll_dir="$gta_helper_first_game/Gameface/Binaries/Win64"
+for gta_helper_name in d3d11.dll dxgi.dll d3d10core.dll; do
+	cp -p "$gta_orphan_runtime/$gta_helper_name" "$gta_helper_first_dll_dir/$gta_helper_name"
+done
+gta_crash_rc=0
+gta_crash_helper_call "$gta_helper_first_data_a" "$gta_helper_first_game" prepare 1 >/dev/null 2>&1 || gta_crash_rc=$?
+is "fresh prepare crashes after its first helper backup mutation" 137 "$gta_crash_rc"
+gta_helper_first_dir="$gta_helper_first_data_a/pfx/$gta_helper_dir"
+gta_helper_first_active="$gta_helper_first_dir/SocialClubHelper.exe"
+gta_helper_first_real="$gta_helper_first_dir/SocialClubHelper_real.exe"
+gta_helper_first_checksum="$gta_helper_first_dir/SocialClubHelper_real.exe.sha256"
+gta_helper_first_license="$gta_helper_first_dir/SocialClubHelper.bridgeplay.LICENSE"
+gta_helper_first_marker="$gta_helper_first_game/.bridgeplay-gta-sa-de-1547000.pending.json"
+gta_helper_first_journal="$gta_helper_first_data_a/.bridgeplay-gta-sa-de-1547000/.bridgeplay-gta-sa-de-1547000.transaction.json"
+gta_helper_first_state="$gta_helper_first_data_a/.bridgeplay-gta-sa-de-1547000/state.json"
+is "first checkpoint keeps the active vendor helper" yes "$(cmp -s "$gta_fixture/vendor-v1.exe" "$gta_helper_first_active" && echo yes || echo no)"
+is "first checkpoint has the byte-identical saved real helper" yes "$(cmp -s "$gta_helper_first_active" "$gta_helper_first_real" && echo yes || echo no)"
+is "first checkpoint has no checksum or license yet" no "$(test -e "$gta_helper_first_checksum" -o -e "$gta_helper_first_license" && echo yes || echo no)"
+is "first checkpoint has no prefix state.json" no "$(test -e "$gta_helper_first_state" && echo yes || echo no)"
+is "first checkpoint retains its owner journal before simulated loss" yes "$(test -f "$gta_helper_first_journal" && echo yes || echo no)"
+rm "$gta_helper_first_journal"
+gta_helper_first_uuid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["transactionUUID"])' "$gta_helper_first_marker")
+gta_orphan_run "$gta_helper_first_uuid" "$gta_helper_first_game" "$gta_fixture/helper-first-game-quarantine.log"
+is "first checkpoint game reset completes with complete user DLLs" 0 "$gta_orphan_rc"
+is "first checkpoint game reset preserves the complete user DLL set" 3 "$(find "$gta_helper_first_dll_dir" \( -name 'd3d11.dll' -o -name 'dxgi.dll' -o -name 'd3d10core.dll' \) | wc -l | tr -d ' ')"
+gta_helper_first_restore=$(gta_helper_call "$gta_helper_first_data_a" "$gta_helper_first_game" restore)
+is "restore after the lost first checkpoint reports no-owned-state" no-owned-state "$gta_helper_first_restore"
+gta_orphan_helper_run_for "$gta_helper_first_game" "$gta_helper_first_data_a" "$gta_fixture/helper-first-cleanup.log"
+is "guarded first-checkpoint cleanup succeeds" 0 "$gta_orphan_helper_rc"
+gta_helper_first_backup=$(sed -n 's/^Orphan helper files quarantined for this prefix: //p' "$gta_fixture/helper-first-cleanup.log")
+if [ -n "$gta_helper_first_backup" ]; then
+	is "helper quarantine is private" 700 "$(stat -f %Lp "$gta_helper_first_backup")"
+	is "helper quarantine is outside pfx" "$gta_helper_first_data_a" "$(dirname "$gta_helper_first_backup")"
+	is "first checkpoint quarantines only the verified duplicate real helper" 1 "$(find "$gta_helper_first_backup" -type f | wc -l | tr -d ' ')"
+	is "first checkpoint preserves duplicate helper bytes" yes "$(cmp -s "$gta_fixture/vendor-v1.exe" "$gta_helper_first_backup/SocialClubHelper_real.exe" && echo yes || echo no)"
+else
+	bad "first checkpoint reports its helper quarantine" present missing
+fi
+is "first checkpoint leaves the active vendor helper in place" yes "$(cmp -s "$gta_fixture/vendor-v1.exe" "$gta_helper_first_active" && echo yes || echo no)"
+is "first checkpoint removes only the active duplicate path" no "$(test -e "$gta_helper_first_real" && echo yes || echo no)"
+gta_helper_first_a_prepared=$(gta_helper_call "$gta_helper_first_data_a" "$gta_helper_first_game" prepare)
+is "A prepares after guarded helper cleanup" prepared "$gta_helper_first_a_prepared"
+gta_helper_first_b_prepared=$(gta_helper_call "$gta_helper_first_data_b" "$gta_helper_first_game" prepare)
+is "B prepares against the complete user DLL set" prepared "$gta_helper_first_b_prepared"
+gta_helper_first_a_restore=$(gta_helper_call "$gta_helper_first_data_a" "$gta_helper_first_game" restore)
+is "A restore leaves the user DLL set in place" restored "$gta_helper_first_a_restore"
+gta_helper_first_b_restore=$(gta_helper_call "$gta_helper_first_data_b" "$gta_helper_first_game" restore)
+is "B restore leaves the user DLL set in place" restored "$gta_helper_first_b_restore"
+is "manual DLL set remains outside shared ownership metadata" no "$(test -e "$gta_helper_first_game/.bridgeplay-gta-sa-de-1547000.json" && echo yes || echo no)"
+for gta_helper_name in d3d11.dll dxgi.dll d3d10core.dll; do
+	is "user-owned $gta_helper_name survives A and B restore byte-for-byte" yes "$(cmp -s "$gta_orphan_runtime/$gta_helper_name" "$gta_helper_first_dll_dir/$gta_helper_name" && echo yes || echo no)"
+done
+
+echo "== lost later helper checkpoint quarantines only pinned sidecars"
+gta_helper_later_game="$gta_fixture/helper-orphan-later-game"
+gta_helper_later_data="$gta_fixture/helper-orphan-later-data"
+gta_seed_case "$gta_helper_later_game" "$gta_helper_later_data"
+gta_helper_later_game=$(CDPATH='' cd -P "$gta_helper_later_game" && pwd -P)
+gta_helper_later_data=$(CDPATH='' cd -P "$gta_helper_later_data" && pwd -P)
+gta_helper_later_dll_dir="$gta_helper_later_game/Gameface/Binaries/Win64"
+for gta_helper_name in d3d11.dll dxgi.dll d3d10core.dll; do
+	cp -p "$gta_orphan_runtime/$gta_helper_name" "$gta_helper_later_dll_dir/$gta_helper_name"
+done
+gta_crash_rc=0
+gta_crash_helper_call "$gta_helper_later_data" "$gta_helper_later_game" prepare 3 >/dev/null 2>&1 || gta_crash_rc=$?
+is "later fresh checkpoint crashes after real, checksum and license install" 137 "$gta_crash_rc"
+gta_helper_later_dir="$gta_helper_later_data/pfx/$gta_helper_dir"
+gta_helper_later_active="$gta_helper_later_dir/SocialClubHelper.exe"
+gta_helper_later_real="$gta_helper_later_dir/SocialClubHelper_real.exe"
+gta_helper_later_checksum="$gta_helper_later_dir/SocialClubHelper_real.exe.sha256"
+gta_helper_later_license="$gta_helper_later_dir/SocialClubHelper.bridgeplay.LICENSE"
+gta_helper_later_marker="$gta_helper_later_game/.bridgeplay-gta-sa-de-1547000.pending.json"
+gta_helper_later_journal="$gta_helper_later_data/.bridgeplay-gta-sa-de-1547000/.bridgeplay-gta-sa-de-1547000.transaction.json"
+is "later checkpoint still has the active vendor helper" yes "$(cmp -s "$gta_fixture/vendor-v1.exe" "$gta_helper_later_active" && echo yes || echo no)"
+is "later checkpoint installed the expected checksum bytes" yes "$(printf '%s  SocialClubHelper_real.exe\n' "$gta_orphan_helper_fixture_vendor" | cmp -s "$gta_helper_later_checksum" - && echo yes || echo no)"
+is "later checkpoint installed the pinned license" yes "$(gta_orphan_hash "$gta_helper_later_license" | grep -q "^$gta_orphan_helper_fixture_license$" && echo yes || echo no)"
+rm "$gta_helper_later_journal"
+gta_helper_later_uuid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["transactionUUID"])' "$gta_helper_later_marker")
+gta_orphan_run "$gta_helper_later_uuid" "$gta_helper_later_game" "$gta_fixture/helper-later-game-quarantine.log"
+is "later checkpoint game reset preserves its user DLL set" 0 "$gta_orphan_rc"
+gta_helper_later_restore=$(gta_helper_call "$gta_helper_later_data" "$gta_helper_later_game" restore)
+is "later checkpoint restore reports no-owned-state" no-owned-state "$gta_helper_later_restore"
+gta_orphan_helper_run_for "$gta_helper_later_game" "$gta_helper_later_data" "$gta_fixture/helper-later-cleanup.log"
+is "later guarded helper cleanup succeeds" 0 "$gta_orphan_helper_rc"
+gta_helper_later_backup=$(sed -n 's/^Orphan helper files quarantined for this prefix: //p' "$gta_fixture/helper-later-cleanup.log")
+if [ -n "$gta_helper_later_backup" ]; then
+	is "later checkpoint quarantines all three verified helper files" 3 "$(find "$gta_helper_later_backup" -type f | wc -l | tr -d ' ')"
+	is "later checkpoint preserves the duplicate real helper" yes "$(cmp -s "$gta_fixture/vendor-v1.exe" "$gta_helper_later_backup/SocialClubHelper_real.exe" && echo yes || echo no)"
+	is "later checkpoint preserves the checksum sidecar" yes "$(printf '%s  SocialClubHelper_real.exe\n' "$gta_orphan_helper_fixture_vendor" | cmp -s "$gta_helper_later_backup/SocialClubHelper_real.exe.sha256" - && echo yes || echo no)"
+	is "later checkpoint preserves the license" yes "$(gta_orphan_hash "$gta_helper_later_backup/SocialClubHelper.bridgeplay.LICENSE" | grep -q "^$gta_orphan_helper_fixture_license$" && echo yes || echo no)"
+else
+	bad "later checkpoint reports its helper quarantine" present missing
+fi
+is "later checkpoint leaves current vendor helper in place" yes "$(cmp -s "$gta_fixture/vendor-v1.exe" "$gta_helper_later_active" && echo yes || echo no)"
+
+echo "== helper recovery refuses changed and wrapped files before writes"
+gta_helper_orphan_snapshot() {
+	find "$gta_helper_test_game" "$gta_helper_test_data" \( -type f -o -type l \) -print | LC_ALL=C sort
+	find "$gta_helper_test_game" "$gta_helper_test_data" -type f -exec shasum -a 256 {} \; | LC_ALL=C sort
+	find "$gta_helper_test_game" "$gta_helper_test_data" -type l -exec readlink {} \; | LC_ALL=C sort
+}
+gta_helper_negative_game="$gta_fixture/helper-orphan-negative-hash-game"
+gta_helper_negative_data="$gta_fixture/helper-orphan-negative-hash-data"
+gta_seed_case "$gta_helper_negative_game" "$gta_helper_negative_data"
+gta_helper_negative_dir="$gta_helper_negative_data/pfx/$gta_helper_dir"
+cp "$gta_fixture/vendor-v1.exe" "$gta_helper_negative_dir/SocialClubHelper_real.exe"
+printf 'changed vendor bytes\n' > "$gta_helper_negative_dir/SocialClubHelper_real.exe"
+gta_helper_test_game=$(CDPATH='' cd -P "$gta_helper_negative_game" && pwd -P)
+gta_helper_test_data=$(CDPATH='' cd -P "$gta_helper_negative_data" && pwd -P)
+gta_helper_negative_before=$(gta_helper_orphan_snapshot)
+gta_orphan_helper_run_for "$gta_helper_test_game" "$gta_helper_test_data" "$gta_fixture/helper-negative-hash.log"
+is "changed helper hash is refused" nonzero "$([ "$gta_orphan_helper_rc" -ne 0 ] && echo nonzero || echo 0)"
+is "changed helper refusal makes no file changes" "$gta_helper_negative_before" "$(gta_helper_orphan_snapshot)"
+is "changed helper refusal creates no quarantine" 0 "$(find "$gta_helper_negative_data" -maxdepth 1 -name '.bridgeplay-gta-sa-de-helper-orphan.*' | wc -l | tr -d ' ')"
+
+gta_helper_mismatch_game="$gta_fixture/helper-orphan-mismatch-game"
+gta_helper_mismatch_data="$gta_fixture/helper-orphan-mismatch-data"
+gta_seed_case "$gta_helper_mismatch_game" "$gta_helper_mismatch_data"
+gta_helper_mismatch_dir="$gta_helper_mismatch_data/pfx/$gta_helper_dir"
+cp "$gta_fixture/vendor-v2.exe" "$gta_helper_mismatch_dir/SocialClubHelper_real.exe"
+gta_helper_test_game=$(CDPATH='' cd -P "$gta_helper_mismatch_game" && pwd -P)
+gta_helper_test_data=$(CDPATH='' cd -P "$gta_helper_mismatch_data" && pwd -P)
+gta_helper_mismatch_before=$(gta_helper_orphan_snapshot)
+gta_orphan_helper_run_for "$gta_helper_test_game" "$gta_helper_test_data" "$gta_fixture/helper-current-not-real.log"
+is "current helper differing from saved real helper is refused" nonzero "$([ "$gta_orphan_helper_rc" -ne 0 ] && echo nonzero || echo 0)"
+is "current-versus-real refusal makes no file changes" "$gta_helper_mismatch_before" "$(gta_helper_orphan_snapshot)"
+is "current-versus-real refusal creates no quarantine" 0 "$(find "$gta_helper_mismatch_data" -maxdepth 1 -name '.bridgeplay-gta-sa-de-helper-orphan.*' | wc -l | tr -d ' ')"
+
+gta_helper_wrapper_game="$gta_fixture/helper-orphan-wrapper-game"
+gta_helper_wrapper_data="$gta_fixture/helper-orphan-wrapper-data"
+gta_seed_case "$gta_helper_wrapper_game" "$gta_helper_wrapper_data"
+gta_helper_wrapper_dir="$gta_helper_wrapper_data/pfx/$gta_helper_dir"
+cp "$gta_fixture/wrapper.exe" "$gta_helper_wrapper_dir/SocialClubHelper.exe"
+cp "$gta_fixture/vendor-v1.exe" "$gta_helper_wrapper_dir/SocialClubHelper_real.exe"
+gta_helper_test_game=$(CDPATH='' cd -P "$gta_helper_wrapper_game" && pwd -P)
+gta_helper_test_data=$(CDPATH='' cd -P "$gta_helper_wrapper_data" && pwd -P)
+gta_helper_wrapper_before=$(gta_helper_orphan_snapshot)
+gta_orphan_helper_run_for "$gta_helper_test_game" "$gta_helper_test_data" "$gta_fixture/helper-wrapper-current.log"
+is "current wrapper is refused" nonzero "$([ "$gta_orphan_helper_rc" -ne 0 ] && echo nonzero || echo 0)"
+is "current-wrapper refusal makes no file changes" "$gta_helper_wrapper_before" "$(gta_helper_orphan_snapshot)"
+is "current-wrapper refusal creates no quarantine" 0 "$(find "$gta_helper_wrapper_data" -maxdepth 1 -name '.bridgeplay-gta-sa-de-helper-orphan.*' | wc -l | tr -d ' ')"
+
+gta_helper_sidecar_game="$gta_fixture/helper-orphan-sidecar-game"
+gta_helper_sidecar_data="$gta_fixture/helper-orphan-sidecar-data"
+gta_seed_case "$gta_helper_sidecar_game" "$gta_helper_sidecar_data"
+gta_helper_sidecar_dir="$gta_helper_sidecar_data/pfx/$gta_helper_dir"
+cp "$gta_fixture/vendor-v1.exe" "$gta_helper_sidecar_dir/SocialClubHelper_real.exe"
+printf 'unknown checksum bytes\n' > "$gta_helper_sidecar_dir/SocialClubHelper_real.exe.sha256"
+gta_helper_test_game=$(CDPATH='' cd -P "$gta_helper_sidecar_game" && pwd -P)
+gta_helper_test_data=$(CDPATH='' cd -P "$gta_helper_sidecar_data" && pwd -P)
+gta_helper_sidecar_before=$(gta_helper_orphan_snapshot)
+gta_orphan_helper_run_for "$gta_helper_test_game" "$gta_helper_test_data" "$gta_fixture/helper-unknown-sidecar.log"
+is "unknown helper sidecar is refused" nonzero "$([ "$gta_orphan_helper_rc" -ne 0 ] && echo nonzero || echo 0)"
+is "unknown sidecar refusal makes no file changes" "$gta_helper_sidecar_before" "$(gta_helper_orphan_snapshot)"
+is "unknown sidecar refusal creates no quarantine" 0 "$(find "$gta_helper_sidecar_data" -maxdepth 1 -name '.bridgeplay-gta-sa-de-helper-orphan.*' | wc -l | tr -d ' ')"
+
+gta_helper_state_mode_game="$gta_fixture/helper-orphan-state-mode-game"
+gta_helper_state_mode_data="$gta_fixture/helper-orphan-state-mode-data"
+gta_seed_case "$gta_helper_state_mode_game" "$gta_helper_state_mode_data"
+gta_helper_state_mode_dir="$gta_helper_state_mode_data/.bridgeplay-gta-sa-de-1547000"
+mkdir -m 755 "$gta_helper_state_mode_dir"
+cp "$gta_fixture/vendor-v1.exe" "$gta_helper_state_mode_data/pfx/$gta_helper_dir/SocialClubHelper_real.exe"
+gta_helper_test_game=$(CDPATH='' cd -P "$gta_helper_state_mode_game" && pwd -P)
+gta_helper_test_data=$(CDPATH='' cd -P "$gta_helper_state_mode_data" && pwd -P)
+gta_helper_state_mode_before=$(gta_helper_orphan_snapshot)
+gta_orphan_helper_run_for "$gta_helper_test_game" "$gta_helper_test_data" "$gta_fixture/helper-unsafe-state-mode.log"
+is "non-private owner state directory is refused" nonzero "$([ "$gta_orphan_helper_rc" -ne 0 ] && echo nonzero || echo 0)"
+is "unsafe state-directory refusal makes no file changes" "$gta_helper_state_mode_before" "$(gta_helper_orphan_snapshot)"
+is "unsafe state-directory mode is not changed" 755 "$(stat -f %Lp "$gta_helper_state_mode_dir")"
+is "unsafe state-directory refusal creates no quarantine" 0 "$(find "$gta_helper_state_mode_data" -maxdepth 1 -name '.bridgeplay-gta-sa-de-helper-orphan.*' | wc -l | tr -d ' ')"
 
 echo "== recovery preserves a changed target"
 gta_crash_changed_game="$gta_fixture/crash-changed-game"
