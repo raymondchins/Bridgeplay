@@ -909,26 +909,66 @@ activate_backend() {
   fi
 }
 
+# A copy some launch staged, from this engine's shim or another engine's build: every build
+# carries the "rockstar-shim: " log prefix, which no other version.dll has.
+rockstar_shim_copy() {
+  [ -f "$2" ] && [ ! -L "$2" ] || return 1
+  cmp -s "$1" "$2" || LC_ALL=C grep -qaF 'rockstar-shim: ' "$2"
+}
+
 # Rockstar Games Launcher and GTA V Legacy (ROCKSTAR_SHIM=1, rockstar-shim/): a version.dll
 # next to SocialClubHelper.exe makes the launcher's CEF windows draw on winemac, and the one
-# next to the game hands GTA5.exe DXVK's dxgi on the dxvk backend. Without the key, copies a
-# launch staged are removed again. The game folder only ever gets version.dll.
+# next to the game hands GTA5.exe DXVK's dxgi on the dxvk backend. The game folder only ever
+# gets version.dll. A version.dll of the game's own (a mod loader) is moved to
+# version.dll.bridgeplay-orig first. Without the key, or on an engine without the shim, the
+# staged copy is removed and that file put back.
 stage_rockstar_shim() {
   shim="$backend_root/rockstar-shim/x86_64-windows"
   social_club="$WINEPREFIX/drive_c/Program Files/Rockstar Games/Social Club"
+  shim_wanted=0
+  if [ "$gamefix_rockstar_shim" = 1 ] && [ "$verb" = waitforexitandrun ]; then
+    [ ! -f "$shim/version.dll" ] || shim_wanted=1
+  elif [ "$gamefix_rockstar_shim" = 1 ]; then
+    # Helpers (verb run) leave the game's files as they are.
+    return 0
+  fi
   for dir in "$social_club" "${STEAM_COMPAT_INSTALL_PATH:-}"; do
     [ -n "$dir" ] && [ -d "$dir" ] || continue
-    if [ "$gamefix_rockstar_shim" = 1 ] && [ "$verb" = waitforexitandrun ]; then
-      stage_backend_file "$shim/version.dll" "$dir/version.dll" \
-        || graphics_log "rockstar-shim: could not stage version.dll into $dir"
-    elif [ "$gamefix_rockstar_shim" != 1 ] && [ -f "$shim/version.dll" ] \
-      && cmp -s "$shim/version.dll" "$dir/version.dll"; then
-      rm -f "$dir/version.dll" 2>> "$log" && graphics_log "rockstar-shim: removed version.dll from $dir"
+    target="$dir/version.dll"
+    saved="$dir/version.dll.bridgeplay-orig"
+    if [ "$shim_wanted" = 1 ]; then
+      moved=0
+      if { [ -e "$target" ] || [ -L "$target" ]; } && ! rockstar_shim_copy "$shim/version.dll" "$target"; then
+        if [ -e "$saved" ] || [ -L "$saved" ]; then
+          graphics_log "rockstar-shim: $dir has its own version.dll and a version.dll.bridgeplay-orig, both left alone"
+          continue
+        fi
+        if ! mv "$target" "$saved" 2>> "$log"; then
+          graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
+          continue
+        fi
+        moved=1
+        graphics_log "rockstar-shim: moved the version.dll in $dir to version.dll.bridgeplay-orig"
+      fi
+      if ! stage_backend_file "$shim/version.dll" "$target"; then
+        graphics_log "rockstar-shim: could not stage version.dll into $dir"
+        [ "$moved" = 0 ] || mv "$saved" "$target" 2>> "$log" || true
+      fi
+      continue
+    fi
+    if rockstar_shim_copy "$shim/version.dll" "$target"; then
+      rm -f "$target" 2>> "$log" && graphics_log "rockstar-shim: removed version.dll from $dir"
+    fi
+    if [ -e "$saved" ] || [ -L "$saved" ]; then
+      if [ -e "$target" ] || [ -L "$target" ]; then
+        graphics_log "rockstar-shim: $dir has a new version.dll, version.dll.bridgeplay-orig left alone"
+      elif mv "$saved" "$target" 2>> "$log"; then
+        graphics_log "rockstar-shim: put the version.dll in $dir back"
+      fi
     fi
   done
-  [ "$gamefix_rockstar_shim" = 1 ] && [ "$verb" = waitforexitandrun ] || return 0
-  if [ ! -f "$shim/version.dll" ]; then
-    graphics_log "rockstar-shim: not in this engine, ROCKSTAR_SHIM=1 does nothing"
+  if [ "$shim_wanted" = 0 ]; then
+    [ "$gamefix_rockstar_shim" != 1 ] || graphics_log "rockstar-shim: not in this engine, ROCKSTAR_SHIM=1 does nothing"
     return 0
   fi
   gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}version=n,b"

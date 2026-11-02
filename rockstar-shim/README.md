@@ -6,6 +6,11 @@ game's conf says `ROCKSTAR_SHIM=1` (`gamefixes/271590.conf`). It goes next to
 exe, never into `system32`, and the run script adds `version=n,b`. Every export forwards to
 kernelbase/kernel32. `DllMain` acts in two processes and nowhere else.
 
+A `version.dll` already in either folder is moved to `version.dll.bridgeplay-orig` and put back
+when the key is off or the engine has no shim. The run script knows a staged copy, from this
+build or another engine's, by the `rockstar-shim: ` prefix of its log messages, so keep that
+string in every build.
+
 ## SocialClubHelper.exe: blank launcher windows
 
 The launcher's windows (sign-in, main window, error pages) are CEF child windows owned by the

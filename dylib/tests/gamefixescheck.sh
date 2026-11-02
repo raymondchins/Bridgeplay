@@ -8,7 +8,7 @@ functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
 	load_gamefixes resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available \
 	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
-	activate_backend record_backend stage_rockstar_shim compose_dll_overrides; do
+	activate_backend record_backend rockstar_shim_copy stage_rockstar_shim compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -700,6 +700,8 @@ rockstar_case() {
 	engine rockstar-shim/x86_64-windows/version.dll rockstar-shim/x86_64-windows/dxgx.dll
 	mkdir -p "$case_dir/data/pfx/drive_c/Program Files/Rockstar Games/Social Club"
 	shim_src="$case_dir/engine/lib/notproton-backends/rockstar-shim/x86_64-windows"
+	# Every build carries its log prefix, which is how a copy from another engine is known.
+	printf 'MZ this build rockstar-shim: DXVK dxgi is dxgi.dll\n' > "$shim_src/version.dll"
 	social="$case_dir/data/pfx/drive_c/Program Files/Rockstar Games/Social Club"
 }
 # The run script reads the game folder from STEAM_COMPAT_INSTALL_PATH.
@@ -729,11 +731,80 @@ is "without the key the staged copy leaves the game folder" "no" "$([ -e "$case_
 case "$(got WINEDLLOVERRIDES)" in *version=*) v=yes ;; *) v=no ;; esac
 is "without the key version is not overridden" "no" "$v"
 
+is "no backup is made when the game had no version.dll" "no" \
+	"$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
 rockstar_case
 printf 'a game of its own\n' > "$case_dir/game/version.dll"
 user_conf 'BACKEND=dxvk'
 rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
 is "a version.dll that is not the shim is left alone" "a game of its own" "$(cat "$case_dir/game/version.dll")"
+
+echo "== ROCKSTAR_SHIM keeps a version.dll the game already had"
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "the game's own version.dll is set aside" "a mod loader" "$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+is "and the shim takes its place" "yes" \
+	"$(cmp -s "$shim_src/version.dll" "$case_dir/game/version.dll" && echo yes || echo no)"
+has "the move is logged" "moved the version.dll in $case_dir/game to version.dll.bridgeplay-orig" "$case_dir/log"
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "a second launch keeps the backup" "a mod loader" "$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "without the key the game's own version.dll is back" "a mod loader" "$(cat "$case_dir/game/version.dll")"
+is "and the backup is gone" "no" "$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+rm -rf "$case_dir/engine/lib/notproton-backends/rockstar-shim"
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "on an engine without the shim the game's own version.dll is back" "a mod loader" "$(cat "$case_dir/game/version.dll")"
+is "and the backup is gone too" "no" "$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+printf 'a newer mod loader\n' > "$case_dir/game/version.dll"
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "a version.dll put in after the backup is not replaced" "a newer mod loader" "$(cat "$case_dir/game/version.dll")"
+is "nor is the backup" "a mod loader" "$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "without the key both stay" "a newer mod loader|a mod loader" \
+	"$(cat "$case_dir/game/version.dll")|$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch run "$case_dir/game/game.exe"
+is "helpers (verb run) do not move the game's own version.dll" "a mod loader" "$(cat "$case_dir/game/version.dll")"
+
+echo "== ROCKSTAR_SHIM removes a copy another engine staged"
+rockstar_case
+printf 'MZ older build rockstar-shim: CEF browser composites in process\n' > "$social/version.dll"
+cp "$social/version.dll" "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "an older shim build is updated, not backed up" "yes|no" \
+	"$(cmp -s "$shim_src/version.dll" "$case_dir/game/version.dll" && echo yes || echo no)|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+rockstar_case
+printf 'MZ older build rockstar-shim: CEF browser composites in process\n' > "$social/version.dll"
+cp "$social/version.dll" "$case_dir/game/version.dll"
+rm -rf "$case_dir/engine/lib/notproton-backends/rockstar-shim"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "an engine without the shim removes the copy in Social Club" "no" "$([ -e "$social/version.dll" ] && echo yes || echo no)"
+is "and the copy in the game folder" "no" "$([ -e "$case_dir/game/version.dll" ] && echo yes || echo no)"
+rockstar_case
+printf 'MZ older build rockstar-shim: CEF browser composites in process\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "without the key an older shim build is removed" "no" "$([ -e "$case_dir/game/version.dll" ] && echo yes || echo no)"
 
 rockstar_case
 user_conf 'BACKEND=dxmt' 'ROCKSTAR_SHIM=1'
