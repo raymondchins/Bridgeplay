@@ -25,6 +25,7 @@ func isolatedValveDownloads(in work: URL) throws -> URL {
 // A UserDefaults that lives in a temporary folder, not in ~/Library/Preferences. Even after
 // removePersistentDomain, a named suite leaves its plist behind there, one file per test run.
 // The folder is deleted when the test process exits; ScratchDefaultsTests checks the location.
+// A suite name passed in must be unique: nothing clears the state an earlier test left under it.
 func scratchDefaults(suite name: String = scratchSuiteName()) -> UserDefaults {
     // An absolute path as the suite name keeps the plist at that path.
     guard let defaults = UserDefaults(suiteName: name) else {
@@ -39,6 +40,16 @@ func scratchSuiteName() -> String {
 
 enum ScratchDefaults {
     static let folder: URL = {
+        let fm = FileManager.default
+        // A run that crashed or was killed never reached the exit hook; clear what it left.
+        let stale = Date().addingTimeInterval(-24 * 3600)
+        for old in (try? fm.contentsOfDirectory(
+            at: URL.temporaryDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        where old.lastPathComponent.hasPrefix("np-defaults-")
+            && ((try? old.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? .distantFuture) < stale {
+            try? fm.removeItem(at: old)
+        }
         let url = URL.temporaryDirectory.appending(path: "np-defaults-\(UUID().uuidString)")
         do { try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true) }
         catch { fatalError("Cannot create scratch defaults folder \(url.path): \(error)") }

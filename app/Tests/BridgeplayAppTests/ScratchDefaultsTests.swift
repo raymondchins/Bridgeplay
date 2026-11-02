@@ -22,12 +22,12 @@ struct ScratchDefaultsTests {
 
         // Look for this suite only: other processes may be writing to Preferences meanwhile.
         let id = URL(filePath: suite).lastPathComponent
-        #expect(try preferenceFiles(startingWith: id).isEmpty)
+        #expect(try preferenceFiles(containing: id).isEmpty)
     }
 
-    private func preferenceFiles(startingWith prefix: String) throws -> [String] {
+    private func preferenceFiles(containing id: String) throws -> [String] {
         let folder = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Preferences")
         return try FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false))
-            .filter { $0.hasPrefix(prefix) }
+            .filter { $0.contains(id) }
     }
 }
