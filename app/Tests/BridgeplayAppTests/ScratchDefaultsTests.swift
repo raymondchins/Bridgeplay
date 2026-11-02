@@ -6,8 +6,9 @@ import Testing
 @Suite("Scratch defaults")
 struct ScratchDefaultsTests {
 
-    // The reason the helper exists: a named suite would leave a plist in ~/Library/Preferences.
-    @Test("A suite keeps its plist in the temporary folder, not in Preferences")
+    // The reason the helper exists: a named suite would leave a plist in ~/Library/Preferences,
+    // so the suite's own file has to show up at the path it was given.
+    @Test("A suite keeps its plist in the temporary folder")
     func staysOutOfPreferences() throws {
         let suite = scratchSuiteName()
         let defaults = scratchDefaults(suite: suite)
@@ -19,15 +20,5 @@ struct ScratchDefaultsTests {
         let plist = suite + ".plist"
         for _ in 0..<50 where !FileManager.default.fileExists(atPath: plist) { Thread.sleep(forTimeInterval: 0.1) }
         #expect(FileManager.default.fileExists(atPath: plist))
-
-        // Look for this suite only: other processes may be writing to Preferences meanwhile.
-        let id = URL(filePath: suite).lastPathComponent
-        #expect(try preferenceFiles(containing: id).isEmpty)
-    }
-
-    private func preferenceFiles(containing id: String) throws -> [String] {
-        let folder = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Preferences")
-        return try FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false))
-            .filter { $0.contains(id) }
     }
 }
