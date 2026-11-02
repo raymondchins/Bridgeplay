@@ -916,6 +916,57 @@ rockstar_shim_copy() {
   cmp -s "$1" "$2" || LC_ALL=C grep -qaF 'rockstar-shim: ' "$2"
 }
 
+# Stages, removes or restores version.dll in Social Club and the game folder. The lock is per
+# macOS user, on the boot volume, so it works whatever volume the game is on.
+rockstar_shim_folders() {
+  (
+    exec 6>> "$np_support/.rockstar-shim.lock" && /usr/bin/lockf -s -t 30 6 || exit 1
+    for dir in "$social_club" "${STEAM_COMPAT_INSTALL_PATH:-}"; do
+      [ -n "$dir" ] && [ -d "$dir" ] || continue
+      target="$dir/version.dll"
+      saved="$dir/version.dll.bridgeplay-orig"
+      if [ "$shim_wanted" = 1 ]; then
+        moved=0
+        if { [ -e "$target" ] || [ -L "$target" ]; } && ! rockstar_shim_copy "$shim/version.dll" "$target"; then
+          if [ -e "$saved" ] || [ -L "$saved" ]; then
+            graphics_log "rockstar-shim: $dir has its own version.dll and a version.dll.bridgeplay-orig, both left alone"
+            continue
+          fi
+          # The backup name is claimed with an exclusive create, so of two macOS users'
+          # launches sharing this folder only one moves the file there.
+          if ! (set -C; : > "$saved") 2>/dev/null; then
+            graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
+            continue
+          fi
+          if ! mv -f "$target" "$saved" 2>> "$log"; then
+            rm -f "$saved"
+            graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
+            continue
+          fi
+          moved=1
+          graphics_log "rockstar-shim: moved the version.dll in $dir to version.dll.bridgeplay-orig"
+        fi
+        if ! stage_backend_file "$shim/version.dll" "$target"; then
+          graphics_log "rockstar-shim: could not stage version.dll into $dir"
+          [ "$moved" = 0 ] || mv "$saved" "$target" 2>> "$log" || true
+        fi
+        continue
+      fi
+      if rockstar_shim_copy "$shim/version.dll" "$target"; then
+        rm -f "$target" 2>> "$log" && graphics_log "rockstar-shim: removed version.dll from $dir"
+      fi
+      if [ -e "$saved" ] || [ -L "$saved" ]; then
+        if [ -e "$target" ] || [ -L "$target" ]; then
+          graphics_log "rockstar-shim: $dir has a new version.dll, version.dll.bridgeplay-orig left alone"
+        elif mv "$saved" "$target" 2>> "$log"; then
+          graphics_log "rockstar-shim: put the version.dll in $dir back"
+        fi
+      fi
+    done
+    exit 0
+  )
+}
+
 # Rockstar Games Launcher and GTA V Legacy (ROCKSTAR_SHIM=1, rockstar-shim/): a version.dll
 # next to SocialClubHelper.exe makes the launcher's CEF windows draw on winemac, and the one
 # next to the game hands GTA5.exe DXVK's dxgi on the dxvk backend. The game folder only ever
@@ -932,48 +983,9 @@ stage_rockstar_shim() {
     # Helpers (verb run) leave the game's files as they are.
     return 0
   fi
-  for dir in "$social_club" "${STEAM_COMPAT_INSTALL_PATH:-}"; do
-    [ -n "$dir" ] && [ -d "$dir" ] || continue
-    target="$dir/version.dll"
-    saved="$dir/version.dll.bridgeplay-orig"
-    if [ "$shim_wanted" = 1 ]; then
-      moved=0
-      if { [ -e "$target" ] || [ -L "$target" ]; } && ! rockstar_shim_copy "$shim/version.dll" "$target"; then
-        if [ -e "$saved" ] || [ -L "$saved" ]; then
-          graphics_log "rockstar-shim: $dir has its own version.dll and a version.dll.bridgeplay-orig, both left alone"
-          continue
-        fi
-        # The backup name is claimed with an exclusive create, so of two launches sharing
-        # this folder only one moves the file there.
-        if ! (set -C; : > "$saved") 2>/dev/null; then
-          graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
-          continue
-        fi
-        if ! mv -f "$target" "$saved" 2>> "$log"; then
-          rm -f "$saved"
-          graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
-          continue
-        fi
-        moved=1
-        graphics_log "rockstar-shim: moved the version.dll in $dir to version.dll.bridgeplay-orig"
-      fi
-      if ! stage_backend_file "$shim/version.dll" "$target"; then
-        graphics_log "rockstar-shim: could not stage version.dll into $dir"
-        [ "$moved" = 0 ] || mv "$saved" "$target" 2>> "$log" || true
-      fi
-      continue
-    fi
-    if rockstar_shim_copy "$shim/version.dll" "$target"; then
-      rm -f "$target" 2>> "$log" && graphics_log "rockstar-shim: removed version.dll from $dir"
-    fi
-    if [ -e "$saved" ] || [ -L "$saved" ]; then
-      if [ -e "$target" ] || [ -L "$target" ]; then
-        graphics_log "rockstar-shim: $dir has a new version.dll, version.dll.bridgeplay-orig left alone"
-      elif mv "$saved" "$target" 2>> "$log"; then
-        graphics_log "rockstar-shim: put the version.dll in $dir back"
-      fi
-    fi
-  done
+  # Launches that share a folder (two prefixes on one game) take turns, so one cannot undo
+  # a move or a restore the other is making.
+  rockstar_shim_folders || graphics_log "rockstar-shim: could not take the lock, version.dll left as it is"
   if [ "$shim_wanted" = 0 ]; then
     [ "$gamefix_rockstar_shim" != 1 ] || graphics_log "rockstar-shim: not in this engine, ROCKSTAR_SHIM=1 does nothing"
     return 0

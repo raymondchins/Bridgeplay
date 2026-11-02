@@ -8,7 +8,7 @@ functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
 	load_gamefixes resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available \
 	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
-	activate_backend record_backend rockstar_shim_copy stage_rockstar_shim compose_dll_overrides; do
+	activate_backend record_backend rockstar_shim_copy rockstar_shim_folders stage_rockstar_shim compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -793,6 +793,20 @@ chmod 755 "$case_dir/game"
 is "a folder the backup cannot go into keeps its own version.dll" "a mod loader|no" \
 	"$(cat "$case_dir/game/version.dll")|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
 has "and says so" "could not set aside the version.dll in $case_dir/game, left alone" "$case_dir/log"
+
+# Another launch holds the lock for two seconds and notes the game folder as it lets go.
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+/usr/bin/lockf -k "$case_dir/support/.rockstar-shim.lock" \
+	sh -c 'sleep 2; cat "$1" > "$2"' sh "$case_dir/game/version.dll" "$case_dir/held" &
+holder=$!
+sleep 0.5
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+wait "$holder"
+is "a launch leaves the folder alone while another holds the lock" "a mod loader" "$(cat "$case_dir/held" 2>/dev/null)"
+is "and stages the shim once it is free" "yes|a mod loader" \
+	"$(cmp -s "$shim_src/version.dll" "$case_dir/game/version.dll" && echo yes || echo no)|$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
 
 echo "== ROCKSTAR_SHIM removes a copy another engine staged"
 rockstar_case
