@@ -493,6 +493,20 @@ struct SteamInstallerTests {
         #expect(!other.retryable)
     }
 
+    @Test("A revert refused by permissions says what is holding it off")
+    func revertFailureCarriesTheRemedy() {
+        let signing = StepFailure(step: SteamInstaller.step, detail: "x could not be signed.")
+        let refused = SteamInstaller.revertFailed(signing, WriteRefused(path: "/x", remedy: .appManagement))
+        #expect(refused.detail.contains(Remedy.appManagement.advice))
+
+        let rooted = SteamInstaller.revertFailed(signing, WriteRefused(path: "/x", remedy: .rootOwned(handOver: "/Applications/Steam.app")))
+        #expect(rooted.detail.contains(Remedy.chownCommand("/Applications/Steam.app")))
+
+        // Any other failure is reported as it is, with no advice to add.
+        let started = SteamInstaller.revertFailed(signing, SteamInstaller.ClientStarted())
+        #expect(started.detail.hasSuffix("Use Repair Steam to restore it."))
+    }
+
     @Test("A broken seal this account can't sign again is reported, not taken as installed")
     func brokenSealElsewhereIsReported() throws {
         let other = try #require(SteamInstaller.brokenSealDetail(.otherAccount))
