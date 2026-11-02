@@ -30,7 +30,7 @@ import sys
 catalog = json.loads(pathlib.Path(sys.argv[1]).read_text())
 bundle = pathlib.Path(sys.argv[2])
 root = bundle / "Contents" / "Resources" if (bundle / "Contents" / "Resources").is_dir() else bundle
-for language in ("en", "it", "zh-Hans"):
+for language in ("en", "it", "ru", "zh-Hans"):
     folder = root / (language + ".lproj")
     folder.mkdir(exist_ok=True)
     values = []
@@ -65,7 +65,7 @@ cat > "$bundle/Contents/Info.plist" <<'PLIST'
 <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string>
-<key>CFBundleLocalizations</key><array><string>en</string><string>it</string><string>zh-Hans</string></array>
+<key>CFBundleLocalizations</key><array><string>en</string><string>it</string><string>ru</string><string>zh-Hans</string></array>
 <key>NSDownloadsFolderUsageDescription</key><string>Moves this installer disk image to Trash after you choose Finish.</string>
 </dict></plist>
 PLIST

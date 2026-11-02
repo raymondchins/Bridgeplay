@@ -32,6 +32,17 @@ struct LocalizationTests {
             == "Aperto Wine Configuration in Zuma Deluxe.")
     }
 
+    let russian = Bundle.module.path(forResource: "ru", ofType: "lproj").flatMap(Bundle.init(path:))
+
+    @Test("Russian text is looked up with interpolated values in place")
+    func russianLookup() throws {
+        let ru = try #require(russian)
+        #expect(String(localized: "Status", bundle: ru) == "Статус")
+        #expect(String(localized: "Delete \(3) prefixes?", bundle: ru) == "Удалить префиксы (3)?")
+        #expect(String(localized: "Opened \("Wine Configuration") in \("Zuma Deluxe").", bundle: ru)
+            == "Wine Configuration открыт в Zuma Deluxe.")
+    }
+
     // l10ncheck keeps every catalogued string translated, so the fallback is shown with a
     // string the catalog does not have.
     @Test("A string without a translation shows English")
