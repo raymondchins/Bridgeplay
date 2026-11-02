@@ -4,6 +4,6 @@ import Foundation
 // the main actor.
 enum RestartGuard {
     static func gameRunning() async -> Bool {
-        await Task.detached(priority: .utility) { Shell.processIsRunning(named: "wineserver") }.value
+        await Task.detached(priority: .utility) { WineServer.isRunning() }.value
     }
 }
