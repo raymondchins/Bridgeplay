@@ -21,3 +21,23 @@ func isolatedValveDownloads(in work: URL) throws -> URL {
     }
     return downloads
 }
+
+// A UserDefaults that lives in a temporary folder, not in ~/Library/Preferences. Even after
+// removePersistentDomain, a named suite leaves its plist behind there, one file per test run.
+// The folder is deleted when the test process exits.
+func scratchDefaults() -> UserDefaults {
+    let name = ScratchDefaultsFolder.shared.url.appending(path: UUID().uuidString)
+        .path(percentEncoded: false)
+    // An absolute path as the suite name keeps the plist at that path.
+    return UserDefaults(suiteName: name)!
+}
+
+private final class ScratchDefaultsFolder: Sendable {
+    static let shared = ScratchDefaultsFolder()
+    let url = URL.temporaryDirectory.appending(path: "np-defaults-\(UUID().uuidString)")
+
+    private init() {
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        atexit { try? FileManager.default.removeItem(at: ScratchDefaultsFolder.shared.url) }
+    }
+}
