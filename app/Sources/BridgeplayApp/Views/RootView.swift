@@ -34,6 +34,7 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
 struct RootView: View {
 
     @Binding var pane: Pane
+    var showsSetup = false
     @Environment(SystemStatus.self) private var status
     @Environment(PrefixesModel.self) private var prefixes
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -101,6 +102,20 @@ struct RootView: View {
                     case .backups: BackupsView()
                     case .guide: GuideView()
                     }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    // Not over a play report question, or before the scan that may raise one.
+                    let prompt = StarPrompt.shared, reports = PlayReports.shared
+                    let shows = prompt.pending && (prompt.shown || !reports.finding) && !reports.isAsking
+                        && !showsSetup && !MigrationLaunch.shared.pending
+                    ZStack {
+                        if shows {
+                            StarPromptCard()
+                                .padding(16)
+                                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                        }
+                    }
+                    .animation(.spring(duration: 0.45, bounce: 0.18), value: shows)
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if let nudge = PlayReports.shared.nudge {
