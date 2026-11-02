@@ -803,6 +803,13 @@ is "a folder the backup cannot go into keeps its own version.dll" "a mod loader|
 	"$(cat "$case_dir/game/version.dll")|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
 has "and says so" "could not set aside the version.dll in $case_dir/game, left alone" "$case_dir/log"
 has "after falling back to this user's lock" "could not lock $case_dir/game, only this macOS user's launches take turns there" "$case_dir/log"
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+ln -s /dev/null "$case_dir/game/.bridgeplay-rockstar-shim.lock"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "without the game folder's lock the game's own version.dll is not moved" "a mod loader|no" \
+	"$(cat "$case_dir/game/version.dll")|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
 
 # An older build killed between claiming the backup name and the move left it empty.
 rockstar_case

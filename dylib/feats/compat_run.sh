@@ -212,7 +212,8 @@ else
   export ROSETTA_ADVERTISE_AVX="${ROSETTA_ADVERTISE_AVX:-1}"
 fi
 
-# Keeps Wine from inheriting the prefix and template locks (fd 8 and 9).
+# Keeps Wine from inheriting the prefix and template locks (fd 8 and 9) and the ROCKSTAR_SHIM
+# in-use mark (fd 5).
 without_lock_fds() {
   "$@" 5>&- 8>&- 9>&-
 }
@@ -952,11 +953,19 @@ rockstar_shim_folders() {
     exec 6>> "$np_support/.rockstar-shim.lock" && /usr/bin/lockf -s -t 30 6 || exit 1
     game=${STEAM_COMPAT_INSTALL_PATH:-}
     lock="$game/.bridgeplay-rockstar-shim.lock"
+    game_locked=0
     if [ -z "$game" ] || [ ! -d "$game" ]; then
       game=""
     elif [ "$shim_wanted" = 1 ] || [ -f "$lock" ] || [ -e "$game/version.dll.bridgeplay-orig" ] \
       || [ -L "$game/version.dll.bridgeplay-orig" ] || rockstar_shim_copy "$shim/version.dll" "$game/version.dll"; then
-      if ! { rockstar_shim_lock_fd 7 "$lock" && /usr/bin/lockf -s -t 30 7; }; then
+      rc=1
+      if rockstar_shim_lock_fd 7 "$lock"; then rc=0; /usr/bin/lockf -s -t 30 7 || rc=$?; fi
+      if [ "$rc" = 0 ]; then
+        game_locked=1
+      elif [ "$rc" = 75 ]; then
+        graphics_log "rockstar-shim: another launch holds the lock on $game, left alone"
+        game=""
+      else
         graphics_log "rockstar-shim: could not lock $game, only this macOS user's launches take turns there"
       fi
     else
@@ -966,24 +975,27 @@ rockstar_shim_folders() {
       [ -n "$dir" ] && [ -d "$dir" ] || continue
       target="$dir/version.dll"
       saved="$dir/version.dll.bridgeplay-orig"
+      is_shim=0
+      ! rockstar_shim_copy "$shim/version.dll" "$target" || is_shim=1
       # A launch of an older build killed between claiming the backup name and the move
       # left it empty, with the game's own file still in place. One still claiming it now
       # made it moments ago.
       if [ -f "$saved" ] && [ ! -L "$saved" ] && [ ! -s "$saved" ] \
-        && { [ -e "$target" ] || [ -L "$target" ]; } && ! rockstar_shim_copy "$shim/version.dll" "$target" \
+        && { [ -e "$target" ] || [ -L "$target" ]; } && [ "$is_shim" = 0 ] \
         && [ -n "$(find "$saved" -prune -mmin +1 2>/dev/null)" ]; then
         rm -f "$saved" 2>> "$log" && graphics_log "rockstar-shim: removed an empty version.dll.bridgeplay-orig from $dir"
       fi
       if [ "$shim_wanted" = 1 ]; then
         moved=0
-        if { [ -e "$target" ] || [ -L "$target" ]; } && ! rockstar_shim_copy "$shim/version.dll" "$target"; then
+        if { [ -e "$target" ] || [ -L "$target" ]; } && [ "$is_shim" = 0 ]; then
           if [ -e "$saved" ] || [ -L "$saved" ]; then
             graphics_log "rockstar-shim: $dir has its own version.dll and a version.dll.bridgeplay-orig, both left alone"
             continue
           fi
           # One rename: a killed launch leaves the file under one name or the other, never
-          # an empty backup.
-          if ! mv "$target" "$saved" 2>> "$log"; then
+          # an empty backup. Without the folder's lock another user's launch could rename a
+          # file over it, so then the game's own file stays.
+          if { [ "$dir" = "$game" ] && [ "$game_locked" = 0 ]; } || ! mv "$target" "$saved" 2>> "$log"; then
             graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
             continue
           fi
@@ -1000,7 +1012,7 @@ rockstar_shim_folders() {
         graphics_log "rockstar-shim: another launch is using the version.dll in $dir, left alone"
         continue
       fi
-      if rockstar_shim_copy "$shim/version.dll" "$target"; then
+      if [ "$is_shim" = 1 ]; then
         rm -f "$target" 2>> "$log" && graphics_log "rockstar-shim: removed version.dll from $dir"
       fi
       if [ -e "$saved" ] || [ -L "$saved" ]; then
@@ -1047,6 +1059,8 @@ stage_rockstar_shim() {
     [ "$gamefix_rockstar_shim" != 1 ] || graphics_log "rockstar-shim: not in this engine, ROCKSTAR_SHIM=1 does nothing"
     return 0
   fi
+  # No shim in the game folder, nothing there for other launches to leave alone.
+  rockstar_shim_copy "$shim/version.dll" "${STEAM_COMPAT_INSTALL_PATH:-}/version.dll" || exec 5>&-
   gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}version=n,b"
   # dxgx.dll is DXVK's dxgi under a name the backend's dxgi=b does not cover.
   if [ "$backend" = dxvk ] && [ -f "$shim/dxgx.dll" ]; then
@@ -3239,6 +3253,8 @@ open_pid=$!
 /usr/bin/caffeinate -d -i -w "$open_pid" >> "$log" 2>&1 &
 status=0
 wait "$open_pid" || status=$?
+# The game is done with the ROCKSTAR_SHIM version.dll; the teardown below can be slow.
+exec 5>&-
 launch_step ended
 np_ran=$(($(date +%s) - np_started))
 echo "=== game exited status=$status, killing wine prefix ===" >> "$log" 2>&1 || true
