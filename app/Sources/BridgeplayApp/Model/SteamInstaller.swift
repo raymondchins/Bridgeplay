@@ -476,9 +476,12 @@ enum SteamInstaller {
     static func revertFailed(_ error: Error, _ revertFailure: Error) -> StepFailure {
         let own = error as? StepFailure
         let cause = own.flatMap { $0.step == step ? $0.detail : nil } ?? error.localizedDescription
+        // A refused write only says it could not write files, which leaves out the one part
+        // the person can act on: what is holding the write off.
+        let advice = (revertFailure as? WriteRefused).map { " " + $0.remedy.advice } ?? ""
         return StepFailure(
             step: step,
-            detail: cause + " " + String(localized: "Putting Steam back as it was also failed, so Steam may not start: \(revertFailure.localizedDescription) Use Repair Steam to restore it."),
+            detail: cause + " " + String(localized: "Putting Steam back as it was also failed, so Steam may not start: \(revertFailure.localizedDescription) Use Repair Steam to restore it.") + advice,
             retryable: own?.retryable == true)
     }
 
