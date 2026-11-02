@@ -212,10 +212,9 @@ else
   export ROSETTA_ADVERTISE_AVX="${ROSETTA_ADVERTISE_AVX:-1}"
 fi
 
-# Keeps Wine from inheriting the prefix and template locks (fd 8 and 9) and the ROCKSTAR_SHIM
-# in-use mark (fd 5).
+# Keeps Wine from inheriting the prefix and template locks (fd 8 and 9).
 without_lock_fds() {
-  "$@" 5>&- 8>&- 9>&-
+  "$@" 8>&- 9>&-
 }
 
 # If two WINEDLLPATH directories have the same DLL, Wine uses the one listed first.
@@ -917,14 +916,15 @@ rockstar_shim_copy() {
   cmp -s "$1" "$2" || LC_ALL=C grep -qaF 'rockstar-shim: ' "$2"
 }
 
-# Opens fd $1 read-only on the lock file $2, created readable by every macOS user sharing the
-# folder. The exclusive create and the read-only open never make or write a file through a
-# link another user puts there. The checks make the exec certain to work, since a failed one
-# ends the script. No `command exec`: after one, bash 3.2 spins forever on exit.
+# Opens fd $1 on the lock file $2, created readable by every macOS user sharing the folder:
+# read-write when it can be (some network volumes lock only a writable fd), else read-only.
+# The exclusive create never makes a file through a link another user puts there, and a
+# link is never opened. The checks make the exec certain to work, since a failed one ends
+# the script. No `command exec`: after one, bash 3.2 spins forever on exit.
 rockstar_shim_lock_fd() {
   [ -e "$2" ] || [ -L "$2" ] || (umask 022; set -C; : > "$2") 2>/dev/null || true
   [ -f "$2" ] && [ ! -L "$2" ] && [ -r "$2" ] || return 1
-  eval "exec $1< \"\$2\""
+  if [ -w "$2" ]; then eval "exec $1>> \"\$2\""; else eval "exec $1< \"\$2\""; fi
 }
 
 # A launch that stages the shim holds an .inuse file in the game folder locked until it
@@ -943,13 +943,14 @@ rockstar_shim_in_use() {
 # Stages, removes or restores version.dll in Social Club and the game folder. The first lock
 # is per macOS user. Several users can share the game folder, so it also gets a lock of its
 # own, taken only when the folder has something of the shim's in it. A volume that cannot
-# hold that lock falls back to the per-user one.
+# hold that lock falls back to the per-user one. Exits 3 when another launch held it.
 rockstar_shim_folders() {
   (
     exec 6>> "$np_support/.rockstar-shim.lock" && /usr/bin/lockf -s -t 30 6 || exit 1
     game=${STEAM_COMPAT_INSTALL_PATH:-}
     lock="$game/.bridgeplay-rockstar-shim.lock"
     game_locked=0
+    busy=0
     if [ -z "$game" ] || [ ! -d "$game" ]; then
       game=""
     elif [ "$shim_wanted" = 1 ] || [ -f "$lock" ] || [ -e "$game/version.dll.bridgeplay-orig" ] \
@@ -961,6 +962,7 @@ rockstar_shim_folders() {
       elif [ "$rc" = 75 ]; then
         graphics_log "rockstar-shim: another launch holds the lock on $game, left alone"
         game=""
+        busy=1
       else
         graphics_log "rockstar-shim: could not lock $game, only this macOS user's launches take turns there"
       fi
@@ -1001,6 +1003,9 @@ rockstar_shim_folders() {
         if ! stage_backend_file "$shim/version.dll" "$target"; then
           graphics_log "rockstar-shim: could not stage version.dll into $dir"
           [ "$moved" = 0 ] || mv "$saved" "$target" 2>> "$log" || true
+        elif [ "$dir" = "$game" ]; then
+          # Other macOS users' launches read it too.
+          chmod a+r "$target" 2>/dev/null || true
         fi
         continue
       fi
@@ -1019,6 +1024,7 @@ rockstar_shim_folders() {
         fi
       fi
     done
+    [ "$busy" = 0 ] || exit 3
     exit 0
   )
 }
@@ -1040,25 +1046,32 @@ stage_rockstar_shim() {
     return 0
   fi
   # Held before staging, so no other launch can take the shim out between the two, and kept
-  # from children (without_lock_fds, the game's launch), so it ends with this script. One per
-  # macOS user and prefix, so two prefixes on one game each hold their own.
+  # from the game's launch, so it ends with this script. One per macOS user and prefix, so
+  # two prefixes on one game each hold their own.
   if [ "$shim_wanted" = 1 ] && [ -d "${STEAM_COMPAT_INSTALL_PATH:-}" ]; then
     inuse="$STEAM_COMPAT_INSTALL_PATH/.bridgeplay-rockstar-shim.$(id -u)-$(printf '%s' "${STEAM_COMPAT_DATA_PATH:-}" | cksum | cut -d ' ' -f 1)"
-    # A mark some leftover process still holds gets one of this launch's own.
-    if ! { rockstar_shim_lock_fd 5 "$inuse.inuse" && /usr/bin/lockf -s -t 1 5; } \
-      && ! { rockstar_shim_lock_fd 5 "$inuse-$$.inuse" && /usr/bin/lockf -s -t 5 5; }; then
+    # A mark the previous launch of this prefix still holds, while it shuts down, gets one of
+    # this launch's own, removed when it ends.
+    if rockstar_shim_lock_fd 5 "$inuse.inuse" && /usr/bin/lockf -s -t 1 5; then
+      :
+    elif rockstar_shim_lock_fd 5 "$inuse-$$.inuse" && /usr/bin/lockf -s -t 5 5; then
+      rockstar_shim_own_mark="$inuse-$$.inuse"
+    else
       graphics_log "rockstar-shim: could not mark the game folder in use"
     fi
   fi
   # Launches that share a folder (two prefixes on one game) take turns, so one cannot undo
   # a move or a restore the other is making.
-  rockstar_shim_folders || graphics_log "rockstar-shim: could not take the lock, version.dll left as it is"
+  folders=0
+  rockstar_shim_folders || folders=$?
+  [ "$folders" != 1 ] || graphics_log "rockstar-shim: could not take the lock, version.dll left as it is"
   if [ "$shim_wanted" = 0 ]; then
     [ "$gamefix_rockstar_shim" != 1 ] || graphics_log "rockstar-shim: not in this engine, ROCKSTAR_SHIM=1 does nothing"
     return 0
   fi
-  # No shim in the game folder, nothing there for other launches to leave alone.
-  cmp -s "$shim/version.dll" "${STEAM_COMPAT_INSTALL_PATH:-}/version.dll" 2>/dev/null || exec 5>&-
+  # No shim in the game folder, nothing there for other launches to leave alone. A folder
+  # another launch is staging keeps the mark.
+  [ "$folders" = 3 ] || cmp -s "$shim/version.dll" "${STEAM_COMPAT_INSTALL_PATH:-}/version.dll" 2>/dev/null || exec 5>&-
   gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}version=n,b"
   # dxgx.dll is DXVK's dxgi under a name the backend's dxgi=b does not cover.
   if [ "$backend" = dxvk ] && [ -f "$shim/dxgx.dll" ]; then
@@ -3251,8 +3264,6 @@ open_pid=$!
 /usr/bin/caffeinate -d -i -w "$open_pid" >> "$log" 2>&1 5>&- &
 status=0
 wait "$open_pid" || status=$?
-# The game is done with the ROCKSTAR_SHIM version.dll; the teardown below can be slow.
-exec 5>&-
 launch_step ended
 np_ran=$(($(date +%s) - np_started))
 echo "=== game exited status=$status, killing wine prefix ===" >> "$log" 2>&1 || true
@@ -3262,4 +3273,5 @@ kill_wine_prefix
 # After the teardown, so reading a long Wine log never holds the prefix up.
 exit_summary "$status" "$np_ran" "$np_terminated" "$loader_root/bridgeplay-wine.log" >> "$log" 2>&1 || true
 echo "=== wine prefix killed, session ending ===" >> "$log" 2>&1 || true
+[ -z "${rockstar_shim_own_mark:-}" ] || rm -f "$rockstar_shim_own_mark" 2>/dev/null || true
 exit $status

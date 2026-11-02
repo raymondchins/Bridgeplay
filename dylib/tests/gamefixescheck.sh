@@ -892,8 +892,8 @@ is "a launch that stages the shim marks the game folder in use, per user and pre
 	"$([ -f "$inuse" ] && echo yes || echo no)"
 is "next to another prefix's mark of the same user" "no" \
 	"$(grep -qF 'could not mark the game folder in use' "$case_dir/log" && echo yes || echo no)"
-is "and its lock files are readable by other macOS users" "-rw-r--r--|-rw-r--r--" \
-	"$(stat -f %Sp "$inuse")|$(stat -f %Sp "$case_dir/game/.bridgeplay-rockstar-shim.lock")"
+is "and its lock files and staged shim are readable by other macOS users" "-rw-r--r--|-rw-r--r--|-rw-r--r--" \
+	"$(stat -f %Sp "$inuse")|$(stat -f %Sp "$case_dir/game/.bridgeplay-rockstar-shim.lock")|$(stat -f %Sp "$case_dir/game/version.dll")"
 wait "$holder"
 # Another macOS user's session is still running and holds its in-use file.
 /usr/bin/lockf -k "$case_dir/game/.bridgeplay-rockstar-shim.4243.inuse" sleep 3 &
