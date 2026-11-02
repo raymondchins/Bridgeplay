@@ -209,7 +209,7 @@ struct PlayReportsTests {
     }
 
     @Test("A report says when a newer Bridgeplay was out")
-    func newerRelease() throws {
+    func newerRelease() {
         let defaults = scratchDefaults()
         #expect(LatestRelease.newer(than: "44", defaults: defaults) == nil)
         LatestRelease.record(build: "55", version: "0.7.38", defaults: defaults)

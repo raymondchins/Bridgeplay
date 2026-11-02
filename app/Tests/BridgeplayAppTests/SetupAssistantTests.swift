@@ -90,7 +90,7 @@ struct SetupAssistantTests {
 
     @Test("The assistant stays away once the user finished or dismissed it")
     @MainActor
-    func finishedFlag() throws {
+    func finishedFlag() {
         let defaults = scratchDefaults()
         defaults.set(true, forKey: SetupAssistant.finishedKey)
         #expect(!SetupAssistant.shouldShow(nil, defaults: defaults))

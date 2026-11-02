@@ -179,7 +179,7 @@ struct UpdateFlowTests {
 
 @Suite("What's New")
 struct WhatsNewTests {
-    @Test func showsOncePerBuild() throws {
+    @Test func showsOncePerBuild() {
         let defaults = scratchDefaults()
         LatestRelease.record(build: "77", version: "0.7.60", notes: "- fix(panel): show the menu (#1)", defaults: defaults)
         let first = LatestRelease.takeWhatsNew(build: "77", defaults: defaults)
@@ -187,18 +187,18 @@ struct WhatsNewTests {
         #expect(LatestRelease.takeWhatsNew(build: "77", defaults: defaults) == nil)
     }
 
-    @Test func waitsForTheBuildItDescribes() throws {
+    @Test func waitsForTheBuildItDescribes() {
         let defaults = scratchDefaults()
         LatestRelease.record(build: "77", version: "0.7.60", notes: "- fix: a", defaults: defaults)
         #expect(LatestRelease.takeWhatsNew(build: "76", defaults: defaults) == nil)
         #expect(LatestRelease.takeWhatsNew(build: "77", defaults: defaults) != nil)
     }
 
-    @Test func nothingRecordedShowsNothing() throws {
+    @Test func nothingRecordedShowsNothing() {
         #expect(LatestRelease.takeWhatsNew(build: "77", defaults: scratchDefaults()) == nil)
     }
 
-    @Test func aReleaseWithoutNotesStillSaysItUpdated() throws {
+    @Test func aReleaseWithoutNotesStillSaysItUpdated() {
         let defaults = scratchDefaults()
         LatestRelease.record(build: "77", version: "0.7.60", defaults: defaults)
         #expect(LatestRelease.takeWhatsNew(build: "77", defaults: defaults)?.changes == [])
