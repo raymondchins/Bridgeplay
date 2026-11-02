@@ -8,7 +8,7 @@ functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
 	load_gamefixes resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available \
 	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
-	activate_backend record_backend rockstar_shim_copy rockstar_shim_folders stage_rockstar_shim compose_dll_overrides; do
+	activate_backend record_backend rockstar_shim_copy rockstar_shim_lock_fd rockstar_shim_in_use rockstar_shim_folders stage_rockstar_shim compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -693,6 +693,13 @@ launch waitforexitandrun "$case_dir/game/game.exe"
 is "a global d3dmetal on an engine without it falls back" "dxmt" "$(got backend)"
 has "the fallback names the global layer" "BACKEND in the global conf, fell back from d3dmetal" "$case_dir/log"
 
+# After a `command exec`, bash 3.2 (macOS /bin/sh) spins forever on exit.
+is "the run script never uses command exec" "0" \
+	"$(grep -v '^[[:space:]]*#' "$SRC" | grep -c 'command exec' || true)"
+# The game, its env -i start and caffeinate outlive staging; holding fd 5 they would keep the
+# ROCKSTAR_SHIM in-use mark after the run script ends.
+is "the game's launch does not inherit the in-use mark" "3" "$(grep -c '>> "$log" 2>&1 5>&- &$' "$SRC" || true)"
+
 echo "== ROCKSTAR_SHIM stages rockstar-shim/ next to Social Club and the game"
 rockstar_case() {
 	new_case
@@ -739,13 +746,18 @@ printf 'a game of its own\n' > "$case_dir/game/version.dll"
 user_conf 'BACKEND=dxvk'
 rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
 is "a version.dll that is not the shim is left alone" "a game of its own" "$(cat "$case_dir/game/version.dll")"
+is "and a folder with nothing of the shim's gets no lock file" "no" \
+	"$([ -e "$case_dir/game/.bridgeplay-rockstar-shim.lock" ] && echo yes || echo no)"
 
 echo "== ROCKSTAR_SHIM keeps a version.dll the game already had"
 rockstar_case
 printf 'a mod loader\n' > "$case_dir/game/version.dll"
+orig_inode=$(stat -f %i "$case_dir/game/version.dll")
 user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
 rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
 is "the game's own version.dll is set aside" "a mod loader" "$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+is "by a rename, so a killed launch cannot leave an empty backup" "$orig_inode" \
+	"$(stat -f %i "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
 is "and the shim takes its place" "yes" \
 	"$(cmp -s "$shim_src/version.dll" "$case_dir/game/version.dll" && echo yes || echo no)"
 has "the move is logged" "moved the version.dll in $case_dir/game to version.dll.bridgeplay-orig" "$case_dir/log"
@@ -793,6 +805,54 @@ chmod 755 "$case_dir/game"
 is "a folder the backup cannot go into keeps its own version.dll" "a mod loader|no" \
 	"$(cat "$case_dir/game/version.dll")|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
 has "and says so" "could not set aside the version.dll in $case_dir/game, left alone" "$case_dir/log"
+has "after falling back to this user's lock" "could not lock $case_dir/game, only this macOS user's launches take turns there" "$case_dir/log"
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+ln -s /dev/null "$case_dir/game/.bridgeplay-rockstar-shim.lock"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "without the game folder's lock the game's own version.dll is not moved" "a mod loader|no" \
+	"$(cat "$case_dir/game/version.dll")|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
+# An older build killed between claiming the backup name and the move left it empty.
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+: > "$case_dir/game/version.dll.bridgeplay-orig"
+touch -t 202601010000 "$case_dir/game/version.dll.bridgeplay-orig"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "an empty backup does not keep the shim off" "yes|a mod loader" \
+	"$(cmp -s "$shim_src/version.dll" "$case_dir/game/version.dll" && echo yes || echo no)|$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+has "and is logged" "removed an empty version.dll.bridgeplay-orig from $case_dir/game" "$case_dir/log"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "and the game's own version.dll comes back after it" "a mod loader|no" \
+	"$(cat "$case_dir/game/version.dll")|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+: > "$case_dir/game/version.dll.bridgeplay-orig"
+touch -t 202601010000 "$case_dir/game/version.dll.bridgeplay-orig"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "without the key an empty backup goes and the game's own file stays" "a mod loader|no" \
+	"$(cat "$case_dir/game/version.dll")|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+: > "$case_dir/game/version.dll.bridgeplay-orig"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "an empty backup an older build is claiming right now is left to it" "a mod loader|yes" \
+	"$(cat "$case_dir/game/version.dll")|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+rockstar_case
+: > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+touch -t 202601010000 "$case_dir/game/version.dll.bridgeplay-orig"
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "an empty version.dll of the game's own is set aside and put back" "yes|0|no" \
+	"$([ -f "$case_dir/game/version.dll" ] && echo yes || echo no)|$(stat -f %z "$case_dir/game/version.dll" 2>/dev/null)|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
 
 # Another launch holds the lock for two seconds and notes the game folder as it lets go.
 rockstar_case
@@ -807,6 +867,76 @@ wait "$holder"
 is "a launch leaves the folder alone while another holds the lock" "a mod loader" "$(cat "$case_dir/held" 2>/dev/null)"
 is "and stages the shim once it is free" "yes|a mod loader" \
 	"$(cmp -s "$shim_src/version.dll" "$case_dir/game/version.dll" && echo yes || echo no)|$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+
+# Another macOS user's launch holds the game folder's own lock.
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+/usr/bin/lockf -k "$case_dir/game/.bridgeplay-rockstar-shim.lock" \
+	sh -c 'sleep 2; cat "$1" > "$2"' sh "$case_dir/game/version.dll" "$case_dir/held" &
+holder=$!
+sleep 0.5
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+wait "$holder"
+is "a launch waits for the game folder's lock too" "a mod loader" "$(cat "$case_dir/held" 2>/dev/null)"
+
+echo "== ROCKSTAR_SHIM leaves the shim to a launch still using it"
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+# Another prefix of this macOS user holds its own mark on the game folder.
+mark() { echo "$case_dir/game/.bridgeplay-rockstar-shim.$(id -u)-$(printf '%s' "$1" | cksum | cut -d ' ' -f 1).inuse"; }
+/usr/bin/lockf -k "$(mark "$case_dir/other-data")" sleep 3 &
+holder=$!
+sleep 0.5
+(umask 077; rockstar_launch waitforexitandrun "$case_dir/game/game.exe")
+inuse=$(mark "$case_dir/data")
+is "a launch that stages the shim marks the game folder in use, per user and prefix" "yes" \
+	"$([ -f "$inuse" ] && echo yes || echo no)"
+is "next to another prefix's mark of the same user" "no" \
+	"$(grep -qF 'could not mark the game folder in use' "$case_dir/log" && echo yes || echo no)"
+is "and its lock files and staged shim are readable by other macOS users" "-rw-r--r--|-rw-r--r--|-rw-r--r--" \
+	"$(stat -f %Sp "$inuse")|$(stat -f %Sp "$case_dir/game/.bridgeplay-rockstar-shim.lock")|$(stat -f %Sp "$case_dir/game/version.dll")"
+wait "$holder"
+# Another macOS user's session is still running and holds its in-use file.
+/usr/bin/lockf -k "$case_dir/game/.bridgeplay-rockstar-shim.4243.inuse" sleep 3 &
+holder=$!
+sleep 0.5
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "a launch without the key leaves the shim while another session uses it" "yes|a mod loader" \
+	"$(cmp -s "$shim_src/version.dll" "$case_dir/game/version.dll" && echo yes || echo no)|$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+has "and says so" "another launch is using the version.dll in $case_dir/game, left alone" "$case_dir/log"
+is "Social Club is the launch's own and is still cleaned" "no" "$([ -e "$social/version.dll" ] && echo yes || echo no)"
+wait "$holder"
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "once that session ends the game's own version.dll is back" "a mod loader|no" \
+	"$(cat "$case_dir/game/version.dll")|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+rockstar_case
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+: > "$case_dir/game/.bridgeplay-rockstar-shim.4244.inuse"
+chmod 000 "$case_dir/game/.bridgeplay-rockstar-shim.4244.inuse"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+chmod 600 "$case_dir/game/.bridgeplay-rockstar-shim.4244.inuse"
+is "a mark that cannot be opened does not keep the shim in" "no" "$([ -e "$case_dir/game/version.dll" ] && echo yes || echo no)"
+rockstar_case
+/usr/bin/lockf -k "$(mark "$case_dir/data")" sleep 3 &
+holder=$!
+sleep 0.5
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+wait "$holder"
+is "a mark a leftover process holds sends the launch to a second one" "no|1" \
+	"$(grep -qF 'could not mark the game folder in use' "$case_dir/log" && echo yes || echo no)|$([ -f "$(mark "$case_dir/data" | sed 's/\.inuse$//')-2.inuse" ] && echo 1 || echo 0)"
+rockstar_case
+ln -s "$case_dir/outside-lock" "$case_dir/game/.bridgeplay-rockstar-shim.lock"
+ln -s "$case_dir/outside-mark" "$(mark "$case_dir/data")"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "lock files that are links create nothing where they point" "no|no" \
+	"$([ -e "$case_dir/outside-lock" ] && echo yes || echo no)|$([ -e "$case_dir/outside-mark" ] && echo yes || echo no)"
 
 echo "== ROCKSTAR_SHIM removes a copy another engine staged"
 rockstar_case
@@ -867,6 +997,28 @@ user_conf 'BACKEND=dxvk'
 rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
 is "without the key the Unreal folder's own version.dll is put back" "a mod loader|no" \
 	"$(cat "$win64/version.dll" 2>/dev/null)|$([ -e "$win64/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
+# The Unreal folder is under the game folder's in-use marks: a launch of another macOS user
+# still running leaves its shim and the backup alone.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'a mod loader' > "$win64/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "the Unreal folder's staged shim is readable by other macOS users" "-rw-r--r--" "$(stat -f %Sp "$win64/version.dll")"
+/usr/bin/lockf -k "$case_dir/game/.bridgeplay-rockstar-shim.4243.inuse" sleep 3 &
+holder=$!
+sleep 0.5
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "a launch without the key leaves the Unreal folder's shim while another session uses it" "yes|a mod loader" \
+	"$(cmp -s "$shim_src/version.dll" "$win64/version.dll" && echo yes || echo no)|$(cat "$win64/version.dll.bridgeplay-orig" 2>/dev/null)"
+has "and says so" "another launch is using the version.dll in $win64, left alone" "$case_dir/log"
+wait "$holder"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "once that session ends the Unreal folder's own version.dll is back" "a mod loader|no" \
+	"$(cat "$win64/version.dll")|$([ -e "$win64/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
 
 # The shipped San Andreas conf, as it is, with the game's real exe path.
 sa_conf="$(dirname "$SRC")/../../gamefixes/1547000.conf"
