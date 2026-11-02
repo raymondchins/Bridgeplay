@@ -214,7 +214,7 @@ fi
 
 # Keeps Wine from inheriting the prefix and template locks (fd 8 and 9).
 without_lock_fds() {
-  "$@" 8>&- 9>&-
+  "$@" 5>&- 8>&- 9>&-
 }
 
 # If two WINEDLLPATH directories have the same DLL, Wine uses the one listed first.
@@ -916,19 +916,37 @@ rockstar_shim_copy() {
   cmp -s "$1" "$2" || LC_ALL=C grep -qaF 'rockstar-shim: ' "$2"
 }
 
-# A launch that stages the shim holds its macOS user's .inuse file in the game folder locked
-# until it ends, so a launch by another user sharing the folder can tell the shim is in use.
+# Opens fd $1 on the lock file $2, created readable by every macOS user sharing the folder,
+# and read-write when it can be, as some network volumes lock only a writable fd. The checks
+# make the exec certain to work, since a failed one ends the script. No `command exec`:
+# after one, bash 3.2 spins forever on exit.
+rockstar_shim_lock_fd() {
+  [ -e "$2" ] || [ -L "$2" ] || (umask 022; : >> "$2") 2>/dev/null || true
+  [ -f "$2" ] && [ ! -L "$2" ] && [ -r "$2" ] || return 1
+  if [ -w "$2" ]; then eval "exec $1>> \"\$2\""; else eval "exec $1< \"\$2\""; fi
+}
+
+# A launch that stages the shim holds an .inuse file in the game folder locked until it
+# ends, so a launch by another macOS user sharing the folder can tell the shim is in use.
+# Only lockf's EX_TEMPFAIL (75) means a holder; a file it cannot open or lock says nothing.
 rockstar_shim_in_use() {
   for held in "$1"/.bridgeplay-rockstar-shim.*.inuse; do
     [ -f "$held" ] && [ ! -L "$held" ] || continue
-    /usr/bin/lockf -k -s -t 0 "$held" true 2>/dev/null || return 0
+    rc=0
+    if [ -w "$held" ]; then
+      /usr/bin/lockf -k -s -w -t 0 "$held" true 2>/dev/null || rc=$?
+    else
+      /usr/bin/lockf -k -s -t 0 "$held" true 2>/dev/null || rc=$?
+    fi
+    [ "$rc" != 75 ] || return 0
   done
   return 1
 }
 
 # Stages, removes or restores version.dll in Social Club and the game folder. The first lock
 # is per macOS user. Several users can share the game folder, so it also gets a lock of its
-# own, taken only when the folder has something of the shim's in it.
+# own, taken only when the folder has something of the shim's in it. A volume that cannot
+# hold that lock falls back to the per-user one.
 rockstar_shim_folders() {
   (
     exec 6>> "$np_support/.rockstar-shim.lock" && /usr/bin/lockf -s -t 30 6 || exit 1
@@ -936,15 +954,10 @@ rockstar_shim_folders() {
     lock="$game/.bridgeplay-rockstar-shim.lock"
     if [ -z "$game" ] || [ ! -d "$game" ]; then
       game=""
-    elif [ "$shim_wanted" = 1 ] || [ -e "$game/version.dll.bridgeplay-orig" ] \
+    elif [ "$shim_wanted" = 1 ] || [ -f "$lock" ] || [ -e "$game/version.dll.bridgeplay-orig" ] \
       || [ -L "$game/version.dll.bridgeplay-orig" ] || rockstar_shim_copy "$shim/version.dll" "$game/version.dll"; then
-      # Opened read-only, as another user may own the file. No `command exec`: after one,
-      # bash 3.2 spins forever on exit.
-      [ -e "$lock" ] || [ -L "$lock" ] || (: >> "$lock") 2>/dev/null || true
-      if ! { [ -f "$lock" ] && [ ! -L "$lock" ] && [ -r "$lock" ] && exec 7< "$lock" \
-        && /usr/bin/lockf -s -t 30 7; }; then
-        graphics_log "rockstar-shim: could not lock $game, left alone"
-        game=""
+      if ! { rockstar_shim_lock_fd 7 "$lock" && /usr/bin/lockf -s -t 30 7; }; then
+        graphics_log "rockstar-shim: could not lock $game, only this macOS user's launches take turns there"
       fi
     else
       game=""
@@ -954,8 +967,11 @@ rockstar_shim_folders() {
       target="$dir/version.dll"
       saved="$dir/version.dll.bridgeplay-orig"
       # A launch of an older build killed between claiming the backup name and the move
-      # left it empty, with the game's own file still in place.
-      if [ -f "$saved" ] && [ ! -L "$saved" ] && [ ! -s "$saved" ]; then
+      # left it empty, with the game's own file still in place. One still claiming it now
+      # made it moments ago.
+      if [ -f "$saved" ] && [ ! -L "$saved" ] && [ ! -s "$saved" ] \
+        && { [ -e "$target" ] || [ -L "$target" ]; } && ! rockstar_shim_copy "$shim/version.dll" "$target" \
+        && [ -n "$(find "$saved" -prune -mmin +1 2>/dev/null)" ]; then
         rm -f "$saved" 2>> "$log" && graphics_log "rockstar-shim: removed an empty version.dll.bridgeplay-orig from $dir"
       fi
       if [ "$shim_wanted" = 1 ]; then
@@ -965,8 +981,8 @@ rockstar_shim_folders() {
             graphics_log "rockstar-shim: $dir has its own version.dll and a version.dll.bridgeplay-orig, both left alone"
             continue
           fi
-          # One rename, under the folder's lock: a killed launch leaves the file under one
-          # name or the other, never an empty backup.
+          # One rename: a killed launch leaves the file under one name or the other, never
+          # an empty backup.
           if ! mv "$target" "$saved" 2>> "$log"; then
             graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
             continue
@@ -1015,13 +1031,14 @@ stage_rockstar_shim() {
     # Helpers (verb run) leave the game's files as they are.
     return 0
   fi
-  # Held before staging, so no other launch can take the shim out between the two. A failed
-  # exec would end the launch, so the file is created in a subshell first.
-  inuse="${STEAM_COMPAT_INSTALL_PATH:-}/.bridgeplay-rockstar-shim.$(id -u).inuse"
-  if [ "$shim_wanted" = 1 ] && [ -d "${STEAM_COMPAT_INSTALL_PATH:-}" ] \
-    && ! { [ ! -L "$inuse" ] && (: >> "$inuse") 2>/dev/null && [ -f "$inuse" ] && [ ! -L "$inuse" ] \
-      && exec 5>> "$inuse" && /usr/bin/lockf -s -t 5 5; }; then
-    graphics_log "rockstar-shim: could not mark the game folder in use"
+  # Held before staging, so no other launch can take the shim out between the two, and kept
+  # from children (without_lock_fds, the game's launch), so it ends with this script. One per
+  # macOS user and prefix, so two prefixes on one game each hold their own.
+  if [ "$shim_wanted" = 1 ] && [ -d "${STEAM_COMPAT_INSTALL_PATH:-}" ]; then
+    inuse="$STEAM_COMPAT_INSTALL_PATH/.bridgeplay-rockstar-shim.$(id -u)-$(printf '%s' "${STEAM_COMPAT_DATA_PATH:-}" | cksum | cut -d ' ' -f 1).inuse"
+    if ! { rockstar_shim_lock_fd 5 "$inuse" && /usr/bin/lockf -s -t 5 5; }; then
+      graphics_log "rockstar-shim: could not mark the game folder in use"
+    fi
   fi
   # Launches that share a folder (two prefixes on one game) take turns, so one cannot undo
   # a move or a restore the other is making.
@@ -3187,7 +3204,7 @@ np_started=$(date +%s)
 np_terminated=0
 launch_step start
 if [ "${NOTPROTON_LAUNCH_SERVICES:-0}" = "1" ]; then
-  open -n -W -a "$loader_app" "$@" >> "$log" 2>&1 &
+  open -n -W -a "$loader_app" "$@" >> "$log" 2>&1 5>&- &
 else
   # A bundle started by `open` is its own TCC responsible process, so every game
   # needed a separate Input Monitoring grant before controllers worked. Started
@@ -3216,7 +3233,7 @@ else
   done
   echo "launching bundle directly so input permission stays with Steam" >> "$log" 2>&1 || true
   env -i HOME="$HOME" USER="$USER" LOGNAME="$LOGNAME" SHELL="$SHELL" TMPDIR="$TMPDIR" \
-    __CF_USER_TEXT_ENCODING="$__CF_USER_TEXT_ENCODING" "$@" >> "$log" 2>&1 &
+    __CF_USER_TEXT_ENCODING="$__CF_USER_TEXT_ENCODING" "$@" >> "$log" 2>&1 5>&- &
 fi
 open_pid=$!
 /usr/bin/caffeinate -d -i -w "$open_pid" >> "$log" 2>&1 &
