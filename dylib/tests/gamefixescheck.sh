@@ -918,6 +918,22 @@ user_conf 'BACKEND=dxvk'
 rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
 chmod 600 "$case_dir/game/.bridgeplay-rockstar-shim.4244.inuse"
 is "a mark that cannot be opened does not keep the shim in" "no" "$([ -e "$case_dir/game/version.dll" ] && echo yes || echo no)"
+rockstar_case
+/usr/bin/lockf -k "$(mark "$case_dir/data")" sleep 3 &
+holder=$!
+sleep 0.5
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+wait "$holder"
+is "a mark a leftover process holds gets one of the launch's own" "no|1" \
+	"$(grep -qF 'could not mark the game folder in use' "$case_dir/log" && echo yes || echo no)|$(set -- "$(mark "$case_dir/data" | sed 's/\.inuse$//')"-*.inuse; [ -f "$1" ] && echo $# || echo 0)"
+rockstar_case
+ln -s "$case_dir/outside-lock" "$case_dir/game/.bridgeplay-rockstar-shim.lock"
+ln -s "$case_dir/outside-mark" "$(mark "$case_dir/data")"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "lock files that are links create nothing where they point" "no|no" \
+	"$([ -e "$case_dir/outside-lock" ] && echo yes || echo no)|$([ -e "$case_dir/outside-mark" ] && echo yes || echo no)"
 
 echo "== ROCKSTAR_SHIM removes a copy another engine staged"
 rockstar_case

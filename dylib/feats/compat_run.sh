@@ -917,14 +917,14 @@ rockstar_shim_copy() {
   cmp -s "$1" "$2" || LC_ALL=C grep -qaF 'rockstar-shim: ' "$2"
 }
 
-# Opens fd $1 on the lock file $2, created readable by every macOS user sharing the folder,
-# and read-write when it can be, as some network volumes lock only a writable fd. The checks
-# make the exec certain to work, since a failed one ends the script. No `command exec`:
-# after one, bash 3.2 spins forever on exit.
+# Opens fd $1 read-only on the lock file $2, created readable by every macOS user sharing the
+# folder. The exclusive create and the read-only open never make or write a file through a
+# link another user puts there. The checks make the exec certain to work, since a failed one
+# ends the script. No `command exec`: after one, bash 3.2 spins forever on exit.
 rockstar_shim_lock_fd() {
-  [ -e "$2" ] || [ -L "$2" ] || (umask 022; : >> "$2") 2>/dev/null || true
+  [ -e "$2" ] || [ -L "$2" ] || (umask 022; set -C; : > "$2") 2>/dev/null || true
   [ -f "$2" ] && [ ! -L "$2" ] && [ -r "$2" ] || return 1
-  if [ -w "$2" ]; then eval "exec $1>> \"\$2\""; else eval "exec $1< \"\$2\""; fi
+  eval "exec $1< \"\$2\""
 }
 
 # A launch that stages the shim holds an .inuse file in the game folder locked until it
@@ -934,11 +934,7 @@ rockstar_shim_in_use() {
   for held in "$1"/.bridgeplay-rockstar-shim.*.inuse; do
     [ -f "$held" ] && [ ! -L "$held" ] || continue
     rc=0
-    if [ -w "$held" ]; then
-      /usr/bin/lockf -k -s -w -t 0 "$held" true 2>/dev/null || rc=$?
-    else
-      /usr/bin/lockf -k -s -t 0 "$held" true 2>/dev/null || rc=$?
-    fi
+    /usr/bin/lockf -k -n -s -t 0 "$held" true 2>/dev/null || rc=$?
     [ "$rc" != 75 ] || return 0
   done
   return 1
@@ -1032,7 +1028,7 @@ rockstar_shim_folders() {
 # next to the game hands GTA5.exe DXVK's dxgi on the dxvk backend. The game folder only ever
 # gets version.dll. A version.dll of the game's own (a mod loader) is moved to
 # version.dll.bridgeplay-orig first. Without the key, or on an engine without the shim, the
-# staged copy is removed and that file put back.
+# staged copy is removed and that file put back, unless another launch is using the folder.
 stage_rockstar_shim() {
   shim="$backend_root/rockstar-shim/x86_64-windows"
   social_club="$WINEPREFIX/drive_c/Program Files/Rockstar Games/Social Club"
@@ -1047,8 +1043,10 @@ stage_rockstar_shim() {
   # from children (without_lock_fds, the game's launch), so it ends with this script. One per
   # macOS user and prefix, so two prefixes on one game each hold their own.
   if [ "$shim_wanted" = 1 ] && [ -d "${STEAM_COMPAT_INSTALL_PATH:-}" ]; then
-    inuse="$STEAM_COMPAT_INSTALL_PATH/.bridgeplay-rockstar-shim.$(id -u)-$(printf '%s' "${STEAM_COMPAT_DATA_PATH:-}" | cksum | cut -d ' ' -f 1).inuse"
-    if ! { rockstar_shim_lock_fd 5 "$inuse" && /usr/bin/lockf -s -t 5 5; }; then
+    inuse="$STEAM_COMPAT_INSTALL_PATH/.bridgeplay-rockstar-shim.$(id -u)-$(printf '%s' "${STEAM_COMPAT_DATA_PATH:-}" | cksum | cut -d ' ' -f 1)"
+    # A mark some leftover process still holds gets one of this launch's own.
+    if ! { rockstar_shim_lock_fd 5 "$inuse.inuse" && /usr/bin/lockf -s -t 1 5; } \
+      && ! { rockstar_shim_lock_fd 5 "$inuse-$$.inuse" && /usr/bin/lockf -s -t 5 5; }; then
       graphics_log "rockstar-shim: could not mark the game folder in use"
     fi
   fi
@@ -1060,7 +1058,7 @@ stage_rockstar_shim() {
     return 0
   fi
   # No shim in the game folder, nothing there for other launches to leave alone.
-  rockstar_shim_copy "$shim/version.dll" "${STEAM_COMPAT_INSTALL_PATH:-}/version.dll" || exec 5>&-
+  cmp -s "$shim/version.dll" "${STEAM_COMPAT_INSTALL_PATH:-}/version.dll" 2>/dev/null || exec 5>&-
   gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}version=n,b"
   # dxgx.dll is DXVK's dxgi under a name the backend's dxgi=b does not cover.
   if [ "$backend" = dxvk ] && [ -f "$shim/dxgx.dll" ]; then
@@ -3250,7 +3248,7 @@ else
     __CF_USER_TEXT_ENCODING="$__CF_USER_TEXT_ENCODING" "$@" >> "$log" 2>&1 5>&- &
 fi
 open_pid=$!
-/usr/bin/caffeinate -d -i -w "$open_pid" >> "$log" 2>&1 &
+/usr/bin/caffeinate -d -i -w "$open_pid" >> "$log" 2>&1 5>&- &
 status=0
 wait "$open_pid" || status=$?
 # The game is done with the ROCKSTAR_SHIM version.dll; the teardown below can be slow.
