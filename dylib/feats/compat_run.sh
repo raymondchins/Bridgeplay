@@ -943,7 +943,14 @@ stage_rockstar_shim() {
           graphics_log "rockstar-shim: $dir has its own version.dll and a version.dll.bridgeplay-orig, both left alone"
           continue
         fi
-        if ! mv "$target" "$saved" 2>> "$log"; then
+        # The backup name is claimed with an exclusive create, so of two launches sharing
+        # this folder only one moves the file there.
+        if ! (set -C; : > "$saved") 2>/dev/null; then
+          graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
+          continue
+        fi
+        if ! mv -f "$target" "$saved" 2>> "$log"; then
+          rm -f "$saved"
           graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
           continue
         fi

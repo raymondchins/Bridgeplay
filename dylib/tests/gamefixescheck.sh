@@ -784,6 +784,16 @@ user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
 rockstar_launch run "$case_dir/game/game.exe"
 is "helpers (verb run) do not move the game's own version.dll" "a mod loader" "$(cat "$case_dir/game/version.dll")"
 
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+chmod 555 "$case_dir/game"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+chmod 755 "$case_dir/game"
+is "a folder the backup cannot go into keeps its own version.dll" "a mod loader|no" \
+	"$(cat "$case_dir/game/version.dll")|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+has "and says so" "could not set aside the version.dll in $case_dir/game, left alone" "$case_dir/log"
+
 echo "== ROCKSTAR_SHIM removes a copy another engine staged"
 rockstar_case
 printf 'MZ older build rockstar-shim: CEF browser composites in process\n' > "$social/version.dll"
