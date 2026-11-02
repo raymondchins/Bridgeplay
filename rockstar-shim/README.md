@@ -7,7 +7,9 @@ exe, never into `system32`, and the run script adds `version=n,b`. Every export 
 kernelbase/kernel32. `DllMain` acts in two processes and nowhere else.
 
 A `version.dll` already in either folder is moved to `version.dll.bridgeplay-orig` and put back
-when the key is off or the engine has no shim. The run script knows a staged copy, from this
+when the key is off or the engine has no shim. Several macOS users can share a game folder, so
+it gets `.bridgeplay-rockstar-shim.lock`, and each launch that stages the shim holds an
+`.inuse` file there until its launch ends; while one is held, the shim stays. The run script knows a staged copy, from this
 build or another engine's, by the `rockstar-shim: ` prefix of its log messages, so keep that
 string in every build.
 
