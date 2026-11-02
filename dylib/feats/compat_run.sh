@@ -916,15 +916,48 @@ rockstar_shim_copy() {
   cmp -s "$1" "$2" || LC_ALL=C grep -qaF 'rockstar-shim: ' "$2"
 }
 
-# Stages, removes or restores version.dll in Social Club and the game folder. The lock is per
-# macOS user, on the boot volume, so it works whatever volume the game is on.
+# A launch that stages the shim holds its macOS user's .inuse file in the game folder locked
+# until it ends, so a launch by another user sharing the folder can tell the shim is in use.
+rockstar_shim_in_use() {
+  for held in "$1"/.bridgeplay-rockstar-shim.*.inuse; do
+    [ -f "$held" ] && [ ! -L "$held" ] || continue
+    /usr/bin/lockf -k -s -t 0 "$held" true 2>/dev/null || return 0
+  done
+  return 1
+}
+
+# Stages, removes or restores version.dll in Social Club and the game folder. The first lock
+# is per macOS user. Several users can share the game folder, so it also gets a lock of its
+# own, taken only when the folder has something of the shim's in it.
 rockstar_shim_folders() {
   (
     exec 6>> "$np_support/.rockstar-shim.lock" && /usr/bin/lockf -s -t 30 6 || exit 1
-    for dir in "$social_club" "${STEAM_COMPAT_INSTALL_PATH:-}"; do
+    game=${STEAM_COMPAT_INSTALL_PATH:-}
+    lock="$game/.bridgeplay-rockstar-shim.lock"
+    if [ -z "$game" ] || [ ! -d "$game" ]; then
+      game=""
+    elif [ "$shim_wanted" = 1 ] || [ -e "$game/version.dll.bridgeplay-orig" ] \
+      || [ -L "$game/version.dll.bridgeplay-orig" ] || rockstar_shim_copy "$shim/version.dll" "$game/version.dll"; then
+      # Opened read-only, as another user may own the file. No `command exec`: after one,
+      # bash 3.2 spins forever on exit.
+      [ -e "$lock" ] || [ -L "$lock" ] || (: >> "$lock") 2>/dev/null || true
+      if ! { [ -f "$lock" ] && [ ! -L "$lock" ] && [ -r "$lock" ] && exec 7< "$lock" \
+        && /usr/bin/lockf -s -t 30 7; }; then
+        graphics_log "rockstar-shim: could not lock $game, left alone"
+        game=""
+      fi
+    else
+      game=""
+    fi
+    for dir in "$social_club" "$game"; do
       [ -n "$dir" ] && [ -d "$dir" ] || continue
       target="$dir/version.dll"
       saved="$dir/version.dll.bridgeplay-orig"
+      # A launch of an older build killed between claiming the backup name and the move
+      # left it empty, with the game's own file still in place.
+      if [ -f "$saved" ] && [ ! -L "$saved" ] && [ ! -s "$saved" ]; then
+        rm -f "$saved" 2>> "$log" && graphics_log "rockstar-shim: removed an empty version.dll.bridgeplay-orig from $dir"
+      fi
       if [ "$shim_wanted" = 1 ]; then
         moved=0
         if { [ -e "$target" ] || [ -L "$target" ]; } && ! rockstar_shim_copy "$shim/version.dll" "$target"; then
@@ -932,14 +965,9 @@ rockstar_shim_folders() {
             graphics_log "rockstar-shim: $dir has its own version.dll and a version.dll.bridgeplay-orig, both left alone"
             continue
           fi
-          # The backup name is claimed with an exclusive create, so of two macOS users'
-          # launches sharing this folder only one moves the file there.
-          if ! (set -C; : > "$saved") 2>/dev/null; then
-            graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
-            continue
-          fi
-          if ! mv -f "$target" "$saved" 2>> "$log"; then
-            rm -f "$saved"
+          # One rename, under the folder's lock: a killed launch leaves the file under one
+          # name or the other, never an empty backup.
+          if ! mv "$target" "$saved" 2>> "$log"; then
             graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
             continue
           fi
@@ -950,6 +978,10 @@ rockstar_shim_folders() {
           graphics_log "rockstar-shim: could not stage version.dll into $dir"
           [ "$moved" = 0 ] || mv "$saved" "$target" 2>> "$log" || true
         fi
+        continue
+      fi
+      if rockstar_shim_in_use "$dir"; then
+        graphics_log "rockstar-shim: another launch is using the version.dll in $dir, left alone"
         continue
       fi
       if rockstar_shim_copy "$shim/version.dll" "$target"; then
@@ -982,6 +1014,14 @@ stage_rockstar_shim() {
   elif [ "$gamefix_rockstar_shim" = 1 ]; then
     # Helpers (verb run) leave the game's files as they are.
     return 0
+  fi
+  # Held before staging, so no other launch can take the shim out between the two. A failed
+  # exec would end the launch, so the file is created in a subshell first.
+  inuse="${STEAM_COMPAT_INSTALL_PATH:-}/.bridgeplay-rockstar-shim.$(id -u).inuse"
+  if [ "$shim_wanted" = 1 ] && [ -d "${STEAM_COMPAT_INSTALL_PATH:-}" ] \
+    && ! { [ ! -L "$inuse" ] && (: >> "$inuse") 2>/dev/null && [ -f "$inuse" ] && [ ! -L "$inuse" ] \
+      && exec 5>> "$inuse" && /usr/bin/lockf -s -t 5 5; }; then
+    graphics_log "rockstar-shim: could not mark the game folder in use"
   fi
   # Launches that share a folder (two prefixes on one game) take turns, so one cannot undo
   # a move or a restore the other is making.
