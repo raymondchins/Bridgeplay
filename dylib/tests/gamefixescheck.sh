@@ -696,6 +696,9 @@ has "the fallback names the global layer" "BACKEND in the global conf, fell back
 # After a `command exec`, bash 3.2 (macOS /bin/sh) spins forever on exit.
 is "the run script never uses command exec" "0" \
 	"$(grep -v '^[[:space:]]*#' "$SRC" | grep -c 'command exec' || true)"
+# The game, its env -i start and caffeinate outlive staging; holding fd 5 they would keep the
+# ROCKSTAR_SHIM in-use mark after the run script ends.
+is "the game's launch does not inherit the in-use mark" "3" "$(grep -c '>> "$log" 2>&1 5>&- &$' "$SRC" || true)"
 
 echo "== ROCKSTAR_SHIM stages rockstar-shim/ next to Social Club and the game"
 rockstar_case() {
@@ -925,8 +928,8 @@ sleep 0.5
 user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
 rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
 wait "$holder"
-is "a mark a leftover process holds gets one of the launch's own" "no|1" \
-	"$(grep -qF 'could not mark the game folder in use' "$case_dir/log" && echo yes || echo no)|$(set -- "$(mark "$case_dir/data" | sed 's/\.inuse$//')"-*.inuse; [ -f "$1" ] && echo $# || echo 0)"
+is "a mark a leftover process holds sends the launch to a second one" "no|1" \
+	"$(grep -qF 'could not mark the game folder in use' "$case_dir/log" && echo yes || echo no)|$([ -f "$(mark "$case_dir/data" | sed 's/\.inuse$//')-2.inuse" ] && echo 1 || echo 0)"
 rockstar_case
 ln -s "$case_dir/outside-lock" "$case_dir/game/.bridgeplay-rockstar-shim.lock"
 ln -s "$case_dir/outside-mark" "$(mark "$case_dir/data")"

@@ -1050,13 +1050,10 @@ stage_rockstar_shim() {
   # two prefixes on one game each hold their own.
   if [ "$shim_wanted" = 1 ] && [ -d "${STEAM_COMPAT_INSTALL_PATH:-}" ]; then
     inuse="$STEAM_COMPAT_INSTALL_PATH/.bridgeplay-rockstar-shim.$(id -u)-$(printf '%s' "${STEAM_COMPAT_DATA_PATH:-}" | cksum | cut -d ' ' -f 1)"
-    # A mark the previous launch of this prefix still holds, while it shuts down, gets one of
-    # this launch's own, removed when it ends.
-    if rockstar_shim_lock_fd 5 "$inuse.inuse" && /usr/bin/lockf -s -t 1 5; then
-      :
-    elif rockstar_shim_lock_fd 5 "$inuse-$$.inuse" && /usr/bin/lockf -s -t 5 5; then
-      rockstar_shim_own_mark="$inuse-$$.inuse"
-    else
+    # A mark the previous launch of this prefix still holds while it shuts down sends this
+    # launch to a second one.
+    if ! { rockstar_shim_lock_fd 5 "$inuse.inuse" && /usr/bin/lockf -s -t 1 5; } \
+      && ! { rockstar_shim_lock_fd 5 "$inuse-2.inuse" && /usr/bin/lockf -s -t 5 5; }; then
       graphics_log "rockstar-shim: could not mark the game folder in use"
     fi
   fi
@@ -1069,9 +1066,9 @@ stage_rockstar_shim() {
     [ "$gamefix_rockstar_shim" != 1 ] || graphics_log "rockstar-shim: not in this engine, ROCKSTAR_SHIM=1 does nothing"
     return 0
   fi
-  # No shim in the game folder, nothing there for other launches to leave alone. A folder
-  # another launch is staging keeps the mark.
-  [ "$folders" = 3 ] || cmp -s "$shim/version.dll" "${STEAM_COMPAT_INSTALL_PATH:-}/version.dll" 2>/dev/null || exec 5>&-
+  # No shim of any build in the game folder, nothing there for other launches to leave
+  # alone. A folder another launch is staging keeps the mark.
+  [ "$folders" = 3 ] || rockstar_shim_copy "$shim/version.dll" "${STEAM_COMPAT_INSTALL_PATH:-}/version.dll" || exec 5>&-
   gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}version=n,b"
   # dxgx.dll is DXVK's dxgi under a name the backend's dxgi=b does not cover.
   if [ "$backend" = dxvk ] && [ -f "$shim/dxgx.dll" ]; then
@@ -3273,5 +3270,4 @@ kill_wine_prefix
 # After the teardown, so reading a long Wine log never holds the prefix up.
 exit_summary "$status" "$np_ran" "$np_terminated" "$loader_root/bridgeplay-wine.log" >> "$log" 2>&1 || true
 echo "=== wine prefix killed, session ending ===" >> "$log" 2>&1 || true
-[ -z "${rockstar_shim_own_mark:-}" ] || rm -f "$rockstar_shim_own_mark" 2>/dev/null || true
 exit $status
