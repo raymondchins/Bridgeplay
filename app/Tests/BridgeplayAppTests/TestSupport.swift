@@ -25,35 +25,38 @@ func isolatedValveDownloads(in work: URL) throws -> URL {
 // A UserDefaults that lives in a temporary folder, not in ~/Library/Preferences. Even after
 // removePersistentDomain, a named suite leaves its plist behind there, one file per test run.
 // The folder is deleted when the test process exits; ScratchDefaultsTests checks the location.
-// A suite name passed in must be unique: nothing clears the state an earlier test left under it.
-func scratchDefaults(suite name: String = scratchSuiteName()) -> UserDefaults {
+func scratchDefaults() -> UserDefaults {
+    scratchDefaultsAndPlist().defaults
+}
+
+// The same, with the path its plist will be written to.
+func scratchDefaultsAndPlist() -> (defaults: UserDefaults, plist: String) {
+    let name = ScratchDefaults.folder.appending(path: UUID().uuidString).path(percentEncoded: false)
     // An absolute path as the suite name keeps the plist at that path.
     guard let defaults = UserDefaults(suiteName: name) else {
         fatalError("UserDefaults refused the suite \(name)")
     }
-    return defaults
-}
-
-func scratchSuiteName() -> String {
-    ScratchDefaults.folder.appending(path: UUID().uuidString).path(percentEncoded: false)
+    return (defaults, name + ".plist")
 }
 
 enum ScratchDefaults {
     static let folder: URL = {
         let fm = FileManager.default
+        let url = URL.temporaryDirectory.appending(path: "np-defaults-\(UUID().uuidString)")
+        atexit { try? FileManager.default.removeItem(at: ScratchDefaults.folder) }
+
         // A run that crashed or was killed never reached the exit hook; clear what it left.
-        let stale = Date().addingTimeInterval(-24 * 3600)
+        // A week is far longer than any test run.
+        let stale = Date().addingTimeInterval(-7 * 24 * 3600)
         for old in (try? fm.contentsOfDirectory(
             at: URL.temporaryDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-        where old.lastPathComponent.hasPrefix("np-defaults-")
-            && ((try? old.resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? .distantFuture) < stale {
-            try? fm.removeItem(at: old)
+        where old.lastPathComponent.hasPrefix("np-defaults-") {
+            let modified = try? old.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+            if let modified, modified < stale { try? fm.removeItem(at: old) }
         }
-        let url = URL.temporaryDirectory.appending(path: "np-defaults-\(UUID().uuidString)")
-        do { try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true) }
-        catch { fatalError("Cannot create scratch defaults folder \(url.path): \(error)") }
-        atexit { try? FileManager.default.removeItem(at: ScratchDefaults.folder) }
+        do { try fm.createDirectory(at: url, withIntermediateDirectories: true) } catch {
+            fatalError("Cannot create scratch defaults folder \(url.path): \(error)")
+        }
         return url
     }()
 }
