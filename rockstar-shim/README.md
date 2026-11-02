@@ -1,12 +1,12 @@
 # rockstar-shim
 
-`version.dll` for the Rockstar Games Launcher and GTA V Legacy, staged by the run script when a
-game's conf says `ROCKSTAR_SHIM=1` (`gamefixes/271590.conf`). It goes next to
+`version.dll` for the Rockstar Games Launcher, GTA V Legacy and GTA San Andreas DE, staged by the
+run script when a game's conf says `ROCKSTAR_SHIM=1` (`gamefixes/271590.conf`, `gamefixes/1547000.conf`). It goes next to
 `SocialClubHelper.exe` (`C:\Program Files\Rockstar Games\Social Club`) and next to the game's
-exe, never into `system32`, and the run script adds `version=n,b`. Every export forwards to
-kernelbase/kernel32. `DllMain` acts in two processes and nowhere else.
+exe (for San Andreas, `Gameface/Binaries/Win64`), never into `system32`, and the run script adds `version=n,b`. Every export forwards to
+kernelbase/kernel32. `DllMain` acts in three processes (SocialClubHelper.exe, GTA5.exe, SanAndreas.exe) and nowhere else.
 
-A `version.dll` already in either folder is moved to `version.dll.bridgeplay-orig` and put back
+A `version.dll` already in any of these folders is moved to `version.dll.bridgeplay-orig` and put back
 when the key is off or the engine has no shim. The run script knows a staged copy, from this
 build or another engine's, by the `rockstar-shim: ` prefix of its log messages, so keep that
 string in every build.
@@ -34,7 +34,7 @@ The launcher starts CEF with the game folder as working directory. `SetDllDirect
 keeps a d3d11 or dxgi in that folder out of CEF's DLL search; without it CEF loaded one and
 timed out ("timed out loading both its online and offline content").
 
-## GTA5.exe: DXVK's dxgi
+## GTA5.exe and SanAndreas.exe: DXVK's dxgi
 
 On WineCX with D3DMetal enabled, the dxvk backend's `dxgi=b` gave GTA5.exe CrossOver's D3DMetal
 dxgi (a 16 MB `PE-Wine` module in `winedbg`'s `info share`, beside DXVK's d3d11 and the
@@ -44,7 +44,7 @@ adapter to DXVK's d3d11, which then calls `DXGIFactory::CreateSwapChain` in D3DM
 (`winedbg` backtrace). A global `dxgi=n,b` with DXVK's dxgi broke the launcher's CEF.
 
 The run script exports `NOTPROTON_ROCKSTAR_DXGI`, the Windows path of DXVK's dxgi shipped as
-`rockstar-shim/x86_64-windows/dxgx.dll` (another name, so `dxgi=b` does not apply). In GTA5.exe
+`rockstar-shim/x86_64-windows/dxgx.dll` (another name, so `dxgi=b` does not apply). In GTA5.exe and SanAndreas.exe
 the shim loads it and registers it as `dxgi.dll`: it renames `BaseDllName` and moves the entry's
 `HashLinks` to the bucket of the new name. The bucket array is private to ntdll; the shim finds
 it from the other modules' bucket heads and uses the hash variant (Windows 8+, 7, first letter)

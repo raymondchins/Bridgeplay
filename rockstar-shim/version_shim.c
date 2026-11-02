@@ -14,7 +14,8 @@
  *   CEF with the game folder as working directory; SetDllDirectoryW(L"") keeps a d3d11 or
  *   dxgi there out of CEF's DLL search.
  *
- * GTA5.exe on DXVK: the game makes its own DXGI factory and passes its adapter to d3d11.
+ * GTA5.exe and SanAndreas.exe on DXVK: the game makes its own DXGI factory and passes its
+ *   adapter to d3d11.
  *   On WineCX "dxgi.dll" is CrossOver's D3DMetal dxgi, whose CreateSwapChain fails for
  *   DXVK's device, and the game deadlocks in its exception handler. NOTPROTON_ROCKSTAR_DXGI
  *   names DXVK's dxgi under another file name (dxgx.dll, so the dxgi=b override does not
@@ -216,7 +217,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
         SetDllDirectoryW(L"");
         cef_browser_switches();
     }
-    else if (exe_is(L"GTA5.exe"))
+    else if (exe_is(L"GTA5.exe") || exe_is(L"SanAndreas.exe"))
         gta_dxvk_dxgi();
     return TRUE;
 }

@@ -234,7 +234,7 @@ enum FreeEngineWinecx {
         rockstar: [
             WinecxBundledFile(resource: "version-rockstar-shim", ext: "dll",
                               path: "lib/notproton-backends/rockstar-shim/x86_64-windows/version.dll",
-                              sha256: "deedb5d799330a3e274fe5cc7f569536280a2420543ef12145fcaa8fcbb7f6d4"),
+                              sha256: "0a6c9f2998d1ade94c8c4858e6f87fe5e718154f02352930da27d8d94ff9b502"),
             WinecxBundledFile(resource: "dxgi-dxvk-macos-1.10.3", ext: "dll",
                               path: "lib/notproton-backends/rockstar-shim/x86_64-windows/dxgx.dll",
                               sha256: "e74f5c985fe98f38f1a096258ef35d62e03a64df7096837965c7383e3cfe153d"),

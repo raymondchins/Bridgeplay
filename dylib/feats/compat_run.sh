@@ -916,12 +916,13 @@ rockstar_shim_copy() {
   cmp -s "$1" "$2" || LC_ALL=C grep -qaF 'rockstar-shim: ' "$2"
 }
 
-# Stages, removes or restores version.dll in Social Club and the game folder. The lock is per
+# Stages, removes or restores version.dll in Social Club and the game folder (and its Unreal exe folder). The lock is per
 # macOS user, on the boot volume, so it works whatever volume the game is on.
 rockstar_shim_folders() {
   (
     exec 6>> "$np_support/.rockstar-shim.lock" && /usr/bin/lockf -s -t 30 6 || exit 1
-    for dir in "$social_club" "${STEAM_COMPAT_INSTALL_PATH:-}"; do
+    # Unreal's exe (GTA San Andreas DE's SanAndreas.exe) is not in the game folder's root.
+    for dir in "$social_club" "${STEAM_COMPAT_INSTALL_PATH:-}" "${STEAM_COMPAT_INSTALL_PATH:+$STEAM_COMPAT_INSTALL_PATH/Gameface/Binaries/Win64}"; do
       [ -n "$dir" ] && [ -d "$dir" ] || continue
       target="$dir/version.dll"
       saved="$dir/version.dll.bridgeplay-orig"
@@ -969,7 +970,7 @@ rockstar_shim_folders() {
 
 # Rockstar Games Launcher and GTA V Legacy (ROCKSTAR_SHIM=1, rockstar-shim/): a version.dll
 # next to SocialClubHelper.exe makes the launcher's CEF windows draw on winemac, and the one
-# next to the game hands GTA5.exe DXVK's dxgi on the dxvk backend. The game folder only ever
+# next to the game hands GTA5.exe and SanAndreas.exe DXVK's dxgi on the dxvk backend. The game folders only ever
 # gets version.dll. A version.dll of the game's own (a mod loader) is moved to
 # version.dll.bridgeplay-orig first. Without the key, or on an engine without the shim, the
 # staged copy is removed and that file put back.
@@ -995,7 +996,7 @@ stage_rockstar_shim() {
   if [ "$backend" = dxvk ] && [ -f "$shim/dxgx.dll" ]; then
     NOTPROTON_ROCKSTAR_DXGI="Z:$(printf '%s' "$shim/dxgx.dll" | tr / '\134')"
     export NOTPROTON_ROCKSTAR_DXGI
-    graphics_log "rockstar-shim: GTA5.exe gets DXVK's dxgi"
+    graphics_log "rockstar-shim: GTA5.exe and SanAndreas.exe get DXVK's dxgi"
   fi
 }
 

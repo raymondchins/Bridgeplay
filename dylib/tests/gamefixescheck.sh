@@ -841,6 +841,49 @@ user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
 rockstar_launch run "$case_dir/game/game.exe"
 is "helpers (verb run) stage nothing" "no" "$([ -e "$social/version.dll" ] && echo yes || echo no)"
 
+# Unreal's exe is in Gameface/Binaries/Win64 (GTA San Andreas DE's SanAndreas.exe).
+rockstar_case
+mkdir -p "$case_dir/game/Gameface/Binaries/Win64"
+win64="$case_dir/game/Gameface/Binaries/Win64"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "version.dll is staged next to an Unreal game's exe" "yes" \
+	"$(cmp -s "$shim_src/version.dll" "$win64/version.dll" && echo yes || echo no)"
+is "an Unreal game's exe gets no dxgx.dll beside it" "no" "$([ -e "$win64/dxgx.dll" ] && echo yes || echo no)"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "without the key the copy leaves the Unreal folder" "no" "$([ -e "$win64/version.dll" ] && echo yes || echo no)"
+
+# A mod loader's version.dll in the Unreal folder is backed up, then put back.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'a mod loader' > "$win64/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "the Unreal folder's own version.dll is backed up and the shim staged" "yes|a mod loader" \
+	"$(cmp -s "$shim_src/version.dll" "$win64/version.dll" && echo yes || echo no)|$(cat "$win64/version.dll.bridgeplay-orig" 2>/dev/null)"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "without the key the Unreal folder's own version.dll is put back" "a mod loader|no" \
+	"$(cat "$win64/version.dll" 2>/dev/null)|$([ -e "$win64/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
+# The shipped San Andreas conf, as it is, with the game's real exe path.
+sa_conf="$(dirname "$SRC")/../../gamefixes/1547000.conf"
+if [ -f "$sa_conf" ]; then
+	rockstar_case
+	mkdir -p "$case_dir/game/Gameface/Binaries/Win64"
+	cp "$sa_conf" "$case_dir/support/gamefixes-default/4242.conf"
+	rockstar_launch waitforexitandrun "$case_dir/game/Gameface/Binaries/Win64/SanAndreas.exe"
+	is "gamefixes/1547000.conf selects dxvk" "dxvk" "$(got backend)"
+	is "gamefixes/1547000.conf stages the shim next to SanAndreas.exe" "yes" \
+		"$(cmp -s "$shim_src/version.dll" "$case_dir/game/Gameface/Binaries/Win64/version.dll" && echo yes || echo no)"
+	is "gamefixes/1547000.conf stages the shim next to Social Club" "yes" \
+		"$(cmp -s "$shim_src/version.dll" "$social/version.dll" && echo yes || echo no)"
+	case "$(got NOTPROTON_ROCKSTAR_DXGI)" in "Z:\\"*dxgx.dll) v=yes ;; *) v=no ;; esac
+	is "gamefixes/1547000.conf hands SanAndreas.exe DXVK's dxgi" "yes" "$v"
+fi
+
 new_case
 full_engine
 user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'

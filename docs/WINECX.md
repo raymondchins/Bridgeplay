@@ -449,7 +449,7 @@ rebuilt Mach-O file needs its line there updated too; `SignedPinTests` fails unt
 | `d3dx11_43-winecx-11.17-i386.dll` | `d3dx11-patch/` | `dd4dd351f2a5880c9848d5ccf4944a0b5e7622bb7fb196544115b1f9c92d749c` | `FreeEngineWinecx.v1117.d3dx` |
 | `d3dx11_42-winecx-11.17.dll` | `d3dx11-patch/` | `3d97e1de9000a78e27eb5c90d0ab9b36d54fd350760063da27226d22c90c8e1b` | `FreeEngineWinecx.v1117.d3dx` |
 | `d3dx11_42-winecx-11.17-i386.dll` | `d3dx11-patch/` | `85075f8b4f30f1a993238a0d6ab772a3a3df6c031e87ee9401c4367a527cd57c` | `FreeEngineWinecx.v1117.d3dx` |
-| `version-rockstar-shim.dll` | `rockstar-shim/` | `deedb5d799330a3e274fe5cc7f569536280a2420543ef12145fcaa8fcbb7f6d4` | `FreeEngineWinecx.v1117.rockstar` |
+| `version-rockstar-shim.dll` | `rockstar-shim/` | `0a6c9f2998d1ade94c8c4858e6f87fe5e718154f02352930da27d8d94ff9b502` | `FreeEngineWinecx.v1117.rockstar` |
 | `dxgi-dxvk-macos-1.10.3.dll` | DXVK-macOS v1.10.3-20230507 `x64/dxgi.dll`, unmodified | `e74f5c985fe98f38f1a096258ef35d62e03a64df7096837965c7383e3cfe153d` | `FreeEngineWinecx.v1117.rockstar` |
 | `winemac-winecx-11.17.so` | `winemac-patch/winecx-11.17-d3dmetal-retina.patch` | `aa192f846ad15d56de200fc92752eaf2d455700846ae2cf1ccc7b27b535f1c00` | `FreeEngineWinecx.v1117.macDriver` |
 | `winebus-winecx-11.17.so` | Controllers (SDL2 build) | `6223c035c824c90708abbc3e733f8d1d6ed6b8b4e9a3e1a5c813493ceba50473` | `FreeEngineWinecx.v1117.gamepad` |
