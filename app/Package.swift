@@ -65,6 +65,8 @@ let package = Package(
                 .copy("Resources/d3dx11_43-winecx-11.17-i386.dll"),
                 .copy("Resources/d3dx11_42-winecx-11.17.dll"),
                 .copy("Resources/d3dx11_42-winecx-11.17-i386.dll"),
+                .copy("Resources/version-rockstar-shim.dll"),
+                .copy("Resources/dxgi-dxvk-macos-1.10.3.dll"),
                 .copy("Resources/libSDL2-2.0.0.dylib"),
                 .copy("Resources/detour2-41073.bin"),
                 .copy("Resources/detour32-41073.bin"),

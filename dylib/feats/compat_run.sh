@@ -384,6 +384,7 @@ gamefix_msync=""
 gamefix_nvapi=""
 gamefix_dlss_fg=""
 gamefix_args=""
+gamefix_rockstar_shim=""
 
 gamefix_log() {
   echo "gamefix: $*" >> "$log" 2>&1 || true
@@ -414,7 +415,7 @@ gamefix_reason() {
   case "$1" in
     BACKEND)
       case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
-    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK)
+    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK|ROCKSTAR_SHIM)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     FRAMEGEN)
       # 1 is the 2x of the first release.
@@ -504,6 +505,7 @@ load_gamefixes() {
       MSYNC) gamefix_msync=$value; gamefix_log "MSYNC=$value from the $from conf" ;;
       NVAPI) gamefix_nvapi=$value; gamefix_log "NVAPI=$value from the $from conf" ;;
       DLSS_FG) gamefix_dlss_fg=$value; gamefix_log "DLSS_FG=$value from the $from conf" ;;
+      ROCKSTAR_SHIM) gamefix_rockstar_shim=$value; gamefix_log "ROCKSTAR_SHIM=$value from the $from conf" ;;
       STDOUT_NULL) gamefix_apply_env NOTPROTON_STDOUT_NULL "$value" "$from" ;;
       VSYNC) gamefix_apply_env NOTPROTON_VSYNC "$value" "$from" ;;
       HIDE_WINE_EXPORTS) gamefix_apply_env NOTPROTON_HIDE_WINE_EXPORTS "$value" "$from" ;;
@@ -583,8 +585,9 @@ managed_dlls() {
     printf '%s\n' dxgi d3d11 d3d10core
     ! d3dmetal_engine || printf '%s\n' d3d10 d3d12
     for dir in "$backend_root"/*/x86_64-windows "$backend_root"/*/i386-windows; do
-      # nvapi-shim is not a Direct3D backend; its nvapi64 is handled with NVAPI below.
-      case "$dir" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*) continue ;; esac
+      # nvapi-shim and rockstar-shim are not Direct3D backends; their DLLs are handled with
+      # NVAPI and ROCKSTAR_SHIM below.
+      case "$dir" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*|"$backend_root"/rockstar-shim/*) continue ;; esac
       [ ! -d "$dir" ] || backend_dlls "$dir"
     done
   } | sort -u
@@ -790,7 +793,7 @@ restore_stock_dll() {
   [ -f "$stock" ] && [ ! -L "$stock" ] || return 0
   ! cmp -s "$stock" "$3" || return 0
   for theirs in "$backend_root"/*/"$1"/*.[dD][lL][lL]; do
-    case "$theirs" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*) continue ;; esac
+    case "$theirs" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*|"$backend_root"/rockstar-shim/*) continue ;; esac
     [ -f "$theirs" ] || continue
     base=${theirs##*/}
     [ "$(printf '%s' "${base%.*}" | tr '[:upper:]' '[:lower:]')" = "$2" ] || continue
@@ -903,6 +906,77 @@ activate_backend() {
       graphics_log "CX_GRAPHICS_BACKEND=$CX_GRAPHICS_BACKEND replaced by d3dmetal"
     fi
     export CX_GRAPHICS_BACKEND=d3dmetal
+  fi
+}
+
+# A copy some launch staged, from this engine's shim or another engine's build: every build
+# carries the "rockstar-shim: " log prefix, which no other version.dll has.
+rockstar_shim_copy() {
+  [ -f "$2" ] && [ ! -L "$2" ] || return 1
+  cmp -s "$1" "$2" || LC_ALL=C grep -qaF 'rockstar-shim: ' "$2"
+}
+
+# Rockstar Games Launcher and GTA V Legacy (ROCKSTAR_SHIM=1, rockstar-shim/): a version.dll
+# next to SocialClubHelper.exe makes the launcher's CEF windows draw on winemac, and the one
+# next to the game hands GTA5.exe DXVK's dxgi on the dxvk backend. The game folder only ever
+# gets version.dll. A version.dll of the game's own (a mod loader) is moved to
+# version.dll.bridgeplay-orig first. Without the key, or on an engine without the shim, the
+# staged copy is removed and that file put back.
+stage_rockstar_shim() {
+  shim="$backend_root/rockstar-shim/x86_64-windows"
+  social_club="$WINEPREFIX/drive_c/Program Files/Rockstar Games/Social Club"
+  shim_wanted=0
+  if [ "$gamefix_rockstar_shim" = 1 ] && [ "$verb" = waitforexitandrun ]; then
+    [ ! -f "$shim/version.dll" ] || shim_wanted=1
+  elif [ "$gamefix_rockstar_shim" = 1 ]; then
+    # Helpers (verb run) leave the game's files as they are.
+    return 0
+  fi
+  for dir in "$social_club" "${STEAM_COMPAT_INSTALL_PATH:-}"; do
+    [ -n "$dir" ] && [ -d "$dir" ] || continue
+    target="$dir/version.dll"
+    saved="$dir/version.dll.bridgeplay-orig"
+    if [ "$shim_wanted" = 1 ]; then
+      moved=0
+      if { [ -e "$target" ] || [ -L "$target" ]; } && ! rockstar_shim_copy "$shim/version.dll" "$target"; then
+        if [ -e "$saved" ] || [ -L "$saved" ]; then
+          graphics_log "rockstar-shim: $dir has its own version.dll and a version.dll.bridgeplay-orig, both left alone"
+          continue
+        fi
+        if ! mv "$target" "$saved" 2>> "$log"; then
+          graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
+          continue
+        fi
+        moved=1
+        graphics_log "rockstar-shim: moved the version.dll in $dir to version.dll.bridgeplay-orig"
+      fi
+      if ! stage_backend_file "$shim/version.dll" "$target"; then
+        graphics_log "rockstar-shim: could not stage version.dll into $dir"
+        [ "$moved" = 0 ] || mv "$saved" "$target" 2>> "$log" || true
+      fi
+      continue
+    fi
+    if rockstar_shim_copy "$shim/version.dll" "$target"; then
+      rm -f "$target" 2>> "$log" && graphics_log "rockstar-shim: removed version.dll from $dir"
+    fi
+    if [ -e "$saved" ] || [ -L "$saved" ]; then
+      if [ -e "$target" ] || [ -L "$target" ]; then
+        graphics_log "rockstar-shim: $dir has a new version.dll, version.dll.bridgeplay-orig left alone"
+      elif mv "$saved" "$target" 2>> "$log"; then
+        graphics_log "rockstar-shim: put the version.dll in $dir back"
+      fi
+    fi
+  done
+  if [ "$shim_wanted" = 0 ]; then
+    [ "$gamefix_rockstar_shim" != 1 ] || graphics_log "rockstar-shim: not in this engine, ROCKSTAR_SHIM=1 does nothing"
+    return 0
+  fi
+  gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}version=n,b"
+  # dxgx.dll is DXVK's dxgi under a name the backend's dxgi=b does not cover.
+  if [ "$backend" = dxvk ] && [ -f "$shim/dxgx.dll" ]; then
+    NOTPROTON_ROCKSTAR_DXGI="Z:$(printf '%s' "$shim/dxgx.dll" | tr / '\134')"
+    export NOTPROTON_ROCKSTAR_DXGI
+    graphics_log "rockstar-shim: GTA5.exe gets DXVK's dxgi"
   fi
 }
 
@@ -2539,6 +2613,7 @@ stage_step="graphics backend"
 select_backend "$1"
 activate_backend || true
 record_backend || true
+stage_rockstar_shim || true
 # An engine without lib/notproton-backends (CrossOver) picks its graphics itself, from
 # CX_GRAPHICS_BACKEND, so the log names that choice, not the dxmt-builtin placeholder.
 if [ "$backend" = dxmt-builtin ]; then
@@ -3006,7 +3081,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | LC_ALL=C sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|FEX_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|NOTPROTON_HIDE_WINE_EXPORTS|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
+for name in $(env | LC_ALL=C sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|FEX_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|NOTPROTON_HIDE_WINE_EXPORTS|NOTPROTON_ROCKSTAR_DXGI|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"

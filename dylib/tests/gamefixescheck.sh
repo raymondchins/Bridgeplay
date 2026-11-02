@@ -8,7 +8,7 @@ functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
 	load_gamefixes resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available \
 	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
-	activate_backend record_backend compose_dll_overrides; do
+	activate_backend record_backend rockstar_shim_copy stage_rockstar_shim compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -103,7 +103,7 @@ launch() {
 		sh -ec '
 			eval "$public_names"
 			eval "$functions"
-			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_nvapi="" gamefix_dlss_fg="" gamefix_args=""
+			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_nvapi="" gamefix_dlss_fg="" gamefix_args="" gamefix_rockstar_shim=""
 			backend_root="$CX_ROOT/lib/notproton-backends"
 			load_gamefixes || true
 			resolve_msync
@@ -111,12 +111,13 @@ launch() {
 			select_backend "$1"
 			activate_backend || true
 			record_backend || true
+			stage_rockstar_shim || true
 			graphics_log "backend=$backend ($backend_from)"
 			compose_dll_overrides
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
 				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE CX_GRAPHICS_BACKEND \
-				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
+				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS NOTPROTON_ROCKSTAR_DXGI CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
 		' launch "$target" > "$case_dir/out" 2>&1 || bad "the launch sequence ran to the end" "exit 0" "exit $? $(tail -1 "$case_dir/out")"
@@ -691,6 +692,138 @@ user_global_conf 'BACKEND=d3dmetal'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a global d3dmetal on an engine without it falls back" "dxmt" "$(got backend)"
 has "the fallback names the global layer" "BACKEND in the global conf, fell back from d3dmetal" "$case_dir/log"
+
+echo "== ROCKSTAR_SHIM stages rockstar-shim/ next to Social Club and the game"
+rockstar_case() {
+	new_case
+	full_engine
+	engine rockstar-shim/x86_64-windows/version.dll rockstar-shim/x86_64-windows/dxgx.dll
+	mkdir -p "$case_dir/data/pfx/drive_c/Program Files/Rockstar Games/Social Club"
+	shim_src="$case_dir/engine/lib/notproton-backends/rockstar-shim/x86_64-windows"
+	# Every build carries its log prefix, which is how a copy from another engine is known.
+	printf 'MZ this build rockstar-shim: DXVK dxgi is dxgi.dll\n' > "$shim_src/version.dll"
+	social="$case_dir/data/pfx/drive_c/Program Files/Rockstar Games/Social Club"
+}
+# The run script reads the game folder from STEAM_COMPAT_INSTALL_PATH.
+rockstar_launch() {
+	launch "$@" STEAM_COMPAT_INSTALL_PATH="$case_dir/game"
+}
+rockstar_case
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "version.dll is staged next to SocialClubHelper.exe" "yes" \
+	"$(cmp -s "$shim_src/version.dll" "$social/version.dll" && echo yes || echo no)"
+is "version.dll is staged next to the game" "yes" \
+	"$(cmp -s "$shim_src/version.dll" "$case_dir/game/version.dll" && echo yes || echo no)"
+is "only version.dll goes into the game folder" "no" "$([ -e "$case_dir/game/dxgx.dll" ] && echo yes || echo no)"
+case "$(got WINEDLLOVERRIDES)" in *';version=n,b'*) v=yes ;; *) v=no ;; esac
+is "version=n,b is added to the overrides" "yes" "$v"
+case "$(got WINEDLLOVERRIDES)" in *dxgx*|*'version=b'*) v=yes ;; *) v=no ;; esac
+is "rockstar-shim's DLLs are not treated as backend DLLs" "no" "$v"
+case "$(got NOTPROTON_ROCKSTAR_DXGI)" in "Z:\\"*"\\rockstar-shim\\x86_64-windows\\dxgx.dll") v=yes ;; *) v=no ;; esac
+is "on dxvk GTA5.exe is pointed at DXVK's dxgi" "yes" "$v"
+is "system32 gets no version.dll" "no" "$([ -e "$case_dir/data/pfx/drive_c/windows/system32/version.dll" ] && echo yes || echo no)"
+
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "without the key the staged copy leaves Social Club" "no" "$([ -e "$social/version.dll" ] && echo yes || echo no)"
+is "without the key the staged copy leaves the game folder" "no" "$([ -e "$case_dir/game/version.dll" ] && echo yes || echo no)"
+case "$(got WINEDLLOVERRIDES)" in *version=*) v=yes ;; *) v=no ;; esac
+is "without the key version is not overridden" "no" "$v"
+
+is "no backup is made when the game had no version.dll" "no" \
+	"$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
+rockstar_case
+printf 'a game of its own\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "a version.dll that is not the shim is left alone" "a game of its own" "$(cat "$case_dir/game/version.dll")"
+
+echo "== ROCKSTAR_SHIM keeps a version.dll the game already had"
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "the game's own version.dll is set aside" "a mod loader" "$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+is "and the shim takes its place" "yes" \
+	"$(cmp -s "$shim_src/version.dll" "$case_dir/game/version.dll" && echo yes || echo no)"
+has "the move is logged" "moved the version.dll in $case_dir/game to version.dll.bridgeplay-orig" "$case_dir/log"
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "a second launch keeps the backup" "a mod loader" "$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "without the key the game's own version.dll is back" "a mod loader" "$(cat "$case_dir/game/version.dll")"
+is "and the backup is gone" "no" "$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+rm -rf "$case_dir/engine/lib/notproton-backends/rockstar-shim"
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "on an engine without the shim the game's own version.dll is back" "a mod loader" "$(cat "$case_dir/game/version.dll")"
+is "and the backup is gone too" "no" "$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+printf 'a newer mod loader\n' > "$case_dir/game/version.dll"
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "a version.dll put in after the backup is not replaced" "a newer mod loader" "$(cat "$case_dir/game/version.dll")"
+is "nor is the backup" "a mod loader" "$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "without the key both stay" "a newer mod loader|a mod loader" \
+	"$(cat "$case_dir/game/version.dll")|$(cat "$case_dir/game/version.dll.bridgeplay-orig" 2>/dev/null)"
+
+rockstar_case
+printf 'a mod loader\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch run "$case_dir/game/game.exe"
+is "helpers (verb run) do not move the game's own version.dll" "a mod loader" "$(cat "$case_dir/game/version.dll")"
+
+echo "== ROCKSTAR_SHIM removes a copy another engine staged"
+rockstar_case
+printf 'MZ older build rockstar-shim: CEF browser composites in process\n' > "$social/version.dll"
+cp "$social/version.dll" "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "an older shim build is updated, not backed up" "yes|no" \
+	"$(cmp -s "$shim_src/version.dll" "$case_dir/game/version.dll" && echo yes || echo no)|$([ -e "$case_dir/game/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+rockstar_case
+printf 'MZ older build rockstar-shim: CEF browser composites in process\n' > "$social/version.dll"
+cp "$social/version.dll" "$case_dir/game/version.dll"
+rm -rf "$case_dir/engine/lib/notproton-backends/rockstar-shim"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "an engine without the shim removes the copy in Social Club" "no" "$([ -e "$social/version.dll" ] && echo yes || echo no)"
+is "and the copy in the game folder" "no" "$([ -e "$case_dir/game/version.dll" ] && echo yes || echo no)"
+rockstar_case
+printf 'MZ older build rockstar-shim: CEF browser composites in process\n' > "$case_dir/game/version.dll"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "without the key an older shim build is removed" "no" "$([ -e "$case_dir/game/version.dll" ] && echo yes || echo no)"
+
+rockstar_case
+user_conf 'BACKEND=dxmt' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+is "off dxvk there is no DXVK dxgi to hand over" "<unset>" "$(got NOTPROTON_ROCKSTAR_DXGI)"
+is "off dxvk the CEF fix is still staged" "yes" "$([ -e "$social/version.dll" ] && echo yes || echo no)"
+
+rockstar_case
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch run "$case_dir/game/game.exe"
+is "helpers (verb run) stage nothing" "no" "$([ -e "$social/version.dll" ] && echo yes || echo no)"
+
+new_case
+full_engine
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
+has "an engine without rockstar-shim says so" "rockstar-shim: not in this engine" "$case_dir/log"
+case "$(got WINEDLLOVERRIDES)" in *version=*) v=yes ;; *) v=no ;; esac
+is "and adds no override" "no" "$v"
 
 if [ "$fails" -eq 0 ]; then
 	echo "==> gamefixescheck: all assertions hold"
