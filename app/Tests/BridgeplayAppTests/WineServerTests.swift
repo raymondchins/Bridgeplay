@@ -48,4 +48,28 @@ struct WineServerTests {
         let seen = try sees(serverNamed: name)
         #expect(seen == false)
     }
+
+    // The names come from PrefixTools.layout (and compat_run.sh). A server it can pick that the
+    // pattern misses would put the bug back, so every layout's server has to match.
+    @Test("Every server PrefixTools can pick matches the pattern",
+          arguments: [
+            (["lib/wine/aarch64-unix/wine.app/Contents/MacOS/wine", "bin/wineserver-arm64"], CompatTool.Flavor.fex),
+            (["lib/wine/x86_64-unix/wine", "bin/wineserver"], .rosetta),
+            (["lib/wine/x86_64-unix/wine", "bin/wineserver-x86"], .rosetta),
+          ])
+    func everyLayoutServerMatches(files: [String], flavor: CompatTool.Flavor) throws {
+        let fm = FileManager.default
+        let runner = fm.temporaryDirectory.appending(path: "np-server-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: runner) }
+        for path in files {
+            let file = runner.appending(path: path)
+            try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data().write(to: file)
+            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path(percentEncoded: false))
+        }
+
+        let name = PrefixTools.layout(runner: runner, flavor: flavor).server.lastPathComponent
+        let regex = try NSRegularExpression(pattern: "^(\(WineServer.processPattern))$")
+        #expect(regex.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil, "\(name)")
+    }
 }
