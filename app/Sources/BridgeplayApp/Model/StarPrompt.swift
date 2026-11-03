@@ -24,15 +24,14 @@ final class StarPrompt {
     // On screen this run.
     private(set) var shown = false
     private var checking = false
+    // Later, or the window closed: nothing brings the card back this run.
+    private var laterThisRun = false
     private let defaults: UserDefaults
     private let opener: (URL) -> Void
     private let gameRunning: () async -> Bool
 
-    // The arm64 engine's server is wineserver-arm64, Rosetta's wineserver or wineserver-x86.
     init(defaults: UserDefaults = .standard, opener: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) },
-         gameRunning: @escaping () async -> Bool = {
-             await Task.detached(priority: .utility) { Shell.processIsRunning(named: "wineserver(-arm64|-x86)?") }.value
-         }) {
+         gameRunning: @escaping () async -> Bool = { await RestartGuard.gameRunning() }) {
         self.defaults = defaults
         self.opener = opener
         self.gameRunning = gameRunning
@@ -53,12 +52,18 @@ final class StarPrompt {
         }
     }
 
-    // When the app comes forward. A game started while the card waited takes it back.
+    // When the app comes forward. A game started since takes the card back, even one already
+    // on screen, which then stays away for this run without counting as another showing.
     func check() async {
-        guard due, !checking else { return }
+        guard due || pending, !laterThisRun, !checking else { return }
         checking = true
         defer { checking = false }
-        pending = await !gameRunning()
+        let running = await gameRunning()
+        if running {
+            pending = false
+        } else if due, !laterThisRun {
+            pending = true
+        }
     }
 
     // A showing counts once the card is on screen, so closing the window or quitting is a
@@ -75,7 +80,10 @@ final class StarPrompt {
         never()
     }
 
-    func later() { pending = false }
+    func later() {
+        pending = false
+        laterThisRun = true
+    }
 
     func never() {
         defaults.set(true, forKey: Self.doneKey)

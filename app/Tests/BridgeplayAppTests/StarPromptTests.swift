@@ -7,11 +7,8 @@ import Testing
 @Suite("GitHub star prompt")
 struct StarPromptTests {
 
-    // One domain per test, emptied first: macOS keeps a file for every domain name used.
-    private func defaults(launches: Int = 0, test: String = #function) -> UserDefaults {
-        let name = "StarPromptTests.\(test.prefix { $0 != "(" })"
-        let defaults = UserDefaults(suiteName: name)!
-        defaults.removePersistentDomain(forName: name)
+    private func defaults(launches: Int = 0) -> UserDefaults {
+        let defaults = scratchDefaults()
         for _ in 0..<launches { StarPrompt.countLaunch(in: defaults) }
         return defaults
     }
@@ -36,9 +33,12 @@ struct StarPromptTests {
         #expect(prompt.due)
         await Self.show(prompt)
         #expect(prompt.pending)
-        prompt.later()
+        prompt.later()  // also what closing the window does
         StarPrompt.countLaunch(in: defaults)
         #expect(!prompt.due)
+        await prompt.check()
+        #expect(!prompt.pending)
+        #expect(defaults.integer(forKey: "StarPromptShown") == 1 && defaults.integer(forKey: "StarPromptShownAt") == 3)
     }
 
     @Test("Later, or closing it any other way, shows it once more five launches on, then never")
@@ -94,6 +94,38 @@ struct StarPromptTests {
         await prompt.check()
         #expect(!prompt.pending)
         prompt.appeared()
+        #expect(defaults.integer(forKey: "StarPromptShown") == 0)
+    }
+
+    @Test("A card on screen is taken back when a game starts, without another showing")
+    func shownThenGame() async {
+        let defaults = defaults(launches: 3)
+        var running = false
+        let prompt = StarPrompt(defaults: defaults, opener: { _ in }, gameRunning: { running })
+        await Self.show(prompt)
+        running = true
+        await prompt.check()
+        #expect(!prompt.pending)
+        running = false
+        await prompt.check()
+        #expect(!prompt.pending)
+        #expect(defaults.integer(forKey: "StarPromptShown") == 1)
+    }
+
+    @Test("Closing the window during a check, or before the card was seen, keeps it away this run")
+    func closedDuringCheck() async {
+        let defaults = defaults(launches: 3)
+        let prompt = StarPrompt(defaults: defaults, opener: { _ in }, gameRunning: {
+            try? await Task.sleep(for: .milliseconds(100))
+            return false
+        })
+        let checking = Task { await prompt.check() }
+        try? await Task.sleep(for: .milliseconds(20))
+        prompt.later()
+        await checking.value
+        #expect(!prompt.pending)
+        await prompt.check()
+        #expect(!prompt.pending)
         #expect(defaults.integer(forKey: "StarPromptShown") == 0)
     }
 

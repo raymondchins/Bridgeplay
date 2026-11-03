@@ -141,6 +141,8 @@ struct RootView: View {
         .font(BP.sans(13))
         .tint(BP.blue)
         .preferredColorScheme(.dark)
+        // The window closed: a Later for the star card, which stays away this run.
+        .onDisappear { StarPrompt.shared.later() }
     }
 
     private var credits: some View {
