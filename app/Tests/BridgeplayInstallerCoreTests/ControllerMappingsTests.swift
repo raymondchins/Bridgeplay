@@ -20,6 +20,11 @@ struct ControllerMappingsTests {
         #expect(ControllerMappings.additions(to: mine, shipped: shipped) == "\n# about C\ncccc,Pad C,a:b2\n")
     }
 
+    @Test("A CRLF-terminated file gets no extra blank line, and a GUID in another case is the same pad")
+    func crlfAndCase() {
+        #expect(ControllerMappings.additions(to: "AAAA,Mine,a:b9\r\nBBBB,Mine,a:b9\r\n", shipped: shipped) == "# about C\ncccc,Pad C,a:b2\n")
+    }
+
     @Test("Running it again changes nothing")
     func idempotent() throws {
         let mine = "zzzz,Mine,a:b3\n"

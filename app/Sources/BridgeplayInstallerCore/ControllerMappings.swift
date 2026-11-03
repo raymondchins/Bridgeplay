@@ -8,7 +8,7 @@ public enum ControllerMappings {
     public static func additions(to existing: String, shipped: String) -> String? {
         func guid(_ line: Substring) -> String? {
             let line = line.trimmingCharacters(in: .whitespaces)
-            return line.isEmpty || line.hasPrefix("#") ? nil : String(line.prefix { $0 != "," })
+            return line.isEmpty || line.hasPrefix("#") ? nil : String(line.prefix { $0 != "," }).lowercased()
         }
         let have = Set(existing.split(whereSeparator: \.isNewline).compactMap(guid))
         let haveComments = Set(existing.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) })
@@ -25,7 +25,7 @@ public enum ControllerMappings {
             }
         }
         guard !added.isEmpty else { return nil }
-        let separator = existing.isEmpty || existing.hasSuffix("\n") ? "" : "\n"
+        let separator = existing.isEmpty || existing.utf8.last == 0x0A ? "" : "\n"
         return separator + added.joined(separator: "\n") + "\n"
     }
 

@@ -38,10 +38,10 @@ merge_mappings() {
     local add
     add=$(awk -F, '
         { sub(/\r$/, ""); sub(/^[[:space:]]+/, "") }
-        FILENAME == ARGV[1] { if (/^#/) have_c[$0] = 1; else if ($0 != "") have[$1] = 1; next }
+        FILENAME == ARGV[1] { if (/^#/) have_c[$0] = 1; else if ($0 != "") have[tolower($1)] = 1; next }
         $0 == "" { n = 0; next }
         /^#/ { c[++n] = $0; next }
-        { if (!($1 in have)) { have[$1] = 1; for (i = 1; i <= n; i++) if (!(c[i] in have_c)) print c[i]; print }
+        { if (!(tolower($1) in have)) { have[tolower($1)] = 1; for (i = 1; i <= n; i++) if (!(c[i] in have_c)) print c[i]; print }
           n = 0 }
     ' "$2" "$1") || return 1
     [ -z "$add" ] && return 0

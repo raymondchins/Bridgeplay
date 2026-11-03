@@ -20,6 +20,7 @@ here="$work/here"
 support="$work/support"
 mkdir -p "$here/config" "$support"
 die() { echo "die: $*" >&2; exit 1; }
+say() { echo "say: $*" >&2; }
 # shellcheck disable=SC1091 # block.sh is cut out of Install.command above
 run() { . "$work/block.sh"; }
 
@@ -48,6 +49,11 @@ is "edited lines and own lines stay, only missing GUIDs are added" "$(printf '%s
 before=$(cat "$mine")
 run
 is "running twice changes nothing after an edit" "$before" "$(cat "$mine")"
+
+# a GUID in another case is the same pad
+printf '%s,Pad A,a:b0\n' "$(printf '%s' "$g1" | tr a-f A-F)" >"$mine"
+run
+is "GUIDs match in any case" "$(printf '%s,Pad A,a:b0' "$(printf '%s' "$g1" | tr a-f A-F)")" "$(grep -i "^$g1" "$mine" | tr -d '\n')"
 
 [ "$failed" = 0 ] || exit 1
 echo "mappingscheck: ok"
