@@ -598,11 +598,17 @@ enum FreeEngineWinecx {
             actual = try Digest.sha256(of: source)
         } catch {
             AppLog.note("bundled file: \(name) at \(path) can't be read: \(error.localizedDescription)")
-            throw StepFailure(step: step, detail: "Bridgeplay can't read its \(name). Reinstall Bridgeplay.")
+            throw StepFailure(step: step, detail: String(localized: """
+                Bridgeplay can't read its \(name). An antivirus or endpoint protection app may be blocking it. \
+                Allow the file, or exclude Bridgeplay.app, then reinstall Bridgeplay.
+                """))
         }
         guard actual == file.sha256 || SignedPin.matches(source, sha256: file.sha256) else {
             AppLog.note("bundled file: \(name) at \(path) has sha256 \(actual), expected \(file.sha256)")
-            throw StepFailure(step: step, detail: "Bridgeplay's \(name) doesn't match its pinned checksum. Reinstall Bridgeplay.")
+            throw StepFailure(step: step, detail: String(localized: """
+                Bridgeplay's \(name) doesn't match its pinned checksum. An antivirus or endpoint protection app \
+                may have changed it. Allow the file, or exclude Bridgeplay.app, then reinstall Bridgeplay.
+                """))
         }
         return source
     }

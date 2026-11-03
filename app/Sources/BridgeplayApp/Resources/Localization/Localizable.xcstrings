@@ -2351,6 +2351,22 @@
         }
       }
     },
+    "Bridgeplay can't read its %@. An antivirus or endpoint protection app may be blocking it. Allow the file, or exclude Bridgeplay.app, then reinstall Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay non riesce a leggere il file %@. Un antivirus o un'app di protezione endpoint potrebbe bloccarlo. Consenti il file, oppure escludi Bridgeplay.app, quindi reinstalla Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 无法读取 %@。杀毒软件或终端防护应用可能阻止了该文件。请允许该文件，或将 Bridgeplay.app 加入排除列表，然后重新安装 Bridgeplay。"
+          }
+        }
+      }
+    },
     "Bridgeplay cannot use Steam from a folder with a colon in its name." : {
       "localizations" : {
         "it" : {
@@ -2891,6 +2907,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 已更新其在 Steam 中的文件。"
+          }
+        }
+      }
+    },
+    "Bridgeplay's %@ doesn't match its pinned checksum. An antivirus or endpoint protection app may have changed it. Allow the file, or exclude Bridgeplay.app, then reinstall Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il file %@ di Bridgeplay non corrisponde al checksum previsto. Un antivirus o un'app di protezione endpoint potrebbe averlo modificato. Consenti il file, oppure escludi Bridgeplay.app, quindi reinstalla Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 的 %@ 与预设校验值不符。杀毒软件或终端防护应用可能修改了该文件。请允许该文件，或将 Bridgeplay.app 加入排除列表，然后重新安装 Bridgeplay。"
           }
         }
       }
