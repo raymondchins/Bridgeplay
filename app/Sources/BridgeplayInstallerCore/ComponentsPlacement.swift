@@ -75,12 +75,13 @@ struct ComponentsPlacement {
             }
         }
 
-        // The user's own controller mappings: only seeded when there are none yet.
+        // The user's own controller mappings: seeded when there are none yet, otherwise only
+        // the shipped mappings they lack are appended.
         let mappings = support.appending(path: "gamecontrollerdb.txt")
-        if !fm.fileExists(atPath: mappings.path) {
-            try fail("gamecontrollerdb.txt could not be copied.") {
-                try Self.put(source.appending(path: "config/gamecontrollerdb.txt"), at: mappings, replacing: false)
-            }
+        let shippedMappings = source.appending(path: "config/gamecontrollerdb.txt")
+        try fail("gamecontrollerdb.txt could not be copied.") {
+            if fm.fileExists(atPath: mappings.path) { try ControllerMappings.update(mappings, from: shippedMappings) }
+            else { try Self.put(shippedMappings, at: mappings, replacing: false) }
         }
         resetSetupAssistant()
     }

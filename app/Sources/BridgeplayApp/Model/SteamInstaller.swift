@@ -1,5 +1,6 @@
 // 'Install' logic for the Steam patch componen
 
+import BridgeplayInstallerCore
 import Foundation
 
 enum InstallPhase: Sendable {
@@ -312,16 +313,18 @@ enum SteamInstaller {
         }
     }
 
-    // The user's own mappings, so an existing file stays. Without one a pad SDL does not know,
-    // such as the GameSir G7 Pro, reaches games in its raw button order.
+    // The user's own mappings stay; shipped ones they lack are appended. Without a mapping a pad
+    // SDL does not know, such as the GameSir G7 Pro, reaches games in its raw button order.
     static func seedControllerMappings(from payload: URL, in support: URL) {
         let fm = FileManager.default
         let source = payload.appending(path: "gamecontrollerdb.txt")
         let mappings = support.appending(path: "gamecontrollerdb.txt")
-        guard fm.fileExists(atPath: source.path(percentEncoded: false)),
-            !fm.fileExists(atPath: mappings.path(percentEncoded: false))
-        else { return }
+        guard fm.fileExists(atPath: source.path(percentEncoded: false)) else { return }
         do {
+            if fm.fileExists(atPath: mappings.path(percentEncoded: false)) {
+                try ControllerMappings.update(mappings, from: source)
+                return
+            }
             try fm.createDirectory(at: support, withIntermediateDirectories: true)
             try fm.copyItem(at: source, to: mappings)
         } catch {
