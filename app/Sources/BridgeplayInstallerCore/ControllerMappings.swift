@@ -4,8 +4,8 @@ import Foundation
 /// file, only the shipped mappings whose GUID it lacks are appended, so new pads reach
 /// existing installs while the user's own lines stay as they are.
 public enum ControllerMappings {
-    /// The text with the missing mappings appended, or nil when there is nothing to add.
-    public static func merged(_ existing: String, shipped: String) -> String? {
+    /// The text to append to `existing` for the missing mappings, or nil when there is nothing to add.
+    public static func additions(to existing: String, shipped: String) -> String? {
         func guid(_ line: Substring) -> String? {
             let line = line.trimmingCharacters(in: .whitespaces)
             return line.isEmpty || line.hasPrefix("#") ? nil : String(line.prefix { $0 != "," })
@@ -26,14 +26,17 @@ public enum ControllerMappings {
         }
         guard !added.isEmpty else { return nil }
         let separator = existing.isEmpty || existing.hasSuffix("\n") ? "" : "\n"
-        return existing + separator + added.joined(separator: "\n") + "\n"
+        return separator + added.joined(separator: "\n") + "\n"
     }
 
-    /// Appends what `shipped` has and `file` lacks. A file that cannot be read is left alone.
+    /// Appends what `shipped` has and `file` lacks, in place so a symlink or the file's mode stays.
     public static func update(_ file: URL, from shipped: URL) throws {
-        guard let existing = try? String(contentsOf: file, encoding: .utf8),
-              let shippedText = try? String(contentsOf: shipped, encoding: .utf8),
-              let text = merged(existing, shipped: shippedText) else { return }
-        try Data(text.utf8).write(to: file, options: .atomic)
+        let existing = String(decoding: try Data(contentsOf: file), as: UTF8.self)
+        let shippedText = String(decoding: try Data(contentsOf: shipped), as: UTF8.self)
+        guard let more = additions(to: existing, shipped: shippedText) else { return }
+        let handle = try FileHandle(forWritingTo: file)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(more.utf8))
     }
 }

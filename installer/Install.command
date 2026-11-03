@@ -179,7 +179,7 @@ done
 if [ ! -f "$support/gamecontrollerdb.txt" ]; then
     cp "$here/config/gamecontrollerdb.txt" "$support/" || die "gamecontrollerdb.txt gagal disalin."
 else
-    merge_mappings "$here/config/gamecontrollerdb.txt" "$support/gamecontrollerdb.txt" || die "gamecontrollerdb.txt gagal diperbarui."
+    merge_mappings "$here/config/gamecontrollerdb.txt" "$support/gamecontrollerdb.txt" || say "gamecontrollerdb.txt tidak bisa diperbarui, dilewati."
 fi
 # Show the Setup Assistant again even if an earlier Bridgeplay was dismissed.
 defaults delete com.bridgeplay.Bridgeplay setupAssistantFinished >/dev/null 2>&1 || true

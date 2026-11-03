@@ -20,7 +20,8 @@ here="$work/here"
 support="$work/support"
 mkdir -p "$here/config" "$support"
 die() { echo "die: $*" >&2; exit 1; }
-run() { (here="$here" support="$support" die=die; . "$work/block.sh"); }
+# shellcheck disable=SC1091 # block.sh is cut out of Install.command above
+run() { . "$work/block.sh"; }
 
 g1=03000000aaaa0000000000000000a1b1
 g2=03000000bbbb0000000000000000a2b2

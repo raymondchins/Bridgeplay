@@ -79,9 +79,14 @@ struct ComponentsPlacement {
         // the shipped mappings they lack are appended.
         let mappings = support.appending(path: "gamecontrollerdb.txt")
         let shippedMappings = source.appending(path: "config/gamecontrollerdb.txt")
-        try fail("gamecontrollerdb.txt could not be copied.") {
-            if fm.fileExists(atPath: mappings.path) { try ControllerMappings.update(mappings, from: shippedMappings) }
-            else { try Self.put(shippedMappings, at: mappings, replacing: false) }
+        if fm.fileExists(atPath: mappings.path) {
+            // Best effort: a file that cannot be appended to is not worth failing the install.
+            do { try ControllerMappings.update(mappings, from: shippedMappings) }
+            catch { log("gamecontrollerdb.txt could not be updated: \(error)") }
+        } else {
+            try fail("gamecontrollerdb.txt could not be copied.") {
+                try Self.put(shippedMappings, at: mappings, replacing: false)
+            }
         }
         resetSetupAssistant()
     }

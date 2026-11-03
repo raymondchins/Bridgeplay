@@ -17,18 +17,18 @@ struct ControllerMappingsTests {
     @Test("Only the GUIDs the file lacks are appended, with their comments, and the user's lines stay")
     func appendsMissing() {
         let mine = "# header\naaaa,My Pad A,a:b9\nbbbb,Pad B,a:b1\nzzzz,Mine,a:b3"
-        #expect(ControllerMappings.merged(mine, shipped: shipped)
-            == "# header\naaaa,My Pad A,a:b9\nbbbb,Pad B,a:b1\nzzzz,Mine,a:b3\n# about C\ncccc,Pad C,a:b2\n")
+        #expect(ControllerMappings.additions(to: mine, shipped: shipped) == "\n# about C\ncccc,Pad C,a:b2\n")
     }
 
     @Test("Running it again changes nothing")
     func idempotent() throws {
-        let once = try #require(ControllerMappings.merged("zzzz,Mine,a:b3\n", shipped: shipped))
-        #expect(ControllerMappings.merged(once, shipped: shipped) == nil)
-        #expect(ControllerMappings.merged(shipped, shipped: shipped) == nil)
+        let mine = "zzzz,Mine,a:b3\n"
+        let once = mine + (try #require(ControllerMappings.additions(to: mine, shipped: shipped)))
+        #expect(ControllerMappings.additions(to: once, shipped: shipped) == nil)
+        #expect(ControllerMappings.additions(to: shipped, shipped: shipped) == nil)
     }
 
-    @Test("A file on disk is updated in place and an unreadable one is left alone")
+    @Test("A file on disk is appended to in place, a non-UTF-8 one too, and a missing one throws")
     func updatesFile() throws {
         let fm = FileManager.default
         let dir = fm.temporaryDirectory.appending(path: UUID().uuidString)
@@ -44,6 +44,9 @@ struct ControllerMappingsTests {
         let after = try Data(contentsOf: mine)
         try ControllerMappings.update(mine, from: source)
         #expect(try Data(contentsOf: mine) == after)
-        try ControllerMappings.update(dir.appending(path: "missing.txt"), from: source)
+        try Data([0x61, 0x61, 0x61, 0x61, 0x2c, 0xe9, 0x0a]).write(to: mine)
+        try ControllerMappings.update(mine, from: source)
+        #expect(try Data(contentsOf: mine).count > 7)
+        #expect(throws: (any Error).self) { try ControllerMappings.update(dir.appending(path: "missing.txt"), from: source) }
     }
 }
