@@ -34,6 +34,7 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
 struct RootView: View {
 
     @Binding var pane: Pane
+    var showsSetup = false
     @Environment(SystemStatus.self) private var status
     @Environment(PrefixesModel.self) private var prefixes
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -102,6 +103,19 @@ struct RootView: View {
                     case .guide: GuideView()
                     }
                 }
+                .overlay(alignment: .bottomTrailing) {
+                    // Not over a play report question. StarPrompt.check waits for the scan that may raise one.
+                    let reports = PlayReports.shared
+                    let shows = StarPrompt.shared.pending && !reports.isAsking && !showsSetup && !MigrationLaunch.shared.pending
+                    ZStack {
+                        if shows {
+                            StarPromptCard()
+                                .padding(16)
+                                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                        }
+                    }
+                    .animation(.spring(duration: 0.45, bounce: 0.18), value: shows)
+                }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if let nudge = PlayReports.shared.nudge {
                         PlayReportCard(nudge: nudge)
@@ -126,6 +140,8 @@ struct RootView: View {
         .font(BP.sans(13))
         .tint(BP.blue)
         .preferredColorScheme(.dark)
+        // The window closed: a Later for the star card, which stays away this run.
+        .onDisappear { StarPrompt.shared.later() }
     }
 
     private var credits: some View {

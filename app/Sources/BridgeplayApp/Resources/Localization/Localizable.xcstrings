@@ -1244,6 +1244,22 @@
         }
       }
     },
+    "A star on GitHub helps other people find it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una stella su GitHub aiuta altre persone a trovarlo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 GitHub 上点个星标，能帮更多人发现它。"
+          }
+        }
+      }
+    },
     "About 500 MB. Also installs Steam if this Mac doesn't have it yet." : {
       "localizations" : {
         "it" : {
@@ -4418,6 +4434,22 @@
         }
       }
     },
+    "Don't show again" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non mostrare più"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不再显示"
+          }
+        }
+      }
+    },
     "Done" : {
       "localizations" : {
         "it" : {
@@ -4718,6 +4750,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "引擎"
+          }
+        }
+      }
+    },
+    "Enjoying Bridgeplay?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ti piace Bridgeplay?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "喜欢 Bridgeplay 吗？"
           }
         }
       }
@@ -6142,6 +6190,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上次使用"
+          }
+        }
+      }
+    },
+    "Later" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Più tardi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稍后"
           }
         }
       }
@@ -9662,6 +9726,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在准备组件"
+          }
+        }
+      }
+    },
+    "Star on GitHub" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stella su GitHub"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 GitHub 上加星"
           }
         }
       }

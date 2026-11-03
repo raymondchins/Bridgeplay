@@ -12,7 +12,7 @@ struct BridgeplayApp: App {
 
     var body: some Scene {
         Window("Bridgeplay", id: "main") {
-            RootView(pane: $pane)
+            RootView(pane: $pane, showsSetup: showsSetup)
                 .environment(status)
                 .environment(prefixes)
                 .frame(minWidth: 800, minHeight: 600)
@@ -34,8 +34,12 @@ struct BridgeplayApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                     checkSteamPatch("foreground")
                     PlayReports.shared.scan()
+                    Task { await StarPrompt.shared.check() }
                 }
-                .task { PlayReports.shared.scan() }
+                .task {
+                    PlayReports.shared.scan()
+                    await StarPrompt.shared.check()
+                }
                 .task {
                     while !Task.isCancelled {
                         try? await Task.sleep(for: SteamPatchKeeper.pollInterval)
