@@ -587,7 +587,10 @@ enum FreeEngineWinecx {
         let name = "\(file.resource).\(file.ext)"
         guard let source = bundle.url(forResource: file.resource, withExtension: file.ext) else {
             AppLog.note("bundled file: \(name) not found in \(bundle.bundleURL.path(percentEncoded: false))")
-            throw StepFailure(step: step, detail: "Bridgeplay is missing its \(name). Reinstall Bridgeplay.")
+            throw StepFailure(step: step, detail: String(localized: """
+                Bridgeplay is missing its \(name). An antivirus or endpoint protection app may have \
+                quarantined it. Restore or allow the file, or exclude Bridgeplay.app, then reinstall Bridgeplay.
+                """))
         }
         let path = source.path(percentEncoded: false)
         let actual: String

@@ -168,7 +168,10 @@ enum PinnedDownload {
             return String(localized: "Something is wrong with the downloaded files. Please check for a Bridgeplay update.")
         }
         if kinds == [.unreachable] {
-            return String(localized: "Bridgeplay could not reach \(source)'s servers. Please check your internet connection and try again.")
+            return String(localized: """
+                Bridgeplay could not reach \(source)'s servers. Check your internet connection. A firewall app \
+                (such as LuLu or Little Snitch), VPN or proxy may also be blocking Bridgeplay. Allow it and try again.
+                """)
         }
         return String(localized: "Bridgeplay could not download the files it needs from \(source). Please try again later.")
     }
