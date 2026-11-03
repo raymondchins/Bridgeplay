@@ -90,8 +90,8 @@ struct SetupAssistantTests {
 
     @Test("The assistant stays away once the user finished or dismissed it")
     @MainActor
-    func finishedFlag() throws {
-        let defaults = try #require(UserDefaults(suiteName: "setup-\(UUID().uuidString)"))
+    func finishedFlag() {
+        let defaults = scratchDefaults()
         defaults.set(true, forKey: SetupAssistant.finishedKey)
         #expect(!SetupAssistant.shouldShow(nil, defaults: defaults))
     }

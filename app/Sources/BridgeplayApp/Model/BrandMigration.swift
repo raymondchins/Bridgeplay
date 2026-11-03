@@ -22,7 +22,7 @@ struct BrandMigration: Sendable {
     let steamUserData: URL
 
     var steamRunning: @Sendable () -> Bool = { SteamBundle.isRunningForThisUser }
-    var gameRunning: @Sendable () -> Bool = { Shell.processIsRunning(named: "wineserver") }
+    var gameRunning: @Sendable () -> Bool = { WineServer.isRunning() }
 
     static let markerName = ".migrated-3.0.0"
     static let backupFolder = "backups/migration-3.0.0"

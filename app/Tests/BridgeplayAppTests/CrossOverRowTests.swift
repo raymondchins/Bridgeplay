@@ -134,16 +134,9 @@ struct CrossOverRowTests {
 @Suite("Manually added CrossOver copies")
 struct ManualCrossOverTests {
 
-    private func defaults() -> UserDefaults {
-        let name = "np-manual-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
-        defaults.removePersistentDomain(forName: name)
-        return defaults
-    }
-
     @Test("The single copy 1.0 remembered carries over as the first entry")
     func legacyChoiceCarriesOver() {
-        let defaults = defaults()
+        let defaults = scratchDefaults()
         defaults.set("/Volumes/Spare/CrossOver.app", forKey: "manualCrossOverPath")
 
         #expect(CrossOverSource.manualBundles(defaults).map { $0.path(percentEncoded: false) }
@@ -157,7 +150,7 @@ struct ManualCrossOverTests {
 
     @Test("Adding keeps earlier copies, skips repeats, and removing drops only the one named")
     func addAndRemove() {
-        let defaults = defaults()
+        let defaults = scratchDefaults()
         let spare = URL(filePath: "/Volumes/Spare/CrossOver.app", directoryHint: .isDirectory)
         let other = URL(filePath: "/Volumes/Other/CrossOver Preview.app", directoryHint: .isDirectory)
 
