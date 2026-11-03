@@ -104,10 +104,9 @@ struct RootView: View {
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    // Not over a play report question, or before the scan that may raise one.
-                    let prompt = StarPrompt.shared, reports = PlayReports.shared
-                    let shows = prompt.pending && (prompt.shown || !reports.finding) && !reports.isAsking
-                        && !showsSetup && !MigrationLaunch.shared.pending
+                    // Not over a play report question. StarPrompt.check waits for the scan that may raise one.
+                    let reports = PlayReports.shared
+                    let shows = StarPrompt.shared.pending && !reports.isAsking && !showsSetup && !MigrationLaunch.shared.pending
                     ZStack {
                         if shows {
                             StarPromptCard()

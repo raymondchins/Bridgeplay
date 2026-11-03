@@ -15,7 +15,7 @@ struct StarPromptTests {
 
     private static func prompt(_ defaults: UserDefaults, opener: @escaping (URL) -> Void = { _ in },
                                gameRunning: Bool = false) -> StarPrompt {
-        StarPrompt(defaults: defaults, opener: opener, gameRunning: { gameRunning })
+        StarPrompt(defaults: defaults, opener: opener, gameRunning: { gameRunning }, reportScanRunning: { false })
     }
 
     // The card goes on screen.
@@ -84,7 +84,7 @@ struct StarPromptTests {
     func gameRunning() async {
         let defaults = defaults(launches: 3)
         var running = true
-        let prompt = StarPrompt(defaults: defaults, opener: { _ in }, gameRunning: { running })
+        let prompt = StarPrompt(defaults: defaults, opener: { _ in }, gameRunning: { running }, reportScanRunning: { false })
         await prompt.check()
         #expect(!prompt.pending)
         running = false
@@ -101,7 +101,7 @@ struct StarPromptTests {
     func shownThenGame() async {
         let defaults = defaults(launches: 3)
         var running = false
-        let prompt = StarPrompt(defaults: defaults, opener: { _ in }, gameRunning: { running })
+        let prompt = StarPrompt(defaults: defaults, opener: { _ in }, gameRunning: { running }, reportScanRunning: { false })
         await Self.show(prompt)
         running = true
         await prompt.check()
@@ -118,7 +118,7 @@ struct StarPromptTests {
         let prompt = StarPrompt(defaults: defaults, opener: { _ in }, gameRunning: {
             try? await Task.sleep(for: .milliseconds(100))
             return false
-        })
+        }, reportScanRunning: { false })
         let checking = Task { await prompt.check() }
         try? await Task.sleep(for: .milliseconds(20))
         prompt.later()
@@ -126,6 +126,27 @@ struct StarPromptTests {
         #expect(!prompt.pending)
         await prompt.check()
         #expect(!prompt.pending)
+        #expect(defaults.integer(forKey: "StarPromptShown") == 0)
+    }
+
+    @Test("A game started during the play report scan keeps the card hidden and uncounted")
+    func gameDuringScan() async {
+        let defaults = defaults(launches: 3)
+        var running = false, scanning = false
+        let prompt = StarPrompt(defaults: defaults, opener: { _ in }, gameRunning: { running },
+                                reportScanRunning: { scanning })
+        await prompt.check()
+        #expect(prompt.pending)
+        // The app comes forward again and a new scan starts: the unseen card waits for it.
+        scanning = true
+        let checking = Task { await prompt.check() }
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(!prompt.pending)
+        running = true
+        scanning = false
+        await checking.value
+        #expect(!prompt.pending)
+        prompt.appeared()
         #expect(defaults.integer(forKey: "StarPromptShown") == 0)
     }
 

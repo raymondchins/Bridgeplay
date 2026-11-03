@@ -29,12 +29,15 @@ final class StarPrompt {
     private let defaults: UserDefaults
     private let opener: (URL) -> Void
     private let gameRunning: () async -> Bool
+    private let reportScanRunning: () -> Bool
 
     init(defaults: UserDefaults = .standard, opener: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) },
-         gameRunning: @escaping () async -> Bool = { await RestartGuard.gameRunning() }) {
+         gameRunning: @escaping () async -> Bool = { await RestartGuard.gameRunning() },
+         reportScanRunning: @escaping () -> Bool = { PlayReports.shared.finding }) {
         self.defaults = defaults
         self.opener = opener
         self.gameRunning = gameRunning
+        self.reportScanRunning = reportScanRunning
     }
 
     // Every game launch starts the launch progress helper, which counts it here.
@@ -58,6 +61,11 @@ final class StarPrompt {
         guard due || pending, !laterThisRun, !checking else { return }
         checking = true
         defer { checking = false }
+        // A card not seen yet waits for a game check made after the play report scan, which
+        // can take a while on the daily VerifiedGames download, so a game started meanwhile
+        // keeps it hidden and uncounted.
+        if !shown { pending = false }
+        while reportScanRunning() { try? await Task.sleep(for: .milliseconds(250)) }
         let running = await gameRunning()
         if running {
             pending = false
