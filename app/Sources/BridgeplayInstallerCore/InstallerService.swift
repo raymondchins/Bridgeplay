@@ -315,7 +315,8 @@ public struct InstallerService: Sendable {
         var path = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
         for pid in pids.prefix(Int(filled)) where pid > 0 {
             guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { continue }
-            let executable = String(cString: path)
+            let executable = String(
+                decoding: path.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             if blocksInstall(executable) {
                 InstallerLog.write("Blocked by running process \(pid): \(executable)")
                 throw InstallerError.appIsRunning
