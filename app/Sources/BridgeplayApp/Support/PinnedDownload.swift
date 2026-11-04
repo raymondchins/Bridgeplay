@@ -97,7 +97,7 @@ enum PinnedDownload {
                 }
             } catch {
                 refusals.append("\(host): \(error.localizedDescription)")
-                kinds.insert(.unreachable)
+                kinds.insert(Self.connectionFailed(error) ? .unreachable : .failed)
                 continue
             }
             defer { try? FileManager.default.removeItem(at: body) }
@@ -161,6 +161,23 @@ enum PinnedDownload {
         case unreachable
         case mismatch
         case answered
+        case failed
+    }
+
+    // Only these point at the network, a firewall, VPN or proxy. A cancel, a full disk or a
+    // file error is not, and must not get that advice.
+    static func connectionFailed(_ error: Error) -> Bool {
+        guard let error = error as? URLError else { return false }
+        switch error.code {
+        case .notConnectedToInternet, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed,
+             .timedOut, .networkConnectionLost, .secureConnectionFailed, .internationalRoamingOff,
+             .dataNotAllowed, .cannotLoadFromNetwork,
+             // A proxy that inspects TLS shows its own certificate for every host.
+             .serverCertificateUntrusted, .serverCertificateHasUnknownRoot:
+            return true
+        default:
+            return false
+        }
     }
 
     private static func reason(_ kinds: Set<Refusal>, from source: String) -> String {
@@ -168,7 +185,10 @@ enum PinnedDownload {
             return String(localized: "Something is wrong with the downloaded files. Please check for a Bridgeplay update.")
         }
         if kinds == [.unreachable] {
-            return String(localized: "Bridgeplay could not reach \(source)'s servers. Please check your internet connection and try again.")
+            return String(localized: """
+                Bridgeplay could not reach \(source)'s servers. Check your internet connection. A firewall app \
+                (such as LuLu or Little Snitch), VPN or proxy may also be blocking Bridgeplay. Allow it and try again.
+                """)
         }
         return String(localized: "Bridgeplay could not download the files it needs from \(source). Please try again later.")
     }

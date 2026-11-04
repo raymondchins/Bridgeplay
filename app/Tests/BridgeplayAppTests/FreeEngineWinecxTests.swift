@@ -784,7 +784,10 @@ struct FreeEngineWinecxTests {
 
         #expect(try FreeEngineWinecx.bundledSource(file("fixture", pin), in: bundle).lastPathComponent == "fixture.dll")
         #expect(detail(file("absent", pin))?.contains("missing its absent.dll") == true)
-        #expect(detail(file("fixture", String(repeating: "0", count: 64)))?.contains("doesn't match") == true)
+        #expect(detail(file("absent", pin))?.contains("antivirus") == true)
+        let changed = detail(file("fixture", String(repeating: "0", count: 64)))
+        #expect(changed?.contains("doesn't match") == true)
+        #expect(changed?.contains("antivirus") == true)
 
         let root = try makeDirectory("bundled-root")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -794,6 +797,8 @@ struct FreeEngineWinecxTests {
         let path = fixture.path(percentEncoded: false)
         try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: path)
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: path) }
-        #expect(detail(file("fixture", pin))?.contains("can't read") == true)
+        let unreadable = detail(file("fixture", pin))
+        #expect(unreadable?.contains("can't read") == true)
+        #expect(unreadable?.contains("antivirus") == true)
     }
 }
