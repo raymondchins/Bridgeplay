@@ -171,7 +171,9 @@ enum PinnedDownload {
         switch error.code {
         case .notConnectedToInternet, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed,
              .timedOut, .networkConnectionLost, .secureConnectionFailed, .internationalRoamingOff,
-             .dataNotAllowed, .cannotLoadFromNetwork:
+             .dataNotAllowed, .cannotLoadFromNetwork,
+             // A proxy that inspects TLS shows its own certificate for every host.
+             .serverCertificateUntrusted, .serverCertificateHasUnknownRoot:
             return true
         default:
             return false

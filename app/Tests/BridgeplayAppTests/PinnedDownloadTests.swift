@@ -115,7 +115,10 @@ struct PinnedDownloadTests {
 
     // Fails every request with the URLError code named by the host, e.g. https://refused.invalid/.
     private final class Failing: URLProtocol, @unchecked Sendable {
-        static let codes: [String: URLError.Code] = ["refused.invalid": .cannotConnectToHost, "cancelled.invalid": .cancelled]
+        static let codes: [String: URLError.Code] = [
+            "refused.invalid": .cannotConnectToHost, "untrusted.invalid": .serverCertificateUntrusted,
+            "cancelled.invalid": .cancelled,
+        ]
 
         override class func canInit(with request: URLRequest) -> Bool { codes[request.url?.host() ?? ""] != nil }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -137,9 +140,10 @@ struct PinnedDownloadTests {
         }
     }
 
-    @Test("A host that can't be reached points at the connection, a firewall, VPN or proxy")
-    func unreachableNamesAFirewall() async throws {
-        let detail = try await failure(from: "refused.invalid").detail
+    @Test("A host that can't be reached points at the connection, a firewall, VPN or proxy",
+          arguments: ["refused.invalid", "untrusted.invalid"])
+    func unreachableNamesAFirewall(host: String) async throws {
+        let detail = try await failure(from: host).detail
         #expect(detail.contains("could not reach"))
         #expect(detail.contains("firewall"))
     }
