@@ -209,10 +209,8 @@ struct PlayReportsTests {
     }
 
     @Test("A report says when a newer Bridgeplay was out")
-    func newerRelease() throws {
-        let name = "latest-release-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: name))
-        defer { defaults.removePersistentDomain(forName: name) }
+    func newerRelease() {
+        let defaults = scratchDefaults()
         #expect(LatestRelease.newer(than: "44", defaults: defaults) == nil)
         LatestRelease.record(build: "55", version: "0.7.38", defaults: defaults)
         #expect(LatestRelease.newer(than: "44", defaults: defaults) == "0.7.38 (55)")
@@ -344,7 +342,7 @@ struct PlayReportsFlowTests {
 
     private func model(_ path: String, queue: URL, version: String = "3.4.0",
                        defaults: UserDefaults? = nil) -> (PlayReports, UserDefaults) {
-        let defaults = defaults ?? UserDefaults(suiteName: "play-reports-\(UUID().uuidString)")!
+        let defaults = defaults ?? scratchDefaults()
         return (PlayReports(defaults: defaults, version: version, sender: { FakeEndpoint.sender(path, queue: queue) }), defaults)
     }
 

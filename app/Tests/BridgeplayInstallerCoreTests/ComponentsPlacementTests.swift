@@ -34,7 +34,7 @@ struct ComponentsPlacementTests {
             "config/gamefixes-default/default.conf": "SHIPPED=1\n",
             "config/gamefixes-default/448510.conf": "BACKEND=dxmt\n",
             "config/gamefixes-default/notes.txt": "not a conf",
-            "config/gamecontrollerdb.txt": "shipped mappings",
+            "config/gamecontrollerdb.txt": "# shipped\naaaa,Pad A,a:b0\nbbbb,Pad B,a:b1\n",
         ]
         for (path, text) in files {
             let url = source.appending(path: path)
@@ -75,7 +75,7 @@ struct ComponentsPlacementTests {
         // The user's own default.conf is never written.
         #expect(!FileManager.default.fileExists(atPath: f.support.appending(path: "gamefixes/default.conf").path))
         #expect(FileManager.default.fileExists(atPath: f.support.appending(path: ".installer").path))
-        #expect(text(f.support.appending(path: "gamecontrollerdb.txt")) == "shipped mappings")
+        #expect(text(f.support.appending(path: "gamecontrollerdb.txt")) == "# shipped\naaaa,Pad A,a:b0\nbbbb,Pad B,a:b1\n")
         #expect(calls.steam.isEmpty)
         #expect(calls.resets == 1)
         #expect(calls.statuses == [ComponentsPlacement.copyStatus])
@@ -122,12 +122,12 @@ struct ComponentsPlacementTests {
         #expect(lines.all.first?.contains("ditto") == true)
     }
 
-    @Test("An older GPTK is replaced whole, and the user's mappings and edited confs stay")
+    @Test("An older GPTK is replaced whole, and the user's mappings and edited confs stay (missing mappings are appended)")
     func update() throws {
         let f = try fixture()
         defer { try? FileManager.default.removeItem(at: f.root) }
         let fm = FileManager.default
-        for (path, text) in ["gptk/stale.dylib": "old", "gamecontrollerdb.txt": "my mappings",
+        for (path, text) in ["gptk/stale.dylib": "old", "gamecontrollerdb.txt": "aaaa,my pad A,a:b9\n",
                              "gamefixes/111.conf": "untouched copy", "gamefixes/222.conf": "edited copy",
                              "gamefixes-default/448510.conf": "BACKEND=d3dmetal\n"] {
             let url = f.support.appending(path: path)
@@ -141,7 +141,7 @@ struct ComponentsPlacementTests {
 
         #expect(!fm.fileExists(atPath: f.support.appending(path: "gptk/stale.dylib").path))
         #expect(try fm.contentsOfDirectory(atPath: f.support.path).filter { $0.hasPrefix(".gptk-") }.isEmpty)
-        #expect(text(f.support.appending(path: "gamecontrollerdb.txt")) == "my mappings")
+        #expect(text(f.support.appending(path: "gamecontrollerdb.txt")) == "aaaa,my pad A,a:b9\nbbbb,Pad B,a:b1\n")
         #expect(!fm.fileExists(atPath: f.support.appending(path: "gamefixes/111.conf").path))
         #expect(text(f.support.appending(path: "gamefixes/222.conf")) == "edited copy")
         #expect(text(f.support.appending(path: "gamefixes-default/448510.conf")) == "BACKEND=dxmt\n")

@@ -60,7 +60,7 @@ lint targets, and its list is `CI_CHECKS` in the Makefile:
 - **C, shell and Python suites:** `sigcheck`, `callscheck`, `np-test-batch-check`, `webpatch-fixtures`, `peicon-fixtures`,
   `panel-behavior`, `spawn-env`, `activatecheck`, `compat-reported-import-check`, `compatcheck`, `compatsvc-check`, `prefixstate-check`,
   `shortcutcheck`, `launch-shell`, `envcheck`, `buildcheck`, `settingscheck`, `routecheck`,
-  `bridgecheck`, `envpasscheck`, `prefixnotecheck`, `powernotecheck`, `exitcheck`, `anticheatcheck`, `launchprogresscheck`, `gamedrivecheck`, `launchercheck`, `seedcheck`, `gamefixescheck`, `versioncheck`, `cicheck`,
+  `bridgecheck`, `envpasscheck`, `prefixnotecheck`, `powernotecheck`, `exitcheck`, `anticheatcheck`, `launchprogresscheck`, `gamedrivecheck`, `launchercheck`, `seedcheck`, `mappingscheck`, `gamefixescheck`, `versioncheck`, `cicheck`,
   `padcheck`, `detourcheck`, `compat-reported-check`, `np-inventory-check`, `np-native-tests`, `native-shim-tests`,
   `native-installercheck`
 

@@ -1,7 +1,7 @@
 {
  "source": "AppleGamingWiki, CrossOver ratings (https://www.applegamingwiki.com)",
  "license": "CC BY-NC-SA 3.0 (https://creativecommons.org/licenses/by-nc-sa/3.0/)",
- "fetched": "2026-10-21",
+ "fetched": "2026-11-02",
  "games": [
   {
    "appid": 1132070,
@@ -1890,7 +1890,7 @@
   {
    "appid": 292030,
    "name": "The Witcher 3",
-   "crossover": "playable",
+   "crossover": "perfect",
    "page": "https://www.applegamingwiki.com/wiki/The_Witcher_3"
   },
   {

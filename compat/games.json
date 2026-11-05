@@ -587,5 +587,44 @@
     "last_tested": "2026-10-23",
     "fork_commit": null,
     "tested_on": "M3 Pro · macOS 27.0.1"
+  },
+  {
+    "appid": 1532200,
+    "name": "Mars First Logistics",
+    "api": "unknown",
+    "anticheat": "none known",
+    "status": "platinum",
+    "backend": "d3dmetal",
+    "engine": "winecx-11.17",
+    "notes": "Runs out of the box. From a player report (#2194).",
+    "last_tested": "2026-11-01",
+    "fork_commit": null,
+    "tested_on": "M1 Pro · macOS 26.1"
+  },
+  {
+    "appid": 2385530,
+    "name": "PGA TOUR 2K25",
+    "api": "unknown",
+    "anticheat": "none known",
+    "status": "borked",
+    "backend": "d3dmetal",
+    "engine": "winecx-11.17",
+    "notes": "The window opens, then the game crashes 14-72s in on every launch (access violation). Denuvo under Rosetta is suspected, not confirmed. From a player report (#2162).",
+    "last_tested": "2026-11-01",
+    "fork_commit": null,
+    "tested_on": "M3 · macOS 27.0.1"
+  },
+  {
+    "appid": 3219030,
+    "name": "Planet Zoo 2",
+    "api": "unknown",
+    "anticheat": "none known",
+    "status": "borked",
+    "backend": null,
+    "engine": "winecx-11.17",
+    "notes": "Does not run. From a player report (#1488).",
+    "last_tested": "2026-10-28",
+    "fork_commit": null,
+    "tested_on": "M4 · macOS 27.2"
   }
 ]

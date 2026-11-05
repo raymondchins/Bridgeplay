@@ -1706,6 +1706,22 @@
         }
       }
     },
+    "A star on GitHub helps other people find it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una stella su GitHub aiuta altre persone a trovarlo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 GitHub 上点个星标，能帮更多人发现它。"
+          }
+        }
+      }
+    },
     "About 500 MB. Also installs Steam if this Mac doesn't have it yet." : {
       "localizations" : {
         "it" : {
@@ -3205,6 +3221,22 @@
         }
       }
     },
+    "Bridgeplay can't read its %@. An antivirus or endpoint protection app may be blocking it. Allow the file, or exclude Bridgeplay.app, then reinstall Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay non riesce a leggere il file %@. Un antivirus o un'app di protezione endpoint potrebbe bloccarlo. Consenti il file, oppure escludi Bridgeplay.app, quindi reinstalla Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 无法读取 %@。杀毒软件或终端防护应用可能阻止了该文件。请允许该文件，或将 Bridgeplay.app 加入排除列表，然后重新安装 Bridgeplay。"
+          }
+        }
+      }
+    },
     "Bridgeplay cannot use Steam from a folder with a colon in its name." : {
       "localizations" : {
         "it" : {
@@ -3293,12 +3325,12 @@
         }
       }
     },
-    "Bridgeplay could not reach %@'s servers. Please check your internet connection and try again." : {
+    "Bridgeplay could not reach %@'s servers. Check your internet connection. A firewall app (such as LuLu or Little Snitch), VPN or proxy may also be blocking Bridgeplay. Allow it and try again." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bridgeplay non è riuscito a raggiungere i server di %@. Controlla la connessione a internet e riprova."
+            "value" : "Bridgeplay non è riuscito a raggiungere i server di %@. Controlla la connessione a internet. Anche un'app firewall (come LuLu o Little Snitch), una VPN o un proxy potrebbero bloccare Bridgeplay. Consentine l'accesso e riprova."
           }
         },
         "ru" : {
@@ -3310,7 +3342,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bridgeplay 无法连接 %@ 服务器。请检查网络连接，然后重试。"
+            "value" : "Bridgeplay 无法连接 %@ 服务器。请检查网络连接。防火墙应用（如 LuLu 或 Little Snitch）、VPN 或代理也可能阻止了 Bridgeplay。请允许其访问，然后重试。"
           }
         }
       }
@@ -3597,6 +3629,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 已安装在 %@ 中。请先使用“修复 Steam”将其移除，再选择另一份 Steam。"
+          }
+        }
+      }
+    },
+    "Bridgeplay is missing its %@. An antivirus or endpoint protection app may have quarantined it. Restore or allow the file, or exclude Bridgeplay.app, then reinstall Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Bridgeplay manca il file %@. Un antivirus o un'app di protezione endpoint potrebbe averlo messo in quarantena. Ripristina o consenti il file, oppure escludi Bridgeplay.app, quindi reinstalla Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 缺少 %@。杀毒软件或终端防护应用可能已将其隔离。请恢复或允许该文件，或将 Bridgeplay.app 加入排除列表，然后重新安装 Bridgeplay。"
           }
         }
       }
@@ -3927,6 +3975,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 已更新其在 Steam 中的文件。"
+          }
+        }
+      }
+    },
+    "Bridgeplay's %@ doesn't match its pinned checksum. An antivirus or endpoint protection app may have changed it. Allow the file, or exclude Bridgeplay.app, then reinstall Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il file %@ di Bridgeplay non corrisponde al checksum previsto. Un antivirus o un'app di protezione endpoint potrebbe averlo modificato. Consenti il file, oppure escludi Bridgeplay.app, quindi reinstalla Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 的 %@ 与预设校验值不符。杀毒软件或终端防护应用可能修改了该文件。请允许该文件，或将 Bridgeplay.app 加入排除列表，然后重新安装 Bridgeplay。"
           }
         }
       }
@@ -6068,6 +6132,22 @@
         }
       }
     },
+    "Don't show again" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non mostrare più"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不再显示"
+          }
+        }
+      }
+    },
     "Done" : {
       "localizations" : {
         "it" : {
@@ -6482,6 +6562,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "引擎"
+          }
+        }
+      }
+    },
+    "Enjoying Bridgeplay?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ti piace Bridgeplay?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "喜欢 Bridgeplay 吗？"
           }
         }
       }
@@ -8440,6 +8536,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上次使用"
+          }
+        }
+      }
+    },
+    "Later" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Più tardi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稍后"
           }
         }
       }
@@ -13280,6 +13392,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在准备组件"
+          }
+        }
+      }
+    },
+    "Star on GitHub" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stella su GitHub"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 GitHub 上加星"
           }
         }
       }

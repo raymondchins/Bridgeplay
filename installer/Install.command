@@ -32,6 +32,23 @@ if [ ! -d "$caches" ] && [ -d "$legacy_caches" ]; then
     migrate_later=1
 fi
 
+# merge_mappings SHIPPED FILE: appends the SHIPPED mappings whose GUID (the text before the first
+# comma) FILE lacks, with the comment lines right above them that FILE does not have yet.
+merge_mappings() {
+    local add
+    add=$(awk -F, '
+        { sub(/\r$/, ""); sub(/^[[:space:]]+/, "") }
+        FILENAME == ARGV[1] { if (/^#/) have_c[$0] = 1; else if ($0 != "") have[tolower($1)] = 1; next }
+        $0 == "" { n = 0; next }
+        /^#/ { c[++n] = $0; next }
+        { if (!(tolower($1) in have)) { have[tolower($1)] = 1; for (i = 1; i <= n; i++) if (!(c[i] in have_c)) print c[i]; print }
+          n = 0 }
+    ' "$2" "$1") || return 1
+    [ -z "$add" ] && return 0
+    [ -n "$(tail -c1 "$2")" ] && printf '\n' >> "$2"
+    printf '%s\n' "$add" >> "$2"
+}
+
 say()  { printf '\n\033[1;32m==>\033[0m %s\n' "$*"; }
 die()  {
     printf '\n\033[1;31mGagal:\033[0m %s\n' "$*" >&2
@@ -157,9 +174,12 @@ done
 # never written here. On its next start the app trims a copy earlier installers wrote there,
 # using .installer/default.conf, the record of that copy, which therefore stays as it is.
 
-# The user's own controller mappings: only seeded when there are none yet.
+# The user's own controller mappings: seeded when there are none yet, otherwise only the
+# shipped mappings whose GUID they lack are appended (their own lines stay).
 if [ ! -f "$support/gamecontrollerdb.txt" ]; then
     cp "$here/config/gamecontrollerdb.txt" "$support/" || die "gamecontrollerdb.txt gagal disalin."
+else
+    merge_mappings "$here/config/gamecontrollerdb.txt" "$support/gamecontrollerdb.txt" || say "gamecontrollerdb.txt tidak bisa diperbarui, dilewati."
 fi
 # Show the Setup Assistant again even if an earlier Bridgeplay was dismissed.
 defaults delete com.bridgeplay.Bridgeplay setupAssistantFinished >/dev/null 2>&1 || true

@@ -208,8 +208,9 @@ restore_fix
 stop_game() {
   local ws=""
   ws="$(sed -n 's/^WINESERVER=//p' "$(latest_of "$RUNLOG")" 2>/dev/null | tail -1)"
-  [ -x "$ws" ] || ws="$(ls -d "$NP"/engines/*/Contents/SharedSupport/CrossOver/bin/wineserver 2>/dev/null | head -1)"
-  [ -x "$ws" ] || ws="$(ls "$NP"/runners/*/CrossOver/bin/wineserver "$NP"/runners/current/bin/wineserver 2>/dev/null | head -1)"
+  # The server's name depends on the engine, as in WineServer.swift: wineserver-arm64, wineserver or wineserver-x86.
+  [ -x "$ws" ] || ws="$(ls -d "$NP"/engines/*/Contents/SharedSupport/CrossOver/bin/wineserver{-arm64,,-x86} 2>/dev/null | head -1)"
+  [ -x "$ws" ] || ws="$(ls "$NP"/runners/*/CrossOver/bin/wineserver{-arm64,,-x86} "$NP"/runners/current/bin/wineserver{-arm64,,-x86} 2>/dev/null | head -1)"
   if [ -x "$ws" ] && [ -d "$PFX" ]; then
     WINEPREFIX="$PFX" "$ws" -k 2>/dev/null || true
     sleep 2

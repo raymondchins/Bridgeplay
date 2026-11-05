@@ -179,34 +179,27 @@ struct UpdateFlowTests {
 
 @Suite("What's New")
 struct WhatsNewTests {
-    private func defaults() throws -> UserDefaults {
-        let name = "WhatsNewTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: name))
-        defaults.removePersistentDomain(forName: name)
-        return defaults
-    }
-
-    @Test func showsOncePerBuild() throws {
-        let defaults = try defaults()
+    @Test func showsOncePerBuild() {
+        let defaults = scratchDefaults()
         LatestRelease.record(build: "77", version: "0.7.60", notes: "- fix(panel): show the menu (#1)", defaults: defaults)
         let first = LatestRelease.takeWhatsNew(build: "77", defaults: defaults)
         #expect(first == WhatsNew(version: "0.7.60", changes: ["Show the menu"]))
         #expect(LatestRelease.takeWhatsNew(build: "77", defaults: defaults) == nil)
     }
 
-    @Test func waitsForTheBuildItDescribes() throws {
-        let defaults = try defaults()
+    @Test func waitsForTheBuildItDescribes() {
+        let defaults = scratchDefaults()
         LatestRelease.record(build: "77", version: "0.7.60", notes: "- fix: a", defaults: defaults)
         #expect(LatestRelease.takeWhatsNew(build: "76", defaults: defaults) == nil)
         #expect(LatestRelease.takeWhatsNew(build: "77", defaults: defaults) != nil)
     }
 
-    @Test func nothingRecordedShowsNothing() throws {
-        #expect(LatestRelease.takeWhatsNew(build: "77", defaults: try defaults()) == nil)
+    @Test func nothingRecordedShowsNothing() {
+        #expect(LatestRelease.takeWhatsNew(build: "77", defaults: scratchDefaults()) == nil)
     }
 
-    @Test func aReleaseWithoutNotesStillSaysItUpdated() throws {
-        let defaults = try defaults()
+    @Test func aReleaseWithoutNotesStillSaysItUpdated() {
+        let defaults = scratchDefaults()
         LatestRelease.record(build: "77", version: "0.7.60", defaults: defaults)
         #expect(LatestRelease.takeWhatsNew(build: "77", defaults: defaults)?.changes == [])
     }
