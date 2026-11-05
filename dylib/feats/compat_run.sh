@@ -933,6 +933,8 @@ rockstar_shim_lock_fd() {
 rockstar_shim_in_use() {
   for held in "$1"/.bridgeplay-rockstar-shim.*.inuse; do
     [ -f "$held" ] && [ ! -L "$held" ] || continue
+    # The mark this launch holds itself says nothing about another one.
+    [ "$held" != "${own_mark:-}" ] || continue
     rc=0
     /usr/bin/lockf -k -n -s -t 0 "$held" true 2>/dev/null || rc=$?
     [ "$rc" != 75 ] || return 0
@@ -1063,6 +1065,7 @@ stage_rockstar_shim() {
   social_club="$WINEPREFIX/drive_c/Program Files/Rockstar Games/Social Club"
   shim_wanted=0
   dxgi_wanted=0
+  own_mark=""
   if [ "$gamefix_rockstar_shim" = 1 ] && [ "$verb" = waitforexitandrun ]; then
     [ ! -f "$shim/version.dll" ] || shim_wanted=1
     [ "$shim_wanted" = 0 ] || [ "$backend" != dxvk ] || [ ! -f "$shim/dxgx.dll" ] || dxgi_wanted=1
@@ -1077,8 +1080,11 @@ stage_rockstar_shim() {
     inuse="$STEAM_COMPAT_INSTALL_PATH/.bridgeplay-rockstar-shim.$(id -u)-$(printf '%s' "${STEAM_COMPAT_DATA_PATH:-}" | cksum | cut -d ' ' -f 1)"
     # A mark the previous launch of this prefix still holds while it shuts down sends this
     # launch to a second one.
-    if ! { rockstar_shim_lock_fd 5 "$inuse.inuse" && /usr/bin/lockf -s -t 1 5; } \
-      && ! { rockstar_shim_lock_fd 5 "$inuse-2.inuse" && /usr/bin/lockf -s -t 5 5; }; then
+    if { rockstar_shim_lock_fd 5 "$inuse.inuse" && /usr/bin/lockf -s -t 1 5; }; then
+      own_mark="$inuse.inuse"
+    elif { rockstar_shim_lock_fd 5 "$inuse-2.inuse" && /usr/bin/lockf -s -t 5 5; }; then
+      own_mark="$inuse-2.inuse"
+    else
       graphics_log "rockstar-shim: could not mark the game folder in use"
     fi
   fi
@@ -1093,10 +1099,11 @@ stage_rockstar_shim() {
   fi
   # No shim of any build in the game folder, nothing there for other launches to leave
   # alone. A folder another launch is staging keeps the mark.
-  win64="${STEAM_COMPAT_INSTALL_PATH:-}/Gameface/Binaries/Win64"
+  win64=""
+  [ -z "${STEAM_COMPAT_INSTALL_PATH:-}" ] || win64="$STEAM_COMPAT_INSTALL_PATH/Gameface/Binaries/Win64"
   [ "$folders" = 3 ] || rockstar_shim_copy "$shim/version.dll" "${STEAM_COMPAT_INSTALL_PATH:-}/version.dll" \
-    || rockstar_shim_copy "$shim/version.dll" "$win64/version.dll" \
-    || rockstar_shim_copy "$shim/dxgx.dll" "$win64/dxgi.dll" || exec 5>&-
+    || { [ -n "$win64" ] && rockstar_shim_copy "$shim/version.dll" "$win64/version.dll"; } \
+    || { [ -n "$win64" ] && rockstar_shim_copy "$shim/dxgx.dll" "$win64/dxgi.dll"; } || exec 5>&-
   gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}version=n,b"
   # dxgx.dll is DXVK's dxgi under a name the backend's dxgi=b does not cover.
   if [ "$backend" = dxvk ] && [ -f "$shim/dxgx.dll" ]; then
@@ -1106,7 +1113,7 @@ stage_rockstar_shim() {
   fi
   # An Unreal game links dxgi.dll statically: DXVK's copy beside its exe, native first. Only
   # when it is there (a user's own dxgi.dll left alone is not ours to load first).
-  if [ "$dxgi_wanted" = 1 ] && rockstar_shim_copy "$shim/dxgx.dll" "$win64/dxgi.dll"; then
+  if [ "$dxgi_wanted" = 1 ] && [ -n "$win64" ] && rockstar_shim_copy "$shim/dxgx.dll" "$win64/dxgi.dll"; then
     gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}dxgi=n,b"
     graphics_log "rockstar-shim: DXVK's dxgi staged beside the game exe, dxgi=n,b"
   fi

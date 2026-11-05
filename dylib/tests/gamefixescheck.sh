@@ -1002,6 +1002,20 @@ rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
 is "off dxvk the Unreal folder gets no dxgi.dll" "no" "$([ -e "$win64/dxgi.dll" ] && echo yes || echo no)"
 is "and says nothing about one" "0" "$(grep -c "DXVK's dxgi staged" "$case_dir/log" || true)"
 
+# Switching away from dxvk with the key still on takes DXVK's dxgi.dll out again, though this
+# launch holds its own in-use mark, and puts the user's own one back.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'user dxgi' > "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+user_conf 'BACKEND=dxmt' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "off dxvk with the key on the user's dxgi.dll is back" "user dxgi|no" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+is "and the shim stays" "yes" "$(cmp -s "$shim_src/version.dll" "$win64/version.dll" && echo yes || echo no)"
+
 # A dxgi.dll of the user's own is backed up, then put back; a stale one left over after a
 # backup was made is left alone and not loaded first.
 rockstar_case
