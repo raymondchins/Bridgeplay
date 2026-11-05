@@ -1714,6 +1714,12 @@
             "value" : "Una stella su GitHub aiuta altre persone a trovarlo."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звезда на GitHub помогает другим людям его найти."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3229,6 +3235,12 @@
             "value" : "Bridgeplay non riesce a leggere il file %@. Un antivirus o un'app di protezione endpoint potrebbe bloccarlo. Consenti il file, oppure escludi Bridgeplay.app, quindi reinstalla Bridgeplay."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay не может прочитать файл %@. Возможно, его блокирует антивирус или программа защиты. Разрешите этот файл или добавьте Bridgeplay.app в исключения, затем переустановите Bridgeplay."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3641,6 +3653,12 @@
             "value" : "In Bridgeplay manca il file %@. Un antivirus o un'app di protezione endpoint potrebbe averlo messo in quarantena. Ripristina o consenti il file, oppure escludi Bridgeplay.app, quindi reinstalla Bridgeplay."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В Bridgeplay не хватает файла %@. Возможно, антивирус или программа защиты поместили его в карантин. Восстановите или разрешите этот файл либо добавьте Bridgeplay.app в исключения, затем переустановите Bridgeplay."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3985,6 +4003,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Il file %@ di Bridgeplay non corrisponde al checksum previsto. Un antivirus o un'app di protezione endpoint potrebbe averlo modificato. Consenti il file, oppure escludi Bridgeplay.app, quindi reinstalla Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файл %@ в Bridgeplay не совпадает с ожидаемой контрольной суммой. Возможно, его изменил антивирус или программа защиты. Разрешите этот файл или добавьте Bridgeplay.app в исключения, затем переустановите Bridgeplay."
           }
         },
         "zh-Hans" : {
@@ -6140,6 +6164,12 @@
             "value" : "Non mostrare più"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Больше не показывать"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6572,6 +6602,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ti piace Bridgeplay?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нравится Bridgeplay?"
           }
         },
         "zh-Hans" : {
@@ -8546,6 +8582,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Più tardi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Позже"
           }
         },
         "zh-Hans" : {
@@ -13402,6 +13444,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Stella su GitHub"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звезда на GitHub"
           }
         },
         "zh-Hans" : {
