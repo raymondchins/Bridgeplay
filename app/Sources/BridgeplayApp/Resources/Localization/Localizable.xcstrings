@@ -5837,7 +5837,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Удалено копий: %lld, префиксов: %lld."
+            "value" : "Удалено копий: %lld, затронуто префиксов: %lld."
           }
         },
         "zh-Hans" : {
@@ -5859,7 +5859,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Удалено копий для %@: %lld."
+            "value" : "Удалено копий для %2$@: %1$lld."
           }
         },
         "zh-Hans" : {

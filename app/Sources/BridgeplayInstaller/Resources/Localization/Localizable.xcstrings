@@ -1120,7 +1120,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Steam и графика Apple тоже установлены. Движок WineCX добавится позже при настройке."
+            "value" : "Steam и графика Apple тоже будут установлены. Движок WineCX добавится позже при настройке."
           }
         },
         "zh-Hans" : {
