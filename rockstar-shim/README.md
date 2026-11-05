@@ -4,9 +4,9 @@
 run script when a game's conf says `ROCKSTAR_SHIM=1` (`gamefixes/271590.conf`, `gamefixes/1547000.conf`). It goes next to
 `SocialClubHelper.exe` (`C:\Program Files\Rockstar Games\Social Club`) and next to the game's
 exe (for San Andreas, `Gameface/Binaries/Win64`), never into `system32`, and the run script adds `version=n,b`. Every export forwards to
-kernelbase/kernel32. `DllMain` acts in three processes (SocialClubHelper.exe, GTA5.exe, SanAndreas.exe) and nowhere else.
+kernelbase/kernel32. `DllMain` acts in two processes (SocialClubHelper.exe, GTA5.exe) and nowhere else.
 
-A `version.dll` already in any of these folders is moved to `version.dll.bridgeplay-orig` and put back
+A `version.dll` (and in San Andreas's folder a `dxgi.dll`) already in any of these folders is moved to `<name>.bridgeplay-orig` and put back
 when the key is off or the engine has no shim. Several macOS users can share a game folder, so
 it gets `.bridgeplay-rockstar-shim.lock`, and each launch that stages the shim holds an
 `.inuse` file there until its launch ends; while one is held, the shim stays. The run script knows a staged copy, from this
@@ -36,7 +36,7 @@ The launcher starts CEF with the game folder as working directory. `SetDllDirect
 keeps a d3d11 or dxgi in that folder out of CEF's DLL search; without it CEF loaded one and
 timed out ("timed out loading both its online and offline content").
 
-## GTA5.exe and SanAndreas.exe: DXVK's dxgi
+## GTA5.exe: DXVK's dxgi
 
 On WineCX with D3DMetal enabled, the dxvk backend's `dxgi=b` gave GTA5.exe CrossOver's D3DMetal
 dxgi (a 16 MB `PE-Wine` module in `winedbg`'s `info share`, beside DXVK's d3d11 and the
@@ -46,12 +46,22 @@ adapter to DXVK's d3d11, which then calls `DXGIFactory::CreateSwapChain` in D3DM
 (`winedbg` backtrace). A global `dxgi=n,b` with DXVK's dxgi broke the launcher's CEF.
 
 The run script exports `NOTPROTON_ROCKSTAR_DXGI`, the Windows path of DXVK's dxgi shipped as
-`rockstar-shim/x86_64-windows/dxgx.dll` (another name, so `dxgi=b` does not apply). In GTA5.exe and SanAndreas.exe
+`rockstar-shim/x86_64-windows/dxgx.dll` (another name, so `dxgi=b` does not apply). In GTA5.exe
 the shim loads it and registers it as `dxgi.dll`: it renames `BaseDllName` and moves the entry's
 `HashLinks` to the bucket of the new name. The bucket array is private to ntdll; the shim finds
 it from the other modules' bucket heads and uses the hash variant (Windows 8+, 7, first letter)
 whose buckets line up for every loaded module, or changes nothing. Later
 `LoadLibrary`/`GetModuleHandle("dxgi.dll")` then return DXVK's dxgi, and DXVK's d3d11 binds to it.
+
+## SanAndreas.exe: DXVK's dxgi as dxgi.dll
+
+SanAndreas.exe imports `dxgi.dll` and `d3d11.dll` statically, so D3DMetal's dxgi is loaded before
+the shim's `DllMain` runs and the substitution above would come too late (the game dies with
+`0xc0000005`, reported by a tester). Instead the run script copies `dxgx.dll` to
+`Gameface/Binaries/Win64/dxgi.dll` beside the exe and adds `dxgi=n,b`, so the import resolves to DXVK's
+dxgi. A `dxgi.dll` the folder already had is moved to `dxgi.dll.bridgeplay-orig` and put back, with the same lock and
+in-use marks as `version.dll`. Only a copy identical to the shipped `dxgx.dll` counts as ours, so
+after an engine update that changes it the old copy is set aside as the user's.
 
 ## Build
 
