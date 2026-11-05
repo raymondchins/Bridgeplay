@@ -210,6 +210,11 @@ final class PlayReports {
     private let sender: @Sendable () -> ReportSender
     private let version: String
     private var scanning = false
+    // Looking for sessions to ask about, before the slower retries of queued reports.
+    private(set) var finding = false
+
+    // Asking the player something, which the star prompt waits for.
+    var isAsking: Bool { nudge != nil || thanking || consentRequest != nil || bulk != nil }
 
     private static let consentKey = "PlayReportsConsent"
     private static let autoShareKey = "PlayReportsAutoShare"
@@ -427,6 +432,7 @@ final class PlayReports {
     func scan() {
         guard !scanning else { return }
         scanning = true
+        finding = true
         let sender = sender()
         Task {
             defer { scanning = false }
@@ -434,6 +440,7 @@ final class PlayReports {
             verifiedHere = await Task.detached { await VerifiedGames.load(chip: chip) }.value
             let found = await Task.detached { PlayReports.findSessions(prefixes: PrefixStore.all()) }.value
             handle(found)
+            finding = false
             await sender.retryPending()
         }
     }

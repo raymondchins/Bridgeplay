@@ -113,6 +113,48 @@ struct PinnedDownloadTests {
         #expect(reported.all.filter { !$0.contains(" / ") }.count == 1)
     }
 
+    // Fails every request with the URLError code named by the host, e.g. https://refused.invalid/.
+    private final class Failing: URLProtocol, @unchecked Sendable {
+        static let codes: [String: URLError.Code] = [
+            "refused.invalid": .cannotConnectToHost, "untrusted.invalid": .serverCertificateUntrusted,
+            "cancelled.invalid": .cancelled,
+        ]
+
+        override class func canInit(with request: URLRequest) -> Bool { codes[request.url?.host() ?? ""] != nil }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {
+            client?.urlProtocol(self, didFailWithError: URLError(Self.codes[request.url!.host()!]!))
+        }
+        override func stopLoading() {}
+    }
+
+    private func failure(from host: String) async throws -> StepFailure {
+        let work = try scratchDirectory("pinned")
+        defer { try? FileManager.default.removeItem(at: work) }
+        return try await #require(throws: StepFailure.self) {
+            _ = try await PinnedDownload.obtain(
+                file: "package.tar", sha256: String(repeating: "0", count: 64),
+                bases: [URL(string: "https://\(host)/")!],
+                into: work.appending(path: "downloads"), step: "test",
+                session: PinnedDownload.session(deadline: 30, protocols: [Failing.self]))
+        }
+    }
+
+    @Test("A host that can't be reached points at the connection, a firewall, VPN or proxy",
+          arguments: ["refused.invalid", "untrusted.invalid"])
+    func unreachableNamesAFirewall(host: String) async throws {
+        let detail = try await failure(from: host).detail
+        #expect(detail.contains("could not reach"))
+        #expect(detail.contains("firewall"))
+    }
+
+    @Test("A failure that isn't the network is not blamed on a firewall")
+    func otherFailureIsNotAFirewall() async throws {
+        let detail = try await failure(from: "cancelled.invalid").detail
+        #expect(!detail.contains("could not reach"))
+        #expect(!detail.contains("firewall"))
+    }
+
     @Test("A download has an overall deadline, not only an idle one")
     func downloadsHaveADeadline() {
         #expect(PinnedDownload.session.configuration.timeoutIntervalForResource <= 4 * 60 * 60)

@@ -1062,7 +1062,7 @@ struct SteamInstallerTests {
         #expect(!FileManager.default.fileExists(atPath: fixture.deployedVersion.path))
     }
 
-    @Test("An install seeds the controller mappings and leaves the user's own alone")
+    @Test("An install seeds the controller mappings and only appends the missing ones to the user's own")
     func seedsControllerMappings() throws {
         let fm = FileManager.default
         let dir = fm.temporaryDirectory.appending(path: UUID().uuidString)
@@ -1079,9 +1079,13 @@ struct SteamInstallerTests {
         SteamInstaller.seedControllerMappings(from: payload, in: support)
         #expect(fm.contents(atPath: mappings.path(percentEncoded: false)) == Data("shipped".utf8))
 
-        try Data("mine".utf8).write(to: mappings)
+        try Data("aaaa,mine,a:b9\n".utf8).write(to: mappings)
+        try Data("aaaa,shipped,a:b0\nbbbb,new,a:b1\n".utf8).write(to: payload.appending(path: "gamecontrollerdb.txt"))
         SteamInstaller.seedControllerMappings(from: payload, in: support)
-        #expect(fm.contents(atPath: mappings.path(percentEncoded: false)) == Data("mine".utf8))
+        let merged = Data("aaaa,mine,a:b9\nbbbb,new,a:b1\n".utf8)
+        #expect(fm.contents(atPath: mappings.path(percentEncoded: false)) == merged)
+        SteamInstaller.seedControllerMappings(from: payload, in: support)
+        #expect(fm.contents(atPath: mappings.path(percentEncoded: false)) == merged)
     }
 
 }

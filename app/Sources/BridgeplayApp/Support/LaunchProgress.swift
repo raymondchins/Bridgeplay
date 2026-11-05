@@ -17,6 +17,7 @@ enum LaunchProgressCommand {
         guard arguments.count == 4, arguments[0].hasPrefix("/"), arguments[2].hasPrefix("/"),
             let launcher = pid_t(arguments[3])
         else { exit(1) }
+        StarPrompt.countLaunch()
         let compatdata = arguments[0]
         // The run script started this, so any other parent means the launch has ended, even
         // one that ended before this got here.
