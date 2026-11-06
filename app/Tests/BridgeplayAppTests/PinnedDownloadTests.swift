@@ -405,6 +405,26 @@ struct PinnedDownloadTests {
         #expect(asked == 3)
     }
 
+    @Test("A host given up on hands over to the next, which gets its own asks")
+    func busyHostFallsThroughToNextHost() async throws {
+        let work = try scratchDirectory("pinned")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let (first, second) = (UUID().uuidString, UUID().uuidString)
+
+        let got = try await PinnedDownload.obtain(
+            file: "package.tar", sha256: Digest.sha256(of: Busy.body),
+            bases: [
+                URL(string: "https://504.busy.invalid/\(first)/99/")!,
+                URL(string: "https://503.busy.invalid/\(second)/2/")!,
+            ],
+            into: work.appending(path: "downloads"), step: "test",
+            session: PinnedDownload.session(deadline: 30, protocols: [Busy.self]), backoff: .zero)
+
+        #expect(try Data(contentsOf: got) == Busy.body)
+        #expect(Busy.count(first) == 3)
+        #expect(Busy.count(second) == 3)
+    }
+
     @Test("A 404 is not asked again")
     func notFoundIsNotRetried() async throws {
         let (result, asked) = try await busy(404, refusals: 99)
