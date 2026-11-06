@@ -452,6 +452,13 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "onChange:v=>{const h=\"hud\"===v.data,p=h?\"0\":v.data;" \
     "s([[\"BRIDGEPLAY_PERF_OVERLAY\",pf(dv(\"BRIDGEPLAY_PERF_OVERLAY\"))===p?\"\":p]," \
     "[\"MTL_HUD_ENABLED\",(\"1\"===dv(\"MTL_HUD_ENABLED\"))===h?\"\":h?\"1\":\"0\"]])}})},\"pov\")," \
+    /* The frame rate limit overlay-shim applies: display, half its rate, or a number. A value \
+       set by hand that the menu does not list shows as its own entry. */ \
+    "fl=x=>{x=(x||\"\").toLowerCase();return/^(display|half)$/.test(x)?x:" \
+    "/^\\d+$/.test(x)&&+x>=10&&+x<=360?String(+x):\"0\"}," \
+    "FL=(l,O)=>{const c=fl(ev(\"BRIDGEPLAY_FPS_LIMIT\"));return(0," RT ".jsx)(" BARREL ".XY,{label:l," \
+    "children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:O.some(o=>o.data===c)?O:O.concat([{data:c,label:c+\" FPS\"}])," \
+    "selectedOption:c,onChange:v=>s([[\"BRIDGEPLAY_FPS_LIMIT\",fl(dv(\"BRIDGEPLAY_FPS_LIMIT\"))===v.data?\"\":v.data]])})},\"fpl\")}," \
     /* A toggle that is on unless set to "0" (upstream 1.2.0: AVX2, FEX x87 precision). */ \
     "X=(k,l)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
     "checked:\"0\"!==ev(k),onChange:v=>s([[k,v?\"\":\"0\"]])},k)," \
@@ -483,12 +490,15 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "OV=[\"CX_GRAPHICS_BACKEND\",\"MTL_HUD_ENABLED\",\"D3DM_ENABLE_METALFX\",\"DXMT_ENABLE_NVEXT\"," \
     "\"ROSETTA_ADVERTISE_AVX\",\"WINEMSYNC\",\"BRIDGEPLAY_RETINA\",\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"DXMT_CONFIG\"," \
     "\"BRIDGEPLAY_FRAMEGEN\",\"BRIDGEPLAY_FRAMEGEN_QUALITY\",\"BRIDGEPLAY_FRAMEGEN_UI\",\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"," \
-    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
+    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
     "if(nat)return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
     "PO(\"Performance Overlay\",[{data:\"0\",label:\"Off\"},{data:\"fps\",label:\"FPS\"}," \
     "{data:\"summary\",label:\"Summary (FPS, frame time, CPU, GPU, memory, battery)\"}," \
-    "{data:\"detailed\",label:\"Detailed (adds a frame-time graph)\"},{data:\"hud\",label:\"Apple Metal HUD\"}]),FG()," \
+    "{data:\"detailed\",label:\"Detailed (adds a frame-time graph)\"},{data:\"hud\",label:\"Apple Metal HUD\"}])," \
+    "FL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\",[{data:\"0\",label:\"Off\"}," \
+    "{data:\"display\",label:\"Match display refresh\"},{data:\"half\",label:\"Half display refresh\"}," \
+    "{data:\"60\",label:\"60 FPS\"},{data:\"40\",label:\"40 FPS\"},{data:\"30\",label:\"30 FPS\"}]),FG()," \
     "(0," RT ".jsx)(" BARREL ".XY,{label:\"Controllers\",children:" \
     "D(\"NP_PAD_MODE\",\"Controller layer\",[{data:\"\",label:\"Automatic\"},{data:\"hid\",label:\"Raw HID (Unity, SDL, Unreal)\"}," \
     "{data:\"gc\",label:\"GameController\"},{data:\"off\",label:\"Off\"}],lc(\"\"))},\"ctl\")" \
@@ -516,6 +526,12 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "{data:\"detailed\",label:npL(\"Detailed (adds a frame-time graph)\",\"详细（增加帧时间图表）\"," \
     "\"Dettagliato (aggiunge il grafico dei tempi per fotogramma)\")}," \
     "{data:\"hud\",label:npL(\"Apple Metal HUD\",\"Apple Metal 性能监视器\",\"Metal HUD di Apple\")}])," \
+    "FL(npL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\"," \
+    "\"帧率限制（与显示器同步，不会更改其刷新率）\",\"Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)\"),[" \
+    "{data:\"0\",label:npL(\"Off\",\"关闭\",\"Disattivato\")}," \
+    "{data:\"display\",label:npL(\"Match display refresh\",\"匹配显示器刷新率\",\"Uguale alla frequenza del display\")}," \
+    "{data:\"half\",label:npL(\"Half display refresh\",\"显示器刷新率的一半\",\"Metà della frequenza del display\")}," \
+    "{data:\"60\",label:\"60 FPS\"},{data:\"40\",label:\"40 FPS\"},{data:\"30\",label:\"30 FPS\"}])," \
     "dx&&(0," RT ".jsx)(" BARREL ".XY," \
     "{label:npL(\"MetalFX Upscaling (Samples from the resolution the game is set to)\"," \
     "\"MetalFX 超分辨率（以游戏设置的分辨率为采样来源）\",\"Upscaling MetalFX (ingrandisce l'immagine dalla risoluzione impostata nel gioco)\")," \
@@ -861,7 +877,7 @@ int np_webpatch_should_patch(const char *path) {
 static const char *const fx_bridgeplay_keys[] = {
     "BRIDGEPLAY_RETINA", "BRIDGEPLAY_FRAMEGEN", "BRIDGEPLAY_FRAMEGEN_QUALITY",
     "BRIDGEPLAY_FRAMEGEN_UI", "BRIDGEPLAY_FRAMEGEN_FALLBACK", "BRIDGEPLAY_FRAMEGEN_ENGINE",
-    "BRIDGEPLAY_PERF_OVERLAY",
+    "BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_FPS_LIMIT",
 };
 
 // The BRIDGEPLAY_ name whose suffix follows prefix in key ("" for the run script's short
@@ -895,7 +911,8 @@ static const char *fx_native_key(const char *key) {
     for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
         if (strcmp(key, keys[i]) == 0) return keys[i];
     if (strncmp(key, "BRIDGEPLAY_FRAMEGEN", 19) != 0 && strncmp(key, "NOTPROTON_FRAMEGEN", 18) != 0 &&
-        strcmp(key, "BRIDGEPLAY_PERF_OVERLAY") != 0 && strcmp(key, "NOTPROTON_PERF_OVERLAY") != 0)
+        strcmp(key, "BRIDGEPLAY_PERF_OVERLAY") != 0 && strcmp(key, "NOTPROTON_PERF_OVERLAY") != 0 &&
+        strcmp(key, "BRIDGEPLAY_FPS_LIMIT") != 0 && strcmp(key, "NOTPROTON_FPS_LIMIT") != 0)
         return NULL;
     const char *bp = fx_bridgeplay_key(key, "BRIDGEPLAY_");
     return bp ? bp : fx_bridgeplay_key(key, "NOTPROTON_");

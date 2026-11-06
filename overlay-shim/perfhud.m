@@ -67,6 +67,7 @@ struct ph_sample {
 	double fps, ft_avg, ft_min, ft_max;
 	int cpu, gpu, battery, on_ac, charging, minutes_left, hz;
 	double game_cpu, ram_used, ram_total, game_mem, gpu_mem, watts;
+	double cap; // frame rate limit in force; 0 not known yet, -1 none
 	int idle;
 };
 
@@ -74,6 +75,7 @@ static struct ph_sample ph_last;
 static _Atomic int ph_attached;
 
 static void perfhud_start(void);
+static double framelimit_cap(void); // framelimit.m
 
 static void perfhud_note_frame(id layer)
 {
@@ -568,6 +570,13 @@ static CGSize ph_draw_summary(CGContextRef ctx, const struct ph_sample *s, doubl
 		x += 3;
 		x += ph_text(ctx, h_box, x, base, "ms", ph_style.label, ph_style.fg2, 0.2);
 	}
+	if (s->cap > 0) {
+		snprintf(text, sizeof(text), "%.0f", s->cap);
+		x += gap;
+		ph_divider(ctx, h, x);
+		x += 1 + gap;
+		x += ph_pair(ctx, h_box, x, base, "CAP", text);
+	}
 
 	struct { const char *label; char value[32]; int shown; } parts[4] = {
 		{ "CPU", "", s->cpu >= 0 }, { "GPU", "", s->gpu >= 0 }, { "RAM", "", s->ram_used > 0 },
@@ -679,7 +688,8 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 	}
 
 	// The rest, a label and a value per row, only what this Mac reports
-	struct { const char *label; char value[40]; int shown; } rows[9] = {
+	struct { const char *label; char value[40]; int shown; } rows[10] = {
+		{ "Frame limit", "", s->cap > 0 },
 		{ "CPU", "", s->cpu >= 0 },
 		{ "Game CPU", "", s->game_cpu >= 0 },
 		{ "GPU", "", s->gpu >= 0 },
@@ -690,18 +700,19 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 		{ "Power", "", s->watts > 0 },
 		{ "Display", "", s->hz > 0 },
 	};
-	snprintf(rows[0].value, sizeof(rows[0].value), "%d%%", s->cpu);
-	snprintf(rows[1].value, sizeof(rows[1].value), "%.0f%%", s->game_cpu);
-	snprintf(rows[2].value, sizeof(rows[2].value), "%d%%", s->gpu);
-	ph_format_gb(rows[3].value, sizeof(rows[3].value), s->gpu_mem);
-	snprintf(rows[4].value, sizeof(rows[4].value), "%.1f / %.0f GB", s->ram_used / 1073741824.0,
+	snprintf(rows[0].value, sizeof(rows[0].value), "%.0f FPS", s->cap);
+	snprintf(rows[1].value, sizeof(rows[1].value), "%d%%", s->cpu);
+	snprintf(rows[2].value, sizeof(rows[2].value), "%.0f%%", s->game_cpu);
+	snprintf(rows[3].value, sizeof(rows[3].value), "%d%%", s->gpu);
+	ph_format_gb(rows[4].value, sizeof(rows[4].value), s->gpu_mem);
+	snprintf(rows[5].value, sizeof(rows[5].value), "%.1f / %.0f GB", s->ram_used / 1073741824.0,
 	         s->ram_total / 1073741824.0);
-	ph_format_gb(rows[5].value, sizeof(rows[5].value), s->game_mem);
-	ph_battery_text(rows[6].value, sizeof(rows[6].value), s, 1);
-	snprintf(rows[7].value, sizeof(rows[7].value), "%.1f W", s->watts);
-	snprintf(rows[8].value, sizeof(rows[8].value), "%d Hz", s->hz);
+	ph_format_gb(rows[6].value, sizeof(rows[6].value), s->game_mem);
+	ph_battery_text(rows[7].value, sizeof(rows[7].value), s, 1);
+	snprintf(rows[8].value, sizeof(rows[8].value), "%.1f W", s->watts);
+	snprintf(rows[9].value, sizeof(rows[9].value), "%d Hz", s->hz);
 
-	for (int i = 0; i < 9; i++) {
+	for (int i = 0; i < 10; i++) {
 		if (!rows[i].shown)
 			continue;
 		y += row;
@@ -842,7 +853,7 @@ static void perfhud_tick(void)
 	struct ph_sample s = { .fps = -1, .ft_avg = -1, .ft_min = -1, .ft_max = -1, .cpu = -1, .gpu = -1,
 	                       .battery = -1, .on_ac = -1, .charging = -1, .minutes_left = -1, .hz = -1,
 	                       .game_cpu = -1, .ram_used = -1, .ram_total = -1, .game_mem = -1,
-	                       .gpu_mem = -1, .watts = -1 };
+	                       .gpu_mem = -1, .watts = -1, .cap = -1 };
 
 	os_unfair_lock_lock(&ph_lock);
 	uint64_t frames = ph_frames;
@@ -881,6 +892,7 @@ static void perfhud_tick(void)
 	ph_gpu(&s);
 	ph_battery(&s);
 	s.watts = ph_power();
+	s.cap = framelimit_cap();
 	s.hz = atomic_load(&ph_refresh_hz) > 0 ? atomic_load(&ph_refresh_hz) : -1;
 	ph_ticks++;
 	ph_last = s;

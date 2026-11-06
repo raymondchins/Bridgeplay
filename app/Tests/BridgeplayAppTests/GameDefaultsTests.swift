@@ -39,6 +39,21 @@ import Testing
         #expect(GameDefaults.confOverrides("PERF_OVERLAY=detailed\nMTL_HUD_ENABLED=1\n") == [.metalHUD, .perfOverlay])
     }
 
+    @Test func theFrameRateLimitTakesTheRunScriptsValues() {
+        #expect(GameDefaults.resolve(.frameLimit, user: "", shipped: "") == .init(value: "0", source: .engine))
+        for value in ["0", "display", "half", "10", "30", "45", "144", "360"] {
+            #expect(GameDefaults.refusal(value, for: .frameLimit) == nil, "\(value)")
+        }
+        for value in ["5", "9", "361", "400", "030", "max", "30fps", "-30", "", "Display"] {
+            #expect(GameDefaults.refusal(value, for: .frameLimit) != nil, "\(value)")
+        }
+        #expect(GameDefaults.value(.frameLimit, in: "BRIDGEPLAY_FPS_LIMIT=half\nFPS_LIMIT=400\n") == "half")
+        #expect(GameDefaults.setting(.frameLimit, to: "30", in: "") == GameDefaults.header + "\nFPS_LIMIT=30\n")
+        #expect(GameDefaults.setting(.frameLimit, to: "0", in: "FPS_LIMIT=30\n") == "")
+        #expect(GameDefaults.launchOverrides("BRIDGEPLAY_FPS_LIMIT=30 %command%") == [.frameLimit])
+        #expect(GameDefaults.problems(in: "FPS_LIMIT=5\n").map(\.setting) == [.frameLimit])
+    }
+
     @Test func writesAndReadsBackAFile() throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "gamedefaults-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }

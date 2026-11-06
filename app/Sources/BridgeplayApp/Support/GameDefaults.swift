@@ -32,6 +32,7 @@ enum GameDefaults {
         case advertiseAVX
         case msync
         case vsync
+        case frameLimit
         case frameGen
         case frameGenQuality
         case frameGenUI
@@ -54,6 +55,7 @@ enum GameDefaults {
             case .advertiseAVX: ["ROSETTA_ADVERTISE_AVX"]
             case .msync: ["MSYNC"]
             case .vsync: ["VSYNC", "BRIDGEPLAY_VSYNC"]
+            case .frameLimit: ["FPS_LIMIT", "BRIDGEPLAY_FPS_LIMIT"]
             case .frameGen: ["FRAMEGEN", "BRIDGEPLAY_FRAMEGEN"]
             case .frameGenQuality: ["FRAMEGEN_QUALITY", "BRIDGEPLAY_FRAMEGEN_QUALITY"]
             case .frameGenUI: ["FRAMEGEN_UI", "BRIDGEPLAY_FRAMEGEN_UI"]
@@ -73,7 +75,7 @@ enum GameDefaults {
             case .msync: ["WINEMSYNC"]
             case .nvapi, .dlssFrameGen, .dllOverrides: []
             case .highResolution, .vsync, .frameGen, .frameGenQuality, .frameGenUI, .frameGenFallback, .frameGenEngine,
-                 .perfOverlay:
+                 .perfOverlay, .frameLimit:
                 ["BRIDGEPLAY_\(keys[0])", "NOTPROTON_\(keys[0])"]
             }
         }
@@ -86,6 +88,7 @@ enum GameDefaults {
             case .frameGenQuality: .choice(["performance", "balanced", "quality"])
             case .frameGenEngine: .choice(["own", "metalfx"])
             case .perfOverlay: .choice(["0", "fps", "summary", "detailed"])
+            case .frameLimit: .choice(["0", "display", "half", "60", "40", "30"])
             case .dllOverrides: .dllOverrides
             default: .toggle
             }
@@ -94,7 +97,8 @@ enum GameDefaults {
         // What the run script accepts in a conf (gamefix_reason); nil takes any safe value.
         var accepted: [String]? {
             switch self {
-            case .metalHUD, .metalFX, .dllOverrides: nil
+            // frameLimit also takes any whole number from 10 to 360, see refusal
+            case .metalHUD, .metalFX, .dllOverrides, .frameLimit: nil
             case .backend: ["dxmt", "dxvk", "wined3d", "d3dmetal"]
             case .frameGen: ["0", "1", "2", "3", "adaptive"]
             case .frameGenQuality: ["performance", "balanced", "quality"]
@@ -252,10 +256,22 @@ enum GameDefaults {
         if let accepted = setting.accepted, !accepted.contains(value) {
             return String(localized: "Bridgeplay doesn't know this value.")
         }
+        if setting == .frameLimit, !validFrameLimit(value) {
+            return String(localized: "Bridgeplay doesn't know this value.")
+        }
         if setting == .dllOverrides, !validDLLOverrides(value) {
             return String(localized: "Use Wine's syntax, for example dinput8=n,b;xinput1_3=n.")
         }
         return nil
+    }
+
+    // 0, display, half, or a whole number of frames per second from 10 to 360 (FPS_LIMIT in
+    // gamefix_reason), written as the run script matches it.
+    static func validFrameLimit(_ value: String) -> Bool {
+        if ["0", "display", "half"].contains(value) { return true }
+        guard let first = value.first, first != "0", value.count <= 3, value.allSatisfy({ ("0"..."9").contains($0) }),
+              let number = Int(value) else { return false }
+        return (10...360).contains(number)
     }
 
     // name[,name...]=[n|b|n,b|b,n|d] entries joined by semicolons (valid_dll_overrides).

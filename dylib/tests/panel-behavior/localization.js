@@ -25,6 +25,11 @@ for (const form of Object.keys(FORMS)) {
       assert.equal(dropdowns[0].props.rgOptions[0].label, t('Automatic', '自动', 'Automatico'));
       assert.equal(dropdowns[1].props.rgOptions[0].label, t('Off', '关闭', 'Disattivato'));
       assert(nodes.some(n => n.props.label === t('Performance Overlay', '性能叠加层', 'Overlay delle prestazioni')));
+      assert(nodes.some(n => n.props.label === t('Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)',
+        '帧率限制（与显示器同步，不会更改其刷新率）', 'Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)')));
+      assert.deepEqual(dropdowns[2].props.rgOptions.map(o => o.label), [t('Off', '关闭', 'Disattivato'),
+        t('Match display refresh', '匹配显示器刷新率', 'Uguale alla frequenza del display'),
+        t('Half display refresh', '显示器刷新率的一半', 'Metà della frequenza del display'), '60 FPS', '40 FPS', '30 FPS']);
       assert.deepEqual(dropdowns[1].props.rgOptions.map(o => o.label), [t('Off', '关闭', 'Disattivato'), 'FPS',
         t('Summary (FPS, frame time, CPU, GPU, memory, battery)', '摘要（FPS、帧时间、CPU、GPU、内存、电池）',
           'Riepilogo (FPS, tempo per fotogramma, CPU, GPU, memoria, batteria)'),

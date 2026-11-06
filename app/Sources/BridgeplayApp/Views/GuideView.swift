@@ -101,6 +101,11 @@ struct GuideView: View {
                          note: String(localized: "Bridgeplay's overlay in the top-left corner while you play. FPS shows the frame rate alone, Summary adds frame time, CPU, GPU, memory and battery in one row, and Detailed a panel with a frame-time graph. Apple Metal HUD shows Apple's own overlay instead. Off by default."))
             }
 
+            SteamBlock(title: String(localized: "Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)")) {
+                SteamRow(.dropdown(nil, String(localized: "Off")),
+                         note: String(localized: "Holds the game to your display's refresh rate, half of it, or 60, 40 or 30 FPS, and waits for the display so frames land evenly. Smoother pacing and less battery drain. The display's own refresh rate is not changed. Off by default."))
+            }
+
             SteamBlock(title: String(localized: "MetalFX Upscaling (Samples from the resolution the game is set to)")) {
                 SteamRow(.dropdown(nil, String(localized: "Off")),
                          note: String(localized: "Shown with Automatic or DXMT. Renders below your display's resolution and scales up with MetalFX: 1.5×, 1.72×, 2× or 3×. Off keeps the resolution set in the game."))

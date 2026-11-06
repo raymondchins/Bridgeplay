@@ -36,6 +36,7 @@ struct GameDefaultsView: View {
                 toggleRow(.highResolution)
                 overlayRow
                 toggleRow(.vsync)
+                choiceRow(.frameLimit)
             } header: {
                 Text("Display")
             }
@@ -204,7 +205,7 @@ struct GameDefaultsView: View {
                 if setting.fallback == nil {
                     Text("Automatic").tag("")
                 }
-                ForEach(Self.options(setting), id: \.self) { option in
+                ForEach(choices(setting), id: \.self) { option in
                     Text(Self.optionLabel(option, for: setting)).tag(option)
                 }
             }
@@ -216,6 +217,14 @@ struct GameDefaultsView: View {
                 Button(action.label, action: action.perform)
             }
         }
+    }
+
+    // The page's options, plus a valid value the conf sets that the page does not list
+    // (FPS_LIMIT=45 written by hand), so the picker shows what games actually get.
+    private func choices(_ setting: GameDefaults.Setting) -> [String] {
+        let options = Self.options(setting)
+        guard let current = resolved(setting).value, !options.contains(current) else { return options }
+        return options + [current]
     }
 
     private var dllRow: some View {
@@ -318,6 +327,7 @@ struct GameDefaultsView: View {
         case .advertiseAVX: String(localized: "Advertise AVX2 to Rosetta")
         case .msync: "MSync"
         case .vsync: String(localized: "Force VSync")
+        case .frameLimit: String(localized: "Frame Rate Limit")
         case .frameGen: String(localized: "Frame Generation")
         case .frameGenQuality: String(localized: "Quality")
         case .frameGenUI: String(localized: "Protect UI")
@@ -348,6 +358,7 @@ struct GameDefaultsView: View {
         case .advertiseAVX: String(localized: "Many games quit without it.")
         case .msync: String(localized: "Automatic follows the engine.")
         case .vsync: String(localized: "Waits for the display even when a game turns VSync off.")
+        case .frameLimit: String(localized: "Paces games to the display they are on, which also waits for the display. The display's refresh rate is not changed.")
         case .frameGen, .frameGenQuality, .frameGenEngine: ""
         case .frameGenUI: String(localized: "Keeps static HUD and menus sharp.")
         case .frameGenFallback: String(localized: "Skips generated frames that would smear.")
@@ -379,6 +390,10 @@ struct GameDefaultsView: View {
         case (.perfOverlay, "detailed"): String(localized: "Detailed")
         case (.perfOverlay, "hud"): String(localized: "Apple Metal HUD")
         case (.perfOverlay, _): String(localized: "Off")
+        case (.frameLimit, "display"): String(localized: "Match Display Refresh")
+        case (.frameLimit, "half"): String(localized: "Half Display Refresh")
+        case (.frameLimit, "0"): String(localized: "Off")
+        case (.frameLimit, _): "\(option) FPS"
         default: option
         }
     }

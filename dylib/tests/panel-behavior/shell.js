@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { panel, walk, details, runner, FORMS, overlay, hud } = require('./harness');
+const { panel, walk, details, runner, FORMS, overlay, hud, limit } = require('./harness');
 
 const emit = process.argv[2];
 if (!emit) { console.error('usage: shell.js <emit>'); process.exit(2); }
@@ -18,7 +18,7 @@ const TOGGLES = {
 const ON_UNLESS_0 = { ROSETTA_ADVERTISE_AVX: true };
 const PANEL_KEYS = ['CX_GRAPHICS_BACKEND', 'MTL_HUD_ENABLED', 'D3DM_ENABLE_METALFX', 'DXMT_ENABLE_NVEXT',
   'DXMT_METALFX_SPATIAL_SWAPCHAIN', 'DXMT_CONFIG', 'ROSETTA_ADVERTISE_AVX', 'WINEMSYNC', 'BRIDGEPLAY_RETINA',
-  'BRIDGEPLAY_RAW_CONTROLLERS', 'BRIDGEPLAY_DISABLE_HIDRAW', 'BRIDGEPLAY_PERF_OVERLAY'];
+  'BRIDGEPLAY_RAW_CONTROLLERS', 'BRIDGEPLAY_DISABLE_HIDRAW', 'BRIDGEPLAY_PERF_OVERLAY', 'BRIDGEPLAY_FPS_LIMIT'];
 const OTHER_KEYS = ['WINEDEBUG', 'DXVK_HUD', 'FOO'];
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'np-shell-'));
@@ -75,7 +75,7 @@ function view(form, options) {
   toggles.MTL_HUD_ENABLED = hud(nodes);
   const backend = nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === 'dxvk'));
   const upscale = nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === '1.5'));
-  return { toggles, backend, upscale, overlay: overlay(nodes), written: P.written };
+  return { toggles, backend, upscale, overlay: overlay(nodes), limit: limit(nodes), written: P.written };
 }
 
 function dxmt(conf) {
@@ -117,6 +117,11 @@ function agrees(t, v, env, what) {
     /^(fps|summary|detailed)$/.test(env.BRIDGEPLAY_PERF_OVERLAY || '') ? env.BRIDGEPLAY_PERF_OVERLAY : '0';
   t.ok(v.overlay.props.selectedOption === level,
        `${what}: overlay shows "${v.overlay.props.selectedOption}", the shim shows ${level}`);
+  const cap = /^(display|half)$/i.test(env.BRIDGEPLAY_FPS_LIMIT || '') ? env.BRIDGEPLAY_FPS_LIMIT.toLowerCase() :
+    /^\d+$/.test(env.BRIDGEPLAY_FPS_LIMIT || '') && +env.BRIDGEPLAY_FPS_LIMIT >= 10 && +env.BRIDGEPLAY_FPS_LIMIT <= 360
+      ? String(+env.BRIDGEPLAY_FPS_LIMIT) : '0';
+  t.ok(v.limit.props.selectedOption === cap,
+       `${what}: limit shows "${v.limit.props.selectedOption}", the shim limits to ${cap}`);
   t.ok(v.backend.props.selectedOption === (env.CX_GRAPHICS_BACKEND || ''),
        `${what}: backend shows "${v.backend.props.selectedOption}", game gets ${env.CX_GRAPHICS_BACKEND}`);
 }
@@ -128,6 +133,10 @@ const ACTIONS = [
     want: (v0, v1) => v1.overlay.props.selectedOption === 'summary' },
   { name: 'overlay off', run: v => v.overlay.props.onChange({ data: '0' }),
     want: (v0, v1) => v1.overlay.props.selectedOption === '0' },
+  { name: 'limit 30', run: v => v.limit.props.onChange({ data: '30' }),
+    want: (v0, v1) => v1.limit.props.selectedOption === '30' },
+  { name: 'limit off', run: v => v.limit.props.onChange({ data: '0' }),
+    want: (v0, v1) => v1.limit.props.selectedOption === '0' },
   { name: 'MSync', run: v => v.toggles.WINEMSYNC.props.onChange(!v.toggles.WINEMSYNC.props.checked),
     want: (v0, v1) => v1.toggles.WINEMSYNC.props.checked === !v0.toggles.WINEMSYNC.props.checked },
   { name: 'AVX2', run: v => v.toggles.ROSETTA_ADVERTISE_AVX.props.onChange(!v.toggles.ROSETTA_ADVERTISE_AVX.props.checked),

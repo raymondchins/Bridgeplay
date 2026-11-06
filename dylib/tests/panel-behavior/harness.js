@@ -89,4 +89,7 @@ function hud(nodes) {
   } };
 }
 
-module.exports = { panel, walk, details, runner, expand, FORMS, overlay, hud };
+// The Frame Rate Limit menu.
+const limit = nodes => nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === 'half'));
+
+module.exports = { panel, walk, details, runner, expand, FORMS, overlay, hud, limit };

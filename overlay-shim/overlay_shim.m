@@ -285,6 +285,7 @@ static int stage_claimed(Class seen, Class *held, const char *stage)
 #include "framegen.m"
 #include "quitkey.m"
 #include "perfhud.m"
+#include "framelimit.m"
 
 static void encoder_mark(id encoder, NSUInteger format, id<MTLCommandBuffer> buffer)
 {
@@ -1023,6 +1024,7 @@ static id (*next_layer_drawable)(id, SEL);
 
 static id hook_next_drawable(id layer, SEL selector)
 {
+	framelimit_wait(layer);
 	id drawable = next_layer_drawable(layer, selector);
 
 	if (!next_drawable_logged) {
@@ -1090,14 +1092,16 @@ __attribute__((constructor)) static void overlay_shim_load(void)
 	                    (IMP *)&next_set_colorspace);
 	hooked += interpose(layer, "setDevice:", (IMP)hook_set_device, (IMP *)&next_set_device);
 	const char *vsync = getenv("NOTPROTON_VSYNC");
-	force_vsync = vsync != NULL && strcmp(vsync, "1") == 0;
+	// A frame rate limit paces to the display, so it waits for the display as VSYNC does
+	int limited = framelimit_init();
+	force_vsync = (vsync != NULL && strcmp(vsync, "1") == 0) || limited;
 	if (force_vsync)
 		hooked += interpose(layer, "setDisplaySyncEnabled:", (IMP)hook_set_display_sync,
 		                    (IMP *)&next_set_display_sync);
 	framegen_install_layer_hooks(layer);
 	// The overlay times frames from nextDrawable, which otherwise waits for lsteamclient's
 	// np_overlay_shim_install: a native game or one without the Steam API never calls it
-	if (perfhud_init())
+	if (perfhud_init() || limited)
 		hook_layer_drawable(layer);
 
 	shim_log("overlay_shim_load: pid=%d exe=%s layer_hooks=%d overlay=%s\n", getpid(),

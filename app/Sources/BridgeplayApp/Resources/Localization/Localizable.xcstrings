@@ -7216,6 +7216,38 @@
         }
       }
     },
+    "Frame Rate Limit" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limite di fotogrammi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧率限制"
+          }
+        }
+      }
+    },
+    "Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧率限制（与显示器同步，不会更改其刷新率）"
+          }
+        }
+      }
+    },
     "Frame rate, frame time, CPU, GPU, memory and battery in the top-left corner while you play, or Apple's Metal HUD." : {
       "localizations" : {
         "it" : {
@@ -7650,6 +7682,22 @@
         }
       }
     },
+    "Half Display Refresh" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metà della frequenza del display"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示器刷新率的一半"
+          }
+        }
+      }
+    },
     "Has issues" : {
       "localizations" : {
         "it" : {
@@ -7712,6 +7760,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "高分辨率"
+          }
+        }
+      }
+    },
+    "Holds the game to your display's refresh rate, half of it, or 60, 40 or 30 FPS, and waits for the display so frames land evenly. Smoother pacing and less battery drain. The display's own refresh rate is not changed. Off by default." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limita il gioco alla frequenza del display, alla sua metà, oppure a 60, 40 o 30 FPS, e attende il display perché i fotogrammi arrivino regolari. Ritmo più fluido e meno consumo di batteria. La frequenza del display non cambia. Disattivato per impostazione predefinita."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将游戏限制在显示器的刷新率、其一半，或 60、40、30 FPS，并等待显示器刷新，让帧均匀呈现。帧节奏更平稳，耗电更少。显示器本身的刷新率不会改变。默认关闭。"
           }
         }
       }
@@ -9168,6 +9232,22 @@
         }
       }
     },
+    "Match Display Refresh" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uguale alla frequenza del display"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配显示器刷新率"
+          }
+        }
+      }
+    },
     "Metal HUD" : {
       "localizations" : {
         "it" : {
@@ -10352,6 +10432,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自有 conf"
+          }
+        }
+      }
+    },
+    "Paces games to the display they are on, which also waits for the display. The display's refresh rate is not changed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizza i giochi con il display su cui si trovano, attendendo il display. La frequenza di aggiornamento del display non cambia."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让游戏与所在的显示器同步，并等待显示器刷新。显示器的刷新率不会改变。"
           }
         }
       }
