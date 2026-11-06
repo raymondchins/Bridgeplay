@@ -75,4 +75,18 @@ function runner(name) {
   };
 }
 
-module.exports = { panel, walk, details, runner, expand, FORMS };
+// The Performance Overlay menu, which also carries Apple's Metal HUD.
+const overlay = nodes => nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === 'hud'));
+
+// The Metal HUD entry of that menu as an on/off switch, for the checks that drive launch
+// options through MTL_HUD_ENABLED: on picks the HUD, off picks Off.
+function hud(nodes) {
+  const menu = overlay(nodes);
+  if (!menu) return undefined;
+  return { type: 'Dropdown', props: {
+    checked: menu.props.selectedOption === 'hud',
+    onChange: on => menu.props.onChange({ data: on ? 'hud' : '0' }),
+  } };
+}
+
+module.exports = { panel, walk, details, runner, expand, FORMS, overlay, hud };

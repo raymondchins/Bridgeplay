@@ -3,13 +3,12 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { panel, walk, details, runner, FORMS } = require('./harness');
+const { panel, walk, details, runner, FORMS, overlay, hud } = require('./harness');
 
 const emit = process.argv[2];
 if (!emit) { console.error('usage: shell.js <emit>'); process.exit(2); }
 
 const TOGGLES = {
-  'Metal HUD': 'MTL_HUD_ENABLED',
   'MSync': 'WINEMSYNC',
   'High Resolution': 'BRIDGEPLAY_RETINA',
   'Advertise AVX2 to Rosetta': 'ROSETTA_ADVERTISE_AVX',
@@ -19,7 +18,7 @@ const TOGGLES = {
 const ON_UNLESS_0 = { ROSETTA_ADVERTISE_AVX: true };
 const PANEL_KEYS = ['CX_GRAPHICS_BACKEND', 'MTL_HUD_ENABLED', 'D3DM_ENABLE_METALFX', 'DXMT_ENABLE_NVEXT',
   'DXMT_METALFX_SPATIAL_SWAPCHAIN', 'DXMT_CONFIG', 'ROSETTA_ADVERTISE_AVX', 'WINEMSYNC', 'BRIDGEPLAY_RETINA',
-  'BRIDGEPLAY_RAW_CONTROLLERS', 'BRIDGEPLAY_DISABLE_HIDRAW'];
+  'BRIDGEPLAY_RAW_CONTROLLERS', 'BRIDGEPLAY_DISABLE_HIDRAW', 'BRIDGEPLAY_PERF_OVERLAY'];
 const OTHER_KEYS = ['WINEDEBUG', 'DXVK_HUD', 'FOO'];
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'np-shell-'));
@@ -72,9 +71,11 @@ function view(form, options) {
   const toggles = {};
   nodes.filter(n => n.type === 'Toggle' && n.props.label in TOGGLES)
        .forEach(n => { toggles[TOGGLES[n.props.label]] = n; });
+  // The Metal HUD is an entry of the Performance Overlay menu
+  toggles.MTL_HUD_ENABLED = hud(nodes);
   const backend = nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === 'dxvk'));
   const upscale = nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === '1.5'));
-  return { toggles, backend, upscale, written: P.written };
+  return { toggles, backend, upscale, overlay: overlay(nodes), written: P.written };
 }
 
 function dxmt(conf) {
@@ -112,6 +113,10 @@ function agrees(t, v, env, what) {
     const on = key in ON_UNLESS_0 ? env[key] !== '0' : env[key] === '1';
     t.ok(node.props.checked === on, `${what}: ${key} shows ${node.props.checked}, game gets ${env[key]}`);
   }
+  const level = env.MTL_HUD_ENABLED === '1' ? 'hud' :
+    /^(fps|summary|detailed)$/.test(env.BRIDGEPLAY_PERF_OVERLAY || '') ? env.BRIDGEPLAY_PERF_OVERLAY : '0';
+  t.ok(v.overlay.props.selectedOption === level,
+       `${what}: overlay shows "${v.overlay.props.selectedOption}", the shim shows ${level}`);
   t.ok(v.backend.props.selectedOption === (env.CX_GRAPHICS_BACKEND || ''),
        `${what}: backend shows "${v.backend.props.selectedOption}", game gets ${env.CX_GRAPHICS_BACKEND}`);
 }
@@ -119,6 +124,10 @@ function agrees(t, v, env, what) {
 const ACTIONS = [
   { name: 'Metal HUD', run: v => v.toggles.MTL_HUD_ENABLED.props.onChange(!v.toggles.MTL_HUD_ENABLED.props.checked),
     want: (v0, v1) => v1.toggles.MTL_HUD_ENABLED.props.checked === !v0.toggles.MTL_HUD_ENABLED.props.checked },
+  { name: 'overlay summary', run: v => v.overlay.props.onChange({ data: 'summary' }),
+    want: (v0, v1) => v1.overlay.props.selectedOption === 'summary' },
+  { name: 'overlay off', run: v => v.overlay.props.onChange({ data: '0' }),
+    want: (v0, v1) => v1.overlay.props.selectedOption === '0' },
   { name: 'MSync', run: v => v.toggles.WINEMSYNC.props.onChange(!v.toggles.WINEMSYNC.props.checked),
     want: (v0, v1) => v1.toggles.WINEMSYNC.props.checked === !v0.toggles.WINEMSYNC.props.checked },
   { name: 'AVX2', run: v => v.toggles.ROSETTA_ADVERTISE_AVX.props.onChange(!v.toggles.ROSETTA_ADVERTISE_AVX.props.checked),

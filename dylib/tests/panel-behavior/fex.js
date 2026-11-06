@@ -1,7 +1,7 @@
 // On the FEX build the panel drops the controls that cannot take effect there, and
 // the Rosetta build keeps every one of them.
 'use strict';
-const { panel, walk, details, runner, FORMS } = require('./harness');
+const { panel, walk, details, runner, FORMS, hud } = require('./harness');
 
 const emit = process.argv[2];
 if (!emit) { console.error('usage: fex.js <emit>'); process.exit(2); }
@@ -72,8 +72,9 @@ for (const form of Object.keys(FORMS)) {
     r = nodes('CX_GRAPHICS_BACKEND=dxmt');
     t.ok(toggles(r).includes('DLSS') && r.some(x => x.type === 'Section' &&
          x.props.label.startsWith('MetalFX')), 'dxmt keeps its DLSS row and MetalFX');
-    for (const l of ['Metal HUD', 'MSync', 'High Resolution'])
+    for (const l of ['MSync', 'High Resolution'])
       t.ok(toggles(r).includes(l), `${l} stays`);
+    t.ok(!!hud(r), 'the performance overlay menu stays');
 
     written.length = 0;
     nodes('CX_GRAPHICS_BACKEND=d3dmetal D3DM_ENABLE_METALFX=1').find(x => x.type === 'Dropdown')
@@ -86,7 +87,7 @@ for (const form of Object.keys(FORMS)) {
     written.length = 0;
     const kept = 'ROSETTA_ADVERTISE_AVX=1 CX_GRAPHICS_BACKEND=dxvk';
     r = nodes(kept);
-    r.find(x => x.type === 'Toggle' && x.props.label === 'Metal HUD').props.onChange(true);
+    hud(r).props.onChange(true);
     t.ok(written[written.length - 1].opts.includes('ROSETTA_ADVERTISE_AVX=1'),
          'editing another row keeps the AVX2 value');
     failed += t.failed;

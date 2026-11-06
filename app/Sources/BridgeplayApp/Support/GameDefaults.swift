@@ -25,6 +25,7 @@ enum GameDefaults {
         case backend
         case highResolution
         case metalHUD
+        case perfOverlay
         case nvapi
         case metalFX
         case dlssFrameGen
@@ -46,6 +47,7 @@ enum GameDefaults {
             case .backend: ["BACKEND"]
             case .highResolution: ["RETINA", "BRIDGEPLAY_RETINA"]
             case .metalHUD: ["MTL_HUD_ENABLED"]
+            case .perfOverlay: ["PERF_OVERLAY", "BRIDGEPLAY_PERF_OVERLAY"]
             case .nvapi: ["NVAPI"]
             case .metalFX: ["D3DM_ENABLE_METALFX"]
             case .dlssFrameGen: ["DLSS_FG"]
@@ -70,7 +72,8 @@ enum GameDefaults {
             case .metalHUD, .metalFX, .advertiseAVX: keys
             case .msync: ["WINEMSYNC"]
             case .nvapi, .dlssFrameGen, .dllOverrides: []
-            case .highResolution, .vsync, .frameGen, .frameGenQuality, .frameGenUI, .frameGenFallback, .frameGenEngine:
+            case .highResolution, .vsync, .frameGen, .frameGenQuality, .frameGenUI, .frameGenFallback, .frameGenEngine,
+                 .perfOverlay:
                 ["BRIDGEPLAY_\(keys[0])", "NOTPROTON_\(keys[0])"]
             }
         }
@@ -82,6 +85,7 @@ enum GameDefaults {
             case .frameGen: .choice(["0", "2", "3", "adaptive"])
             case .frameGenQuality: .choice(["performance", "balanced", "quality"])
             case .frameGenEngine: .choice(["own", "metalfx"])
+            case .perfOverlay: .choice(["0", "fps", "summary", "detailed"])
             case .dllOverrides: .dllOverrides
             default: .toggle
             }
@@ -95,6 +99,7 @@ enum GameDefaults {
             case .frameGen: ["0", "1", "2", "3", "adaptive"]
             case .frameGenQuality: ["performance", "balanced", "quality"]
             case .frameGenEngine: ["own", "metalfx"]
+            case .perfOverlay: ["0", "fps", "summary", "detailed"]
             default: ["0", "1"]
             }
         }

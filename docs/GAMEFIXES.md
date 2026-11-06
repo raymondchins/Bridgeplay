@@ -53,6 +53,7 @@ logged, when:
 | `FRAMEGEN_UI` | `0`, `1` | Same as `BRIDGEPLAY_FRAMEGEN_UI`, Protect UI: keeps static HUD and menus sharp. On when unset |
 | `FRAMEGEN_FALLBACK` | `0`, `1` | Same as `BRIDGEPLAY_FRAMEGEN_FALLBACK`, Fast-motion fallback: skips generated frames that would smear. On when unset |
 | `FRAMEGEN_ENGINE` | `own`, `metalfx` | Same as `BRIDGEPLAY_FRAMEGEN_ENGINE`: the built-in optical flow (`own`, the default) or MetalFX frame interpolation |
+| `PERF_OVERLAY` | `0`, `fps`, `summary`, `detailed` | Same as `BRIDGEPLAY_PERF_OVERLAY`: Bridgeplay's performance overlay, drawn by overlay-shim in the top-left corner. `fps` is the frame rate alone, `summary` one row with frame time, CPU, GPU, memory and battery, `detailed` a panel with a frame-time graph. Off (`0`) by default. It sits on the game's Metal layer (D3DMetal, DXMT, DXVK through MoltenVK, native Metal games), not on OpenGL. `MTL_HUD_ENABLED=1` shows Apple's Metal HUD instead of it |
 | `NVAPI` | `0`, `1` | `1` turns on Apple's `nvapi64` and `nvngx` (DLSS on MetalFX) on an engine with a linked Game Porting Toolkit, for `d3dmetal` only, and makes D3DMetal report an NVIDIA GeForce RTX 4090 (`D3DM_VENDOR_ID=0x10de`, `D3DM_DEVICE_ID=0x2684`, `D3DM_DEVICE_DESCRIPTION`; a `D3DM_*` from a conf or the launch options wins) and a driver version of 32.0.15.9541 (`NOTPROTON_DRIVER_VERSION`), since games offer DLSS only on an NVIDIA adapter. Without the key, the run script treats it as `0`. Bridgeplay's `gamefixes-default/default.conf` sets `NVAPI=1`, so it is on for every game unless a later conf says `NVAPI=0`. It has no launch-option spelling. An nvapi that answers sends some games down NVIDIA-only paths, which is the reason to turn it off |
 | `DLSS_FG` | `0`, `1` | With `NVAPI=1` on `d3dmetal`, `1` sets `CX_ACTIVE_GRAPHICS_BACKEND=d3dmetal` so WineCX reports hardware GPU scheduling, which DLSS frame generation requires. Experimental and off by default (`gamefixes-default/default.conf` leaves it out): [frankea/Whisky#231](https://github.com/frankea/Whisky/pull/231) saw MetalFX frame interpolation on an M5 with D3DMetal 4.0b2 hang WindowServer |
 | `STDOUT_NULL` | `0`, `1` | `1` starts the game without a stdout handle, as Steam on Windows does. Source 2 treats any stdout as a console build (`Plat_IsConsoleApplication`) and then skips NGX, so Deadlock offers no DLSS |
@@ -172,7 +173,8 @@ with variable names as they are (`BRIDGEPLAY_FRAMEGEN=2`, `NP_PAD_MODE=hid`, `MT
 1. `~/Library/Application Support/bridgeplay/gamefixes/native-default.conf`, for every native game
 2. `~/Library/Application Support/bridgeplay/gamefixes/native/<appid>.conf`, which wins per key
 
-The Bridgeplay tab in Steam Properties for such a game shows the Metal HUD, Frame Generation and the controller
+The Bridgeplay tab in Steam Properties for such a game shows the performance overlay
+(`BRIDGEPLAY_PERF_OVERLAY`, or `MTL_HUD_ENABLED=1` for the Metal HUD), Frame Generation and the controller
 layer (`NP_PAD_MODE`: `hid`, `gc` or `off`). It writes the launch options as
 `<home>/.bridgeplay/np-native VAR=VALUE ... %command% <game args>`, and rewrites the older
 `/usr/bin/arch -arm64 -x86_64 -e VAR=VALUE ... %command%` form into that one, dropping its

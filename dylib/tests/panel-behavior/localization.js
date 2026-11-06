@@ -24,6 +24,12 @@ for (const form of Object.keys(FORMS)) {
       const dropdowns = nodes.filter(n => n.type === 'Dropdown');
       assert.equal(dropdowns[0].props.rgOptions[0].label, t('Automatic', '自动', 'Automatico'));
       assert.equal(dropdowns[1].props.rgOptions[0].label, t('Off', '关闭', 'Disattivato'));
+      assert(nodes.some(n => n.props.label === t('Performance Overlay', '性能叠加层', 'Overlay delle prestazioni')));
+      assert.deepEqual(dropdowns[1].props.rgOptions.map(o => o.label), [t('Off', '关闭', 'Disattivato'), 'FPS',
+        t('Summary (FPS, frame time, CPU, GPU, memory, battery)', '摘要（FPS、帧时间、CPU、GPU、内存、电池）',
+          'Riepilogo (FPS, tempo per fotogramma, CPU, GPU, memoria, batteria)'),
+        t('Detailed (adds a frame-time graph)', '详细（增加帧时间图表）', 'Dettagliato (aggiunge il grafico dei tempi per fotogramma)'),
+        t('Apple Metal HUD', 'Apple Metal 性能监视器', 'Metal HUD di Apple')]);
       assert.deepEqual(dropdowns[0].props.rgOptions.map(o => o.data),
         ['', 'd3dmetal', 'dxmt', 'dxvk', 'wined3d']);
       assert(nodes.some(n => n.props.label === t('Graphics', '图形', 'Grafica')));
@@ -35,8 +41,7 @@ for (const form of Object.keys(FORMS)) {
       assert(nodes.some(n => n.props.label === t('Disable hidraw', '停用 hidraw', 'Disattiva hidraw')));
       raw.props.onChange(true);
       assert.equal(written.at(-1).opts, 'BRIDGEPLAY_RAW_CONTROLLERS=1 CX_GRAPHICS_BACKEND=dxmt %command%');
-      const hud = nodes.find(n => n.props.label === t('Metal HUD', 'Metal 性能监视器', 'Metal HUD'));
-      hud.props.onChange(true);
+      dropdowns[1].props.onChange({ data: 'hud' });
       assert.equal(written.at(-1).opts, 'MTL_HUD_ENABLED=1 CX_GRAPHICS_BACKEND=dxmt %command%');
       for (const [mode, ...labels] of [
         ['compat-hint', 'Enable CrossOver under Properties > Bridgeplay to install and run the Windows version.',

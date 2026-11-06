@@ -25,6 +25,20 @@ import Testing
         #expect(GameDefaults.setting(.metalHUD, to: "0", in: "MTL_HUD_ENABLED=1\n") == "")
     }
 
+    @Test func thePerformanceOverlayIsALevelOffByDefault() {
+        #expect(GameDefaults.resolve(.perfOverlay, user: "", shipped: "") == .init(value: "0", source: .engine))
+        #expect(GameDefaults.value(.perfOverlay, in: "PERF_OVERLAY=summary\n") == "summary")
+        #expect(GameDefaults.value(.perfOverlay, in: "BRIDGEPLAY_PERF_OVERLAY=detailed\n") == "detailed")
+        // What the run script refuses is skipped, as it is there
+        #expect(GameDefaults.value(.perfOverlay, in: "PERF_OVERLAY=fps\nPERF_OVERLAY=full\n") == "fps")
+        #expect(GameDefaults.refusal("full", for: .perfOverlay) != nil)
+        #expect(GameDefaults.setting(.perfOverlay, to: "fps", in: "") == GameDefaults.header + "\nPERF_OVERLAY=fps\n")
+        #expect(GameDefaults.setting(.perfOverlay, to: "0", in: "BRIDGEPLAY_PERF_OVERLAY=fps\n") == "")
+        #expect(GameDefaults.Setting.perfOverlay.launchKeys == ["BRIDGEPLAY_PERF_OVERLAY", "NOTPROTON_PERF_OVERLAY"])
+        #expect(GameDefaults.launchOverrides("BRIDGEPLAY_PERF_OVERLAY=summary %command%") == [.perfOverlay])
+        #expect(GameDefaults.confOverrides("PERF_OVERLAY=detailed\nMTL_HUD_ENABLED=1\n") == [.metalHUD, .perfOverlay])
+    }
+
     @Test func writesAndReadsBackAFile() throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "gamedefaults-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }

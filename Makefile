@@ -533,17 +533,22 @@ OVERLAY_SHIM_SRC   := overlay-shim/overlay_shim.m
 OVERLAY_SHIM_ARM   := $(OUT_DIR)/overlay-shim.arm64.dylib
 OVERLAY_SHIM_X86   := $(OUT_DIR)/overlay-shim.x86_64.dylib
 OVERLAY_SHIM       := $(OUT_DIR)/overlay-shim.dylib
+OVERLAY_SHIM_FONT  := app/Sources/BridgeplayUI/Resources/Fonts/geist.woff2
 OVERLAY_SHIM_FLAGS := -mmacosx-version-min=$(MIN_VER) $(AVAIL) -dynamiclib -O2 -Wall -Wextra \
                       -install_name @rpath/overlay-shim.dylib \
                       -framework Metal -framework QuartzCore \
-                      -framework CoreGraphics -framework CoreFoundation -framework Foundation
+                      -framework CoreGraphics -framework CoreFoundation -framework Foundation \
+                      -framework CoreText -framework IOKit \
+                      -DNP_GEIST_PATH='"$(OVERLAY_SHIM_FONT)"'
 OVERLAY_SHIM_TESTS := overlay-shim/tests
 OVERLAY_SHIM_TEST_FLAGS := -mmacosx-version-min=$(MIN_VER) -O2 -Wall -Wextra \
-                      -framework Metal -framework Foundation -framework QuartzCore -framework CoreGraphics
+                      -framework Metal -framework Foundation -framework QuartzCore -framework CoreGraphics \
+                      -framework CoreText -framework IOKit -DNP_GEIST_PATH='"$(OVERLAY_SHIM_FONT)"'
 
 overlay-shim: $(OVERLAY_SHIM)
 
-$(OVERLAY_SHIM): $(OVERLAY_SHIM_SRC) overlay-shim/framegen.m overlay-shim/quitkey.m
+$(OVERLAY_SHIM): $(OVERLAY_SHIM_SRC) overlay-shim/framegen.m overlay-shim/quitkey.m overlay-shim/perfhud.m \
+                $(OVERLAY_SHIM_FONT)
 	@mkdir -p $(OUT_DIR)
 	$(CC) -arch arm64 $(OVERLAY_SHIM_FLAGS) -o $(OVERLAY_SHIM_ARM) $<
 	$(CC) -arch x86_64 $(OVERLAY_SHIM_FLAGS) -o $(OVERLAY_SHIM_X86) $<
@@ -566,7 +571,7 @@ overlay-shim-tests: $(OVERLAY_SHIM)
 		$(call SKIP,overlay-shim-tests,$(OVERLAY_SHIM_TESTS)); exit 0; fi; \
 	mkdir -p $(OUT_DIR); \
 	fail=0; ran=0; skipped=0; \
-	for t in device bridge delivery framegen ownership; do \
+	for t in device bridge delivery framegen ownership perfhud; do \
 		for a in arm64 x86_64; do \
 			$(CC) -arch $$a $(OVERLAY_SHIM_TEST_FLAGS) -o $(OUT_DIR)/$$t.$$a \
 				$(OVERLAY_SHIM_TESTS)/$$t.m || exit 1; \

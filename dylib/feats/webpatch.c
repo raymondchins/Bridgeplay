@@ -444,6 +444,14 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "fo&&T([\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"],\"Fast-motion fallback (skips frames that would smear)\",\"1\",\"0\")," \
     "fo&&D(\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"Engine\",[{data:\"own\",label:\"Built-in optical flow\"}," \
     "{data:\"metalfx\",label:\"MetalFX\"}],lc(\"own\"))]},\"fgn\")," \
+    /* The performance overlay and Apple's Metal HUD are one choice, so only one of them \
+       is ever on screen. The Metal HUD wins in overlay-shim when both come from the confs. */ \
+    "pf=x=>{x=(x||\"\").toLowerCase();return x===\"1\"?\"fps\":/^(fps|summary|detailed)$/.test(x)?x:\"0\"}," \
+    "PO=(l,O)=>(0," RT ".jsx)(" BARREL ".XY,{label:l,children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:O," \
+    "selectedOption:\"1\"===ev(\"MTL_HUD_ENABLED\")?\"hud\":pf(ev(\"BRIDGEPLAY_PERF_OVERLAY\"))," \
+    "onChange:v=>{const h=\"hud\"===v.data,p=h?\"0\":v.data;" \
+    "s([[\"BRIDGEPLAY_PERF_OVERLAY\",pf(dv(\"BRIDGEPLAY_PERF_OVERLAY\"))===p?\"\":p]," \
+    "[\"MTL_HUD_ENABLED\",(\"1\"===dv(\"MTL_HUD_ENABLED\"))===h?\"\":h?\"1\":\"0\"]])}})},\"pov\")," \
     /* A toggle that is on unless set to "0" (upstream 1.2.0: AVX2, FEX x87 precision). */ \
     "X=(k,l)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
     "checked:\"0\"!==ev(k),onChange:v=>s([[k,v?\"\":\"0\"]])},k)," \
@@ -475,10 +483,12 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "OV=[\"CX_GRAPHICS_BACKEND\",\"MTL_HUD_ENABLED\",\"D3DM_ENABLE_METALFX\",\"DXMT_ENABLE_NVEXT\"," \
     "\"ROSETTA_ADVERTISE_AVX\",\"WINEMSYNC\",\"BRIDGEPLAY_RETINA\",\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"DXMT_CONFIG\"," \
     "\"BRIDGEPLAY_FRAMEGEN\",\"BRIDGEPLAY_FRAMEGEN_QUALITY\",\"BRIDGEPLAY_FRAMEGEN_UI\",\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"," \
-    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
+    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
     "if(nat)return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
-    "T([\"MTL_HUD_ENABLED\"],\"Metal HUD\",\"1\"),FG()," \
+    "PO(\"Performance Overlay\",[{data:\"0\",label:\"Off\"},{data:\"fps\",label:\"FPS\"}," \
+    "{data:\"summary\",label:\"Summary (FPS, frame time, CPU, GPU, memory, battery)\"}," \
+    "{data:\"detailed\",label:\"Detailed (adds a frame-time graph)\"},{data:\"hud\",label:\"Apple Metal HUD\"}]),FG()," \
     "(0," RT ".jsx)(" BARREL ".XY,{label:\"Controllers\",children:" \
     "D(\"NP_PAD_MODE\",\"Controller layer\",[{data:\"\",label:\"Automatic\"},{data:\"hid\",label:\"Raw HID (Unity, SDL, Unreal)\"}," \
     "{data:\"gc\",label:\"GameController\"},{data:\"off\",label:\"Off\"}],lc(\"\"))},\"ctl\")" \
@@ -493,13 +503,19 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     ".concat(\"\"===v.data||\"dxmt\"===v.data?[]:" \
     "[[\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"\"],[\"DXMT_CONFIG\",fx(\"\")]])" \
     ".concat(\"dxmt\"===v.data?[]:[[\"DXMT_ENABLE_NVEXT\",\"\"]]))})," \
-    "T([\"MTL_HUD_ENABLED\"],npL(\"Metal HUD\",\"Metal 性能监视器\",\"Metal HUD\"),\"1\")," \
     "dm&&T([\"D3DM_ENABLE_METALFX\"],\"DLSS\",\"1\")," \
     "\"dxmt\"===b&&T([\"DXMT_ENABLE_NVEXT\"],\"DLSS\",\"1\")," \
     "!fex&&X(\"ROSETTA_ADVERTISE_AVX\",npL(\"Advertise AVX2 to Rosetta\",\"向 Rosetta 声明 AVX2 支持\",\"Segnala AVX2 a Rosetta\"))," \
     "T([\"WINEMSYNC\"],\"MSync\",\"1\",\"0\")," \
     "T([\"BRIDGEPLAY_RETINA\"],npL(\"High Resolution\",\"高分辨率\",\"Alta risoluzione\"),\"1\",\"0\")" \
     "]},\"gfx\")," \
+    "PO(npL(\"Performance Overlay\",\"性能叠加层\",\"Overlay delle prestazioni\"),[" \
+    "{data:\"0\",label:npL(\"Off\",\"关闭\",\"Disattivato\")},{data:\"fps\",label:\"FPS\"}," \
+    "{data:\"summary\",label:npL(\"Summary (FPS, frame time, CPU, GPU, memory, battery)\"," \
+    "\"摘要（FPS、帧时间、CPU、GPU、内存、电池）\",\"Riepilogo (FPS, tempo per fotogramma, CPU, GPU, memoria, batteria)\")}," \
+    "{data:\"detailed\",label:npL(\"Detailed (adds a frame-time graph)\",\"详细（增加帧时间图表）\"," \
+    "\"Dettagliato (aggiunge il grafico dei tempi per fotogramma)\")}," \
+    "{data:\"hud\",label:npL(\"Apple Metal HUD\",\"Apple Metal 性能监视器\",\"Metal HUD di Apple\")}])," \
     "dx&&(0," RT ".jsx)(" BARREL ".XY," \
     "{label:npL(\"MetalFX Upscaling (Samples from the resolution the game is set to)\"," \
     "\"MetalFX 超分辨率（以游戏设置的分辨率为采样来源）\",\"Upscaling MetalFX (ingrandisce l'immagine dalla risoluzione impostata nel gioco)\")," \
@@ -845,6 +861,7 @@ int np_webpatch_should_patch(const char *path) {
 static const char *const fx_bridgeplay_keys[] = {
     "BRIDGEPLAY_RETINA", "BRIDGEPLAY_FRAMEGEN", "BRIDGEPLAY_FRAMEGEN_QUALITY",
     "BRIDGEPLAY_FRAMEGEN_UI", "BRIDGEPLAY_FRAMEGEN_FALLBACK", "BRIDGEPLAY_FRAMEGEN_ENGINE",
+    "BRIDGEPLAY_PERF_OVERLAY",
 };
 
 // The BRIDGEPLAY_ name whose suffix follows prefix in key ("" for the run script's short
@@ -877,7 +894,8 @@ static const char *fx_native_key(const char *key) {
     static const char *const keys[] = { "MTL_HUD_ENABLED", "NP_PAD_MODE" };
     for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
         if (strcmp(key, keys[i]) == 0) return keys[i];
-    if (strncmp(key, "BRIDGEPLAY_FRAMEGEN", 19) != 0 && strncmp(key, "NOTPROTON_FRAMEGEN", 18) != 0)
+    if (strncmp(key, "BRIDGEPLAY_FRAMEGEN", 19) != 0 && strncmp(key, "NOTPROTON_FRAMEGEN", 18) != 0 &&
+        strcmp(key, "BRIDGEPLAY_PERF_OVERLAY") != 0 && strcmp(key, "NOTPROTON_PERF_OVERLAY") != 0)
         return NULL;
     const char *bp = fx_bridgeplay_key(key, "BRIDGEPLAY_");
     return bp ? bp : fx_bridgeplay_key(key, "NOTPROTON_");

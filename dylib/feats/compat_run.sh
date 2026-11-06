@@ -424,6 +424,8 @@ gamefix_reason() {
       case "$2" in performance|balanced|quality) ;; *) echo "not performance, balanced or quality" ;; esac ;;
     FRAMEGEN_ENGINE)
       case "$2" in own|metalfx) ;; *) echo "not own or metalfx" ;; esac ;;
+    PERF_OVERLAY)
+      case "$2" in 0|fps|summary|detailed) ;; *) echo "not 0, fps, summary or detailed" ;; esac ;;
     DLLOVERRIDES)
       valid_dll_overrides "$2" || echo "not Wine override syntax" ;;
     ARGS)
@@ -461,7 +463,7 @@ gamefix_read() {
     fi
     # The keys that set a BRIDGEPLAY_ variable also take its full name: BRIDGEPLAY_RETINA=1 is RETINA=1.
     case "$key" in
-      BRIDGEPLAY_STDOUT_NULL|BRIDGEPLAY_VSYNC|BRIDGEPLAY_HIDE_WINE_EXPORTS|BRIDGEPLAY_RETINA|BRIDGEPLAY_FRAMEGEN|BRIDGEPLAY_FRAMEGEN_?*)
+      BRIDGEPLAY_STDOUT_NULL|BRIDGEPLAY_VSYNC|BRIDGEPLAY_HIDE_WINE_EXPORTS|BRIDGEPLAY_RETINA|BRIDGEPLAY_FRAMEGEN|BRIDGEPLAY_FRAMEGEN_?*|BRIDGEPLAY_PERF_OVERLAY)
         key=${key#BRIDGEPLAY_} ;;
     esac
     value=${line#*=}
@@ -519,7 +521,7 @@ load_gamefixes() {
       RETINA) gamefix_apply_env NOTPROTON_RETINA "$value" "$from" ;;
       # Steam reads SteamDeck in mixed case, which a conf key cannot spell.
       STEAMDECK) gamefix_apply_env SteamDeck "$value" "$from" ;;
-      FRAMEGEN|FRAMEGEN_QUALITY|FRAMEGEN_UI|FRAMEGEN_FALLBACK|FRAMEGEN_ENGINE)
+      FRAMEGEN|FRAMEGEN_QUALITY|FRAMEGEN_UI|FRAMEGEN_FALLBACK|FRAMEGEN_ENGINE|PERF_OVERLAY)
         gamefix_apply_env "NOTPROTON_$key" "$value" "$from" ;;
       *) gamefix_apply_env "$key" "$value" "$from" ;;
     esac
@@ -3067,8 +3069,10 @@ if [ -n "\$STEAM_DYLD_INSERT_LIBRARIES" ]; then
   else
     export DYLD_INSERT_LIBRARIES="\$STEAM_DYLD_INSERT_LIBRARIES"
   fi
-elif [ -f "\$shim" ] && [ "\${NOTPROTON_FRAMEGEN:-0}" != 0 ] && [ "\$NOTPROTON_FRAMEGEN" != off ]; then
-  # Frame generation lives in the shim, so it loads without the Steam overlay too.
+elif [ -f "\$shim" ] && { { [ "\${NOTPROTON_FRAMEGEN:-0}" != 0 ] && [ "\$NOTPROTON_FRAMEGEN" != off ]; } ||
+  { [ "\${NOTPROTON_PERF_OVERLAY:-0}" != 0 ] && [ "\$NOTPROTON_PERF_OVERLAY" != off ]; }; }; then
+  # Frame generation and the performance overlay live in the shim, so it loads without the
+  # Steam overlay too.
   export DYLD_INSERT_LIBRARIES="\$shim"
   export NOTPROTON_OVERLAY_SHIM="\$shim"
 fi
@@ -3179,7 +3183,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | LC_ALL=C sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|FEX_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|NOTPROTON_HIDE_WINE_EXPORTS|NOTPROTON_ROCKSTAR_DXGI|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
+for name in $(env | LC_ALL=C sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|FEX_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_PERF_OVERLAY|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|NOTPROTON_HIDE_WINE_EXPORTS|NOTPROTON_ROCKSTAR_DXGI|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"

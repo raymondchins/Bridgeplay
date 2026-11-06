@@ -1724,6 +1724,22 @@
         }
       }
     },
+    "Apple Metal HUD" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metal HUD di Apple"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Metal 性能监视器"
+          }
+        }
+      }
+    },
     "Apple silicon" : {
       "localizations" : {
         "it" : {
@@ -1752,22 +1768,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple 的 Game Porting Toolkit（D3DMetal）可通过 Metal 运行 DirectX 11 和 12 游戏。Bridgeplay 可以按 Apple 的非商业许可为你下载它，你也可以添加自己从 Apple 下载的副本。"
-          }
-        }
-      }
-    },
-    "Apple's performance overlay: frame rate, frame time and GPU use." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L'overlay delle prestazioni di Apple: frame rate, tempo di frame e uso della GPU."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple 的性能叠层：帧率、帧时间和 GPU 占用。"
           }
         }
       }
@@ -2939,6 +2939,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 默认值。"
+          }
+        }
+      }
+    },
+    "Bridgeplay's overlay in the top-left corner while you play. FPS shows the frame rate alone, Summary adds frame time, CPU, GPU, memory and battery in one row, and Detailed a panel with a frame-time graph. Apple Metal HUD shows Apple's own overlay instead. Off by default." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'overlay di Bridgeplay nell'angolo in alto a sinistra mentre giochi. FPS mostra solo la frequenza dei fotogrammi, Riepilogo aggiunge in una riga tempo per fotogramma, CPU, GPU, memoria e batteria, e Dettagliato un pannello con il grafico dei tempi per fotogramma. Metal HUD di Apple mostra invece l'overlay di Apple. Disattivato per impostazione predefinita."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏时 Bridgeplay 的叠加层显示在左上角。FPS 只显示帧率，摘要在一行中加上帧时间、CPU、GPU、内存和电池，详细则是带帧时间图表的面板。Apple Metal 性能监视器改为显示 Apple 自己的叠加层。默认关闭。"
           }
         }
       }
@@ -4402,6 +4418,22 @@
         }
       }
     },
+    "Detailed" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dettagliato"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "详细"
+          }
+        }
+      }
+    },
     "Didn't run" : {
       "localizations" : {
         "it" : {
@@ -5214,6 +5246,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "帧生成质量"
+          }
+        }
+      }
+    },
+    "Frame rate, frame time, CPU, GPU, memory and battery in the top-left corner while you play, or Apple's Metal HUD." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frequenza dei fotogrammi, tempo per fotogramma, CPU, GPU, memoria e batteria nell'angolo in alto a sinistra mentre giochi, oppure il Metal HUD di Apple."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏时在左上角显示帧率、帧时间、CPU、GPU、内存和电池，或改用 Apple 的 Metal 性能监视器。"
           }
         }
       }
@@ -7186,18 +7234,18 @@
         }
       }
     },
-    "Only on native Mac games, next to Metal HUD and Frame Generation. Raw HID suits Unity, SDL and Unreal games, GameController uses Apple's framework, and Off leaves controllers alone." : {
+    "Only on native Mac games, next to the Performance Overlay and Frame Generation. Raw HID suits Unity, SDL and Unreal games, GameController uses Apple's framework, and Off leaves controllers alone." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Solo per i giochi nativi per Mac, accanto a Metal HUD e Generazione fotogrammi. Raw HID va bene per i giochi Unity, SDL e Unreal, GameController usa il framework di Apple e Disattivato lascia stare i controller."
+            "value" : "Solo per i giochi nativi per Mac, accanto a Overlay delle prestazioni e Generazione fotogrammi. Raw HID va bene per i giochi Unity, SDL e Unreal, GameController usa il framework di Apple e Disattivato lascia stare i controller."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅限原生 Mac 游戏，位于 Metal HUD 和帧生成旁边。Raw HID 适合 Unity、SDL 和 Unreal 游戏，GameController 使用 Apple 的框架，关闭则不处理控制器。"
+            "value" : "仅限原生 Mac 游戏，位于性能叠加层和帧生成旁边。Raw HID 适合 Unity、SDL 和 Unreal 游戏，GameController 使用 Apple 的框架，关闭则不处理控制器。"
           }
         }
       }
@@ -7598,6 +7646,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "性能"
+          }
+        }
+      }
+    },
+    "Performance Overlay" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overlay delle prestazioni"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "性能叠加层"
           }
         }
       }
@@ -10513,6 +10577,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在停止 Steam"
+          }
+        }
+      }
+    },
+    "Summary" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riepilogo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "摘要"
           }
         }
       }
