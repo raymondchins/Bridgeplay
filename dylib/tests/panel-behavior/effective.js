@@ -40,6 +40,9 @@ put('gamefixes/native-default.conf', '# native\nexport MTL_HUD_ENABLED=1\nNP_PAD
   'NOTPROTON_FRAMEGEN=3\nFRAMEGEN=2\nBRIDGEPLAY_RETINA=1\n');
 put('gamefixes/native/1778820.conf', "NP_PAD_MODE='gc'\nBRIDGEPLAY_FRAMEGEN_ENGINE=metalfx\n");
 put('gamefixes/native/1778823.conf', 'NOTPROTON_PERF_OVERLAY=fps\n');
+// As in np-native, the NOTPROTON_ spelling wins in the same file, before or after.
+put('gamefixes/native/1778824.conf', 'NOTPROTON_PERF_OVERLAY=fps\nBRIDGEPLAY_PERF_OVERLAY=detailed\n');
+put('gamefixes/native/1778825.conf', 'BRIDGEPLAY_FRAMEGEN=3\nNOTPROTON_FRAMEGEN=2\nBRIDGEPLAY_FRAMEGEN=adaptive\n');
 // The first tool is the default one, and its name runs past the 16 characters a value may.
 put('tools',
   'bridgeplay-proton-winecx-11.17\twinecx-11.17\trosetta\tWineCX 11.17 (msync, D3DMetal)\n' +
@@ -98,6 +101,9 @@ t0.ok(!!fx && fx.a[1778821] && fx.a[1778821].BRIDGEPLAY_PERF_OVERLAY === 'summar
       `PERF_OVERLAY reaches the panel in either spelling (${fx && JSON.stringify(fx.a)})`);
 t0.ok(!!fx && fx.na[1778823] && fx.na[1778823].BRIDGEPLAY_PERF_OVERLAY === 'fps',
       `a native conf's overlay level reaches the panel (${fx && JSON.stringify(fx.na)})`);
+t0.ok(!!fx && fx.na[1778824] && fx.na[1778824].BRIDGEPLAY_PERF_OVERLAY === 'fps' &&
+      fx.na[1778825] && fx.na[1778825].BRIDGEPLAY_FRAMEGEN === '2',
+      `a NOTPROTON_ line wins over BRIDGEPLAY_ in one native conf, as np-native reads it (${fx && JSON.stringify(fx.na)})`);
 t0.ok(!!fx && JSON.stringify(fx.na[1778820]) === '{"NP_PAD_MODE":"gc","BRIDGEPLAY_FRAMEGEN_ENGINE":"metalfx"}',
       `native/<appid>.conf lands per app (${fx && JSON.stringify(fx.na)})`);
 t0.ok(!!legacyFx && legacyFx.g.BRIDGEPLAY_RETINA === '1',

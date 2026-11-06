@@ -943,6 +943,10 @@ static void fx_read(const char *path, fx_set_t *set, int native) {
     FILE *f = fopen(path, "r");
     if (!f) return;
     char line[256];
+    // np-native lets NOTPROTON_<X> win over BRIDGEPLAY_<X> from the same file, whatever
+    // the order, so a BRIDGEPLAY_ line does not replace a key this file set the old way.
+    const char *legacy[sizeof(set->p) / sizeof(set->p[0])];
+    size_t nlegacy = 0;
     while (fgets(line, sizeof(line), f)) {
         char *b = fx_trim(line);
         if (native && strncmp(b, "export ", 7) == 0) b = fx_trim(b + 7);
@@ -961,6 +965,15 @@ static void fx_read(const char *path, fx_set_t *set, int native) {
                 val++;
             }
             key = fx_native_key(b);
+            if (key && fx_safe(val)) {
+                size_t i = 0;
+                while (i < nlegacy && strcmp(legacy[i], key) != 0) i++;
+                if (strncmp(b, "NOTPROTON_", 10) == 0) {
+                    if (i == nlegacy && nlegacy < sizeof(legacy) / sizeof(legacy[0])) legacy[nlegacy++] = key;
+                } else if (i < nlegacy) {
+                    continue;
+                }
+            }
         } else {
             key = fx_panel_key(b);
         }

@@ -790,9 +790,19 @@ static void ph_read_screen(CALayer *host)
 	}
 }
 
+// Main queue only, unlike fg_on_main's inline fallback: AppKit and the window's layer tree
+// belong to the main thread, and a busy one only delays the overlay. One update at a time,
+// so a stalled main thread does not pile them up.
+static _Atomic int ph_place_pending;
+
 static void ph_place(id host, CGImageRef image, CGSize size, double scale)
 {
-	fg_on_main(^{
+	if (atomic_exchange(&ph_place_pending, 1)) {
+		CGImageRelease(image);
+		[host release]; // ph_host still holds the layer
+		return;
+	}
+	dispatch_async(dispatch_get_main_queue(), ^{
 		ph_read_screen(host);
 		fg_ca_begin();
 		if (ph_layer == nil) {
@@ -822,6 +832,7 @@ static void ph_place(id host, CGImageRef image, CGSize size, double scale)
 		fg_ca_end();
 		CGImageRelease(image);
 		[host release];
+		atomic_store(&ph_place_pending, 0);
 	});
 }
 
