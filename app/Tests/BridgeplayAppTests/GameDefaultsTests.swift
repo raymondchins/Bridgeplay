@@ -54,6 +54,16 @@ import Testing
         #expect(GameDefaults.problems(in: "FPS_LIMIT=5\n").map(\.setting) == [.frameLimit])
     }
 
+    @Test func theScalingFilterIsLinearUnlessSet() {
+        #expect(GameDefaults.resolve(.scalingFilter, user: "", shipped: "") == .init(value: "0", source: .engine))
+        #expect(GameDefaults.value(.scalingFilter, in: "BRIDGEPLAY_SCALING_FILTER=integer\n") == "integer")
+        #expect(GameDefaults.refusal("linear", for: .scalingFilter) == nil)
+        #expect(GameDefaults.refusal("fsr", for: .scalingFilter) != nil)
+        #expect(GameDefaults.setting(.scalingFilter, to: "nearest", in: "") == GameDefaults.header + "\nSCALING_FILTER=nearest\n")
+        #expect(GameDefaults.setting(.scalingFilter, to: "0", in: "SCALING_FILTER=nearest\n") == "")
+        #expect(GameDefaults.launchOverrides("BRIDGEPLAY_SCALING_FILTER=nearest %command%") == [.scalingFilter])
+    }
+
     @Test func writesAndReadsBackAFile() throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "gamedefaults-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }

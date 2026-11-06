@@ -92,4 +92,7 @@ function hud(nodes) {
 // The Frame Rate Limit menu.
 const limit = nodes => nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === 'half'));
 
-module.exports = { panel, walk, details, runner, expand, FORMS, overlay, hud, limit };
+// The Scaling Filter menu.
+const filter = nodes => nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === 'integer'));
+
+module.exports = { panel, walk, details, runner, expand, FORMS, overlay, hud, limit, filter };

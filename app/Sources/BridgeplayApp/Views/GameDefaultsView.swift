@@ -37,6 +37,7 @@ struct GameDefaultsView: View {
                 overlayRow
                 toggleRow(.vsync)
                 choiceRow(.frameLimit)
+                choiceRow(.scalingFilter)
             } header: {
                 Text("Display")
             }
@@ -328,6 +329,7 @@ struct GameDefaultsView: View {
         case .msync: "MSync"
         case .vsync: String(localized: "Force VSync")
         case .frameLimit: String(localized: "Frame Rate Limit")
+        case .scalingFilter: String(localized: "Scaling Filter")
         case .frameGen: String(localized: "Frame Generation")
         case .frameGenQuality: String(localized: "Quality")
         case .frameGenUI: String(localized: "Protect UI")
@@ -359,6 +361,7 @@ struct GameDefaultsView: View {
         case .msync: String(localized: "Automatic follows the engine.")
         case .vsync: String(localized: "Waits for the display even when a game turns VSync off.")
         case .frameLimit: String(localized: "Paces games to the display they are on, which also waits for the display. The display's refresh rate is not changed.")
+        case .scalingFilter: String(localized: "How a game's frames are scaled up to the screen when it draws fewer pixels, as with High Resolution off. Automatic keeps what Wine does there, sharp pixels; Linear smooths them.")
         case .frameGen, .frameGenQuality, .frameGenEngine: ""
         case .frameGenUI: String(localized: "Keeps static HUD and menus sharp.")
         case .frameGenFallback: String(localized: "Skips generated frames that would smear.")
@@ -390,6 +393,10 @@ struct GameDefaultsView: View {
         case (.perfOverlay, "detailed"): String(localized: "Detailed")
         case (.perfOverlay, "hud"): String(localized: "Apple Metal HUD")
         case (.perfOverlay, _): String(localized: "Off")
+        case (.scalingFilter, "nearest"): String(localized: "Nearest")
+        case (.scalingFilter, "integer"): String(localized: "Integer")
+        case (.scalingFilter, "linear"): String(localized: "Linear")
+        case (.scalingFilter, _): String(localized: "Automatic")
         case (.frameLimit, "display"): String(localized: "Match Display Refresh")
         case (.frameLimit, "half"): String(localized: "Half Display Refresh")
         case (.frameLimit, "0"): String(localized: "Off")

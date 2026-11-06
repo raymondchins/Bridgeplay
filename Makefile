@@ -547,7 +547,7 @@ OVERLAY_SHIM_TEST_FLAGS := -mmacosx-version-min=$(MIN_VER) -O2 -Wall -Wextra \
 
 overlay-shim: $(OVERLAY_SHIM)
 
-$(OVERLAY_SHIM): $(OVERLAY_SHIM_SRC) overlay-shim/framegen.m overlay-shim/quitkey.m overlay-shim/perfhud.m overlay-shim/framelimit.m \
+$(OVERLAY_SHIM): $(OVERLAY_SHIM_SRC) overlay-shim/framegen.m overlay-shim/quitkey.m overlay-shim/perfhud.m overlay-shim/framelimit.m overlay-shim/scalefilter.m \
                 $(OVERLAY_SHIM_FONT)
 	@mkdir -p $(OUT_DIR)
 	$(CC) -arch arm64 $(OVERLAY_SHIM_FLAGS) -o $(OVERLAY_SHIM_ARM) $<
@@ -571,7 +571,7 @@ overlay-shim-tests: $(OVERLAY_SHIM)
 		$(call SKIP,overlay-shim-tests,$(OVERLAY_SHIM_TESTS)); exit 0; fi; \
 	mkdir -p $(OUT_DIR); \
 	fail=0; ran=0; skipped=0; \
-	for t in device bridge delivery framegen ownership perfhud framelimit; do \
+	for t in device bridge delivery framegen ownership perfhud framelimit scalefilter; do \
 		for a in arm64 x86_64; do \
 			$(CC) -arch $$a $(OVERLAY_SHIM_TEST_FLAGS) -o $(OUT_DIR)/$$t.$$a \
 				$(OVERLAY_SHIM_TESTS)/$$t.m || exit 1; \

@@ -33,6 +33,7 @@ enum GameDefaults {
         case msync
         case vsync
         case frameLimit
+        case scalingFilter
         case frameGen
         case frameGenQuality
         case frameGenUI
@@ -56,6 +57,7 @@ enum GameDefaults {
             case .msync: ["MSYNC"]
             case .vsync: ["VSYNC", "BRIDGEPLAY_VSYNC"]
             case .frameLimit: ["FPS_LIMIT", "BRIDGEPLAY_FPS_LIMIT"]
+            case .scalingFilter: ["SCALING_FILTER", "BRIDGEPLAY_SCALING_FILTER"]
             case .frameGen: ["FRAMEGEN", "BRIDGEPLAY_FRAMEGEN"]
             case .frameGenQuality: ["FRAMEGEN_QUALITY", "BRIDGEPLAY_FRAMEGEN_QUALITY"]
             case .frameGenUI: ["FRAMEGEN_UI", "BRIDGEPLAY_FRAMEGEN_UI"]
@@ -75,7 +77,7 @@ enum GameDefaults {
             case .msync: ["WINEMSYNC"]
             case .nvapi, .dlssFrameGen, .dllOverrides: []
             case .highResolution, .vsync, .frameGen, .frameGenQuality, .frameGenUI, .frameGenFallback, .frameGenEngine,
-                 .perfOverlay, .frameLimit:
+                 .perfOverlay, .frameLimit, .scalingFilter:
                 ["BRIDGEPLAY_\(keys[0])", "NOTPROTON_\(keys[0])"]
             }
         }
@@ -89,6 +91,7 @@ enum GameDefaults {
             case .frameGenEngine: .choice(["own", "metalfx"])
             case .perfOverlay: .choice(["0", "fps", "summary", "detailed"])
             case .frameLimit: .choice(["0", "display", "half", "60", "40", "30"])
+            case .scalingFilter: .choice(["0", "linear", "nearest", "integer"])
             case .dllOverrides: .dllOverrides
             default: .toggle
             }
@@ -104,6 +107,7 @@ enum GameDefaults {
             case .frameGenQuality: ["performance", "balanced", "quality"]
             case .frameGenEngine: ["own", "metalfx"]
             case .perfOverlay: ["0", "fps", "summary", "detailed"]
+            case .scalingFilter: ["0", "linear", "nearest", "integer"]
             default: ["0", "1"]
             }
         }

@@ -1,6 +1,6 @@
 // What the panel renders, checked against both forms of the one payload.
 'use strict';
-const { panel, walk, details, runner, FORMS, overlay, hud, limit } = require('./harness');
+const { panel, walk, details, runner, FORMS, overlay, hud, limit, filter } = require('./harness');
 
 const emit = process.argv[2];
 if (!emit) { console.error('usage: behavior.js <emit>'); process.exit(2); }
@@ -19,8 +19,8 @@ for (const form of Object.keys(FORMS)) {
        'a shortcut renders the panel before a tool name reaches the page');
 
   let r = nodes('');
-  t.ok(toggles(r).length === 6 && sections(r).length === 6, 'automatic shows six toggles in six sections');
-  t.ok(r.filter(x => x.type === 'Dropdown').length === 5, 'five dropdowns');
+  t.ok(toggles(r).length === 6 && sections(r).length === 7, 'automatic shows six toggles in seven sections');
+  t.ok(r.filter(x => x.type === 'Dropdown').length === 6, 'six dropdowns');
   t.ok(!('label' in r.find(x => x.type === 'Dropdown').props), 'the backend dropdown carries no label column');
 
   r = nodes('CX_GRAPHICS_BACKEND=dxmt');
@@ -168,6 +168,44 @@ for (const form of Object.keys(FORMS)) {
   written.length = 0;
   nodes('WINEDEBUG=-all BRIDGEPLAY_FPS_LIMIT=30').find(x => x.type === 'button').props.onClick();
   t.ok(last().trim() === 'WINEDEBUG=-all %command%', `Use Bridgeplay defaults drops the limit (${last()})`);
+
+  // Scaling Filter: linear unless set, nearest or integer written only when they differ.
+  const sf = o => filter(nodes(o));
+  t.ok(sf('').props.rgOptions.map(x => x.label + ':' + x.data).join(',') ===
+       'Automatic (Wine keeps pixels sharp with High Resolution off):0,Linear (smooth):linear,' +
+       'Nearest (sharp pixels at any scale):nearest,' +
+       'Integer (sharp at exact 2x or 3x, smooth otherwise):integer', 'the filters name themselves');
+  t.ok(nodes('').some(x => x.type === 'Section' && typeof x.props.label === 'string' &&
+       x.props.label.startsWith('Scaling Filter (When the game draws fewer pixels than the screen')),
+       'the filter says when it applies');
+  t.ok(sf('').props.selectedOption === '0', 'automatic by default');
+  t.ok(sf('BRIDGEPLAY_SCALING_FILTER=Nearest').props.selectedOption === 'nearest', 'nearest reads in any case');
+  t.ok(sf('BRIDGEPLAY_SCALING_FILTER=linear').props.selectedOption === 'linear', 'linear is its own choice, not the default');
+  t.ok(sf('NOTPROTON_SCALING_FILTER=integer').props.selectedOption === 'integer', 'the pre-3.0 spelling reads too');
+  t.ok(sf('BRIDGEPLAY_SCALING_FILTER=fsr').props.selectedOption === '0', 'a filter the shim refuses reads as automatic');
+  written.length = 0;
+  sf('').props.onChange({ data: 'linear' });
+  t.ok(last().trim() === 'BRIDGEPLAY_SCALING_FILTER=linear %command%', `Linear is written (${last()})`);
+
+  written.length = 0;
+  sf('').props.onChange({ data: 'integer' });
+  t.ok(last().trim() === 'BRIDGEPLAY_SCALING_FILTER=integer %command%', `picking a filter writes it (${last()})`);
+  written.length = 0;
+  sf('BRIDGEPLAY_SCALING_FILTER=nearest BRIDGEPLAY_FPS_LIMIT=30 DXMT_METALFX_SPATIAL_SWAPCHAIN=1').props.onChange({ data: '0' });
+  t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT=30 DXMT_METALFX_SPATIAL_SWAPCHAIN=1 %command%',
+       `Automatic drops only the filter, MetalFX and the limit stay (${last()})`);
+  globalThis.MSCXFx = { g: { BRIDGEPLAY_SCALING_FILTER: 'nearest' }, a: {}, e: {}, d: {} };
+  t.ok(sf('').props.selectedOption === 'nearest', 'the Game Defaults filter shows');
+  written.length = 0;
+  sf('').props.onChange({ data: '0' });
+  t.ok(last().trim() === 'BRIDGEPLAY_SCALING_FILTER=0 %command%', `Automatic over a default filter writes 0 (${last()})`);
+  written.length = 0;
+  sf('BRIDGEPLAY_SCALING_FILTER=integer').props.onChange({ data: 'nearest' });
+  t.ok(last() === '', `the default filter drops the override (${JSON.stringify(last())})`);
+  delete globalThis.MSCXFx;
+  written.length = 0;
+  nodes('WINEDEBUG=-all BRIDGEPLAY_SCALING_FILTER=nearest').find(x => x.type === 'button').props.onClick();
+  t.ok(last().trim() === 'WINEDEBUG=-all %command%', `Use Bridgeplay defaults drops the filter (${last()})`);
 
   const def = o => nodes(o).find(x => x.type === 'button');
   written.length = 0;
@@ -340,11 +378,17 @@ for (const form of Object.keys(FORMS)) {
   let n = nnodes('');
   t.ok(P({ details: mac('') }) !== null && P({ details: mac('') }).props.className === 'MSCXPanel',
        'a mac build with nothing pinned renders the native panel');
-  t.ok(toggles(n).length === 0 && sections(n).join(',') === 'Performance,Frame,Frame,Controllers',
-       `the native panel has the overlay, the limit, frame generation and controllers only (${toggles(n)} / ${sections(n)})`);
-  t.ok(n.filter(x => x.type === 'Dropdown').map(x => x === overlay(n) ? 'overlay' : x === limit(n) ? 'limit' : x.props.label)
-        .join(',') === 'overlay,limit,Mode,Controller layer',
-       'native dropdowns: the overlay, the limit, the mode and the controller layer');
+  t.ok(toggles(n).length === 0 && sections(n).join(',') === 'Performance,Frame,Scaling,Frame,Controllers',
+       `the native panel has the overlay, the limit, the filter, frame generation and controllers only (${toggles(n)} / ${sections(n)})`);
+  t.ok(n.filter(x => x.type === 'Dropdown').map(x => x === overlay(n) ? 'overlay' : x === limit(n) ? 'limit' :
+        x === filter(n) ? 'filter' : x.props.label).join(',') === 'overlay,limit,filter,Mode,Controller layer',
+       'native dropdowns: the overlay, the limit, the filter, the mode and the controller layer');
+  written.length = 0;
+  filter(nnodes('-novid')).props.onChange({ data: 'nearest' });
+  t.ok(last() === NAT + ' BRIDGEPLAY_SCALING_FILTER=nearest %command% -novid',
+       `a native game gets the filter under np-native (${last()})`);
+  t.ok(filter(nnodes('')).props.rgOptions[0].label === 'Automatic (as the game sets it)',
+       'a native game is not told about Wine');
   written.length = 0;
   limit(nnodes('-novid')).props.onChange({ data: '30' });
   t.ok(last() === NAT + ' BRIDGEPLAY_FPS_LIMIT=30 %command% -novid', `a native game gets the limit under np-native (${last()})`);

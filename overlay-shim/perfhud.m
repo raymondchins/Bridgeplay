@@ -76,6 +76,7 @@ static _Atomic int ph_attached;
 
 static void perfhud_start(void);
 static double framelimit_cap(void); // framelimit.m
+static const char *scalefilter_state(double *scale); // scalefilter.m
 
 static void perfhud_note_frame(id layer)
 {
@@ -688,8 +689,11 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 	}
 
 	// The rest, a label and a value per row, only what this Mac reports
-	struct { const char *label; char value[40]; int shown; } rows[10] = {
+	double scale = 0;
+	const char *filter = scalefilter_state(&scale);
+	struct { const char *label; char value[40]; int shown; } rows[11] = {
 		{ "Frame limit", "", s->cap > 0 },
+		{ "Scaling", "", filter != NULL },
 		{ "CPU", "", s->cpu >= 0 },
 		{ "Game CPU", "", s->game_cpu >= 0 },
 		{ "GPU", "", s->gpu >= 0 },
@@ -701,18 +705,21 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 		{ "Display", "", s->hz > 0 },
 	};
 	snprintf(rows[0].value, sizeof(rows[0].value), "%.0f FPS", s->cap);
-	snprintf(rows[1].value, sizeof(rows[1].value), "%d%%", s->cpu);
-	snprintf(rows[2].value, sizeof(rows[2].value), "%.0f%%", s->game_cpu);
-	snprintf(rows[3].value, sizeof(rows[3].value), "%d%%", s->gpu);
-	ph_format_gb(rows[4].value, sizeof(rows[4].value), s->gpu_mem);
-	snprintf(rows[5].value, sizeof(rows[5].value), "%.1f / %.0f GB", s->ram_used / 1073741824.0,
+	// The filter in use and the scale it draws at: 1.0x means nothing is scaled
+	if (filter != NULL)
+		snprintf(rows[1].value, sizeof(rows[1].value), "%s · %.1fx", filter, scale);
+	snprintf(rows[2].value, sizeof(rows[2].value), "%d%%", s->cpu);
+	snprintf(rows[3].value, sizeof(rows[3].value), "%.0f%%", s->game_cpu);
+	snprintf(rows[4].value, sizeof(rows[4].value), "%d%%", s->gpu);
+	ph_format_gb(rows[5].value, sizeof(rows[5].value), s->gpu_mem);
+	snprintf(rows[6].value, sizeof(rows[6].value), "%.1f / %.0f GB", s->ram_used / 1073741824.0,
 	         s->ram_total / 1073741824.0);
-	ph_format_gb(rows[6].value, sizeof(rows[6].value), s->game_mem);
-	ph_battery_text(rows[7].value, sizeof(rows[7].value), s, 1);
-	snprintf(rows[8].value, sizeof(rows[8].value), "%.1f W", s->watts);
-	snprintf(rows[9].value, sizeof(rows[9].value), "%d Hz", s->hz);
+	ph_format_gb(rows[7].value, sizeof(rows[7].value), s->game_mem);
+	ph_battery_text(rows[8].value, sizeof(rows[8].value), s, 1);
+	snprintf(rows[9].value, sizeof(rows[9].value), "%.1f W", s->watts);
+	snprintf(rows[10].value, sizeof(rows[10].value), "%d Hz", s->hz);
 
-	for (int i = 0; i < 10; i++) {
+	for (int i = 0; i < 11; i++) {
 		if (!rows[i].shown)
 			continue;
 		y += row;

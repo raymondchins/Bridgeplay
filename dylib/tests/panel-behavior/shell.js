@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { panel, walk, details, runner, FORMS, overlay, hud, limit } = require('./harness');
+const { panel, walk, details, runner, FORMS, overlay, hud, limit, filter } = require('./harness');
 
 const emit = process.argv[2];
 if (!emit) { console.error('usage: shell.js <emit>'); process.exit(2); }
@@ -18,7 +18,7 @@ const TOGGLES = {
 const ON_UNLESS_0 = { ROSETTA_ADVERTISE_AVX: true };
 const PANEL_KEYS = ['CX_GRAPHICS_BACKEND', 'MTL_HUD_ENABLED', 'D3DM_ENABLE_METALFX', 'DXMT_ENABLE_NVEXT',
   'DXMT_METALFX_SPATIAL_SWAPCHAIN', 'DXMT_CONFIG', 'ROSETTA_ADVERTISE_AVX', 'WINEMSYNC', 'BRIDGEPLAY_RETINA',
-  'BRIDGEPLAY_RAW_CONTROLLERS', 'BRIDGEPLAY_DISABLE_HIDRAW', 'BRIDGEPLAY_PERF_OVERLAY', 'BRIDGEPLAY_FPS_LIMIT'];
+  'BRIDGEPLAY_RAW_CONTROLLERS', 'BRIDGEPLAY_DISABLE_HIDRAW', 'BRIDGEPLAY_PERF_OVERLAY', 'BRIDGEPLAY_FPS_LIMIT', 'BRIDGEPLAY_SCALING_FILTER'];
 const OTHER_KEYS = ['WINEDEBUG', 'DXVK_HUD', 'FOO'];
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'np-shell-'));
@@ -75,7 +75,7 @@ function view(form, options) {
   toggles.MTL_HUD_ENABLED = hud(nodes);
   const backend = nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === 'dxvk'));
   const upscale = nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === '1.5'));
-  return { toggles, backend, upscale, overlay: overlay(nodes), limit: limit(nodes), written: P.written };
+  return { toggles, backend, upscale, overlay: overlay(nodes), limit: limit(nodes), filter: filter(nodes), written: P.written };
 }
 
 function dxmt(conf) {
@@ -122,6 +122,9 @@ function agrees(t, v, env, what) {
       ? String(+env.BRIDGEPLAY_FPS_LIMIT) : '0';
   t.ok(v.limit.props.selectedOption === cap,
        `${what}: limit shows "${v.limit.props.selectedOption}", the shim limits to ${cap}`);
+  const sfw = /^(linear|nearest|integer)$/i.test(env.BRIDGEPLAY_SCALING_FILTER || '') ? env.BRIDGEPLAY_SCALING_FILTER.toLowerCase() : '0';
+  t.ok(v.filter.props.selectedOption === sfw,
+       `${what}: filter shows "${v.filter.props.selectedOption}", the shim uses ${sfw}`);
   t.ok(v.backend.props.selectedOption === (env.CX_GRAPHICS_BACKEND || ''),
        `${what}: backend shows "${v.backend.props.selectedOption}", game gets ${env.CX_GRAPHICS_BACKEND}`);
 }
@@ -133,6 +136,10 @@ const ACTIONS = [
     want: (v0, v1) => v1.overlay.props.selectedOption === 'summary' },
   { name: 'overlay off', run: v => v.overlay.props.onChange({ data: '0' }),
     want: (v0, v1) => v1.overlay.props.selectedOption === '0' },
+  { name: 'filter nearest', run: v => v.filter.props.onChange({ data: 'nearest' }),
+    want: (v0, v1) => v1.filter.props.selectedOption === 'nearest' },
+  { name: 'filter automatic', run: v => v.filter.props.onChange({ data: '0' }),
+    want: (v0, v1) => v1.filter.props.selectedOption === '0' },
   { name: 'limit 30', run: v => v.limit.props.onChange({ data: '30' }),
     want: (v0, v1) => v1.limit.props.selectedOption === '30' },
   { name: 'limit off', run: v => v.limit.props.onChange({ data: '0' }),

@@ -459,6 +459,12 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "FL=(l,O)=>{const c=fl(ev(\"BRIDGEPLAY_FPS_LIMIT\"));return(0," RT ".jsx)(" BARREL ".XY,{label:l," \
     "children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:O.some(o=>o.data===c)?O:O.concat([{data:c,label:c+\" FPS\"}])," \
     "selectedOption:c,onChange:v=>s([[\"BRIDGEPLAY_FPS_LIMIT\",fl(dv(\"BRIDGEPLAY_FPS_LIMIT\"))===v.data?\"\":v.data]])})},\"fpl\")}," \
+    /* The filter Core Animation scales the game's frames to the screen with. 0 leaves it as \
+       Wine (nearest with High Resolution off) or a native game (linear) sets it. */ \
+    "sq=x=>{x=(x||\"\").toLowerCase();return/^(linear|nearest|integer)$/.test(x)?x:\"0\"}," \
+    "SQ=(l,O)=>(0," RT ".jsx)(" BARREL ".XY,{label:l,children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:O," \
+    "selectedOption:sq(ev(\"BRIDGEPLAY_SCALING_FILTER\"))," \
+    "onChange:v=>s([[\"BRIDGEPLAY_SCALING_FILTER\",sq(dv(\"BRIDGEPLAY_SCALING_FILTER\"))===v.data?\"\":v.data]])})},\"scf\")," \
     /* A toggle that is on unless set to "0" (upstream 1.2.0: AVX2, FEX x87 precision). */ \
     "X=(k,l)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
     "checked:\"0\"!==ev(k),onChange:v=>s([[k,v?\"\":\"0\"]])},k)," \
@@ -490,7 +496,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "OV=[\"CX_GRAPHICS_BACKEND\",\"MTL_HUD_ENABLED\",\"D3DM_ENABLE_METALFX\",\"DXMT_ENABLE_NVEXT\"," \
     "\"ROSETTA_ADVERTISE_AVX\",\"WINEMSYNC\",\"BRIDGEPLAY_RETINA\",\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"DXMT_CONFIG\"," \
     "\"BRIDGEPLAY_FRAMEGEN\",\"BRIDGEPLAY_FRAMEGEN_QUALITY\",\"BRIDGEPLAY_FRAMEGEN_UI\",\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"," \
-    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
+    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\",\"BRIDGEPLAY_SCALING_FILTER\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
     "if(nat)return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
     "PO(\"Performance Overlay\",[{data:\"0\",label:\"Off\"},{data:\"fps\",label:\"FPS\"}," \
@@ -498,7 +504,11 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "{data:\"detailed\",label:\"Detailed (adds a frame-time graph)\"},{data:\"hud\",label:\"Apple Metal HUD\"}])," \
     "FL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\",[{data:\"0\",label:\"Off\"}," \
     "{data:\"display\",label:\"Match display refresh\"},{data:\"half\",label:\"Half display refresh\"}," \
-    "{data:\"60\",label:\"60 FPS\"},{data:\"40\",label:\"40 FPS\"},{data:\"30\",label:\"30 FPS\"}]),FG()," \
+    "{data:\"60\",label:\"60 FPS\"},{data:\"40\",label:\"40 FPS\"},{data:\"30\",label:\"30 FPS\"}])," \
+    "SQ(\"Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)\",[" \
+    "{data:\"0\",label:\"Automatic (as the game sets it)\"},{data:\"linear\",label:\"Linear (smooth)\"}," \
+    "{data:\"nearest\",label:\"Nearest (sharp pixels at any scale)\"}," \
+    "{data:\"integer\",label:\"Integer (sharp at exact 2x or 3x, smooth otherwise)\"}]),FG()," \
     "(0," RT ".jsx)(" BARREL ".XY,{label:\"Controllers\",children:" \
     "D(\"NP_PAD_MODE\",\"Controller layer\",[{data:\"\",label:\"Automatic\"},{data:\"hid\",label:\"Raw HID (Unity, SDL, Unreal)\"}," \
     "{data:\"gc\",label:\"GameController\"},{data:\"off\",label:\"Off\"}],lc(\"\"))},\"ctl\")" \
@@ -532,6 +542,16 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "{data:\"display\",label:npL(\"Match display refresh\",\"匹配显示器刷新率\",\"Uguale alla frequenza del display\")}," \
     "{data:\"half\",label:npL(\"Half display refresh\",\"显示器刷新率的一半\",\"Metà della frequenza del display\")}," \
     "{data:\"60\",label:\"60 FPS\"},{data:\"40\",label:\"40 FPS\"},{data:\"30\",label:\"30 FPS\"}])," \
+    "SQ(npL(\"Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)\"," \
+    "\"缩放过滤（当游戏绘制的像素少于屏幕时生效，例如关闭高分辨率时）\"," \
+    "\"Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)\"),[" \
+    "{data:\"0\",label:npL(\"Automatic (Wine keeps pixels sharp with High Resolution off)\"," \
+    "\"自动（关闭高分辨率时 Wine 保持像素锐利）\",\"Automatico (con Alta risoluzione disattivata Wine mantiene i pixel nitidi)\")}," \
+    "{data:\"linear\",label:npL(\"Linear (smooth)\",\"线性（平滑）\",\"Lineare (morbido)\")}," \
+    "{data:\"nearest\",label:npL(\"Nearest (sharp pixels at any scale)\",\"最近邻（任何比例都保持锐利像素）\"," \
+    "\"Nearest (pixel nitidi a qualsiasi scala)\")}," \
+    "{data:\"integer\",label:npL(\"Integer (sharp at exact 2x or 3x, smooth otherwise)\"," \
+    "\"整数（正好 2 倍或 3 倍时锐利，其他比例平滑）\",\"Intero (nitido a 2x o 3x esatti, morbido altrimenti)\")}])," \
     "dx&&(0," RT ".jsx)(" BARREL ".XY," \
     "{label:npL(\"MetalFX Upscaling (Samples from the resolution the game is set to)\"," \
     "\"MetalFX 超分辨率（以游戏设置的分辨率为采样来源）\",\"Upscaling MetalFX (ingrandisce l'immagine dalla risoluzione impostata nel gioco)\")," \
@@ -877,7 +897,7 @@ int np_webpatch_should_patch(const char *path) {
 static const char *const fx_bridgeplay_keys[] = {
     "BRIDGEPLAY_RETINA", "BRIDGEPLAY_FRAMEGEN", "BRIDGEPLAY_FRAMEGEN_QUALITY",
     "BRIDGEPLAY_FRAMEGEN_UI", "BRIDGEPLAY_FRAMEGEN_FALLBACK", "BRIDGEPLAY_FRAMEGEN_ENGINE",
-    "BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_FPS_LIMIT",
+    "BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_FPS_LIMIT", "BRIDGEPLAY_SCALING_FILTER",
 };
 
 // The BRIDGEPLAY_ name whose suffix follows prefix in key ("" for the run script's short
@@ -912,7 +932,8 @@ static const char *fx_native_key(const char *key) {
         if (strcmp(key, keys[i]) == 0) return keys[i];
     if (strncmp(key, "BRIDGEPLAY_FRAMEGEN", 19) != 0 && strncmp(key, "NOTPROTON_FRAMEGEN", 18) != 0 &&
         strcmp(key, "BRIDGEPLAY_PERF_OVERLAY") != 0 && strcmp(key, "NOTPROTON_PERF_OVERLAY") != 0 &&
-        strcmp(key, "BRIDGEPLAY_FPS_LIMIT") != 0 && strcmp(key, "NOTPROTON_FPS_LIMIT") != 0)
+        strcmp(key, "BRIDGEPLAY_FPS_LIMIT") != 0 && strcmp(key, "NOTPROTON_FPS_LIMIT") != 0 &&
+        strcmp(key, "BRIDGEPLAY_SCALING_FILTER") != 0 && strcmp(key, "NOTPROTON_SCALING_FILTER") != 0)
         return NULL;
     const char *bp = fx_bridgeplay_key(key, "BRIDGEPLAY_");
     return bp ? bp : fx_bridgeplay_key(key, "NOTPROTON_");

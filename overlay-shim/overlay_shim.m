@@ -286,6 +286,7 @@ static int stage_claimed(Class seen, Class *held, const char *stage)
 #include "quitkey.m"
 #include "perfhud.m"
 #include "framelimit.m"
+#include "scalefilter.m"
 
 static void encoder_mark(id encoder, NSUInteger format, id<MTLCommandBuffer> buffer)
 {
@@ -1038,8 +1039,10 @@ static id hook_next_drawable(id layer, SEL selector)
 		ensure_drawable_hooks(drawable);
 		framegen_note_drawable(layer, drawable);
 	}
-	if (drawable != nil)
+	if (drawable != nil) {
 		perfhud_note_frame(layer);
+		scalefilter_note(layer);
+	}
 
 	return drawable;
 }
@@ -1101,7 +1104,8 @@ __attribute__((constructor)) static void overlay_shim_load(void)
 	framegen_install_layer_hooks(layer);
 	// The overlay times frames from nextDrawable, which otherwise waits for lsteamclient's
 	// np_overlay_shim_install: a native game or one without the Steam API never calls it
-	if (perfhud_init() || limited)
+	int filtered = scalefilter_init();
+	if (perfhud_init() || limited || filtered)
 		hook_layer_drawable(layer);
 
 	shim_log("overlay_shim_load: pid=%d exe=%s layer_hooks=%d overlay=%s\n", getpid(),

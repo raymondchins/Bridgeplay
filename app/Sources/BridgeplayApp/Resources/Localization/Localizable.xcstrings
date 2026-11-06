@@ -2624,6 +2624,22 @@
         }
       }
     },
+    "Automatic (Wine keeps pixels sharp with High Resolution off)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatico (con Alta risoluzione disattivata Wine mantiene i pixel nitidi)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动（关闭高分辨率时 Wine 保持像素锐利）"
+          }
+        }
+      }
+    },
     "Automatic follows the engine." : {
       "localizations" : {
         "it" : {
@@ -7780,6 +7796,22 @@
         }
       }
     },
+    "How a game's frames are scaled up to the screen when it draws fewer pixels, as with High Resolution off. Automatic keeps what Wine does there, sharp pixels; Linear smooths them." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Come i fotogrammi di un gioco vengono ingranditi sullo schermo quando disegna meno pixel, come con Alta risoluzione disattivata. Automatico mantiene ciò che fa Wine, pixel nitidi; Lineare li ammorbidisce."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当游戏绘制的像素少于屏幕时（例如关闭高分辨率），其画面如何放大到屏幕。自动保持 Wine 的做法，即锐利像素；线性会将其平滑。"
+          }
+        }
+      }
+    },
     "How did each game run? Games you already answered for this version of Bridgeplay, games you asked not to be asked about, and games already verified on a Mac like yours are left out." : {
       "localizations" : {
         "it" : {
@@ -7842,6 +7874,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "游戏的 DirectX 如何到达你的 GPU。“自动”会按游戏选择。D3DMetal（Apple 的 Game Porting Toolkit）运行 DirectX 11 和 12，为默认选项。DXMT 直接在 Metal 上运行 DirectX 10 和 11。DXVK 通过 Vulkan 运行 DirectX 9 到 11。WineD3D 是 Wine 自带的转换层，适用于很老的游戏。"
+          }
+        }
+      }
+    },
+    "How the game's frames are scaled up to your screen. Automatic keeps what happens today: Wine doubles each pixel sharply with High Resolution off, and Mac games are smoothed. Linear smooths, Nearest keeps every pixel sharp, which suits pixel art, and Integer is sharp only at an exact 2x or 3x. MetalFX upscaling, when on, runs first." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Come i fotogrammi del gioco vengono ingranditi sullo schermo. Automatico mantiene il comportamento attuale: con Alta risoluzione disattivata Wine raddoppia ogni pixel in modo nitido, e i giochi per Mac vengono ammorbiditi. Lineare ammorbidisce, Nearest mantiene ogni pixel nitido, adatto alla pixel art, e Intero è nitido solo a 2x o 3x esatti. L'upscaling MetalFX, se attivo, viene prima."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏画面如何放大到屏幕。自动保持现在的效果：关闭高分辨率时 Wine 会将每个像素锐利地放大一倍，Mac 游戏则会被平滑。线性会平滑，最近邻让每个像素保持锐利，适合像素风格，整数仅在正好 2 倍或 3 倍时锐利。若开启 MetalFX 超分辨率，它会先执行。"
           }
         }
       }
@@ -8484,6 +8532,22 @@
         }
       }
     },
+    "Integer" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intero"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整数"
+          }
+        }
+      }
+    },
     "It installs when you quit Bridgeplay, or you can restart now." : {
       "localizations" : {
         "it" : {
@@ -8990,6 +9054,22 @@
         }
       }
     },
+    "Linear" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lineare"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "线性"
+          }
+        }
+      }
+    },
     "Linked." : {
       "localizations" : {
         "it" : {
@@ -9486,6 +9566,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "原生 Mac 游戏"
+          }
+        }
+      }
+    },
+    "Nearest" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nearest"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近邻"
           }
         }
       }
@@ -12664,6 +12760,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "基于 CodeWeavers 的 Wine 和 Apple 的 Game Porting Toolkit 运行。"
+          }
+        }
+      }
+    },
+    "Scaling Filter" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtro di scala"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩放过滤"
+          }
+        }
+      }
+    },
+    "Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩放过滤（当游戏绘制的像素少于屏幕时生效，例如关闭高分辨率时）"
           }
         }
       }

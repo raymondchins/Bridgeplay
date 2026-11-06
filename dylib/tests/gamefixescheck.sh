@@ -126,7 +126,7 @@ launch() {
 			compose_dll_overrides
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
-				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE NOTPROTON_PERF_OVERLAY NOTPROTON_FPS_LIMIT CX_GRAPHICS_BACKEND \
+				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE NOTPROTON_PERF_OVERLAY NOTPROTON_FPS_LIMIT NOTPROTON_SCALING_FILTER CX_GRAPHICS_BACKEND \
 				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS NOTPROTON_ROCKSTAR_DXGI CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
@@ -668,6 +668,35 @@ launch waitforexitandrun "$case_dir/game/game.exe"
 is "no conf leaves the quality to the shim" "<unset>" "$(got NOTPROTON_FRAMEGEN_QUALITY)"
 is "no conf leaves the performance overlay off" "<unset>" "$(got NOTPROTON_PERF_OVERLAY)"
 
+echo "== SCALING_FILTER"
+for value in 0 linear nearest integer; do
+	new_case
+	full_engine
+	user_conf "SCALING_FILTER=$value"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	is "SCALING_FILTER=$value maps to NOTPROTON_SCALING_FILTER" "$value" "$(got NOTPROTON_SCALING_FILTER)"
+done
+for bad in fsr nis Nearest pixel 1; do
+	new_case
+	full_engine
+	user_conf "SCALING_FILTER=$bad"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	has "SCALING_FILTER=$bad is refused" "rejected SCALING_FILTER: not 0, linear, nearest or integer" "$case_dir/log"
+	is "a refused SCALING_FILTER=$bad leaves it unset" "<unset>" "$(got NOTPROTON_SCALING_FILTER)"
+done
+new_case
+full_engine
+printf 'SCALING_FILTER=nearest\n' > "$case_dir/support/gamefixes/default.conf"
+user_conf 'BRIDGEPLAY_SCALING_FILTER=integer'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a per-game filter wins over Game Defaults, BRIDGEPLAY_ name and all" "integer" "$(got NOTPROTON_SCALING_FILTER)"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_SCALING_FILTER=0
+is "a launch option sets the filter back over the confs" "0" "$(got NOTPROTON_SCALING_FILTER)"
+new_case
+full_engine
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "no conf leaves the filter alone" "<unset>" "$(got NOTPROTON_SCALING_FILTER)"
+
 echo "== FPS_LIMIT"
 for value in 0 display half 10 30 60 144 360; do
 	new_case
@@ -755,15 +784,22 @@ for spec in '0:none' 'off:none' 'display:shim' 'half:shim' '30:shim'; do
 	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
 	is "NOTPROTON_FPS_LIMIT=$fl without the Steam overlay: $want" "$want" "$got_dyld"
 done
+for spec in '0:none' 'off:none' 'linear:shim' 'nearest:shim' 'integer:shim'; do
+	sfv=${spec%%:*} want=${spec#*:}
+	env -i PATH="$PATH" NOTPROTON_SCALING_FILTER="$sfv" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
+	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
+	is "NOTPROTON_SCALING_FILTER=$sfv without the Steam overlay: $want" "$want" "$got_dyld"
+done
 
 echo "== the launcher receives the allow-listed variables"
 set --
 out=$(env -i PATH="$PATH" forward="$forward" VKD3D_CONFIG=dxr MVK_CONFIG_LOG_LEVEL=1 \
 	STAGING_SHARED_MEMORY=1 WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 CX_FWD_COMPAT_GL_CTX=1 \
 	DXVK_HUD=fps NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 \
-	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_FPS_LIMIT=30 NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | LC_ALL=C sort | tr '\n' ' ')
+	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_FPS_LIMIT=30 NOTPROTON_SCALING_FILTER=nearest NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | LC_ALL=C sort | tr '\n' ' ')
 is "VKD3D_, MVK_, STAGING_, WINE_ topology and CX_FWD_COMPAT_GL_CTX variables are forwarded" \
-	"CX_FWD_COMPAT_GL_CTX=1 DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FPS_LIMIT=30 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 NOTPROTON_PERF_OVERLAY=summary STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
+	"CX_FWD_COMPAT_GL_CTX=1 DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FPS_LIMIT=30 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_SCALING_FILTER=nearest STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
 
 echo "== the wineserver directory self-heal"
 heal=$(sed -n '/^heal_wine_tmp() {$/,/^}$/p' "$SRC")

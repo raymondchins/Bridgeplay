@@ -1,0 +1,141 @@
+// Scaling filter: NOTPROTON_SCALING_FILTER (BRIDGEPLAY_SCALING_FILTER in launch options and
+// confs) = linear | nearest | integer. Included by overlay_shim.m after framelimit.m.
+//
+// When a game's drawable has fewer pixels than its window on screen (High Resolution off,
+// the default, renders at the window's point size, half a Retina display's pixels; a game
+// set to a lower resolution than its window), Core Animation scales each frame up to the
+// screen with the layer's magnificationFilter. Wine's Mac driver sets that to nearest while
+// Retina mode is off, so a Wine game is pixel-doubled today; a native game gets Core
+// Animation's own linear. Unset leaves either as it is; this picks the filter instead. It is the last step before the screen, after the game and after
+// DXMT's MetalFX upscaling, and it changes nothing when the drawable already matches the
+// screen. integer is nearest only at an exact whole-number scale (2x, 3x), where every game
+// pixel becomes an even square, and linear otherwise, where nearest would draw some pixels
+// wider than others.
+
+#import <math.h>
+
+enum { sf_default, sf_linear, sf_nearest, sf_integer };
+static const char *const sf_mode_names[] = { "default", "linear", "nearest", "integer" };
+
+static int sf_mode;
+static os_unfair_lock sf_lock = OS_UNFAIR_LOCK_INIT;
+static id sf_layer; // compared only
+static double sf_checked;
+static _Atomic int sf_pending;
+// What the screen shows, for the overlay: the filter in use (0 not yet known, 1 linear,
+// 2 nearest) and screen pixels per drawable pixel, times 100
+static _Atomic int sf_filter;
+static _Atomic int sf_scale_x100;
+
+// Main thread: measure the scale the layer is drawn at and set its filter, and the filter
+// of framegen's covering layer, which shows the frames while it is on
+static void sf_apply(CAMetalLayer *layer)
+{
+	ph_read_screen(layer);
+	CGSize drawable = layer.drawableSize;
+	CGRect bounds = layer.bounds;
+	double screen = atomic_load(&ph_scale);
+	double sx = drawable.width > 0 ? bounds.size.width * screen / drawable.width : 0;
+	double sy = drawable.height > 0 ? bounds.size.height * screen / drawable.height : 0;
+
+	int whole = sx >= 1.99 && fabs(sx - round(sx)) < 0.01 && fabs(sy - round(sy)) < 0.01 &&
+	            fabs(sx - sy) < 0.01;
+	int nearest = sf_mode == sf_nearest || (sf_mode == sf_integer && whole);
+	NSString *filter = nearest ? kCAFilterNearest : kCAFilterLinear;
+
+	static int seen;
+	if (!seen) {
+		seen = 1;
+		shim_log("overlay_shim scalefilter: the layer came with %s magnification\n",
+		         layer.magnificationFilter.UTF8String);
+	}
+	fg_ca_begin();
+	if (![layer.magnificationFilter isEqualToString:filter])
+		layer.magnificationFilter = filter;
+	for (CALayer *sub in layer.sublayers)
+		if ([sub isKindOfClass:[CAMetalLayer class]] && ![sub.magnificationFilter isEqualToString:filter])
+			sub.magnificationFilter = filter;
+	fg_ca_end();
+
+	int scale = (int)lround(sx * 100);
+	int before = atomic_exchange(&sf_filter, nearest ? 2 : 1);
+	int before_scale = atomic_exchange(&sf_scale_x100, scale);
+	if (before != (nearest ? 2 : 1) || abs(before_scale - scale) > 1)
+		shim_log("overlay_shim scalefilter: %s, drawable %.0fx%.0f shown at %.0fx%.0f px (%.2fx), %s\n",
+		         sf_mode_names[sf_mode], drawable.width, drawable.height, bounds.size.width * screen,
+		         bounds.size.height * screen, sx, nearest ? "nearest" : "linear");
+}
+
+// Called on the game's thread after its nextDrawable: checks the layer when it is new and
+// every second, so a resolution change in the game or a move to another display follows.
+static void scalefilter_note(id layer)
+{
+	if (sf_mode == sf_default || fg_internal || layer == nil)
+		return;
+
+	double now = CACurrentMediaTime();
+	os_unfair_lock_lock(&sf_lock);
+	int due = layer != sf_layer || now - sf_checked >= 1.0;
+	if (due) {
+		sf_layer = layer;
+		sf_checked = now;
+	}
+	os_unfair_lock_unlock(&sf_lock);
+	if (!due || atomic_exchange(&sf_pending, 1))
+		return;
+
+	[layer retain];
+	dispatch_async(dispatch_get_main_queue(), ^{
+		sf_apply((CAMetalLayer *)layer);
+		[layer release];
+		atomic_store(&sf_pending, 0);
+	});
+}
+
+// What the overlay shows: the filter in use (NULL when this is not set or not known yet)
+// and the scale it is applied at
+static const char *scalefilter_state(double *scale)
+{
+	int filter = atomic_load(&sf_filter);
+	if (sf_mode == sf_default || filter == 0)
+		return NULL;
+	int scale_x100 = atomic_load(&sf_scale_x100);
+	if (scale != NULL)
+		*scale = scale_x100 / 100.0;
+	// The frame already has the screen's pixels (High Resolution, MetalFX): no filter applies
+	if (scale_x100 <= 101)
+		return "Not scaled";
+	return filter == 2 ? "Nearest" : "Linear";
+}
+
+// Reads the setting; returns whether a filter is chosen for this process.
+static int scalefilter_init(void)
+{
+	const char *value = getenv("NOTPROTON_SCALING_FILTER");
+	if (value == NULL || value[0] == '\0' || strcmp(value, "0") == 0 || strcasecmp(value, "default") == 0)
+		return 0;
+	if (strcasecmp(value, "linear") == 0)
+		sf_mode = sf_linear;
+	else if (strcasecmp(value, "nearest") == 0)
+		sf_mode = sf_nearest;
+	else if (strcasecmp(value, "integer") == 0)
+		sf_mode = sf_integer;
+	else {
+		shim_log("overlay_shim scalefilter: BRIDGEPLAY_SCALING_FILTER=%s not understood "
+		         "(linear|nearest|integer), left as it is\n", value);
+		return 0;
+	}
+	shim_log("overlay_shim scalefilter: %s\n", sf_mode_names[sf_mode]);
+	return 1;
+}
+
+// Test entry: the mode, and the filter and scale last applied
+__attribute__((visibility("default"))) void np_scalefilter_probe(int *mode, int *filter, double *scale)
+{
+	if (mode != NULL)
+		*mode = sf_mode;
+	if (filter != NULL)
+		*filter = atomic_load(&sf_filter);
+	if (scale != NULL)
+		*scale = atomic_load(&sf_scale_x100) / 100.0;
+}

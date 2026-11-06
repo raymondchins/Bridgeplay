@@ -106,6 +106,11 @@ struct GuideView: View {
                          note: String(localized: "Holds the game to your display's refresh rate, half of it, or 60, 40 or 30 FPS, and waits for the display so frames land evenly. Smoother pacing and less battery drain. The display's own refresh rate is not changed. Off by default."))
             }
 
+            SteamBlock(title: String(localized: "Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)")) {
+                SteamRow(.dropdown(nil, String(localized: "Automatic (Wine keeps pixels sharp with High Resolution off)")),
+                         note: String(localized: "How the game's frames are scaled up to your screen. Automatic keeps what happens today: Wine doubles each pixel sharply with High Resolution off, and Mac games are smoothed. Linear smooths, Nearest keeps every pixel sharp, which suits pixel art, and Integer is sharp only at an exact 2x or 3x. MetalFX upscaling, when on, runs first."))
+            }
+
             SteamBlock(title: String(localized: "MetalFX Upscaling (Samples from the resolution the game is set to)")) {
                 SteamRow(.dropdown(nil, String(localized: "Off")),
                          note: String(localized: "Shown with Automatic or DXMT. Renders below your display's resolution and scales up with MetalFX: 1.5×, 1.72×, 2× or 3×. Off keeps the resolution set in the game."))

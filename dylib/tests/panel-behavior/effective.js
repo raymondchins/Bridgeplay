@@ -34,13 +34,13 @@ put('gamefixes-default/default.conf', 'MTL_HUD_ENABLED=0\nDXMT_ENABLE_NVEXT=1\nR
 // The run script's short keys also take the BRIDGEPLAY_ name.
 put('gamefixes/1778821.conf', 'BRIDGEPLAY_FRAMEGEN=0\nPERF_OVERLAY=summary\n');
 put('gamefixes/1778822.conf', 'BRIDGEPLAY_PERF_OVERLAY=detailed\nFPS_LIMIT=30\n');
-put('gamefixes/1778826.conf', 'BRIDGEPLAY_FPS_LIMIT=half\n');
+put('gamefixes/1778826.conf', 'BRIDGEPLAY_FPS_LIMIT=half\nSCALING_FILTER=integer\n');
 // np-native's own confs: raw variable names, export and quotes allowed, and the pre-3.0
 // NOTPROTON_ spelling still read under the BRIDGEPLAY_ name.
 put('gamefixes/native-default.conf', '# native\nexport MTL_HUD_ENABLED=1\nNP_PAD_MODE = "hid"\n' +
   'NOTPROTON_FRAMEGEN=3\nFRAMEGEN=2\nBRIDGEPLAY_RETINA=1\n');
 put('gamefixes/native/1778820.conf', "NP_PAD_MODE='gc'\nBRIDGEPLAY_FRAMEGEN_ENGINE=metalfx\n");
-put('gamefixes/native/1778823.conf', 'NOTPROTON_PERF_OVERLAY=fps\nBRIDGEPLAY_FPS_LIMIT=display\n');
+put('gamefixes/native/1778823.conf', 'NOTPROTON_PERF_OVERLAY=fps\nBRIDGEPLAY_FPS_LIMIT=display\nBRIDGEPLAY_SCALING_FILTER=nearest\n');
 // As in np-native, the NOTPROTON_ spelling wins in the same file, before or after.
 put('gamefixes/native/1778824.conf', 'NOTPROTON_PERF_OVERLAY=fps\nBRIDGEPLAY_PERF_OVERLAY=detailed\n');
 put('gamefixes/native/1778825.conf', 'BRIDGEPLAY_FRAMEGEN=3\nNOTPROTON_FRAMEGEN=2\nBRIDGEPLAY_FRAMEGEN=adaptive\n');
@@ -103,6 +103,8 @@ t0.ok(!!fx && fx.a[1778821] && fx.a[1778821].BRIDGEPLAY_PERF_OVERLAY === 'summar
 t0.ok(!!fx && fx.a[1778822].BRIDGEPLAY_FPS_LIMIT === '30' && fx.a[1778826] && fx.a[1778826].BRIDGEPLAY_FPS_LIMIT === 'half' &&
       fx.na[1778823].BRIDGEPLAY_FPS_LIMIT === 'display',
       `FPS_LIMIT reaches the panel in either spelling, native too (${fx && JSON.stringify(fx.a)})`);
+t0.ok(!!fx && fx.a[1778826].BRIDGEPLAY_SCALING_FILTER === 'integer' && fx.na[1778823].BRIDGEPLAY_SCALING_FILTER === 'nearest',
+      `SCALING_FILTER reaches the panel, native too (${fx && JSON.stringify(fx.na)})`);
 t0.ok(!!fx && fx.na[1778823] && fx.na[1778823].BRIDGEPLAY_PERF_OVERLAY === 'fps',
       `a native conf's overlay level reaches the panel (${fx && JSON.stringify(fx.na)})`);
 t0.ok(!!fx && fx.na[1778824] && fx.na[1778824].BRIDGEPLAY_PERF_OVERLAY === 'fps' &&
