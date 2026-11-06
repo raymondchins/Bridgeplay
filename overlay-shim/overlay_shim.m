@@ -284,6 +284,7 @@ static int stage_claimed(Class seen, Class *held, const char *stage)
 // Frame generation (NOTPROTON_FRAMEGEN=1), one translation unit with the shim
 #include "framegen.m"
 #include "quitkey.m"
+#include "perfhud.m"
 
 static void encoder_mark(id encoder, NSUInteger format, id<MTLCommandBuffer> buffer)
 {
@@ -1035,8 +1036,20 @@ static id hook_next_drawable(id layer, SEL selector)
 		ensure_drawable_hooks(drawable);
 		framegen_note_drawable(layer, drawable);
 	}
+	if (drawable != nil)
+		perfhud_note_frame(layer);
 
 	return drawable;
+}
+
+// Once only: a second interpose would make the hook its own next
+static void hook_layer_drawable(Class layer)
+{
+	static int hooked;
+
+	if (hooked || layer == Nil)
+		return;
+	hooked = interpose(layer, "nextDrawable", (IMP)hook_next_drawable, (IMP *)&next_layer_drawable);
 }
 
 static void report_renderer_chain(void)
@@ -1046,7 +1059,7 @@ static void report_renderer_chain(void)
 	shim_log("overlay_shim report_renderer_chain: drawable_swizzle=%s\n",
 	        class_has_method(layer, "steamoverlay_nextDrawable") ? "present" : "missing");
 
-	interpose(layer, "nextDrawable", (IMP)hook_next_drawable, (IMP *)&next_layer_drawable);
+	hook_layer_drawable(layer);
 }
 
 // FEX specific stuff
@@ -1082,6 +1095,10 @@ __attribute__((constructor)) static void overlay_shim_load(void)
 		hooked += interpose(layer, "setDisplaySyncEnabled:", (IMP)hook_set_display_sync,
 		                    (IMP *)&next_set_display_sync);
 	framegen_install_layer_hooks(layer);
+	// The overlay times frames from nextDrawable, which otherwise waits for lsteamclient's
+	// np_overlay_shim_install: a native game or one without the Steam API never calls it
+	if (perfhud_init())
+		hook_layer_drawable(layer);
 
 	shim_log("overlay_shim_load: pid=%d exe=%s layer_hooks=%d overlay=%s\n", getpid(),
 	        getprogname(), hooked, overlay_text_end != NULL ? "present" : "absent");

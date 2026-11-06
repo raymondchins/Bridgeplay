@@ -86,8 +86,6 @@ struct GuideView: View {
             SteamBlock(title: String(localized: "Graphics")) {
                 SteamRow(.dropdown(nil, String(localized: "Automatic")),
                          note: String(localized: "How the game's DirectX reaches your GPU. Automatic picks per game. D3DMetal (Apple's Game Porting Toolkit) runs DirectX 11 and 12 and is the default. DXMT runs DirectX 10 and 11 directly on Metal. DXVK runs DirectX 9 to 11 through Vulkan. WineD3D is Wine's own translation, for very old games."))
-                SteamRow(.check(String(localized: "Metal HUD"), true),
-                         note: String(localized: "Apple's performance overlay: frame rate, frame time and GPU use."))
                 SteamRow(.check("DLSS", true),
                          note: String(localized: "Lets the game offer NVIDIA DLSS. Apple's MetalFX does the upscaling, and DLSS Frame Generation is experimental and off by default. Turn DLSS on in the game's own settings as well."))
                 SteamRow(.check(String(localized: "Advertise AVX2 to Rosetta"), true),
@@ -96,6 +94,11 @@ struct GuideView: View {
                          note: String(localized: "A faster way for the game's threads to wait on each other. Leave it on unless a game hangs."))
                 SteamRow(.check(String(localized: "High Resolution"), true),
                          note: String(localized: "Draws at your display's full Retina resolution instead of half. Sharper, heavier on the GPU."))
+            }
+
+            SteamBlock(title: String(localized: "Performance Overlay")) {
+                SteamRow(.dropdown(nil, String(localized: "Off")),
+                         note: String(localized: "Bridgeplay's overlay in the top-left corner while you play. FPS shows the frame rate alone, Summary adds frame time, CPU, GPU, memory and battery in one row, and Detailed a panel with a frame-time graph. Apple Metal HUD shows Apple's own overlay instead. Off by default."))
             }
 
             SteamBlock(title: String(localized: "MetalFX Upscaling (Samples from the resolution the game is set to)")) {
@@ -125,7 +128,7 @@ struct GuideView: View {
 
             SteamBlock(title: String(localized: "Native Mac games")) {
                 SteamRow(.dropdown(String(localized: "Controller layer"), String(localized: "Automatic")),
-                         note: String(localized: "Only on native Mac games, next to Metal HUD and Frame Generation. Raw HID suits Unity, SDL and Unreal games, GameController uses Apple's framework, and Off leaves controllers alone."))
+                         note: String(localized: "Only on native Mac games, next to the Performance Overlay and Frame Generation. Raw HID suits Unity, SDL and Unreal games, GameController uses Apple's framework, and Off leaves controllers alone."))
             }
         }
     }
@@ -340,7 +343,7 @@ private struct SteamPropertiesDrawing: View {
                 .padding(7).background(Steam.row)
                 Text("Graphics").font(Steam.font(11, .semibold)).foregroundStyle(.white).padding(.top, 4)
                 mini(String(localized: "Automatic"), wide: true)
-                ForEach([String(localized: "Metal HUD"), "DLSS", "MSync", String(localized: "High Resolution")], id: \.self) { label in
+                ForEach(["DLSS", "MSync", String(localized: "High Resolution")], id: \.self) { label in
                     HStack(spacing: 7) {
                         checkbox(true)
                         Text(verbatim: label).font(Steam.font(9.5, .regular)).foregroundStyle(Steam.text)

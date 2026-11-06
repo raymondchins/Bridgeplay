@@ -25,7 +25,8 @@
  *
  * DYLD_INSERT_LIBRARIES is composed, never replaced:
  *   gamepad shim (~/.bridgeplay/libnp_gamepad.dylib, unless NP_PAD_MODE=off)
- *   overlay shim (only when BRIDGEPLAY_FRAMEGEN is set and not 0/off)
+ *   overlay shim (only when BRIDGEPLAY_FRAMEGEN or BRIDGEPLAY_PERF_OVERLAY is set
+ *   and not 0/off)
  *   DYLD_INSERT_LIBRARIES given through the sources above
  *   DYLD_INSERT_LIBRARIES and STEAM_DYLD_INSERT_LIBRARIES received from Steam
  * de-duplicated, ours first. STEAM_DYLD_INSERT_LIBRARIES is set to the same
@@ -495,8 +496,10 @@ int main(int argc, char **argv)
 		if (file_exists(pad_shim) || (pad_mode && *pad_mode))
 			libs_add(&L, pad_shim); /* warns and skips when missing */
 	}
+	/* frame generation and the performance overlay both live in the overlay shim */
 	const char *framegen = getenv("NOTPROTON_FRAMEGEN");
-	if (home && framegen && *framegen && !is_off(framegen)) {
+	const char *perf = getenv("NOTPROTON_PERF_OVERLAY");
+	if (home && ((framegen && *framegen && !is_off(framegen)) || (perf && *perf && !is_off(perf)))) {
 		char *support = current_or_legacy(home, SUPPORT_REL, LEGACY_SUPPORT_REL, dir_exists);
 		libs_add(&L, join3(support, OVERLAY_SHIM_REL, ""));
 	}

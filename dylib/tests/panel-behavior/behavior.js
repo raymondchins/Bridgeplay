@@ -1,6 +1,6 @@
 // What the panel renders, checked against both forms of the one payload.
 'use strict';
-const { panel, walk, details, runner, FORMS } = require('./harness');
+const { panel, walk, details, runner, FORMS, overlay, hud } = require('./harness');
 
 const emit = process.argv[2];
 if (!emit) { console.error('usage: behavior.js <emit>'); process.exit(2); }
@@ -19,8 +19,8 @@ for (const form of Object.keys(FORMS)) {
        'a shortcut renders the panel before a tool name reaches the page');
 
   let r = nodes('');
-  t.ok(toggles(r).length === 7 && sections(r).length === 4, 'automatic shows seven toggles in four sections');
-  t.ok(r.filter(x => x.type === 'Dropdown').length === 3, 'three dropdowns');
+  t.ok(toggles(r).length === 6 && sections(r).length === 5, 'automatic shows six toggles in five sections');
+  t.ok(r.filter(x => x.type === 'Dropdown').length === 4, 'four dropdowns');
   t.ok(!('label' in r.find(x => x.type === 'Dropdown').props), 'the backend dropdown carries no label column');
 
   r = nodes('CX_GRAPHICS_BACKEND=dxmt');
@@ -50,10 +50,11 @@ for (const form of Object.keys(FORMS)) {
 
   t.ok(nodes('CX_GRAPHICS_BACKEND=dxmt').find(x => x.type === 'Dropdown').props.selectedOption === 'dxmt',
        'the backend dropdown reflects the current value');
-  t.ok(nodes('MTL_HUD_ENABLED=1').find(x => x.props.label === 'Metal HUD').props.checked === true,
-       'a toggle reads as on from its argument');
+  t.ok(hud(nodes('MTL_HUD_ENABLED=1')).props.checked === true,
+       'the Metal HUD reads as on from its argument');
 
-  nodes('CX_GRAPHICS_BACKEND=dxmt').filter(x => x.type === 'Dropdown')[1].props.onChange({ data: '2.0' });
+  nodes('CX_GRAPHICS_BACKEND=dxmt').find(x => x.type === 'Dropdown' && x.props.rgOptions.some(o => o.data === '1.5'))
+    .props.onChange({ data: '2.0' });
   t.ok(last().includes('metalSpatialUpscaleFactor=2.0'), 'the upscaler writes its factor');
 
   // The section names the factor, so a label promising a resolution to go and set in
@@ -62,7 +63,7 @@ for (const form of Object.keys(FORMS)) {
     x.props.label.indexOf('MetalFX') === 0);
   t.ok(/Samples from the resolution the game is set to/.test(upscaler.props.label),
        'the upscaler section says where it samples from');
-  const factors = nodes('CX_GRAPHICS_BACKEND=dxmt').filter(x => x.type === 'Dropdown')[1]
+  const factors = nodes('CX_GRAPHICS_BACKEND=dxmt').find(x => x.type === 'Dropdown' && x.props.rgOptions.some(o => o.data === '1.5'))
     .props.rgOptions.map(o => o.label);
   t.ok(factors.join(',') === 'Off,1.5x,1.72x,2x,3x', `the factors name themselves (${factors.join(',')})`);
 
@@ -77,7 +78,60 @@ for (const form of Object.keys(FORMS)) {
   const root = P({ details: details('') });
   t.ok(root.props.className === 'MSCXPanel', 'the panel root carries its own class');
   const classes = nodes('').filter(x => x.type === 'Toggle').map(x => x.props.className);
-  t.ok(classes.length === 7 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
+  t.ok(classes.length === 6 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
+
+  // Performance Overlay: Bridgeplay's own levels and the Metal HUD in one menu, off by default.
+  const po = o => overlay(nodes(o));
+  const POL = 'Off:0,FPS:fps,Summary (FPS, frame time, CPU, GPU, memory, battery):summary,' +
+              'Detailed (adds a frame-time graph):detailed,Apple Metal HUD:hud';
+  t.ok(po('').props.rgOptions.map(x => x.label + ':' + x.data).join(',') === POL, 'the overlay levels name themselves');
+  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === 'Performance Overlay'),
+       'the overlay has a section of its own');
+  t.ok(po('').props.selectedOption === '0', 'the overlay is off by default');
+  t.ok(po('BRIDGEPLAY_PERF_OVERLAY=summary').props.selectedOption === 'summary', 'a level reads from its argument');
+  t.ok(po('NOTPROTON_PERF_OVERLAY=detailed').props.selectedOption === 'detailed', 'the pre-3.0 spelling reads too');
+  t.ok(po('BRIDGEPLAY_PERF_OVERLAY=1').props.selectedOption === 'fps', '1 reads as FPS, as the shim takes it');
+  t.ok(po('BRIDGEPLAY_PERF_OVERLAY=bogus').props.selectedOption === '0', 'a value the shim refuses reads as off');
+  t.ok(po('MTL_HUD_ENABLED=1 BRIDGEPLAY_PERF_OVERLAY=fps').props.selectedOption === 'hud',
+       'the Metal HUD shows over a level, as the shim lets it');
+  written.length = 0;
+  po('').props.onChange({ data: 'summary' });
+  t.ok(last().trim() === 'BRIDGEPLAY_PERF_OVERLAY=summary %command%', `picking a level writes it (${last()})`);
+  written.length = 0;
+  po('WINEDEBUG=-all BRIDGEPLAY_PERF_OVERLAY=summary').props.onChange({ data: '0' });
+  t.ok(last().trim() === 'WINEDEBUG=-all %command%', `Off drops it (${last()})`);
+  written.length = 0;
+  po('BRIDGEPLAY_PERF_OVERLAY=detailed').props.onChange({ data: 'hud' });
+  t.ok(last().trim() === 'MTL_HUD_ENABLED=1 %command%', `the Metal HUD replaces a level (${last()})`);
+  written.length = 0;
+  po('MTL_HUD_ENABLED=1').props.onChange({ data: 'fps' });
+  t.ok(last().trim() === 'BRIDGEPLAY_PERF_OVERLAY=fps %command%', `a level replaces the Metal HUD (${last()})`);
+  written.length = 0;
+  po('NOTPROTON_PERF_OVERLAY=fps').props.onChange({ data: 'detailed' });
+  t.ok(last().trim() === 'BRIDGEPLAY_PERF_OVERLAY=detailed %command%', `the pre-3.0 spelling is rewritten (${last()})`);
+
+  // Over Game Defaults: the conf's level shows, and the menu writes only what differs from it.
+  globalThis.MSCXFx = { g: { BRIDGEPLAY_PERF_OVERLAY: 'detailed' }, a: {}, e: {}, d: {} };
+  t.ok(po('').props.selectedOption === 'detailed', 'the Game Defaults level shows');
+  written.length = 0;
+  po('').props.onChange({ data: '0' });
+  t.ok(last().trim() === 'BRIDGEPLAY_PERF_OVERLAY=0 %command%', `Off over a default level writes 0 (${last()})`);
+  written.length = 0;
+  po('BRIDGEPLAY_PERF_OVERLAY=fps').props.onChange({ data: 'detailed' });
+  t.ok(last() === '', `the default level drops the override (${JSON.stringify(last())})`);
+  globalThis.MSCXFx = { g: { MTL_HUD_ENABLED: '1' }, a: {}, e: {}, d: {} };
+  t.ok(po('').props.selectedOption === 'hud', 'a Metal HUD default shows');
+  written.length = 0;
+  po('').props.onChange({ data: 'fps' });
+  t.ok(last().trim() === 'BRIDGEPLAY_PERF_OVERLAY=fps MTL_HUD_ENABLED=0 %command%',
+       `a level over a Metal HUD default turns that off (${last()})`);
+  globalThis.MSCXFx = { g: {}, a: { 287700: { BRIDGEPLAY_PERF_OVERLAY: 'summary' } }, e: {}, d: {} };
+  t.ok(po('').props.selectedOption === 'summary', "the game's own conf level shows");
+  delete globalThis.MSCXFx;
+  const def = o => nodes(o).find(x => x.type === 'button');
+  written.length = 0;
+  def('WINEDEBUG=-all BRIDGEPLAY_PERF_OVERLAY=summary').props.onClick();
+  t.ok(last().trim() === 'WINEDEBUG=-all %command%', `Use Bridgeplay defaults drops the overlay (${last()})`);
   const raw = o => nodes(o).find(x => x.props.label === 'Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)');
   t.ok(sections(nodes('')).includes('Controllers') && raw('').props.checked === false,
        'controller hiding is on unless the game says otherwise');
@@ -98,7 +152,8 @@ for (const form of Object.keys(FORMS)) {
     e: { 'bridgeplay-proton': { WINEMSYNC: '1' }, '': { WINEMSYNC: '0' } },
     d: { BRIDGEPLAY_RAW_CONTROLLERS: '1' },
   };
-  const row = (o, l) => nodes(o).find(x => x.props.label === l || (typeof x.props.label === 'string' && x.props.label.startsWith(l + ' (')));
+  const row = (o, l) => l === 'Metal HUD' ? hud(nodes(o)) :
+    nodes(o).find(x => x.props.label === l || (typeof x.props.label === 'string' && x.props.label.startsWith(l + ' (')));
   t.ok(row('', 'Metal HUD').props.checked === true, 'a global conf value reads as on');
   t.ok(row('', 'High Resolution').props.checked === false, 'the per-app conf beats the global conf');
   t.ok(row('', 'MSync').props.checked === true, 'the engine default reads as on');
@@ -236,17 +291,25 @@ for (const form of Object.keys(FORMS)) {
   const NAT = "'/Users/some one/.bridgeplay/np-native'";
   const mac = (o, over) => details(o, Object.assign({ vecPlatforms: ['osx'], strCompatToolName: '' }, over || {}));
   const nnodes = o => walk(P({ details: mac(o) }));
-  const nrow = (o, l) => nnodes(o).find(x => x.props.label === l || (typeof x.props.label === 'string' && x.props.label.startsWith(l + ' (')));
+  const nrow = (o, l) => l === 'Metal HUD' ? hud(nnodes(o)) :
+    nnodes(o).find(x => x.props.label === l || (typeof x.props.label === 'string' && x.props.label.startsWith(l + ' (')));
   globalThis.MSCXFx = { g: { MTL_HUD_ENABLED: '1', BRIDGEPLAY_FRAMEGEN: '2' }, a: { 287700: { WINEMSYNC: '1' } },
                         e: {}, d: { BRIDGEPLAY_FRAMEGEN_UI: '1', BRIDGEPLAY_FRAMEGEN_FALLBACK: '1' },
                         ng: {}, na: {}, h: HOME };
   let n = nnodes('');
   t.ok(P({ details: mac('') }) !== null && P({ details: mac('') }).props.className === 'MSCXPanel',
        'a mac build with nothing pinned renders the native panel');
-  t.ok(toggles(n).join('|') === 'Metal HUD' && sections(n).join(',') === 'Frame,Controllers',
-       `the native panel has the HUD, frame generation and controllers only (${toggles(n)} / ${sections(n)})`);
-  t.ok(n.filter(x => x.type === 'Dropdown').map(x => x.props.label).join(',') === 'Mode,Controller layer',
-       'native dropdowns: the mode and the controller layer');
+  t.ok(toggles(n).length === 0 && sections(n).join(',') === 'Performance,Frame,Controllers',
+       `the native panel has the overlay, frame generation and controllers only (${toggles(n)} / ${sections(n)})`);
+  t.ok(n.filter(x => x.type === 'Dropdown').map(x => x.props.label || 'overlay').join(',') === 'overlay,Mode,Controller layer',
+       'native dropdowns: the overlay, the mode and the controller layer');
+  written.length = 0;
+  overlay(nnodes('-novid')).props.onChange({ data: 'summary' });
+  t.ok(last() === NAT + ' BRIDGEPLAY_PERF_OVERLAY=summary %command% -novid',
+       `a native game gets the overlay under np-native (${last()})`);
+  written.length = 0;
+  overlay(nnodes(NAT + ' BRIDGEPLAY_PERF_OVERLAY=summary %command% -novid')).props.onChange({ data: 'hud' });
+  t.ok(last() === NAT + ' MTL_HUD_ENABLED=1 %command% -novid', `and the Metal HUD in its place (${last()})`);
   t.ok(nrow('', 'Metal HUD').props.checked === false && nrow('', 'Mode').props.selectedOption === '0',
        'the Wine confs do not reach a native game');
   t.ok(nnodes('BRIDGEPLAY_FRAMEGEN=3 %command%').filter(x => x.props.label === 'Quality').length === 1,

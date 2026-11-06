@@ -258,6 +258,10 @@ expect "names: a BRIDGEPLAY_ argument beats a conf NOTPROTON_" "NOTPROTON_RETINA
 rm -f "$confdir/native-default.conf"
 run "$V" -- NP_PAD_MODE=off NOTPROTON_FRAMEGEN=1 "$probe"
 expect "names: NOTPROTON_FRAMEGEN still loads the overlay shim" "DYLD_INSERT_LIBRARIES=$ov"
+run "$V" -- NP_PAD_MODE=off BRIDGEPLAY_PERF_OVERLAY=summary "$probe"
+expect "the performance overlay loads the overlay shim" "DYLD_INSERT_LIBRARIES=$ov"
+run "$V" -- NP_PAD_MODE=off BRIDGEPLAY_PERF_OVERLAY=0 "$probe"
+expect "a performance overlay that is off loads no shim" "DYLD_INSERT_LIBRARIES=(unset)"
 # A home the app has not moved over yet: only ~/.notproton and .../notproton exist.
 old_support="$H/Library/Application Support/notproton"
 mv "$H/.bridgeplay" "$H/.notproton"
