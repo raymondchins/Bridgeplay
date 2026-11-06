@@ -348,4 +348,87 @@ struct PinnedDownloadTests {
         #expect(label.hasPrefix("Downloading from "))
         #expect(label.contains(serving.lastPathComponent))
     }
+
+    // Answers the status in the host name ("504.busy.invalid") to the first requests, then
+    // 200 with the body. How many times it says no is the first path component.
+    private final class Busy: URLProtocol, @unchecked Sendable {
+        static let body = Data("the real package".utf8)
+        private static let lock = NSLock()
+        nonisolated(unsafe) private static var asked: [String: Int] = [:]
+        static func count(_ key: String) -> Int { lock.lock(); defer { lock.unlock() }; return asked[key] ?? 0 }
+
+        override class func canInit(with request: URLRequest) -> Bool { request.url?.host()?.hasSuffix("busy.invalid") == true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {
+            let url = request.url!
+            let key = url.pathComponents[1]
+            Self.lock.lock(); Self.asked[key, default: 0] += 1; let n = Self.asked[key]!; Self.lock.unlock()
+            let status = n <= Int(url.pathComponents[2])! ? Int(url.host()!.split(separator: ".")[0])! : 200
+            let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: status == 200 ? Self.body : Data("busy".utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        override func stopLoading() {}
+    }
+
+    private func busy(_ status: Int, refusals: Int) async throws -> (Result<URL, StepFailure>, asked: Int) {
+        let work = try scratchDirectory("pinned")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let key = UUID().uuidString
+        let result: Result<URL, StepFailure>
+        do {
+            let got = try await PinnedDownload.obtain(
+                file: "package.tar", sha256: Digest.sha256(of: Busy.body),
+                bases: [URL(string: "https://\(status).busy.invalid/\(key)/\(refusals)/")!],
+                into: work.appending(path: "downloads"), step: "test",
+                session: PinnedDownload.session(deadline: 30, protocols: [Busy.self]), backoff: .zero)
+            result = .success(got)
+        } catch let failure as StepFailure {
+            result = .failure(failure)
+        }
+        return (result, Busy.count(key))
+    }
+
+    @Test("A host that answers a passing 5xx is asked again (#2727)", arguments: [502, 503, 504, 429])
+    func passingBusyIsAskedAgain(status: Int) async throws {
+        let (result, asked) = try await busy(status, refusals: 2)
+        #expect((try? result.get()) != nil)
+        #expect(asked == 3)
+    }
+
+    @Test("A host that stays busy is given up on after three asks")
+    func busyHostIsGivenUpOn() async throws {
+        let (result, asked) = try await busy(504, refusals: 99)
+        guard case .failure(let failure) = result else { Issue.record("downloaded from a busy host"); return }
+        #expect(failure.detail.contains("try again later"))
+        #expect(asked == 3)
+    }
+
+    @Test("A host given up on hands over to the next, which gets its own asks")
+    func busyHostFallsThroughToNextHost() async throws {
+        let work = try scratchDirectory("pinned")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let (first, second) = (UUID().uuidString, UUID().uuidString)
+
+        let got = try await PinnedDownload.obtain(
+            file: "package.tar", sha256: Digest.sha256(of: Busy.body),
+            bases: [
+                URL(string: "https://504.busy.invalid/\(first)/99/")!,
+                URL(string: "https://503.busy.invalid/\(second)/2/")!,
+            ],
+            into: work.appending(path: "downloads"), step: "test",
+            session: PinnedDownload.session(deadline: 30, protocols: [Busy.self]), backoff: .zero)
+
+        #expect(try Data(contentsOf: got) == Busy.body)
+        #expect(Busy.count(first) == 3)
+        #expect(Busy.count(second) == 3)
+    }
+
+    @Test("A 404 is not asked again")
+    func notFoundIsNotRetried() async throws {
+        let (result, asked) = try await busy(404, refusals: 99)
+        #expect((try? result.get()) == nil)
+        #expect(asked == 1)
+    }
 }

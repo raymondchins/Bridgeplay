@@ -59,6 +59,7 @@ enum PinnedDownload {
         step: String,
         from source: String = "Valve",
         session: URLSession = PinnedDownload.session,
+        backoff: Duration = .seconds(3),
         report: @Sendable (Progress) -> Void = { _ in }
     ) async throws -> URL {
         let archive = downloads.appending(path: file)
@@ -69,67 +70,78 @@ enum PinnedDownload {
 
         var refusals: [String] = []
         var kinds: Set<Refusal> = []
-        for base in bases {
+        hosts: for base in bases {
             let host = base.host() ?? base.absoluteString
-            report(.fetching(host: host))
-            let body: URL, response: URLResponse
-            do {
-                (body, response) = try await withoutActuallyEscaping(report) { report in
-                    // A dropped connection (or one the server closed during a pause) resumes
-                    // where it stopped rather than starting the 440 MB over.
-                    defer { Task { @MainActor in DownloadMeter.shared.clear() } }
-                    var resumeData: Data?
-                    for attempt in 1... {
-                        let relay = ProgressRelay(host: host, report: report)
-                        defer { relay.finish() }
-                        do {
-                            if let resumeData { return try await session.download(resumeFrom: resumeData, delegate: relay) }
-                            return try await session.download(from: base.appending(path: file), delegate: relay)
-                        } catch let error as URLError where attempt < 4 && error.downloadTaskResumeData != nil {
-                            resumeData = error.downloadTaskResumeData
-                            AppLog.note("\(file) from \(host) interrupted (\(error.localizedDescription)), resuming")
-                            // #279: a Wi-Fi drop spent every try within one second.
-                            await networkBack(within: .seconds(120))
-                            try await Task.sleep(for: .seconds(2 * attempt))
+            var busy = 0
+            while true {
+                report(.fetching(host: host))
+                let body: URL, response: URLResponse
+                do {
+                    (body, response) = try await withoutActuallyEscaping(report) { report in
+                        // A dropped connection (or one the server closed during a pause) resumes
+                        // where it stopped rather than starting the 440 MB over.
+                        defer { Task { @MainActor in DownloadMeter.shared.clear() } }
+                        var resumeData: Data?
+                        for attempt in 1... {
+                            let relay = ProgressRelay(host: host, report: report)
+                            defer { relay.finish() }
+                            do {
+                                if let resumeData { return try await session.download(resumeFrom: resumeData, delegate: relay) }
+                                return try await session.download(from: base.appending(path: file), delegate: relay)
+                            } catch let error as URLError where attempt < 4 && error.downloadTaskResumeData != nil {
+                                resumeData = error.downloadTaskResumeData
+                                AppLog.note("\(file) from \(host) interrupted (\(error.localizedDescription)), resuming")
+                                // #279: a Wi-Fi drop spent every try within one second.
+                                await networkBack(within: .seconds(120))
+                                try await Task.sleep(for: .seconds(2 * attempt))
+                            }
                         }
+                        fatalError("unreachable")
                     }
-                    fatalError("unreachable")
+                } catch {
+                    refusals.append("\(host): \(error.localizedDescription)")
+                    kinds.insert(Self.connectionFailed(error) ? .unreachable : .failed)
+                    continue hosts
                 }
-            } catch {
-                refusals.append("\(host): \(error.localizedDescription)")
-                kinds.insert(Self.connectionFailed(error) ? .unreachable : .failed)
-                continue
-            }
-            defer { try? FileManager.default.removeItem(at: body) }
+                defer { try? FileManager.default.removeItem(at: body) }
 
-            // 206: resumed after a dropped connection.
-            if let http = response as? HTTPURLResponse, ![200, 206].contains(http.statusCode) {
-                refusals.append("\(host) answered \(http.statusCode)")
-                kinds.insert(.answered)
-                continue
-            }
+                // 206: resumed after a dropped connection.
+                if let http = response as? HTTPURLResponse, ![200, 206].contains(http.statusCode) {
+                    // #2727: github.com answers a passing 504 now and then, and the engine has
+                    // only that one host. Ask it again before giving up on it.
+                    if busy < 2, http.statusCode == 408 || http.statusCode == 429 || (500...599).contains(http.statusCode) {
+                        busy += 1
+                        AppLog.note("\(file) from \(host) answered \(http.statusCode), asking again")
+                        try await Task.sleep(for: backoff * busy)
+                        continue
+                    }
+                    refusals.append("\(host) answered \(http.statusCode)")
+                    kinds.insert(.answered)
+                    continue hosts
+                }
 
-            let got = try Digest.sha256(of: body)
-            guard got == sha256 else {
-                refusals.append("\(host) served \(got.prefix(16)) rather than \(sha256.prefix(16))")
-                kinds.insert(.mismatch)
-                continue
-            }
+                let got = try Digest.sha256(of: body)
+                guard got == sha256 else {
+                    refusals.append("\(host) served \(got.prefix(16)) rather than \(sha256.prefix(16))")
+                    kinds.insert(.mismatch)
+                    continue hosts
+                }
 
-            do {
-                try FileManager.default.createDirectory(
-                    at: downloads, withIntermediateDirectories: true
-                )
-                try? FileManager.default.removeItem(at: archive)
-                try FileManager.default.moveItem(at: body, to: archive)
-            } catch {
-                throw StepFailure(
-                    step: step,
-                    detail: String(localized: "\(downloads.path(percentEncoded: false)) could not be written. ")
-                        + error.localizedDescription
-                )
+                do {
+                    try FileManager.default.createDirectory(
+                        at: downloads, withIntermediateDirectories: true
+                    )
+                    try? FileManager.default.removeItem(at: archive)
+                    try FileManager.default.moveItem(at: body, to: archive)
+                } catch {
+                    throw StepFailure(
+                        step: step,
+                        detail: String(localized: "\(downloads.path(percentEncoded: false)) could not be written. ")
+                            + error.localizedDescription
+                    )
+                }
+                return archive
             }
-            return archive
         }
 
         AppLog.note("\(file) refused by all \(bases.count) hosts: \(refusals.joined(separator: ". "))")
