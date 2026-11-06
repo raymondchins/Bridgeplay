@@ -14,8 +14,9 @@
 enum { fl_off, fl_display, fl_half, fl_fixed };
 static const char *const fl_mode_names[] = { "off", "display", "half", "fixed" };
 
-static int fl_mode;
-static double fl_fixed_fps;
+// Changed at run time by the quick settings sidebar, read on the game's thread
+static _Atomic int fl_mode;
+static _Atomic int fl_fixed_fps;
 static mach_timebase_info_data_t fl_timebase;
 
 static os_unfair_lock fl_lock = OS_UNFAIR_LOCK_INIT;
@@ -35,9 +36,10 @@ static uint64_t fl_ticks(double seconds)
 // limits as set, the others from the display. 0 when only display sync applies.
 static double framelimit_rate(int hz)
 {
-	switch (fl_mode) {
+	double fixed = atomic_load(&fl_fixed_fps);
+	switch (atomic_load(&fl_mode)) {
 	case fl_fixed:
-		return hz > 0 && fl_fixed_fps >= hz ? hz : fl_fixed_fps;
+		return hz > 0 && fixed >= hz ? hz : fixed;
 	case fl_half:
 		return hz > 0 ? hz / 2.0 : 0;
 	case fl_display:
@@ -51,7 +53,7 @@ static double framelimit_rate(int hz)
 // for a display-relative limit, -1 without a limit.
 static double framelimit_cap(void)
 {
-	if (fl_mode == fl_off)
+	if (atomic_load(&fl_mode) == fl_off)
 		return -1;
 	return framelimit_rate(atomic_load(&ph_refresh_hz));
 }
@@ -82,7 +84,7 @@ static void fl_track_screen(id layer, uint64_t now)
 // Called on the game's thread before its nextDrawable runs.
 static void framelimit_wait(id layer)
 {
-	if (fl_mode == fl_off || fg_internal || layer == nil)
+	if (atomic_load(&fl_mode) == fl_off || fg_internal || layer == nil)
 		return;
 
 	uint64_t now = mach_absolute_time();
@@ -123,33 +125,76 @@ static void framelimit_wait(id layer)
 	}
 }
 
+// display, half, 10 to 360, or off; returns 0 for anything else.
+static int framelimit_parse(const char *value, int *mode, int *fps)
+{
+	*fps = 0;
+	if (value == NULL || value[0] == '\0' || strcmp(value, "0") == 0 || strcasecmp(value, "off") == 0) {
+		*mode = fl_off;
+		return 1;
+	}
+	if (strcasecmp(value, "display") == 0) {
+		*mode = fl_display;
+		return 1;
+	}
+	if (strcasecmp(value, "half") == 0) {
+		*mode = fl_half;
+		return 1;
+	}
+	char *end = NULL;
+	long n = strtol(value, &end, 10);
+	if (end == value || *end != '\0' || n < 10 || n > 360)
+		return 0;
+	*mode = fl_fixed;
+	*fps = (int)n;
+	return 1;
+}
+
+static int framelimit_active(void)
+{
+	return atomic_load(&fl_mode) != fl_off;
+}
+
 // Reads the setting; returns whether a limit is on for this process.
 static int framelimit_init(void)
 {
-	const char *value = getenv("NOTPROTON_FPS_LIMIT");
-	if (value == NULL || value[0] == '\0' || strcmp(value, "0") == 0 || strcasecmp(value, "off") == 0)
-		return 0;
-
-	if (strcasecmp(value, "display") == 0) {
-		fl_mode = fl_display;
-	} else if (strcasecmp(value, "half") == 0) {
-		fl_mode = fl_half;
-	} else {
-		char *end = NULL;
-		long fps = strtol(value, &end, 10);
-		if (end == value || *end != '\0' || fps < 10 || fps > 360) {
-			shim_log("overlay_shim framelimit: BRIDGEPLAY_FPS_LIMIT=%s not understood "
-			         "(display|half|10-360), off\n", value);
-			return 0;
-		}
-		fl_mode = fl_fixed;
-		fl_fixed_fps = (double)fps;
-	}
+	// The quick settings can set a limit later
 	mach_timebase_info(&fl_timebase);
-	if (fl_mode == fl_fixed)
-		shim_log("overlay_shim framelimit: %.0f fps, paced to the display\n", fl_fixed_fps);
+	const char *value = getenv("NOTPROTON_FPS_LIMIT");
+	int mode, fps;
+	if (!framelimit_parse(value, &mode, &fps)) {
+		shim_log("overlay_shim framelimit: BRIDGEPLAY_FPS_LIMIT=%s not understood "
+		         "(display|half|10-360), off\n", value);
+		return 0;
+	}
+	if (mode == fl_off)
+		return 0;
+	atomic_store(&fl_fixed_fps, fps);
+	atomic_store(&fl_mode, mode);
+	if (mode == fl_fixed)
+		shim_log("overlay_shim framelimit: %d fps, paced to the display\n", fps);
 	else
-		shim_log("overlay_shim framelimit: %s refresh, paced to the display\n", fl_mode_names[fl_mode]);
+		shim_log("overlay_shim framelimit: %s refresh, paced to the display\n", fl_mode_names[mode]);
+	return 1;
+}
+
+static void framelimit_sync_layer(id layer); // overlay_shim.m
+
+// The quick settings' limit, applied from the next frame; layer gets display sync to match.
+// Main thread.
+static int framelimit_set(const char *value, id layer)
+{
+	int mode, fps;
+	if (!framelimit_parse(value, &mode, &fps))
+		return 0;
+	os_unfair_lock_lock(&fl_lock);
+	atomic_store(&fl_fixed_fps, fps);
+	atomic_store(&fl_mode, mode);
+	fl_next = 0;
+	os_unfair_lock_unlock(&fl_lock);
+	if (layer != nil)
+		framelimit_sync_layer(layer);
+	shim_log("overlay_shim framelimit: %s from the quick settings\n", mode == fl_off ? "off" : value);
 	return 1;
 }
 
@@ -158,11 +203,11 @@ __attribute__((visibility("default"))) void np_framelimit_probe(int *mode, doubl
                                                                 int *vsync)
 {
 	if (mode != NULL)
-		*mode = fl_mode;
+		*mode = atomic_load(&fl_mode);
 	if (cap != NULL)
 		*cap = framelimit_cap();
 	if (waits != NULL)
 		*waits = (int)atomic_load(&fl_waits);
 	if (vsync != NULL)
-		*vsync = force_vsync;
+		*vsync = force_vsync || framelimit_active();
 }

@@ -39,7 +39,10 @@ static const char *const ph_level_names[] = { "off", "fps", "summary", "detailed
 
 #define ph_ring 120
 
-static int ph_level;
+// Changed at run time by the quick settings sidebar, read on the render and sampler threads
+static _Atomic int ph_level;
+// Set when the game started with Apple's Metal HUD, which then stays the only overlay
+static int ph_hud_locked;
 static os_unfair_lock ph_lock = OS_UNFAIR_LOCK_INIT;
 // Under ph_lock, written on the render thread
 static float ph_intervals[ph_ring]; // ms between the game's frames
@@ -248,13 +251,13 @@ static void ph_gpu(struct ph_sample *s)
 	CFRelease(stats);
 }
 
-// The internal battery's charge and state. Asked every few seconds: it goes through powerd.
-static void ph_battery(struct ph_sample *s)
+// The internal battery's charge and state, -1 for what the Mac does not report. Goes through
+// powerd, so callers ask every few seconds. Keeps no state: the sidebar calls it on the main
+// thread while the overlay's sampler does on its own.
+static void ph_read_battery(int *battery_out, int *on_ac_out, int *charging_out, int *minutes_out)
 {
-	static int battery = -1, on_ac = -1, charging = -1, minutes = -1;
-
-	if (ph_ticks % 10 == 0) {
-		battery = on_ac = charging = minutes = -1;
+	int battery = -1, on_ac = -1, charging = -1, minutes = -1;
+	{
 		CFTypeRef info = IOPSCopyPowerSourcesInfo();
 		CFArrayRef list = info != NULL ? IOPSCopyPowerSourcesList(info) : NULL;
 		for (CFIndex i = 0; list != NULL && i < CFArrayGetCount(list); i++) {
@@ -283,6 +286,18 @@ static void ph_battery(struct ph_sample *s)
 		if (info != NULL)
 			CFRelease(info);
 	}
+	*battery_out = battery;
+	*on_ac_out = on_ac;
+	*charging_out = charging;
+	*minutes_out = minutes;
+}
+
+static void ph_battery(struct ph_sample *s)
+{
+	static int battery = -1, on_ac = -1, charging = -1, minutes = -1;
+
+	if (ph_ticks % 10 == 0)
+		ph_read_battery(&battery, &on_ac, &charging, &minutes);
 	s->battery = battery;
 	s->on_ac = on_ac;
 	s->charging = charging;
@@ -294,12 +309,11 @@ static void ph_battery(struct ph_sample *s)
 static double ph_power(void)
 {
 	static io_registry_entry_t battery;
-	static int looked;
+	static dispatch_once_t looked;
 
-	if (!looked) {
-		looked = 1;
+	dispatch_once(&looked, ^{
 		battery = IOServiceGetMatchingService(0, IOServiceMatching("AppleSmartBattery"));
-	}
+	});
 	if (battery == 0)
 		return -1;
 
@@ -395,7 +409,8 @@ static CTFontRef ph_font(double size, double weight)
 }
 
 // The brand's colours (BridgeplayTheme.swift): off-white and secondary grey type, near-black
-// raised surface, hairline borders, and the violet-blue-pink gradient for emphasis only.
+// raised surface, hairline borders, the violet-blue-pink gradient for a value's extent (a slider's
+// fill, the frame-time line), and amber only for a warning (a frame well over budget).
 #define PH_RGB(hex, a) (((hex) >> 16) & 0xff) / 255.0, (((hex) >> 8) & 0xff) / 255.0, ((hex) & 0xff) / 255.0, (a)
 
 struct ph_style {
@@ -419,8 +434,16 @@ static void ph_style_load(void)
 	CGColorSpaceRelease(srgb);
 	ph_style.value = ph_font(13, 600);
 	ph_style.value_big = ph_font(22, 600);
-	ph_style.label = ph_font(10, 500);
-	ph_style.small = ph_font(10, 400);
+	// 10.5 and 11 pt: the smallest that stay readable over a game on a Retina window
+	ph_style.label = ph_font(10.5, 500);
+	ph_style.small = ph_font(11, 400);
+}
+
+// The baseline that centres a font's capitals on the line at y: how a label and the value
+// beside it share an optical centre even at different sizes.
+static double ph_centred(double y, CTFontRef font)
+{
+	return y + CTFontGetCapHeight(font) / 2;
 }
 
 static CTLineRef ph_line(const char *text, CTFontRef font, CGColorRef color, double tracking)
@@ -486,15 +509,6 @@ static void ph_surface(CGContextRef ctx, double w, double h)
 	CGContextSetLineWidth(ctx, 1);
 	CGContextStrokePath(ctx);
 	CGPathRelease(path);
-
-	// The emphasis: a short gradient rule on the leading edge
-	CGContextSaveGState(ctx);
-	CGPathRef rule = CGPathCreateWithRoundedRect(CGRectMake(6, 7, 2, h - 14), 1, 1, NULL);
-	CGContextAddPath(ctx, rule);
-	CGContextClip(ctx);
-	ph_gradient(ctx, CGPointMake(0, h - 7), CGPointMake(0, 7));
-	CGContextRestoreGState(ctx);
-	CGPathRelease(rule);
 }
 
 static void ph_format_gb(char *out, size_t size, double bytes)
@@ -502,11 +516,11 @@ static void ph_format_gb(char *out, size_t size, double bytes)
 	snprintf(out, size, "%.1f GB", bytes / 1073741824.0);
 }
 
-// One "LABEL value" pair of the summary row; returns the advance.
-static double ph_pair(CGContextRef ctx, double h, double x, double base, const char *label, const char *value)
+// One "LABEL value" pair centred on the line at mid; returns the advance.
+static double ph_pair(CGContextRef ctx, double h, double x, double mid, const char *label, const char *value)
 {
-	double w = ph_text(ctx, h, x, base, label, ph_style.label, ph_style.fg2, 0.6);
-	return w + 5 + ph_text(ctx, h, x + w + 5, base, value, ph_style.value, ph_style.fg, 0);
+	double w = ph_text(ctx, h, x, ph_centred(mid, ph_style.label), label, ph_style.label, ph_style.fg2, 0.5);
+	return w + 5 + ph_text(ctx, h, x + w + 5, ph_centred(mid, ph_style.value), value, ph_style.value, ph_style.fg, 0);
 }
 
 static void ph_divider(CGContextRef ctx, double h, double x)
@@ -544,31 +558,33 @@ static void ph_battery_text(char *out, size_t size, const struct ph_sample *s, i
 // Lays out (ctx NULL) or draws one level; returns the size in points.
 static CGSize ph_draw_compact(CGContextRef ctx, const struct ph_sample *s, double h_box)
 {
-	const double h = 28, base = 18.5, pad = 16;
+	const double h = 28, mid = h / 2, pad = 12;
 	char fps[16];
 	ph_fps_text(fps, sizeof(fps), s);
 	double x = pad;
-	x += ph_text(ctx, h_box, x, base, fps, ph_style.value, ph_style.fg, 0);
+	x += ph_text(ctx, h_box, x, ph_centred(mid, ph_style.value), fps, ph_style.value, ph_style.fg, 0);
 	x += 4;
-	x += ph_text(ctx, h_box, x, base, "FPS", ph_style.label, ph_style.fg2, 0.6);
-	return CGSizeMake(x + 11, h);
+	x += ph_text(ctx, h_box, x, ph_centred(mid, ph_style.label), "FPS", ph_style.label, ph_style.fg2, 0.5);
+	return CGSizeMake(x + pad, h);
 }
 
 static CGSize ph_draw_summary(CGContextRef ctx, const struct ph_sample *s, double h_box)
 {
-	const double h = 28, base = 18.5, gap = 10;
+	const double h = 28, mid = h / 2, gap = 10;
+	const double base = ph_centred(mid, ph_style.value);
 	char text[48];
-	double x = 16;
+	double x = 12;
 
 	ph_fps_text(text, sizeof(text), s);
 	x += ph_text(ctx, h_box, x, base, text, ph_style.value, ph_style.fg, 0);
 	x += 4;
-	x += ph_text(ctx, h_box, x, base, "FPS", ph_style.label, ph_style.fg2, 0.6);
+	x += ph_text(ctx, h_box, x, ph_centred(mid, ph_style.label), "FPS", ph_style.label, ph_style.fg2, 0.5);
 	if (!s->idle && s->ft_avg > 0) {
 		snprintf(text, sizeof(text), "%.1f", s->ft_avg);
 		x += 8;
 		x += ph_text(ctx, h_box, x, base, text, ph_style.value, ph_style.fg, 0);
 		x += 3;
+		// A lowercase unit stays on its number's baseline
 		x += ph_text(ctx, h_box, x, base, "ms", ph_style.label, ph_style.fg2, 0.2);
 	}
 	if (s->cap > 0) {
@@ -576,7 +592,7 @@ static CGSize ph_draw_summary(CGContextRef ctx, const struct ph_sample *s, doubl
 		x += gap;
 		ph_divider(ctx, h, x);
 		x += 1 + gap;
-		x += ph_pair(ctx, h_box, x, base, "CAP", text);
+		x += ph_pair(ctx, h_box, x, mid, "CAP", text);
 	}
 
 	struct { const char *label; char value[32]; int shown; } parts[4] = {
@@ -593,7 +609,7 @@ static CGSize ph_draw_summary(CGContextRef ctx, const struct ph_sample *s, doubl
 		x += gap;
 		ph_divider(ctx, h, x);
 		x += 1 + gap;
-		x += ph_pair(ctx, h_box, x, base, parts[i].label, parts[i].value);
+		x += ph_pair(ctx, h_box, x, mid, parts[i].label, parts[i].value);
 	}
 	// On a desktop Mac the power figure has no battery to sit with
 	if (s->battery < 0 && s->watts > 0) {
@@ -601,7 +617,7 @@ static CGSize ph_draw_summary(CGContextRef ctx, const struct ph_sample *s, doubl
 		x += gap;
 		ph_divider(ctx, h, x);
 		x += 1 + gap;
-		x += ph_pair(ctx, h_box, x, base, "PWR", text);
+		x += ph_pair(ctx, h_box, x, mid, "PWR", text);
 	}
 	return CGSizeMake(x + 12, h);
 }
@@ -619,26 +635,33 @@ static int ph_graph(float *out, int max)
 
 static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, double h_box)
 {
-	const double w = 236, left = 16, right = w - 12, row = 18;
+	// Every text line is centred in its own slot by cap height, so the padding reads the same
+	// above the first line and below the last
+	const double w = 240, left = 14, right = w - 14, row = 20, pad = 10, bottom = 12;
 	char text[64], label_ms[48];
-	double y = 0;
+	double y = pad;
 
-	// FPS and frame time
+	// FPS and frame time, centred together on one line
+	const double head = 32, head_mid = y + head / 2;
 	ph_fps_text(text, sizeof(text), s);
 	double x = left;
-	x += ph_text(ctx, h_box, x, 33, text, ph_style.value_big, ph_style.fg, -0.3);
-	ph_text(ctx, h_box, x + 5, 33, "FPS", ph_style.label, ph_style.fg2, 0.6);
+	x += ph_text(ctx, h_box, x, ph_centred(head_mid, ph_style.value_big), text, ph_style.value_big, ph_style.fg, -0.3);
+	ph_text(ctx, h_box, x + 5, ph_centred(head_mid, ph_style.label), "FPS", ph_style.label, ph_style.fg2, 0.5);
 	if (!s->idle && s->ft_avg > 0) {
 		snprintf(text, sizeof(text), "%.1f", s->ft_avg);
 		double unit = ph_width("ms", ph_style.label, 0.2);
 		double value = ph_width(text, ph_style.value, 0);
-		ph_text(ctx, h_box, right - unit - 3 - value, 33, text, ph_style.value, ph_style.fg, 0);
-		ph_text(ctx, h_box, right - unit, 33, "ms", ph_style.label, ph_style.fg2, 0.2);
+		double base = ph_centred(head_mid, ph_style.value);
+		ph_text(ctx, h_box, right - unit - 3 - value, base, text, ph_style.value, ph_style.fg, 0);
+		ph_text(ctx, h_box, right - unit, base, "ms", ph_style.label, ph_style.fg2, 0.2);
 	}
-	y = 44;
+	y += head + 6;
 
-	// Frame time graph: the last ph_ring frames, one stroke in the brand gradient
-	const double gx = left, gw = right - left, gh = 40;
+	// Frame time graph: the last ph_ring frames in one stroke of the brand gradient, amber where a
+	// frame ran well over its budget. The budget is the limit's frame time, or the display's without a limit,
+	// and is drawn as the line the frames should sit on.
+	const double gx = left, gw = right - left, gh = 38;
+	double budget = s->cap > 0 ? 1000.0 / s->cap : s->hz > 0 ? 1000.0 / s->hz : 0;
 	if (ctx != NULL) {
 		CGRect area = CGRectMake(gx, h_box - y - gh, gw, gh);
 		CGPathRef bg = CGPathCreateWithRoundedRect(area, 4, 4, NULL);
@@ -653,40 +676,56 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 		for (int i = 0; i < n; i++)
 			if (frames[i] * 1.15 > top)
 				top = frames[i] * 1.15;
-		int hz = s->hz;
-		if (hz > 0) {
-			// The display's frame interval, for scale
-			double ty = area.origin.y + (1000.0 / hz) / top * gh;
-			CGContextSetFillColorWithColor(ctx, ph_style.line);
+		if (budget > 0 && budget * 1.15 > top)
+			top = budget * 1.15;
+		if (budget > 0) {
+			double ty = area.origin.y + 3 + budget / top * (gh - 6);
+			CGContextSetRGBFillColor(ctx, 1, 1, 1, 0.16);
 			CGContextFillRect(ctx, CGRectMake(gx + 4, ty, gw - 8, 1));
 		}
 		if (n > 1) {
-			CGMutablePathRef path = CGPathCreateMutable();
+			double px[ph_ring], py[ph_ring];
+			CGMutablePathRef path = CGPathCreateMutable(), over = CGPathCreateMutable();
 			for (int i = 0; i < n; i++) {
-				double px = gx + 4 + (gw - 8) * (i + ph_ring - n) / (double)(ph_ring - 1);
-				double py = area.origin.y + 3 + (frames[i] / top) * (gh - 6);
+				px[i] = gx + 4 + (gw - 8) * (i + ph_ring - n) / (double)(ph_ring - 1);
+				py[i] = area.origin.y + 3 + (frames[i] / top) * (gh - 6);
 				if (i == 0)
-					CGPathMoveToPoint(path, NULL, px, py);
+					CGPathMoveToPoint(path, NULL, px[i], py[i]);
 				else
-					CGPathAddLineToPoint(path, NULL, px, py);
+					CGPathAddLineToPoint(path, NULL, px[i], py[i]);
+				// A frame half again over budget: the stretch into and out of it
+				if (i > 0 && budget > 0 && (frames[i] > budget * 1.5 || frames[i - 1] > budget * 1.5)) {
+					CGPathMoveToPoint(over, NULL, px[i - 1], py[i - 1]);
+					CGPathAddLineToPoint(over, NULL, px[i], py[i]);
+				}
 			}
-			CGContextSaveGState(ctx);
-			CGContextAddPath(ctx, path);
 			CGContextSetLineWidth(ctx, 1.5);
 			CGContextSetLineJoin(ctx, kCGLineJoinRound);
+			CGContextSetLineCap(ctx, kCGLineCapRound);
+			CGContextSaveGState(ctx);
+			CGContextAddPath(ctx, path);
 			CGContextReplacePathWithStrokedPath(ctx);
 			CGContextClip(ctx);
 			ph_gradient(ctx, CGPointMake(gx, 0), CGPointMake(gx + gw, 0));
 			CGContextRestoreGState(ctx);
+			CGContextAddPath(ctx, over);
+			CGContextSetRGBStrokeColor(ctx, PH_RGB(0xFF9F0A, 1));
+			CGContextStrokePath(ctx);
 			CGPathRelease(path);
+			CGPathRelease(over);
 		}
 	}
-	y += gh + 14;
+	y += gh;
+	// Kept close to the graph it describes, then a wider gap before the readings
 	if (!s->idle && s->ft_min > 0) {
-		snprintf(label_ms, sizeof(label_ms), "min %.1f · max %.1f ms", s->ft_min, s->ft_max);
-		ph_text(ctx, h_box, left, y, label_ms, ph_style.small, ph_style.fg3, 0);
-		y += 8;
+		if (budget > 0)
+			snprintf(label_ms, sizeof(label_ms), "min %.1f · max %.1f · line %.1f ms", s->ft_min, s->ft_max, budget);
+		else
+			snprintf(label_ms, sizeof(label_ms), "min %.1f · max %.1f ms", s->ft_min, s->ft_max);
+		ph_text(ctx, h_box, left, ph_centred(y + 4 + 9, ph_style.small), label_ms, ph_style.small, ph_style.fg3, 0);
+		y += 4 + 18;
 	}
+	y += 6;
 
 	// The rest, a label and a value per row, only what this Mac reports
 	double scale = 0;
@@ -722,12 +761,13 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 	for (int i = 0; i < 11; i++) {
 		if (!rows[i].shown)
 			continue;
-		y += row;
-		ph_text(ctx, h_box, left, y, rows[i].label, ph_style.small, ph_style.fg2, 0);
+		double mid = y + row / 2;
+		ph_text(ctx, h_box, left, ph_centred(mid, ph_style.small), rows[i].label, ph_style.small, ph_style.fg2, 0);
 		double vw = ph_width(rows[i].value, ph_style.value, 0);
-		ph_text(ctx, h_box, right - vw, y, rows[i].value, ph_style.value, ph_style.fg, 0);
+		ph_text(ctx, h_box, right - vw, ph_centred(mid, ph_style.value), rows[i].value, ph_style.value, ph_style.fg, 0);
+		y += row;
 	}
-	return CGSizeMake(w, y + 13);
+	return CGSizeMake(w, y + bottom);
 }
 
 static CGSize ph_draw(CGContextRef ctx, const struct ph_sample *s, double h_box)
@@ -847,6 +887,7 @@ static void ph_place(id host, CGImageRef image, CGSize size, double scale)
 		ph_layer.contentsScale = scale;
 		// Core Animation shows CGImage contents upright in a flipped tree too
 		ph_layer.contents = (id)image;
+		ph_layer.hidden = atomic_load(&ph_level) == ph_off;
 		fg_ca_end();
 		CGImageRelease(image);
 		[host release];
@@ -892,6 +933,14 @@ static void perfhud_tick(void)
 	ph_tick_frames = frames;
 	ph_tick_time = now;
 	ph_tick_written = written;
+	// Turned off from the quick settings: the counts above stay current for when it comes back
+	if (atomic_load(&ph_level) == ph_off) {
+		[host release];
+		dispatch_async(dispatch_get_main_queue(), ^{
+			ph_layer.hidden = YES;
+		});
+		return;
+	}
 
 	s.cpu = ph_cpu_percent();
 	s.game_cpu = ph_game_cpu(now);
@@ -936,6 +985,10 @@ static void perfhud_start(void)
 // Reads the setting; returns whether the overlay is on for this process.
 static int perfhud_init(void)
 {
+	// The quick settings can turn the overlay on later, so the sampler's port is always ready
+	ph_host_port = mach_host_self();
+	const char *hud = getenv("MTL_HUD_ENABLED");
+	ph_hud_locked = hud != NULL && hud[0] != '\0' && strcmp(hud, "0") != 0;
 	const char *value = getenv("NOTPROTON_PERF_OVERLAY");
 	if (value == NULL || value[0] == '\0' || strcmp(value, "0") == 0 || strcasecmp(value, "off") == 0)
 		return 0;
@@ -952,17 +1005,30 @@ static int perfhud_init(void)
 		return 0;
 	}
 
-	const char *hud = getenv("MTL_HUD_ENABLED");
-	if (hud != NULL && hud[0] != '\0' && strcmp(hud, "0") != 0) {
+	if (ph_hud_locked) {
 		shim_log("overlay_shim perfhud: the Metal HUD is on, it shows instead of the %s overlay\n",
 		         ph_level_names[ph_level]);
 		ph_level = ph_off;
 		return 0;
 	}
 
-	ph_host_port = mach_host_self();
 	shim_log("overlay_shim perfhud: %s overlay on, waiting for the game's first frame\n",
 	         ph_level_names[ph_level]);
+	return 1;
+}
+
+// The quick settings' level; returns 0 when the Metal HUD owns the overlay. Main thread.
+static int perfhud_set_level(int level)
+{
+	if (ph_hud_locked || level < ph_off || level > ph_detailed)
+		return 0;
+	atomic_store(&ph_level, level);
+	if (level == ph_off && ph_layer != nil) {
+		fg_ca_begin();
+		ph_layer.hidden = YES;
+		fg_ca_end();
+	}
+	shim_log("overlay_shim perfhud: %s from the quick settings\n", ph_level_names[level]);
 	return 1;
 }
 

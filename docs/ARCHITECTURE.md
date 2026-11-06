@@ -17,7 +17,7 @@ each folder is, which process it ends up in, and where new code belongs.
 | `nvapi-shim/` | Windows `nvapi64.dll` in the game, in front of Apple's nvapi: reports a newer NVIDIA driver so games offer DLSS | Prebuilt in the app's Resources |
 | `rockstar-shim/` | Windows `version.dll` for the Rockstar Games Launcher and GTA (`ROCKSTAR_SHIM=1`, see its README) | Prebuilt in the app's Resources |
 | `d3d12-stub/` | Windows `d3d12.dll` in the game under DXMT on a D3DMetal engine (creates no device, so games fall back to D3D11) | Prebuilt in the app's Resources |
-| `overlay-shim/` | Mac dylib in the game process (HDR, Metal 4, frame generation) | `DYLD_INSERT_LIBRARIES` from the run script, or loaded by lsteamclient |
+| `overlay-shim/` | Mac dylib in the game process (HDR, Metal 4, frame generation, the performance overlay, frame rate limit, scaling filter and in-game quick settings) | `DYLD_INSERT_LIBRARIES` from the run script, or loaded by lsteamclient |
 | `native-launch/` (`np-native`), `native-shim/` (`libnp_gamepad.dylib`) | Native Mac games | A Steam launch option re-execs the game with the shim inserted |
 | `helpers/` | Small CLIs the dylib and run script call (`iconmaker`, `appinfo`) | Application Support |
 | `gamefixes/` | Per-game defaults read by the run script | Bundled in the app payload and the installer |

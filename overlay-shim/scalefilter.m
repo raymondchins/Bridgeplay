@@ -17,7 +17,10 @@
 enum { sf_default, sf_linear, sf_nearest, sf_integer };
 static const char *const sf_mode_names[] = { "default", "linear", "nearest", "integer" };
 
-static int sf_mode;
+// Changed at run time by the quick settings sidebar
+static _Atomic int sf_mode;
+// The filter the game's layer came with, put back when the quick settings return to Automatic
+static NSString *sf_original; // main thread
 static os_unfair_lock sf_lock = OS_UNFAIR_LOCK_INIT;
 static id sf_layer; // compared only
 static double sf_checked;
@@ -40,14 +43,14 @@ static void sf_apply(CAMetalLayer *layer)
 
 	int whole = sx >= 1.99 && fabs(sx - round(sx)) < 0.01 && fabs(sy - round(sy)) < 0.01 &&
 	            fabs(sx - sy) < 0.01;
-	int nearest = sf_mode == sf_nearest || (sf_mode == sf_integer && whole);
+	int mode = atomic_load(&sf_mode);
+	int nearest = mode == sf_nearest || (mode == sf_integer && whole);
 	NSString *filter = nearest ? kCAFilterNearest : kCAFilterLinear;
 
-	static int seen;
-	if (!seen) {
-		seen = 1;
+	if (sf_original == nil) {
+		sf_original = [layer.magnificationFilter copy];
 		shim_log("overlay_shim scalefilter: the layer came with %s magnification\n",
-		         layer.magnificationFilter.UTF8String);
+		         sf_original.UTF8String);
 	}
 	fg_ca_begin();
 	if (![layer.magnificationFilter isEqualToString:filter])
@@ -62,7 +65,7 @@ static void sf_apply(CAMetalLayer *layer)
 	int before_scale = atomic_exchange(&sf_scale_x100, scale);
 	if (before != (nearest ? 2 : 1) || abs(before_scale - scale) > 1)
 		shim_log("overlay_shim scalefilter: %s, drawable %.0fx%.0f shown at %.0fx%.0f px (%.2fx), %s\n",
-		         sf_mode_names[sf_mode], drawable.width, drawable.height, bounds.size.width * screen,
+		         sf_mode_names[mode], drawable.width, drawable.height, bounds.size.width * screen,
 		         bounds.size.height * screen, sx, nearest ? "nearest" : "linear");
 }
 
@@ -70,7 +73,7 @@ static void sf_apply(CAMetalLayer *layer)
 // every second, so a resolution change in the game or a move to another display follows.
 static void scalefilter_note(id layer)
 {
-	if (sf_mode == sf_default || fg_internal || layer == nil)
+	if (atomic_load(&sf_mode) == sf_default || fg_internal || layer == nil)
 		return;
 
 	double now = CACurrentMediaTime();
@@ -97,7 +100,7 @@ static void scalefilter_note(id layer)
 static const char *scalefilter_state(double *scale)
 {
 	int filter = atomic_load(&sf_filter);
-	if (sf_mode == sf_default || filter == 0)
+	if (atomic_load(&sf_mode) == sf_default || filter == 0)
 		return NULL;
 	int scale_x100 = atomic_load(&sf_scale_x100);
 	if (scale != NULL)
@@ -106,6 +109,43 @@ static const char *scalefilter_state(double *scale)
 	if (scale_x100 <= 101)
 		return "Not scaled";
 	return filter == 2 ? "Nearest" : "Linear";
+}
+
+static int sf_parse(const char *value)
+{
+	if (value == NULL || value[0] == '\0' || strcmp(value, "0") == 0 || strcasecmp(value, "default") == 0)
+		return sf_default;
+	if (strcasecmp(value, "linear") == 0)
+		return sf_linear;
+	if (strcasecmp(value, "nearest") == 0)
+		return sf_nearest;
+	if (strcasecmp(value, "integer") == 0)
+		return sf_integer;
+	return -1;
+}
+
+// The quick settings' filter, applied to layer now. Automatic puts back the filter the layer
+// came with. Main thread.
+static int scalefilter_set(const char *value, CAMetalLayer *layer)
+{
+	int mode = sf_parse(value);
+	if (mode < 0)
+		return 0;
+	atomic_store(&sf_mode, mode);
+	if (layer != nil && mode != sf_default) {
+		sf_apply(layer);
+	} else if (layer != nil && sf_original != nil) {
+		fg_ca_begin();
+		layer.magnificationFilter = sf_original;
+		for (CALayer *sub in layer.sublayers)
+			if ([sub isKindOfClass:[CAMetalLayer class]])
+				sub.magnificationFilter = sf_original;
+		fg_ca_end();
+	}
+	if (mode == sf_default)
+		atomic_store(&sf_filter, 0);
+	shim_log("overlay_shim scalefilter: %s from the quick settings\n", sf_mode_names[mode]);
+	return 1;
 }
 
 // Reads the setting; returns whether a filter is chosen for this process.
@@ -133,7 +173,7 @@ static int scalefilter_init(void)
 __attribute__((visibility("default"))) void np_scalefilter_probe(int *mode, int *filter, double *scale)
 {
 	if (mode != NULL)
-		*mode = sf_mode;
+		*mode = atomic_load(&sf_mode);
 	if (filter != NULL)
 		*filter = atomic_load(&sf_filter);
 	if (scale != NULL)

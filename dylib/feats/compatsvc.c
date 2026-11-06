@@ -15,6 +15,7 @@
 #include "compatsvc.h"
 #include "compat.h"
 #include "prefixstate.h"
+#include "quicksettings.h"
 #include "webui.h"
 #include "../resolver/anchor.h"
 #include "../util/file.h"
@@ -30,6 +31,8 @@
 #define ROUTE_REBUILD              "NotProton.RebuildPrefix#1"
 #define ROUTE_BACKUP_REBUILD       "NotProton.BackupAndRebuildPrefix#1"
 #define ROUTE_OPEN_LOG             "NotProton.OpenPrefixLog#1"
+// Changes from the in-game quick settings sidebar, for the page to write to launch options.
+#define ROUTE_TAKE_QUICK_SETTINGS  "NotProton.TakeQuickSettings#1"
 
 // Mangled RTTI names of the message types. A client that builds the CompatManager
 // page compiles these without registering the service, so the vtables are there to
@@ -481,6 +484,19 @@ static int open_prefix_log(uintptr_t request, uintptr_t response) {
     return answer_json(response, appid, opened ? "{\"opened\":true}" : "{\"error\":\"log\"}");
 }
 
+// Polled by the page every couple of seconds; any appid in the request is ignored.
+static int take_quick_settings(uintptr_t request, uintptr_t response) {
+    (void)request;
+    const char *home = np_home_dir();
+    if (!home) return RESULT_FAIL;
+    char dir[PATH_MAX], json[STATE_JSON_MAX];
+    np_support_path(dir, sizeof dir, home, "quick-settings");
+    int apps = np_quick_settings_take(dir, json, sizeof json);
+    if (apps < 0) return RESULT_FAIL;
+    if (apps > 0) NP_LOG("compatsvc: quick settings from %d game(s): %s", apps, json);
+    return answer_json(response, 0, json);
+}
+
 static uintptr_t g_state_changed;
 static int g_routes = NP_COMPATSVC_UNTRIED;
 
@@ -532,6 +548,8 @@ void np_compatsvc_register(const struct mach_header_64 *mh, intptr_t slide,
                                     backup_and_rebuild_prefix)
         || !np_webui_register_route(ROUTE_OPEN_LOG, request, response, open_prefix_log))
         NP_WARN("compatsvc: the Compatibility page cannot rebuild prefixes");
+    if (!np_webui_register_route(ROUTE_TAKE_QUICK_SETTINGS, request, response, take_quick_settings))
+        NP_WARN("compatsvc: changes made in a game's quick settings stay with that session");
 
     uintptr_t notification = np_rtti_vptr(mh, slide, text_base, text_size,
                                           TYPE_STATE_CHANGED);

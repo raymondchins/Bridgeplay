@@ -382,6 +382,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 #define NP_CX_OPTIONS_BODY(ARG, RT, BARREL) \
     ARG "=>{" \
     "const t=" ARG ".details,o=t.strLaunchOptions||\"\"," \
+    /* MSCXApply hands in its own writer, to run several changes into one write. */ \
+    "W=" ARG ".write||((a,b)=>SteamClient.Apps.SetAppLaunchOptions(a,b))," \
     "fex=" NP_FEX_TOOLS ".indexOf(t.strCompatToolName||\"" NP_FALLBACK_TOOL "\")>=0," \
     "npZh=" NP_WEB_IS_ZH ",npIt=" NP_WEB_IS_IT ",npL=(en,zh,it)=>npZh?zh:npIt&&it?it:en," \
     NP_CX_LAUNCH_PARSE \
@@ -399,7 +401,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "else{let at=E.p;r=o.slice(0,at)+(add?add+\" \":\"\");" \
     "E.e.forEach(w=>{if(ps.some(p=>o.startsWith(p[0]+\"=\",w.start))){" \
     "r+=o.slice(at,w.start);at=w.end;while(o[at]===\" \"||o[at]===\"\\t\")at++}});r+=o.slice(at)}" \
-    "SteamClient.Apps.SetAppLaunchOptions(t.unAppID,r.trim()===\"%command%\"?\"\":r)}," \
+    "W(t.unAppID,r.trim()===\"%command%\"?\"\":r)}," \
     /* Native games run through np-native, which also forces arm64: <launcher> VAR=VALUE ... \
        %command% <game args>. Assignments are read from any word before %command%, so the \
        older "/usr/bin/arch ... -e VAR=VALUE" form is understood, and rewritten without the \
@@ -413,7 +415,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "ps.forEach(p=>{const i=vs.findIndex(x=>x[0]===p[0]);vs=vs.filter(x=>x[0]!==p[0]);" \
     "if(p[1])vs.splice(i<0?vs.length:i,0,[p[0],p[0]+\"=\"+qv(p[1])])});" \
     "const h=[qv(L)].concat(vs.map(x=>x[1])).join(\" \");" \
-    "SteamClient.Apps.SetAppLaunchOptions(t.unAppID," \
+    "W(t.unAppID," \
     "c?o.slice(0,E.p)+h+\" \"+o.slice(c.start):h+\" %command%\"+(o.trim()?\" \"+o.trim():\"\"))}," \
     /* Writing BRIDGEPLAY_<X> drops a NOTPROTON_<X> the line still carries. */ \
     "s=ps=>{ps=ps.concat(ps.filter(p=>/^BRIDGEPLAY_/.test(p[0])).map(p=>[\"NOTPROTON_\"+p[0].slice(11),\"\"]));" \
@@ -499,7 +501,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\",\"BRIDGEPLAY_SCALING_FILTER\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
     "if(nat)return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
-    "PO(\"Performance Overlay\",[{data:\"0\",label:\"Off\"},{data:\"fps\",label:\"FPS\"}," \
+    "PO(\"Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)\",[{data:\"0\",label:\"Off\"},{data:\"fps\",label:\"FPS\"}," \
     "{data:\"summary\",label:\"Summary (FPS, frame time, CPU, GPU, memory, battery)\"}," \
     "{data:\"detailed\",label:\"Detailed (adds a frame-time graph)\"},{data:\"hud\",label:\"Apple Metal HUD\"}])," \
     "FL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\",[{data:\"0\",label:\"Off\"}," \
@@ -529,7 +531,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "T([\"WINEMSYNC\"],\"MSync\",\"1\",\"0\")," \
     "T([\"BRIDGEPLAY_RETINA\"],npL(\"High Resolution\",\"高分辨率\",\"Alta risoluzione\"),\"1\",\"0\")" \
     "]},\"gfx\")," \
-    "PO(npL(\"Performance Overlay\",\"性能叠加层\",\"Overlay delle prestazioni\"),[" \
+    "PO(npL(\"Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)\",\"性能叠加层（游戏中按 ⌥⌘P 打开这些设置的快捷面板）\",\"Overlay delle prestazioni (in gioco, ⌥⌘P apre le impostazioni rapide di questi controlli)\"),[" \
     "{data:\"0\",label:npL(\"Off\",\"关闭\",\"Disattivato\")},{data:\"fps\",label:\"FPS\"}," \
     "{data:\"summary\",label:npL(\"Summary (FPS, frame time, CPU, GPU, memory, battery)\"," \
     "\"摘要（FPS、帧时间、CPU、GPU、内存、电池）\",\"Riepilogo (FPS, tempo per fotogramma, CPU, GPU, memoria, batteria)\")}," \
@@ -576,16 +578,46 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 #define NP_CX_OPTIONS_CAPTURE(RT, BARREL) \
     "((npReact,npUI)=>" NP_CX_OPTIONS_BODY("np", "npReact()", "npUI()") ")(()=>" RT ",()=>" BARREL ")"
 
+// Changes from a game's in-game quick settings (overlay-shim/sidebar.m, collected by the
+// NotProton.TakeQuickSettings route) go through the panel's own menus, so a pick in the game
+// is written exactly as the same pick in Steam Properties › Bridgeplay would be: the same
+// keys, the same native or Wine form, nothing written when it matches the game's confs.
+#define NP_CX_APPLY \
+    "(t,ch)=>{let o=t.strLaunchOptions||\"\";const o0=o," \
+    "K={BRIDGEPLAY_PERF_OVERLAY:\"hud\",BRIDGEPLAY_FPS_LIMIT:\"half\",BRIDGEPLAY_SCALING_FILTER:\"integer\"}," \
+    /* The sidebar's values only, as the route allows: never the Metal HUD, never a hand-set number. */ \
+    "V={BRIDGEPLAY_PERF_OVERLAY:[\"0\",\"fps\",\"summary\",\"detailed\"]," \
+    "BRIDGEPLAY_FPS_LIMIT:[\"0\",\"display\",\"half\",\"60\",\"40\",\"30\"]," \
+    "BRIDGEPLAY_SCALING_FILTER:[\"0\",\"linear\",\"nearest\",\"integer\"]}," \
+    "menu=(n,m)=>{let f=null;const w=x=>{if(f||!x||typeof x!==\"object\")return;if(Array.isArray(x))return x.forEach(w);" \
+    "const p=x.props;if(!p)return;if(Array.isArray(p.rgOptions)&&p.rgOptions.some(z=>z.data===m))f=p;else w(p.children)};" \
+    "w(n);return f};" \
+    "Object.keys(ch||{}).forEach(k=>{if(!(k in K))return;" \
+    "const d=menu(MSCXOpts({details:Object.assign({},t,{strLaunchOptions:o}),write:(a,r)=>{o=r}}),K[k]);" \
+    "if(d&&V[k].indexOf(ch[k])>=0)d.onChange({data:ch[k]})});" \
+    "if(o!==o0)SteamClient.Apps.SetAppLaunchOptions(t.unAppID,o);return o}"
+
+// Started once per page context; a page without Steam's app store (the test harness) skips it.
+#define NP_CX_SYNC \
+    "globalThis.window&&window.appDetailsStore&&!globalThis.MSCXSyncOn&&" \
+    "(globalThis.MSCXSyncOn=setInterval(()=>{if(typeof MSCXRoute!==\"function\"||globalThis.MSCXSyncBusy)return;" \
+    "globalThis.MSCXSyncBusy=1;MSCXRoute(\"NotProton.TakeQuickSettings#1\",0).then(async j=>{const q=JSON.parse(j||\"{}\");" \
+    "for(const id of Object.keys(q)){const t=await window.appDetailsStore.RequestAppDetails(+id);" \
+    "if(t){const r=MSCXApply(t,q[id]);console.log(\"Bridgeplay: quick settings for app \"+id+\" saved: \"+r)}}})" \
+    ".catch(e=>console.warn(\"Bridgeplay: quick settings not saved\",e)).finally(()=>{globalThis.MSCXSyncBusy=0})},2000))"
+
 #define NP_CX_OPTIONS_COMPONENT \
     "MSCXLaunch=" NP_CX_LAUNCH ",MSCXPick=" NP_CX_PICK "," \
-    "MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C4, NP_C5) ","
+    "MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C4, NP_C5) "," \
+    "MSCXApply=" NP_CX_APPLY ",MSCXSync=" NP_CX_SYNC ","
 
 // Valve is testing a new compatibility page UI, this logic relates to supporting that
 #define NP_CX_OPTIONS_STATEMENT \
     "var MSCXLaunch=" NP_CX_LAUNCH ";" \
     "var MSCXPick=" NP_CX_PICK ";" \
     "var MSCXToolQuery=" NP_CX_TOOL_QUERY ";" \
-    "var MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C3, NP_C4) ";"
+    "var MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C3, NP_C4) ";" \
+    "var MSCXApply=" NP_CX_APPLY ";var MSCXSync=" NP_CX_SYNC ";"
 
 // 1.0.x saved CrossOver settings without %command%, this migrates them.
 #define NP_LAUNCH_MIGRATION_RULE \

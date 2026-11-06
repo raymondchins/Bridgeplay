@@ -85,7 +85,7 @@ for (const form of Object.keys(FORMS)) {
   const POL = 'Off:0,FPS:fps,Summary (FPS, frame time, CPU, GPU, memory, battery):summary,' +
               'Detailed (adds a frame-time graph):detailed,Apple Metal HUD:hud';
   t.ok(po('').props.rgOptions.map(x => x.label + ':' + x.data).join(',') === POL, 'the overlay levels name themselves');
-  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === 'Performance Overlay'),
+  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === 'Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)'),
        'the overlay has a section of its own');
   t.ok(po('').props.selectedOption === '0', 'the overlay is off by default');
   t.ok(po('BRIDGEPLAY_PERF_OVERLAY=summary').props.selectedOption === 'summary', 'a level reads from its argument');

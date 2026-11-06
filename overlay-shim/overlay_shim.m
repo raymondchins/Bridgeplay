@@ -287,6 +287,7 @@ static int stage_claimed(Class seen, Class *held, const char *stage)
 #include "perfhud.m"
 #include "framelimit.m"
 #include "scalefilter.m"
+#include "sidebar.m"
 
 static void encoder_mark(id encoder, NSUInteger format, id<MTLCommandBuffer> buffer)
 {
@@ -466,16 +467,32 @@ static void hook_set_colorspace(id layer, SEL selector, CGColorSpaceRef colorspa
 	next_set_colorspace(layer, selector, colorspace);
 }
 
+static int framelimit_active(void); // framelimit.m
+// What the game last asked for; a frame rate limit or VSYNC=1 turns it on over that
+static _Atomic int game_display_sync = 1;
+
 static void hook_set_display_sync(id layer, SEL selector, BOOL enabled)
 {
 	static int last = -1;
 
+	atomic_store(&game_display_sync, enabled ? 1 : 0);
+	int effective = enabled || force_vsync || framelimit_active();
 	if ((int)enabled != last) {
 		last = enabled;
 		shim_log("overlay_shim hook_set_display_sync: game asks %d, layer gets %d\n", enabled,
-		        enabled || force_vsync);
+		        effective);
 	}
-	next_set_display_sync(layer, selector, enabled || force_vsync);
+	next_set_display_sync(layer, selector, effective);
+}
+
+// After the quick settings change the limit: the game's own choice again, or display sync.
+// Main thread.
+static void framelimit_sync_layer(id layer)
+{
+	if (next_set_display_sync == NULL || layer == nil)
+		return;
+	next_set_display_sync(layer, sel_registerName("setDisplaySyncEnabled:"),
+	                      atomic_load(&game_display_sync) || force_vsync || framelimit_active());
 }
 
 static void hook_set_device(id layer, SEL selector, id device)
@@ -1042,6 +1059,7 @@ static id hook_next_drawable(id layer, SEL selector)
 	if (drawable != nil) {
 		perfhud_note_frame(layer);
 		scalefilter_note(layer);
+		sidebar_note_layer(layer);
 	}
 
 	return drawable;
@@ -1097,15 +1115,17 @@ __attribute__((constructor)) static void overlay_shim_load(void)
 	const char *vsync = getenv("NOTPROTON_VSYNC");
 	// A frame rate limit paces to the display, so it waits for the display as VSYNC does
 	int limited = framelimit_init();
-	force_vsync = (vsync != NULL && strcmp(vsync, "1") == 0) || limited;
-	if (force_vsync)
+	int quick = sidebar_init();
+	force_vsync = vsync != NULL && strcmp(vsync, "1") == 0;
+	// The quick settings can set a limit while the game runs, so the hook is in place then too
+	if (force_vsync || limited || quick)
 		hooked += interpose(layer, "setDisplaySyncEnabled:", (IMP)hook_set_display_sync,
 		                    (IMP *)&next_set_display_sync);
 	framegen_install_layer_hooks(layer);
 	// The overlay times frames from nextDrawable, which otherwise waits for lsteamclient's
 	// np_overlay_shim_install: a native game or one without the Steam API never calls it
 	int filtered = scalefilter_init();
-	if (perfhud_init() || limited || filtered)
+	if (perfhud_init() || limited || filtered || quick)
 		hook_layer_drawable(layer);
 
 	shim_log("overlay_shim_load: pid=%d exe=%s layer_hooks=%d overlay=%s\n", getpid(),

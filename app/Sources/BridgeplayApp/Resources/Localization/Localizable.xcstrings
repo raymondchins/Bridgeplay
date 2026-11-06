@@ -4073,18 +4073,18 @@
         }
       }
     },
-    "Bridgeplay's overlay in the top-left corner while you play. FPS shows the frame rate alone, Summary adds frame time, CPU, GPU, memory and battery in one row, and Detailed a panel with a frame-time graph. Apple Metal HUD shows Apple's own overlay instead. Off by default." : {
+    "Bridgeplay's overlay in the top-left corner while you play. FPS shows the frame rate alone, Summary adds frame time, CPU, GPU, memory and battery in one row, and Detailed a panel with a frame-time graph. Apple Metal HUD shows Apple's own overlay instead. Off by default. While a game runs, Option-Command-P opens Bridgeplay's quick settings on the right of the game: the overlay, the frame rate limit and the scaling filter change at once and are saved for that game. Use the arrow keys or click, and Esc to close." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L'overlay di Bridgeplay nell'angolo in alto a sinistra mentre giochi. FPS mostra solo la frequenza dei fotogrammi, Riepilogo aggiunge in una riga tempo per fotogramma, CPU, GPU, memoria e batteria, e Dettagliato un pannello con il grafico dei tempi per fotogramma. Metal HUD di Apple mostra invece l'overlay di Apple. Disattivato per impostazione predefinita."
+            "value" : "L'overlay di Bridgeplay nell'angolo in alto a sinistra mentre giochi. FPS mostra solo la frequenza dei fotogrammi, Riepilogo aggiunge in una riga tempo per fotogramma, CPU, GPU, memoria e batteria, e Dettagliato un pannello con il grafico dei tempi per fotogramma. Metal HUD di Apple mostra invece l'overlay di Apple. Disattivato per impostazione predefinita. Mentre un gioco è in esecuzione, Opzione-Comando-P apre le impostazioni rapide di Bridgeplay a destra del gioco: overlay, limite di fotogrammi e filtro di scala cambiano subito e vengono salvati per quel gioco. Usa i tasti freccia o fai clic, ed Esc per chiudere."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "游戏时 Bridgeplay 的叠加层显示在左上角。FPS 只显示帧率，摘要在一行中加上帧时间、CPU、GPU、内存和电池，详细则是带帧时间图表的面板。Apple Metal 性能监视器改为显示 Apple 自己的叠加层。默认关闭。"
+            "value" : "游戏时 Bridgeplay 的叠加层显示在左上角。FPS 只显示帧率，摘要在一行中加上帧时间、CPU、GPU、内存和电池，详细则是带帧时间图表的面板。Apple Metal 性能监视器改为显示 Apple 自己的叠加层。默认关闭。游戏运行时，按 Option-Command-P 会在游戏右侧打开 Bridgeplay 快捷设置：叠加层、帧率限制和缩放过滤会立即生效，并为该游戏保存。使用方向键或点击操作，按 Esc 关闭。"
           }
         }
       }
@@ -10714,6 +10714,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "性能叠加层"
+          }
+        }
+      }
+    },
+    "Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overlay delle prestazioni (in gioco, ⌥⌘P apre le impostazioni rapide di questi controlli)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "性能叠加层（游戏中按 ⌥⌘P 打开这些设置的快捷面板）"
           }
         }
       }

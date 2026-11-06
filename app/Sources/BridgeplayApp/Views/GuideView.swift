@@ -96,9 +96,9 @@ struct GuideView: View {
                          note: String(localized: "Draws at your display's full Retina resolution instead of half. Sharper, heavier on the GPU."))
             }
 
-            SteamBlock(title: String(localized: "Performance Overlay")) {
+            SteamBlock(title: String(localized: "Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)")) {
                 SteamRow(.dropdown(nil, String(localized: "Off")),
-                         note: String(localized: "Bridgeplay's overlay in the top-left corner while you play. FPS shows the frame rate alone, Summary adds frame time, CPU, GPU, memory and battery in one row, and Detailed a panel with a frame-time graph. Apple Metal HUD shows Apple's own overlay instead. Off by default."))
+                         note: String(localized: "Bridgeplay's overlay in the top-left corner while you play. FPS shows the frame rate alone, Summary adds frame time, CPU, GPU, memory and battery in one row, and Detailed a panel with a frame-time graph. Apple Metal HUD shows Apple's own overlay instead. Off by default. While a game runs, Option-Command-P opens Bridgeplay's quick settings on the right of the game: the overlay, the frame rate limit and the scaling filter change at once and are saved for that game. Use the arrow keys or click, and Esc to close."))
             }
 
             SteamBlock(title: String(localized: "Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)")) {

@@ -24,7 +24,7 @@ for (const form of Object.keys(FORMS)) {
       const dropdowns = nodes.filter(n => n.type === 'Dropdown');
       assert.equal(dropdowns[0].props.rgOptions[0].label, t('Automatic', '自动', 'Automatico'));
       assert.equal(dropdowns[1].props.rgOptions[0].label, t('Off', '关闭', 'Disattivato'));
-      assert(nodes.some(n => n.props.label === t('Performance Overlay', '性能叠加层', 'Overlay delle prestazioni')));
+      assert(nodes.some(n => n.props.label === t('Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)', '性能叠加层（游戏中按 ⌥⌘P 打开这些设置的快捷面板）', 'Overlay delle prestazioni (in gioco, ⌥⌘P apre le impostazioni rapide di questi controlli)')));
       assert(nodes.some(n => n.props.label === t('Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)',
         '帧率限制（与显示器同步，不会更改其刷新率）', 'Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)')));
       assert(nodes.some(n => n.props.label === t('Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)',

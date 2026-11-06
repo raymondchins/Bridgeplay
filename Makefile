@@ -36,6 +36,7 @@ DOBBY_LIBS := $(DOBBY_DIR)/libdobby.a \
               $(DOBBY_DIR)/external/logging/liblogging.a
 
 SRCS := \
+	dylib/feats/quicksettings.c \
 	dylib/core/loader.c \
 	dylib/core/macho.c \
 	dylib/resolver/anchor.c \
@@ -253,6 +254,12 @@ prefixstate-check:
 	$(PREFIXSTATE_CHECK)
 
 COMPATSVC_CHECK := $(OUT_DIR)/compatsvc-check
+
+quicksettings-check:
+	@if [ ! -f dylib/tests/quicksettings-check.c ]; then $(call SKIP,quicksettings-check,dylib/tests/quicksettings-check.c); exit 0; fi; \
+	mkdir -p $(OUT_DIR) && \
+	$(TEST_CC) -o $(OUT_DIR)/quicksettings-check dylib/tests/quicksettings-check.c && \
+	$(OUT_DIR)/quicksettings-check
 
 compatsvc-check:
 	@if [ ! -f dylib/tests/compatsvc-check.c ]; then $(call SKIP,compatsvc-check,dylib/tests/compatsvc-check.c); exit 0; fi; \
@@ -482,6 +489,7 @@ panel-behavior:
 	node $(PANEL_TESTS)/effective.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/localization.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/fex.js $(OUT_DIR)/panel-emit && \
+	node $(PANEL_TESTS)/quick-settings.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/prefix-row.js $(OUT_DIR)/panel-emit && \
 	echo "==> panel behavior: renders as expected, no stale arguments"
 
@@ -547,7 +555,7 @@ OVERLAY_SHIM_TEST_FLAGS := -mmacosx-version-min=$(MIN_VER) -O2 -Wall -Wextra \
 
 overlay-shim: $(OVERLAY_SHIM)
 
-$(OVERLAY_SHIM): $(OVERLAY_SHIM_SRC) overlay-shim/framegen.m overlay-shim/quitkey.m overlay-shim/perfhud.m overlay-shim/framelimit.m overlay-shim/scalefilter.m \
+$(OVERLAY_SHIM): $(OVERLAY_SHIM_SRC) overlay-shim/framegen.m overlay-shim/quitkey.m overlay-shim/perfhud.m overlay-shim/framelimit.m overlay-shim/scalefilter.m overlay-shim/sidebar.m \
                 $(OVERLAY_SHIM_FONT)
 	@mkdir -p $(OUT_DIR)
 	$(CC) -arch arm64 $(OVERLAY_SHIM_FLAGS) -o $(OVERLAY_SHIM_ARM) $<
@@ -571,7 +579,7 @@ overlay-shim-tests: $(OVERLAY_SHIM)
 		$(call SKIP,overlay-shim-tests,$(OVERLAY_SHIM_TESTS)); exit 0; fi; \
 	mkdir -p $(OUT_DIR); \
 	fail=0; ran=0; skipped=0; \
-	for t in device bridge delivery framegen ownership perfhud framelimit scalefilter; do \
+	for t in device bridge delivery framegen ownership perfhud framelimit scalefilter quicksettings; do \
 		for a in arm64 x86_64; do \
 			$(CC) -arch $$a $(OVERLAY_SHIM_TEST_FLAGS) -o $(OUT_DIR)/$$t.$$a \
 				$(OVERLAY_SHIM_TESTS)/$$t.m || exit 1; \
@@ -934,7 +942,7 @@ np-inventory-check:
 # overlay-shim-tests is left out: it needs a Metal GPU and real frame timing.
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
-	activatecheck compat-reported-import-check compatcheck compatsvc-check prefixstate-check shortcutcheck launch-shell envcheck \
+	activatecheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck launchercheck \
 	seedcheck gamefixescheck versioncheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
 	app-tests native-installercheck
