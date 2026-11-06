@@ -758,6 +758,74 @@ struct FreeEngineWinecxTests {
         return lines.sorted()
     }
 
+    // #2688: an antivirus quarantined the app's d3dx11 and setup stopped. Those four may fall
+    // back to the runtime's own; every other bundled file stays required.
+    @Test("Only the d3dx11 DLLs may fall back to the runtime's own", arguments: FreeEngineWinecx.releases.map(\.build))
+    func fallbacksAreD3dxOnly(id: String) throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
+        let fallbacks = FreeEngineWinecx.fallbackFiles(release)
+        #expect(Set(fallbacks.keys) == Set(release.d3dx.map(\.path)))
+        for file in release.d3dx {
+            let fallback = try #require(file.fallback)
+            #expect(fallback.count == 64 && fallback != file.sha256, "\(file.path)")
+        }
+    }
+
+    @Test("A quarantined d3dx11 keeps the runtime's own and the engine still counts as laid out")
+    func quarantinedD3dxFallsBack() throws {
+        let release = FreeEngineWinecx.v1117
+        let file = try #require(release.d3dx.first)
+        let stock = Data("winecx's own d3dx11_43.dll".utf8)
+        let quarantined = WinecxBundledFile(resource: "quarantined-d3dx", ext: "dll", path: file.path,
+                                            sha256: file.sha256, fallback: Digest.sha256(of: stock))
+        let empty = try makeDirectory("empty-bundle")
+        defer { try? FileManager.default.removeItem(at: empty) }
+        let bundle = try #require(Bundle(url: empty))
+
+        let root = try makeDirectory("d3dx-fallback")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let dll = root.appending(path: file.path)
+        try FileManager.default.createDirectory(at: dll.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try stock.write(to: dll)
+
+        try FreeEngineWinecx.installBundled([quarantined], root: root, bundle: bundle)
+        #expect(Digest.sha256IfPresent(dll) == quarantined.fallback)
+
+        #expect(FreeEngineWinecx.laidOut(dll, pin: quarantined.sha256, fallback: quarantined.fallback))
+        #expect(!FreeEngineWinecx.laidOut(dll, pin: quarantined.sha256, fallback: nil))
+        try Data("something else".utf8).write(to: dll)
+        #expect(!FreeEngineWinecx.laidOut(dll, pin: quarantined.sha256, fallback: quarantined.fallback))
+        // A file that is neither ours nor the runtime's is flagged, and so is a missing one.
+        #expect(FreeEngineWinecx.layoutProblems(root: root, release: release).contains(file.path))
+        try FileManager.default.removeItem(at: dll)
+        #expect(!FreeEngineWinecx.laidOut(dll, pin: quarantined.sha256, fallback: quarantined.fallback))
+    }
+
+    @Test("A quarantined d3dx11 over a file that isn't the runtime's own still stops setup")
+    func quarantinedD3dxOverUnknownFileFails() throws {
+        let empty = try makeDirectory("empty-bundle")
+        defer { try? FileManager.default.removeItem(at: empty) }
+        let bundle = try #require(Bundle(url: empty))
+        let root = try makeDirectory("d3dx-unknown")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = "lib/wine/x86_64-windows/d3dx11_43.dll"
+        let dll = root.appending(path: path)
+        try FileManager.default.createDirectory(at: dll.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("not the runtime's file".utf8).write(to: dll)
+
+        let withFallback = WinecxBundledFile(resource: "quarantined-d3dx", ext: "dll", path: path,
+                                             sha256: String(repeating: "1", count: 64),
+                                             fallback: String(repeating: "2", count: 64))
+        #expect(throws: StepFailure.self) { try FreeEngineWinecx.installBundled([withFallback], root: root, bundle: bundle) }
+        // No fallback at all: a missing bundled file stops setup as before, whatever is there.
+        let required = WinecxBundledFile(resource: "quarantined-d3dx", ext: "dll", path: path,
+                                         sha256: String(repeating: "1", count: 64))
+        try Data("x".utf8).write(to: dll)
+        #expect(throws: StepFailure.self) { try FreeEngineWinecx.installBundled([required], root: root, bundle: bundle) }
+        try FileManager.default.removeItem(at: dll)
+        #expect(throws: StepFailure.self) { try FreeEngineWinecx.installBundled([withFallback], root: root, bundle: bundle) }
+    }
+
     // #1295: setup said "missing" for a file that could also be unreadable or changed.
     @Test("A bundled file that is missing, unreadable or changed says which check failed")
     func bundledSourceFailures() throws {

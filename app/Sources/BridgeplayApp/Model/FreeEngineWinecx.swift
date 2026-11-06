@@ -25,6 +25,9 @@ struct WinecxBundledFile: Sendable, Equatable {
     // Path below the engine root.
     let path: String
     let sha256: String
+    // sha256 of the runtime's own file at `path`, kept when the app's copy is missing,
+    // unreadable or changed (an antivirus quarantine, #2688). Nil: the app's copy is required.
+    var fallback: String? = nil
 }
 
 struct WinecxRelease: Sendable {
@@ -204,20 +207,25 @@ enum FreeEngineWinecx {
                               sha256: "680b267e8cf41af0868de4adf7f6760615a434a4be06b4ab0cfeece2d9240faa"),
         ],
         // d3dx11_43.dll, d3dx11_42.dll: winecx e0aa380's PE halves, both arches, with
-        // d3dx11-patch/winecx-create-thread-pump.patch.
+        // d3dx11-patch/winecx-create-thread-pump.patch. The fallbacks are the runtime's own,
+        // from Libraries.tar.gz above: only games that call D3DX11CreateThreadPump need ours.
         d3dx: [
             WinecxBundledFile(resource: "d3dx11_43-winecx-11.17", ext: "dll",
                               path: "lib/wine/x86_64-windows/d3dx11_43.dll",
-                              sha256: "7d23cdfacc922f67dfa2eba98df277ae2ae351ad3646c3191a84966b55dbbfd3"),
+                              sha256: "7d23cdfacc922f67dfa2eba98df277ae2ae351ad3646c3191a84966b55dbbfd3",
+                              fallback: "fe5c706255c39f5575f00c59602f1bcee58f995c81d03036c58c905a19ad527c"),
             WinecxBundledFile(resource: "d3dx11_43-winecx-11.17-i386", ext: "dll",
                               path: "lib/wine/i386-windows/d3dx11_43.dll",
-                              sha256: "dd4dd351f2a5880c9848d5ccf4944a0b5e7622bb7fb196544115b1f9c92d749c"),
+                              sha256: "dd4dd351f2a5880c9848d5ccf4944a0b5e7622bb7fb196544115b1f9c92d749c",
+                              fallback: "c4357370a29625cc69d79b8a7ebee328704950562d026d684240a6e52feea0de"),
             WinecxBundledFile(resource: "d3dx11_42-winecx-11.17", ext: "dll",
                               path: "lib/wine/x86_64-windows/d3dx11_42.dll",
-                              sha256: "3d97e1de9000a78e27eb5c90d0ab9b36d54fd350760063da27226d22c90c8e1b"),
+                              sha256: "3d97e1de9000a78e27eb5c90d0ab9b36d54fd350760063da27226d22c90c8e1b",
+                              fallback: "b835f5ff9bc88a535997a9e5281ab4efe1a6359d3381a6d78c176deebe6e6e46"),
             WinecxBundledFile(resource: "d3dx11_42-winecx-11.17-i386", ext: "dll",
                               path: "lib/wine/i386-windows/d3dx11_42.dll",
-                              sha256: "85075f8b4f30f1a993238a0d6ab772a3a3df6c031e87ee9401c4367a527cd57c"),
+                              sha256: "85075f8b4f30f1a993238a0d6ab772a3a3df6c031e87ee9401c4367a527cd57c",
+                              fallback: "f4d8b1310cea5f7b51aa62c87fcd685ce6fde7f1901fda1bcf1236bb8a942d2f"),
         ],
         // kernel32.dll, kernelbase.dll: winecx e0aa380's PE halves with
         // hide-wine-exports-patch/winecx-hide-wine-exports.patch.
@@ -431,11 +439,25 @@ enum FreeEngineWinecx {
         return table
     }
 
+    static func laidOut(_ file: URL, pin: String, fallback: String?) -> Bool {
+        SignedPin.matches(file, sha256: pin) || (fallback != nil && Digest.sha256IfPresent(file) == fallback)
+    }
+
+    // The runtime's own files that may stand in for a bundled one, by path.
+    static func fallbackFiles(_ release: WinecxRelease = current) -> [String: String] {
+        var table: [String: String] = [:]
+        for file in release.gamepad + release.network + release.nvidia + release.audio + release.d3dx + release.loader + release.rockstar {
+            if let fallback = file.fallback { table[file.path] = fallback }
+        }
+        return table
+    }
+
     // Files that are absent or differ from their pin, the msync marker, and a Direct3D
     // layout that is neither stock nor a complete D3DMetal link.
     static func layoutProblems(root: URL, release: WinecxRelease = current) -> [String] {
+        let fallbacks = fallbackFiles(release)
         var problems = expectedFiles(release).filter { path, hash in
-            !SignedPin.matches(root.appending(path: path), sha256: hash)
+            !laidOut(root.appending(path: path), pin: hash, fallback: fallbacks[path])
         }.keys.sorted()
         if !FileManager.default.fileExists(atPath: msyncMarker(in: root).path(percentEncoded: false)) {
             problems.append(msyncMarkerPath)
@@ -573,8 +595,18 @@ enum FreeEngineWinecx {
     static func installBundled(_ files: [WinecxBundledFile], root: URL, bundle: Bundle = .module) throws {
         let fm = FileManager.default
         for file in files {
-            let source = try bundledSource(file, in: bundle)
             let destination = root.appending(path: file.path)
+            let source: URL
+            do {
+                source = try bundledSource(file, in: bundle)
+            } catch where file.fallback != nil && Digest.sha256IfPresent(destination) == file.fallback {
+                // #2688: an antivirus took the app's copy. The runtime's own still runs
+                // nearly every game, so setup goes on instead of stopping here.
+                // CEILING: an engine set up this way keeps the runtime's file after the copy
+                // is restored — reinstalling the engine lays ours in.
+                AppLog.note("bundled file: keeping the runtime's own \(file.path)")
+                continue
+            }
             try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             try? fm.removeItem(at: destination)
             try fm.copyItem(at: source, to: destination)
