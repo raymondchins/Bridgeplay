@@ -113,7 +113,7 @@ ps_game() { # print ps lines belonging to the game's wine exe
   [ -s "$PATS" ] || return 1
   ps -axww -o pid=,command= 2>/dev/null \
     | grep -iFf "$PATS" \
-    | grep -i 'wine' \
+    | grep -iE '[[:space:]][A-Z]:\\|wine' \
     | grep -Ev 'waitforexitandrun|/bin/sh -c|np-test-game|grep ' || true
 }
 wine_procs() { ps -axww -o pid=,command= 2>/dev/null | grep -Ei 'wineserver|wine-preloader|/wine(64)? ' | grep -v grep || true; }
