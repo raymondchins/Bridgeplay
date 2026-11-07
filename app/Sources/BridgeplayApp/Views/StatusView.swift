@@ -758,6 +758,7 @@ struct StatusView: View {
             action: crossOverAction(row, prominent: snapshot.runner == .none),
             menu: crossOverMenu(row, addsCrossOver: isCrossOver)
         )
+        .help(row.install.map { Self.location($0.bundle) } ?? "")
         .background {
             if isCrossOver { RowWash.crossOver }
             RowWash(fill: Color.accentColor.opacity(0.2), opacity: highlighted ? 1 : 0)
@@ -797,6 +798,13 @@ struct StatusView: View {
         }
     }
 
+    // Where the app is, shown on hover rather than on the row.
+    private static func location(_ bundle: URL) -> String {
+        var path = bundle.path(percentEncoded: false)
+        if path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        return path
+    }
+
     private func crossOverDetail(_ row: CrossOverRow, tools: [InstalledTool]) -> String? {
         var lines: [String] = []
         if row.copy == .ready || row.copy == .unpatched {
@@ -804,11 +812,7 @@ struct StatusView: View {
             lines.append(contentsOf: names)
         }
         if row.copy == .none, row.licensed == false { lines.append("\(String(localized: "Open CrossOver to activate it.")) \(CrossOverLicense.trialUnsupported)") }
-        if let install = row.install {
-            var path = install.bundle.path(percentEncoded: false)
-            if path.count > 1, path.hasSuffix("/") { path.removeLast() }
-            lines.append(path)
-        } else if row.copy != .unsupported {
+        if row.install == nil, row.copy != .unsupported {
             lines.append(String(localized: "CrossOver app not found."))
         }
         return lines.isEmpty ? nil : lines.joined(separator: "\n")
