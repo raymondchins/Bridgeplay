@@ -742,5 +742,108 @@ check test "$cache_status" -eq 0
 check test ! -e "$WINEPREFIX/system.reg"
 check test "$(cat "$template_dir/ready")" = stale
 
+# The WineHQ engine is stock Wine, which names the profile after the Mac user while Steam
+# Cloud syncs steamuser (#2618). That name is folded into steamuser and linked there.
+notify_user() { printf '%s\n' "$1" >> "$case_root/notified"; }
+saved_user=${USER:-}
+USER=tester
+np_build=winehq-11.15
+
+fixture
+check test "$(readlink "$template_dir/pfx/drive_c/users/tester")" = steamuser
+check test "$(prefix_is_bare && echo bare || echo refused)" = bare
+lay_out_proton_profile
+check test "$(readlink "$WINEPREFIX/drive_c/users/tester")" = steamuser
+check test "$(prefix_is_bare && echo bare || echo refused)" = bare
+
+# A prefix an earlier launch split: the game's saves under the Mac user, Steam Cloud's under
+# steamuser, Wine's links out to the home folders, and a copy that differs on each side.
+split_prefix() {
+  users="$WINEPREFIX/drive_c/users"
+  mine="$users/tester/AppData/LocalLow/Perfect_Random/Sulfur"
+  cloud="$users/steamuser/AppData/LocalLow/Perfect_Random/Sulfur"
+  mkdir -p "$mine/deep" "$cloud" "$case_root/home/Documents" "$users/tester/Saved Games/Other"
+  printf local > "$mine/Sulfur_SaveSlot_2.sss"
+  printf mac > "$mine/settings.json"
+  printf same > "$mine/same.txt"
+  printf deep > "$mine/deep/inner.sav"
+  printf other > "$users/tester/Saved Games/Other/slot.sav"
+  printf cloud > "$cloud/Sulfur_SaveSlot_1.sss"
+  printf steam > "$cloud/settings.json"
+  printf same > "$cloud/same.txt"
+  ln -s "$case_root/home/Documents" "$users/tester/Documents"
+}
+fixture
+lay_out_proton_profile
+rm "$WINEPREFIX/drive_c/users/tester"
+split_prefix
+check lay_out_proton_profile
+check test "$(readlink "$users/tester")" = steamuser
+check test "$(cat "$cloud/Sulfur_SaveSlot_1.sss")" = cloud
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss")" = local
+check test "$(cat "$cloud/settings.json")" = steam
+check test "$(cat "$cloud/settings.json BACKUP")" = mac
+check test "$(cat "$cloud/same.txt")" = same
+check test ! -e "$cloud/same.txt BACKUP"
+check test "$(cat "$cloud/deep/inner.sav")" = deep
+check test "$(cat "$users/steamuser/Saved Games/Other/slot.sav")" = other
+check test ! -L "$users/steamuser/Documents"
+check test "$(readlink "$users/tester BACKUP/Documents")" = "$case_root/home/Documents"
+check grep -q "kept both copies, this one as: .*settings.json BACKUP" "$log"
+check test "$(wc -l < "$case_root/notified" | tr -d ' ')" = 1
+check lay_out_proton_profile
+check test "$(find "$users" -name '*BACKUP*' | wc -l | tr -d ' ')" = 2
+check test "$(wc -l < "$case_root/notified" | tr -d ' ')" = 1
+
+# A file that cannot move stops the launch with everything still on one side or the other.
+fixture
+lay_out_proton_profile
+rm "$WINEPREFIX/drive_c/users/tester"
+split_prefix
+chmod 500 "$mine"
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+chmod 700 "$mine"
+check test -d "$users/tester" -a ! -L "$users/tester"
+check test "$(cat "$mine/settings.json")" = mac
+check test "$(cat "$cloud/settings.json")" = steam
+check lay_out_proton_profile
+check test "$(readlink "$users/tester")" = steamuser
+check test "$(cat "$cloud/settings.json BACKUP")" = mac
+
+# A case-sensitive volume keeps names apart that Wine reads as one.
+if ! attach_image "Case-sensitive APFS" folds; then
+  no_image "case-sensitive APFS" "the case-sensitive fold"
+else
+  fixture
+  STEAM_COMPAT_DATA_PATH="$work/mnt.folds/game"
+  WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
+  mkdir -p "$WINEPREFIX"
+  lay_out_proton_profile
+  rm "$WINEPREFIX/drive_c/users/tester"
+  users="$WINEPREFIX/drive_c/users"
+  mkdir -p "$users/tester/AppData/LocalLow/perfect_random" "$users/steamuser/AppData/LocalLow/Perfect_Random"
+  printf mac > "$users/tester/AppData/LocalLow/perfect_random/slot.sav"
+  printf cloud > "$users/steamuser/AppData/LocalLow/Perfect_Random/Slot.sav"
+  check lay_out_proton_profile
+  check test ! -e "$users/steamuser/AppData/LocalLow/perfect_random"
+  check test "$(cat "$users/steamuser/AppData/LocalLow/Perfect_Random/Slot.sav")" = cloud
+  check test "$(cat "$users/steamuser/AppData/LocalLow/Perfect_Random/Slot.sav BACKUP")" = mac
+  detach_image "$work/mnt.folds" || true
+fi
+
+# CrossOver's lineage names its profile crossover: a folder under the Mac user is left be.
+np_build=winecx-11.17
+fixture
+lay_out_proton_profile
+check test ! -e "$WINEPREFIX/drive_c/users/tester"
+check test ! -e "$template_dir/pfx/drive_c/users/tester"
+mkdir -p "$WINEPREFIX/drive_c/users/tester/AppData"
+printf mine > "$WINEPREFIX/drive_c/users/tester/AppData/save.sav"
+check lay_out_proton_profile
+check test ! -L "$WINEPREFIX/drive_c/users/tester"
+check test "$(cat "$WINEPREFIX/drive_c/users/tester/AppData/save.sav")" = mine
+np_build=fixture
+USER=$saved_user
+
 printf 'seedcheck: %s failures\n' "$fails"
 test "$fails" -eq 0

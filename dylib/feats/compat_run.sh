@@ -1895,6 +1895,128 @@ lay_out_proton_profile() {
     && ln -s steamuser "$users/crossover" 2>/dev/null; then
     echo "=== pointed crossover at steamuser ===" >> "$log" 2>&1 || true
   fi
+  fold_wine_profile
+}
+
+# Stock Wine (the WineHQ engine) names the profile after the Mac user, where CrossOver's
+# lineage uses crossover. Same rule as set_home_dir in Wine's ntdll/unix/loader.c.
+wine_profile_name() {
+  case "$np_build" in winehq-*) ;; *) return 1 ;; esac
+  wine_user=${USER:-}
+  [ -n "$wine_user" ] || wine_user=$(id -un 2>/dev/null) || return 1
+  wine_user=${wine_user##*/}
+  wine_user=${wine_user##*\\}
+  case "$(printf '%s' "$wine_user" | tr '[:upper:]' '[:lower:]')" in
+    ''|.|..|steamuser|crossover|public) return 1 ;;
+  esac
+  printf '%s' "$wine_user"
+}
+
+# The name in $1 that the volume would take $2 as. A case-sensitive volume keeps
+# "Saves" and "saves" apart, but Wine reads them as one.
+fold_landing() {
+  if [ -e "$1/$2" ] || [ -L "$1/$2" ] || [ "$fold_case" = 0 ]; then
+    printf '%s' "$1/$2"
+    return 0
+  fi
+  want=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
+  for other in "$1"/* "$1"/.[!.]* "$1"/..?*; do
+    [ -e "$other" ] || [ -L "$other" ] || continue
+    if [ "$(printf '%s' "${other##*/}" | tr '[:upper:]' '[:lower:]')" = "$want" ]; then
+      printf '%s' "$other"
+      return 0
+    fi
+  done
+  printf '%s' "$1/$2"
+}
+
+# Moves what is in $1 into $2. Renames only, so a launch killed partway leaves every file
+# whole on one side or the other. A file that differs from the one already in $2 is kept
+# beside it as "<name> BACKUP" and printed. Fails if anything could not move.
+fold_user_dir() (
+  status=0
+  for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
+    [ -e "$entry" ] || [ -L "$entry" ] || continue
+    landing=$(fold_landing "$2" "${entry##*/}")
+    if [ ! -e "$landing" ] && [ ! -L "$landing" ]; then
+      mv -n "$entry" "$landing" 2>> "$log" && [ ! -e "$entry" ] && [ ! -L "$entry" ] || status=1
+      continue
+    fi
+    # Wine's links out to the Mac's home folders: what is behind them stays there.
+    [ ! -L "$entry" ] || continue
+    if [ -d "$entry" ] && [ -d "$landing" ] && [ ! -L "$landing" ]; then
+      fold_user_dir "$entry" "$landing" || status=1
+      rmdir "$entry" 2>/dev/null || true
+      continue
+    fi
+    if [ -f "$entry" ] && [ -f "$landing" ] && [ ! -L "$landing" ] && cmp -s "$entry" "$landing"; then
+      rm -f "$entry" || status=1
+      continue
+    fi
+    parked="$landing BACKUP"
+    parked_number=2
+    while [ -e "$parked" ] || [ -L "$parked" ]; do
+      if [ -f "$entry" ] && [ -f "$parked" ] && [ ! -L "$parked" ] && cmp -s "$entry" "$parked"; then
+        break
+      fi
+      parked="$landing BACKUP $parked_number"
+      parked_number=$((parked_number + 1))
+    done
+    if [ -e "$parked" ]; then
+      rm -f "$entry" || status=1
+    elif mv -n "$entry" "$parked" 2>> "$log" && [ ! -e "$entry" ]; then
+      printf '%s\n' "$parked"
+    else
+      status=1
+    fi
+  done
+  exit "$status"
+)
+
+# Steam Cloud syncs users/steamuser, so a profile under the Mac user's name splits a game's
+# saves from its cloud saves (#2618). Folds it into steamuser and links the name there.
+fold_wine_profile() {
+  wine_user=$(wine_profile_name) || return 0
+  own="$users/$wine_user"
+  if [ -L "$own" ]; then
+    [ "$(readlink "$own")" = steamuser ] \
+      || echo "=== users/$wine_user is a link elsewhere, cloud saves may be split ===" >> "$log" 2>&1 \
+      || true
+    return 0
+  fi
+  [ ! "$own" -ef "$profile" ] || return 0
+  if [ -e "$own" ]; then
+    if [ ! -d "$own" ]; then
+      echo "=== users/$wine_user is not a folder, cloud saves may be split ===" >> "$log" 2>&1 || true
+      return 0
+    fi
+    fold_case=1
+    [ ! "$users/STEAMUSER" -ef "$profile" ] || fold_case=0
+    fold_parked=$(fold_user_dir "$own" "$profile") || {
+      echo "=== users/$wine_user did not all move into steamuser, left in place ===" \
+        >> "$log" 2>&1 || true
+      return 1
+    }
+    find "$own" -depth -type d -empty -delete 2>/dev/null || true
+    if [ -e "$own" ]; then
+      # Only links out to the Mac's home folders are left, kept as a pointer to them.
+      aside="$own BACKUP"
+      aside_number=2
+      while [ -e "$aside" ] || [ -L "$aside" ]; do
+        aside="$own BACKUP $aside_number"
+        aside_number=$((aside_number + 1))
+      done
+      mv -n "$own" "$aside" 2>> "$log" || return 1
+    fi
+    echo "=== moved users/$wine_user into steamuser, where Steam Cloud syncs ===" >> "$log" 2>&1 || true
+    if [ -n "$fold_parked" ]; then
+      printf '%s\n' "$fold_parked" | sed 's/^/=== kept both copies, this one as: /; s/$/ ===/' \
+        >> "$log" 2>&1 || true
+      notify_user "Saved games moved to where Steam Cloud syncs" "Files that differed from Steam Cloud's copy were kept beside it with BACKUP in the name."
+    fi
+  fi
+  ln -s steamuser "$own" 2>/dev/null \
+    || echo "=== could not point users/$wine_user at steamuser ===" >> "$log" 2>&1 || true
 }
 
 controller_ids() {
@@ -2405,6 +2527,7 @@ finish_dead_seeds() {
 }
 
 prefix_is_bare() (
+  own_profile=$(wine_profile_name) || own_profile=""
   set -- ""
   while [ "$#" -gt 0 ]; do
     relative=$1
@@ -2417,6 +2540,10 @@ prefix_is_bare() (
       part="$relative/${node##*/}"
       if [ -L "$node" ]; then
         if [ "$part" = /dosdevices/s: ] && [ "$(readlink "$node")" = "$(game_drive_record)" ]; then
+          continue
+        fi
+        if [ -n "$own_profile" ] && [ "$part" = "/drive_c/users/$own_profile" ] \
+          && [ "$(readlink "$node")" = steamuser ]; then
           continue
         fi
         case "$part:$(readlink "$node")" in
