@@ -137,16 +137,20 @@ struct CrossOverRowTests {
         let made = rows([engine, release, odd, Self.old], orphaned: ["winehq-10.0", "25.0.0.1"])
         #expect(made.map(\.isFreeEngine) == [true, false, true, false, true, false])
 
-        // A CrossOver build stays CrossOver wherever its app is.
+        // CrossOver stays CrossOver wherever its app is, supported or not.
         var moved = install("CrossOver", Self.release, root: SupportPaths.engines.path(percentEncoded: false))
         moved.isEngine = true
-        #expect(rows([moved]).map(\.isFreeEngine) == [false])
+        let oldMoved = CrossOverInstall(
+            bundle: SupportPaths.engines.appending(path: "CrossOver 24.app"), releaseVersion: "24.0.5",
+            support: .unsupportedBuild("24.0.5"), isEngine: true
+        )
+        #expect(rows([moved, oldMoved]).map(\.isFreeEngine) == [false, false])
 
         let copies = rows([], installed: [winecx, Self.release])
         #expect(copies.map(\.isFreeEngine) == [true, false])
     }
 
-    @Test("The supported versions named for CrossOver are CrossOver's own, previews by name")
+    @Test("Each kind of engine is pointed at its own supported versions")
     func crossOverVersions() {
         let named = SupportedRunners.crossOverVersions
 
@@ -155,6 +159,9 @@ struct CrossOverRowTests {
         #expect(!named.contains("Wine"))
         let previews = SupportedRunners.all.filter(\.isPreview)
         #expect(!previews.isEmpty && previews.allSatisfy { !$0.isFree })
+
+        let free = SupportedRunners.freeEngineVersions
+        #expect(free.contains("WineHQ") && free.contains("WineCX") && !free.contains("Preview"))
     }
 }
 

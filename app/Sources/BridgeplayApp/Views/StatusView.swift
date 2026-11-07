@@ -779,7 +779,8 @@ struct StatusView: View {
 
     private func crossOverValue(_ row: CrossOverRow) -> String {
         if let version = row.unsupportedVersion {
-            return String(localized: "Version \(version) isn't supported. Use \(SupportedRunners.crossOverVersions).")
+            let use = row.isFreeEngine ? SupportedRunners.freeEngineVersions : SupportedRunners.crossOverVersions
+            return String(localized: "Version \(version) isn't supported. Use \(use).")
         }
         let build = String(localized: "Build \(SupportedRunners.displayVersion(forID: row.buildID))")
         switch row.copy {

@@ -23,6 +23,7 @@ struct CrossOverInstall: Sendable, Identifiable {
     var crossOverRoot: URL { SupportPaths.crossOverRoot(inBundle: bundle) }
 
     var isPreview: Bool { name.localizedCaseInsensitiveContains("Preview") }
+    var isNamedCrossOver: Bool { CrossOverSource.isNamedCrossOver(bundle) }
 
     var isFree: Bool {
         if case .supported(let build) = support { return build.isFree }
@@ -76,6 +77,10 @@ enum CrossOverSource {
         a.standardizedFileURL.path(percentEncoded: false) == b.standardizedFileURL.path(percentEncoded: false)
     }
 
+    static func isNamedCrossOver(_ bundle: URL) -> Bool {
+        bundle.deletingPathExtension().lastPathComponent.hasPrefix("CrossOver")
+    }
+
     // A CrossOver bundle without this directory is bad!
     static func looksLikeCrossOver(_ bundle: URL) -> Bool {
         let root = SupportPaths.crossOverRoot(inBundle: bundle)
@@ -103,7 +108,7 @@ enum CrossOverSource {
         for root in searchRoots {
             let entries = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
             for entry in entries where entry.pathExtension == "app" {
-                guard entry.deletingPathExtension().lastPathComponent.hasPrefix("CrossOver") else { continue }
+                guard isNamedCrossOver(entry) else { continue }
                 consider(entry)
             }
         }

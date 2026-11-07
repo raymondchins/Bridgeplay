@@ -29,9 +29,10 @@ struct CrossOverRow: Identifiable, Equatable {
     var isManual: Bool { install?.isManual ?? false }
 
     // The free engines Bridgeplay downloads list here too: apps in its engines folder, and
-    // copies made from them. A known build decides; otherwise where it was found, or its id.
+    // copies made from them. A known build decides; otherwise where it was found and its
+    // name (CrossOver keeps its own wherever it sits), or its id.
     var isFreeEngine: Bool {
-        if let install { return install.isUsable ? install.isFree : install.isEngine }
+        if let install { return install.isUsable ? install.isFree : install.isEngine && !install.isNamedCrossOver }
         return SupportedRunners.build(id: buildID)?.isFree ?? (FreeEngine.family(ofBuild: buildID) != nil)
     }
 

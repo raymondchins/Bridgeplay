@@ -333,6 +333,10 @@ enum SupportedRunners {
         return named.formatted(.list(type: .or))
     }
 
+    static var freeEngineVersions: String {
+        versions(of: all.filter(\.isFree)).formatted(.list(type: .or))
+    }
+
     static var versionList: String {
         versions(of: all).joined(separator: ", ")
     }
