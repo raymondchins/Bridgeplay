@@ -150,6 +150,17 @@ struct CrossOverRowTests {
         let copies = rows([], installed: [winecx, Self.release])
         #expect(copies.map(\.isFreeEngine) == [true, false])
     }
+
+    @Test("The supported versions named for CrossOver are CrossOver's own, previews by name")
+    func crossOverVersions() {
+        let named = SupportedRunners.crossOverVersions
+
+        #expect(named.hasPrefix(Self.release.releaseVersion))
+        #expect(named.contains("Preview \(Self.preview.releaseVersion)"))
+        #expect(!named.contains("Wine"))
+        let previews = SupportedRunners.all.filter(\.isPreview)
+        #expect(!previews.isEmpty && previews.allSatisfy { !$0.isFree })
+    }
 }
 
 @Suite("Manually added CrossOver copies")

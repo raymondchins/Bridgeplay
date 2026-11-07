@@ -48,6 +48,9 @@ struct RunnerBuild: Sendable, Equatable, Identifiable {
         )
     }
 
+    // CrossOver Preview builds are versioned by their build date.
+    var isPreview: Bool { !isFree && releaseVersion.allSatisfy(\.isNumber) }
+
     var flavorName: String { flavor?.uppercased() ?? "Rosetta" }
 
     var displayVersion: String { "\(releaseVersion) \(flavorName)" }
@@ -311,6 +314,19 @@ enum SupportedRunners {
 
     static func displayVersion(forID id: String) -> String {
         build(id: id)?.displayVersion ?? id
+    }
+
+    // The CrossOver versions to tell someone to use, for a row already titled CrossOver:
+    // "26.3 or Preview 20260821, 20261006, or 20261015". Free engines aren't CrossOver.
+    static var crossOverVersions: String {
+        func versions(_ preview: Bool) -> String? {
+            var seen = Set<String>()
+            let list = all.filter { !$0.isFree && $0.isPreview == preview }.map(\.releaseVersion)
+                .filter { seen.insert($0).inserted }
+            return list.isEmpty ? nil : list.formatted(.list(type: .or))
+        }
+        return [versions(false), versions(true).map { "Preview \($0)" }]
+            .compactMap { $0 }.formatted(.list(type: .or))
     }
 
     static var versionList: String {

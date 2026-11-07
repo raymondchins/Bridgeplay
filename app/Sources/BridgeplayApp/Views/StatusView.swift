@@ -657,7 +657,7 @@ struct StatusView: View {
         if rows.isEmpty {
             StatusRow(
                 title: "Wine Engine",
-                value: String(localized: "None found. Download the free WineHQ or WineCX engine, or use CrossOver (\(SupportedRunners.versionList))."),
+                value: String(localized: "None set up yet. Choose one below."),
                 tone: .bad
             )
         }
@@ -777,7 +777,7 @@ struct StatusView: View {
 
     private func crossOverValue(_ row: CrossOverRow) -> String {
         if let version = row.unsupportedVersion {
-            return String(localized: "Version \(version) not supported (supported: \(SupportedRunners.versionList))")
+            return String(localized: "Version \(version) isn't supported. Use \(SupportedRunners.crossOverVersions).")
         }
         let build = String(localized: "Build \(SupportedRunners.displayVersion(forID: row.buildID))")
         switch row.copy {
