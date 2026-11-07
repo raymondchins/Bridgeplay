@@ -933,6 +933,8 @@ rockstar_shim_lock_fd() {
 rockstar_shim_in_use() {
   for held in "$1"/.bridgeplay-rockstar-shim.*.inuse; do
     [ -f "$held" ] && [ ! -L "$held" ] || continue
+    # The mark this launch holds itself says nothing about another one.
+    [ "$held" != "${own_mark:-}" ] || continue
     rc=0
     /usr/bin/lockf -k -n -s -t 0 "$held" true 2>/dev/null || rc=$?
     [ "$rc" != 75 ] || return 0
@@ -940,7 +942,9 @@ rockstar_shim_in_use() {
   return 1
 }
 
-# Stages, removes or restores version.dll in Social Club and the game folder. The first lock
+# Stages, removes or restores version.dll in Social Club and the game folder (and Unreal's exe
+# folder inside it, under the game folder's lock and in-use marks, where DXVK's dxgi goes too
+# as dxgi.dll when $dxgi_wanted is 1). The first lock
 # is per macOS user. Several users can share the game folder, so it also gets a lock of its
 # own, taken only when the folder has something of the shim's in it. A volume that cannot
 # hold that lock falls back to the per-user one. Exits 3 when another launch held it.
@@ -949,12 +953,18 @@ rockstar_shim_folders() {
     exec 6>> "$np_support/.rockstar-shim.lock" && /usr/bin/lockf -s -t 30 6 || exit 1
     game=${STEAM_COMPAT_INSTALL_PATH:-}
     lock="$game/.bridgeplay-rockstar-shim.lock"
+    # Unreal's exe (GTA San Andreas DE's SanAndreas.exe) is not in the game folder's root.
+    win64="$game/Gameface/Binaries/Win64"
     game_locked=0
     busy=0
     if [ -z "$game" ] || [ ! -d "$game" ]; then
       game=""
     elif [ "$shim_wanted" = 1 ] || [ -f "$lock" ] || [ -e "$game/version.dll.bridgeplay-orig" ] \
-      || [ -L "$game/version.dll.bridgeplay-orig" ] || rockstar_shim_copy "$shim/version.dll" "$game/version.dll"; then
+      || [ -L "$game/version.dll.bridgeplay-orig" ] || rockstar_shim_copy "$shim/version.dll" "$game/version.dll" \
+      || [ -e "$win64/version.dll.bridgeplay-orig" ] || [ -L "$win64/version.dll.bridgeplay-orig" ] \
+      || rockstar_shim_copy "$shim/version.dll" "$win64/version.dll" \
+      || [ -e "$win64/dxgi.dll.bridgeplay-orig" ] || [ -L "$win64/dxgi.dll.bridgeplay-orig" ] \
+      || rockstar_shim_copy "$shim/dxgx.dll" "$win64/dxgi.dll"; then
       rc=1
       if rockstar_shim_lock_fd 7 "$lock"; then rc=0; /usr/bin/lockf -s -t 30 7 || rc=$?; fi
       if [ "$rc" = 0 ]; then
@@ -969,60 +979,74 @@ rockstar_shim_folders() {
     else
       game=""
     fi
-    for dir in "$social_club" "$game"; do
+    [ -n "$game" ] || win64=""
+    for dir in "$social_club" "$game" "$win64"; do
       [ -n "$dir" ] && [ -d "$dir" ] || continue
-      target="$dir/version.dll"
-      saved="$dir/version.dll.bridgeplay-orig"
-      is_shim=0
-      ! rockstar_shim_copy "$shim/version.dll" "$target" || is_shim=1
-      # A launch of an older build killed between claiming the backup name and the move
-      # left it empty, with the game's own file still in place. One still claiming it now
-      # made it moments ago.
-      if [ -f "$saved" ] && [ ! -L "$saved" ] && [ ! -s "$saved" ] \
-        && { [ -e "$target" ] || [ -L "$target" ]; } && [ "$is_shim" = 0 ] \
-        && [ -n "$(find "$saved" -prune -mmin +1 2>/dev/null)" ]; then
-        rm -f "$saved" 2>> "$log" && graphics_log "rockstar-shim: removed an empty version.dll.bridgeplay-orig from $dir"
-      fi
-      if [ "$shim_wanted" = 1 ]; then
-        moved=0
-        if { [ -e "$target" ] || [ -L "$target" ]; } && [ "$is_shim" = 0 ]; then
-          if [ -e "$saved" ] || [ -L "$saved" ]; then
-            graphics_log "rockstar-shim: $dir has its own version.dll and a version.dll.bridgeplay-orig, both left alone"
-            continue
+      for name in version.dll dxgi.dll; do
+        src=$shim/version.dll
+        want=$shim_wanted
+        if [ "$name" = dxgi.dll ]; then
+          # SanAndreas.exe imports dxgi.dll statically, so DXVK's goes beside it as dxgi.dll.
+          [ "$dir" = "$win64" ] || continue
+          src=$shim/dxgx.dll
+          want=$dxgi_wanted
+        fi
+        target="$dir/$name"
+        saved="$dir/$name.bridgeplay-orig"
+        is_shim=0
+        ! rockstar_shim_copy "$src" "$target" || is_shim=1
+        # A launch of an older build killed between claiming the backup name and the move
+        # left it empty, with the game's own file still in place. One still claiming it now
+        # made it moments ago.
+        if [ -f "$saved" ] && [ ! -L "$saved" ] && [ ! -s "$saved" ] \
+          && { [ -e "$target" ] || [ -L "$target" ]; } && [ "$is_shim" = 0 ] \
+          && [ -n "$(find "$saved" -prune -mmin +1 2>/dev/null)" ]; then
+          rm -f "$saved" 2>> "$log" && graphics_log "rockstar-shim: removed an empty $name.bridgeplay-orig from $dir"
+        fi
+        if [ "$want" = 1 ]; then
+          moved=0
+          if { [ -e "$target" ] || [ -L "$target" ]; } && [ "$is_shim" = 0 ]; then
+            if [ -e "$saved" ] || [ -L "$saved" ]; then
+              graphics_log "rockstar-shim: $dir has its own $name and a $name.bridgeplay-orig, both left alone"
+              continue
+            fi
+            # One rename: a killed launch leaves the file under one name or the other, never
+            # an empty backup. Without the folder's lock another user's launch could rename a
+            # file over it, so then the game's own file stays.
+            if { [ "$dir" != "$social_club" ] && [ "$game_locked" = 0 ]; } || ! mv "$target" "$saved" 2>> "$log"; then
+              graphics_log "rockstar-shim: could not set aside the $name in $dir, left alone"
+              continue
+            fi
+            moved=1
+            graphics_log "rockstar-shim: moved the $name in $dir to $name.bridgeplay-orig"
           fi
-          # One rename: a killed launch leaves the file under one name or the other, never
-          # an empty backup. Without the folder's lock another user's launch could rename a
-          # file over it, so then the game's own file stays.
-          if { [ "$dir" = "$game" ] && [ "$game_locked" = 0 ]; } || ! mv "$target" "$saved" 2>> "$log"; then
-            graphics_log "rockstar-shim: could not set aside the version.dll in $dir, left alone"
-            continue
+          if ! stage_backend_file "$src" "$target"; then
+            graphics_log "rockstar-shim: could not stage $name into $dir"
+            [ "$moved" = 0 ] || mv "$saved" "$target" 2>> "$log" || true
+          elif [ "$dir" != "$social_club" ]; then
+            # Other macOS users' launches read it too.
+            chmod a+r "$target" 2>/dev/null || true
           fi
-          moved=1
-          graphics_log "rockstar-shim: moved the version.dll in $dir to version.dll.bridgeplay-orig"
+          continue
         fi
-        if ! stage_backend_file "$shim/version.dll" "$target"; then
-          graphics_log "rockstar-shim: could not stage version.dll into $dir"
-          [ "$moved" = 0 ] || mv "$saved" "$target" 2>> "$log" || true
-        elif [ "$dir" = "$game" ]; then
-          # Other macOS users' launches read it too.
-          chmod a+r "$target" 2>/dev/null || true
+        # The in-use marks are in the game folder, also for the exe folder inside it.
+        held_in=$dir
+        [ "$dir" != "$win64" ] || held_in=$game
+        if rockstar_shim_in_use "$held_in"; then
+          graphics_log "rockstar-shim: another launch is using the $name in $dir, left alone"
+          continue
         fi
-        continue
-      fi
-      if rockstar_shim_in_use "$dir"; then
-        graphics_log "rockstar-shim: another launch is using the version.dll in $dir, left alone"
-        continue
-      fi
-      if [ "$is_shim" = 1 ]; then
-        rm -f "$target" 2>> "$log" && graphics_log "rockstar-shim: removed version.dll from $dir"
-      fi
-      if [ -e "$saved" ] || [ -L "$saved" ]; then
-        if [ -e "$target" ] || [ -L "$target" ]; then
-          graphics_log "rockstar-shim: $dir has a new version.dll, version.dll.bridgeplay-orig left alone"
-        elif mv "$saved" "$target" 2>> "$log"; then
-          graphics_log "rockstar-shim: put the version.dll in $dir back"
+        if [ "$is_shim" = 1 ]; then
+          rm -f "$target" 2>> "$log" && graphics_log "rockstar-shim: removed $name from $dir"
         fi
-      fi
+        if [ -e "$saved" ] || [ -L "$saved" ]; then
+          if [ -e "$target" ] || [ -L "$target" ]; then
+            graphics_log "rockstar-shim: $dir has a new $name, $name.bridgeplay-orig left alone"
+          elif mv "$saved" "$target" 2>> "$log"; then
+            graphics_log "rockstar-shim: put the $name in $dir back"
+          fi
+        fi
+      done
     done
     [ "$busy" = 0 ] || exit 3
     exit 0
@@ -1031,16 +1055,20 @@ rockstar_shim_folders() {
 
 # Rockstar Games Launcher and GTA V Legacy (ROCKSTAR_SHIM=1, rockstar-shim/): a version.dll
 # next to SocialClubHelper.exe makes the launcher's CEF windows draw on winemac, and the one
-# next to the game hands GTA5.exe DXVK's dxgi on the dxvk backend. The game folder only ever
-# gets version.dll. A version.dll of the game's own (a mod loader) is moved to
-# version.dll.bridgeplay-orig first. Without the key, or on an engine without the shim, the
-# staged copy is removed and that file put back, unless another launch is using the folder.
+# next to the game hands GTA5.exe DXVK's dxgi on the dxvk backend. Unreal's exe folder
+# (SanAndreas.exe) also gets DXVK's dxgi as dxgi.dll, as the game imports it statically. A
+# version.dll or dxgi.dll of the game's own (a mod loader) is moved to <name>.bridgeplay-orig
+# first. Without the key, or on an engine without the shim, the staged copy is removed and
+# that file put back, unless another launch is using the folder.
 stage_rockstar_shim() {
   shim="$backend_root/rockstar-shim/x86_64-windows"
   social_club="$WINEPREFIX/drive_c/Program Files/Rockstar Games/Social Club"
   shim_wanted=0
+  dxgi_wanted=0
+  own_mark=""
   if [ "$gamefix_rockstar_shim" = 1 ] && [ "$verb" = waitforexitandrun ]; then
     [ ! -f "$shim/version.dll" ] || shim_wanted=1
+    [ "$shim_wanted" = 0 ] || [ "$backend" != dxvk ] || [ ! -f "$shim/dxgx.dll" ] || dxgi_wanted=1
   elif [ "$gamefix_rockstar_shim" = 1 ]; then
     # Helpers (verb run) leave the game's files as they are.
     return 0
@@ -1052,8 +1080,11 @@ stage_rockstar_shim() {
     inuse="$STEAM_COMPAT_INSTALL_PATH/.bridgeplay-rockstar-shim.$(id -u)-$(printf '%s' "${STEAM_COMPAT_DATA_PATH:-}" | cksum | cut -d ' ' -f 1)"
     # A mark the previous launch of this prefix still holds while it shuts down sends this
     # launch to a second one.
-    if ! { rockstar_shim_lock_fd 5 "$inuse.inuse" && /usr/bin/lockf -s -t 1 5; } \
-      && ! { rockstar_shim_lock_fd 5 "$inuse-2.inuse" && /usr/bin/lockf -s -t 5 5; }; then
+    if { rockstar_shim_lock_fd 5 "$inuse.inuse" && /usr/bin/lockf -s -t 1 5; }; then
+      own_mark="$inuse.inuse"
+    elif { rockstar_shim_lock_fd 5 "$inuse-2.inuse" && /usr/bin/lockf -s -t 5 5; }; then
+      own_mark="$inuse-2.inuse"
+    else
       graphics_log "rockstar-shim: could not mark the game folder in use"
     fi
   fi
@@ -1068,13 +1099,23 @@ stage_rockstar_shim() {
   fi
   # No shim of any build in the game folder, nothing there for other launches to leave
   # alone. A folder another launch is staging keeps the mark.
-  [ "$folders" = 3 ] || rockstar_shim_copy "$shim/version.dll" "${STEAM_COMPAT_INSTALL_PATH:-}/version.dll" || exec 5>&-
+  win64=""
+  [ -z "${STEAM_COMPAT_INSTALL_PATH:-}" ] || win64="$STEAM_COMPAT_INSTALL_PATH/Gameface/Binaries/Win64"
+  [ "$folders" = 3 ] || rockstar_shim_copy "$shim/version.dll" "${STEAM_COMPAT_INSTALL_PATH:-}/version.dll" \
+    || { [ -n "$win64" ] && rockstar_shim_copy "$shim/version.dll" "$win64/version.dll"; } \
+    || { [ -n "$win64" ] && rockstar_shim_copy "$shim/dxgx.dll" "$win64/dxgi.dll"; } || exec 5>&-
   gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}version=n,b"
   # dxgx.dll is DXVK's dxgi under a name the backend's dxgi=b does not cover.
   if [ "$backend" = dxvk ] && [ -f "$shim/dxgx.dll" ]; then
     NOTPROTON_ROCKSTAR_DXGI="Z:$(printf '%s' "$shim/dxgx.dll" | tr / '\134')"
     export NOTPROTON_ROCKSTAR_DXGI
     graphics_log "rockstar-shim: GTA5.exe gets DXVK's dxgi"
+  fi
+  # An Unreal game links dxgi.dll statically: DXVK's copy beside its exe, native first. Only
+  # when it is there (a user's own dxgi.dll left alone is not ours to load first).
+  if [ "$dxgi_wanted" = 1 ] && [ -n "$win64" ] && rockstar_shim_copy "$shim/dxgx.dll" "$win64/dxgi.dll"; then
+    gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}dxgi=n,b"
+    graphics_log "rockstar-shim: DXVK's dxgi staged beside the game exe, dxgi=n,b"
   fi
 }
 
