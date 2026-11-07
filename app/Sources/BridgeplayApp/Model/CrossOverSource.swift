@@ -15,12 +15,15 @@ struct CrossOverInstall: Sendable, Identifiable {
 
     // Selected by the user rather than found on disk by tool.
     var isManual = false
+    // Found in Bridgeplay's own engines folder, where its free engines live.
+    var isEngine = false
 
     var id: String { bundle.path(percentEncoded: false) }
     var name: String { bundle.deletingPathExtension().lastPathComponent }
     var crossOverRoot: URL { SupportPaths.crossOverRoot(inBundle: bundle) }
 
     var isPreview: Bool { name.localizedCaseInsensitiveContains("Preview") }
+    var isNamedCrossOver: Bool { CrossOverSource.isNamedCrossOver(bundle) }
 
     var isFree: Bool {
         if case .supported(let build) = support { return build.isFree }
@@ -74,6 +77,10 @@ enum CrossOverSource {
         a.standardizedFileURL.path(percentEncoded: false) == b.standardizedFileURL.path(percentEncoded: false)
     }
 
+    static func isNamedCrossOver(_ bundle: URL) -> Bool {
+        bundle.deletingPathExtension().lastPathComponent.hasPrefix("CrossOver")
+    }
+
     // A CrossOver bundle without this directory is bad!
     static func looksLikeCrossOver(_ bundle: URL) -> Bool {
         let root = SupportPaths.crossOverRoot(inBundle: bundle)
@@ -87,11 +94,13 @@ enum CrossOverSource {
         var found: [CrossOverInstall] = []
         var seen: Set<String> = []
 
-        func consider(_ bundle: URL, isManual: Bool) {
+        func consider(_ bundle: URL, isManual: Bool = false, isEngine: Bool = false) {
             let key = bundle.standardizedFileURL.path(percentEncoded: false)
             guard !seen.contains(key), looksLikeCrossOver(bundle) else { return }
             seen.insert(key)
-            found.append(inspect(bundle: bundle, isManual: isManual))
+            var install = inspect(bundle: bundle, isManual: isManual)
+            install.isEngine = isEngine
+            found.append(install)
         }
 
         for manual in manualBundles() where !isSearched(manual) { consider(manual, isManual: true) }
@@ -99,14 +108,14 @@ enum CrossOverSource {
         for root in searchRoots {
             let entries = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
             for entry in entries where entry.pathExtension == "app" {
-                guard entry.deletingPathExtension().lastPathComponent.hasPrefix("CrossOver") else { continue }
-                consider(entry, isManual: false)
+                guard isNamedCrossOver(entry) else { continue }
+                consider(entry)
             }
         }
 
         let engines = (try? fm.contentsOfDirectory(at: SupportPaths.engines, includingPropertiesForKeys: nil)) ?? []
         for entry in engines where entry.pathExtension == "app" {
-            consider(entry, isManual: false)
+            consider(entry, isEngine: true)
         }
 
         return found.sorted(by: preferred)

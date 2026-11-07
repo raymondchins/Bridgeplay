@@ -105,7 +105,7 @@ struct StatusHero: View {
     static func engineName(_ build: String) -> String {
         let parts = build.split(separator: "-", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { return build }
-        let family = ["winecx": "WineCX", "winehq": "WineHQ"][parts[0]] ?? parts[0]
+        let family = FreeEngine.family(ofBuild: build) ?? parts[0]
         return "\(family) \(parts[1])"
     }
 }

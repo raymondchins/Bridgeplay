@@ -35,6 +35,12 @@ struct StatusAction {
     var isEnabled = true
     var startsGroup = false
     let perform: () -> Void
+
+    static var getCrossOver: StatusAction {
+        StatusAction(label: String(localized: "Get CrossOver")) {
+            NSWorkspace.shared.open(URL(string: "https://www.codeweavers.com/crossover")!)
+        }
+    }
 }
 
 enum StatusMetrics {
@@ -125,7 +131,7 @@ struct StatusRow: View {
                         .labelStyle(.iconOnly)
                 }
                 .menuStyle(.button)
-                .buttonStyle(.bordered)
+                .buttonStyle(.pillSecondary)
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .help("More actions")
@@ -362,13 +368,6 @@ struct StatusView: View {
                 crossOverSection(snapshot)
             } header: {
                 Text("Engines")
-            } footer: {
-                HStack {
-                    Spacer()
-                    Button("Add CrossOver\u{2026}") { Task { await status.addCrossOver() } }
-                        .disabled(!status.isIdle)
-                        .help("Add a copy of CrossOver from another folder.")
-                }
             }
 
             gameDefaultsSection
@@ -652,12 +651,30 @@ struct StatusView: View {
     @ViewBuilder
     private func crossOverSection(_ snapshot: StatusSnapshot) -> some View {
         let rows = status.crossOverRows
+        let crossOvers = rows.filter { !$0.isFreeEngine }
+        let freeEngines = rows.filter(\.isFreeEngine)
+        let tools = SupportedRunners.tools(for: snapshot.installedRunners)
         if rows.isEmpty {
             StatusRow(
                 title: "Wine Engine",
-                value: String(localized: "None found. Download the free WineHQ or WineCX engine, or use CrossOver (\(SupportedRunners.versionList))."),
+                value: String(localized: "None set up yet. Choose one below."),
                 tone: .bad
             )
+        }
+        // CrossOver comes first, with a faint wash. It is a separate purchase, so the row
+        // says so and its button only adds a copy the user already has.
+        if crossOvers.isEmpty {
+            StatusRow(
+                title: String(localized: "CrossOver"),
+                value: String(localized: "Use your own licensed copy of CrossOver. It's sold separately by CodeWeavers."),
+                tone: .neutral,
+                action: addCrossOverAction(label: String(localized: "Add\u{2026}")),
+                menu: [.getCrossOver]
+            )
+            .background { RowWash.crossOver }
+        }
+        ForEach(crossOvers) { row in
+            engineRow(row, snapshot: snapshot, tools: tools)
         }
         let winehq = status.freeEngineState(FreeEngine.current.build)
         if winehq != .current {
@@ -712,25 +729,8 @@ struct StatusView: View {
                 ) { Task { await status.rescanGameportingToolkit() } }
             )
         }
-        let tools = SupportedRunners.tools(for: snapshot.installedRunners)
-        ForEach(rows) { row in
-            StatusRow(
-                title: row.title,
-                value: crossOverValue(row),
-                tone: crossOverTone(row),
-                detail: crossOverDetail(row, tools: tools),
-                trailing: row.copy == .ready ? buildSize(row.buildID) : nil,
-                action: crossOverAction(row, prominent: snapshot.runner == .none),
-                menu: crossOverMenu(row)
-            )
-            .background {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.accentColor.opacity(0.2))
-                    .padding(-6)
-                    .opacity(status.highlightedRow == row.id ? 1 : 0)
-            }
-            .animation(.easeInOut(duration: 0.3), value: status.highlightedRow == row.id)
-            .id(row.id)
+        ForEach(freeEngines) { row in
+            engineRow(row, snapshot: snapshot, tools: tools)
         }
         if case .ready = snapshot.runner, !snapshot.payload.missing(origin: .patched).isEmpty {
             StatusRow(
@@ -747,9 +747,40 @@ struct StatusView: View {
         }
     }
 
+    private func engineRow(_ row: CrossOverRow, snapshot: StatusSnapshot, tools: [InstalledTool]) -> some View {
+        let highlighted = status.highlightedRow == row.id
+        let isCrossOver = !row.isFreeEngine
+        return StatusRow(
+            title: row.title,
+            value: crossOverValue(row),
+            tone: crossOverTone(row),
+            detail: crossOverDetail(row, tools: tools),
+            trailing: row.copy == .ready ? buildSize(row.buildID) : nil,
+            action: crossOverAction(row, prominent: snapshot.runner == .none),
+            menu: crossOverMenu(row)
+        )
+        // The app's folder shows on hover rather than as a line on the row.
+        .help(row.install?.bundle.plainPath ?? "")
+        .background {
+            if isCrossOver { RowWash.crossOver }
+            RowWash(fill: Color.accentColor.opacity(0.2), opacity: highlighted ? 1 : 0)
+        }
+        .animation(.easeInOut(duration: 0.3), value: highlighted)
+        .id(row.id)
+    }
+
+    private func addCrossOverAction(label: String) -> StatusAction {
+        StatusAction(
+            label: label,
+            help: String(localized: "Add a copy of CrossOver from another folder."),
+            isEnabled: status.isIdle
+        ) { Task { await status.addCrossOver() } }
+    }
+
     private func crossOverValue(_ row: CrossOverRow) -> String {
         if let version = row.unsupportedVersion {
-            return String(localized: "Version \(version) not supported (supported: \(SupportedRunners.versionList))")
+            let use = row.isFreeEngine ? SupportedRunners.freeEngineVersions : SupportedRunners.crossOverVersions
+            return String(localized: "Version \(version) isn't supported. Use \(use).")
         }
         let build = String(localized: "Build \(SupportedRunners.displayVersion(forID: row.buildID))")
         switch row.copy {
@@ -777,11 +808,7 @@ struct StatusView: View {
             lines.append(contentsOf: names)
         }
         if row.copy == .none, row.licensed == false { lines.append("\(String(localized: "Open CrossOver to activate it.")) \(CrossOverLicense.trialUnsupported)") }
-        if let install = row.install {
-            var path = install.bundle.path(percentEncoded: false)
-            if path.count > 1, path.hasSuffix("/") { path.removeLast() }
-            lines.append(path)
-        } else if row.copy != .unsupported {
+        if row.install == nil, row.copy != .unsupported {
             lines.append(String(localized: "CrossOver app not found."))
         }
         return lines.isEmpty ? nil : lines.joined(separator: "\n")
@@ -839,6 +866,11 @@ struct StatusView: View {
                 isEnabled: status.isIdle,
                 startsGroup: !items.contains(where: \.startsGroup)
             ) { Task { await status.removeFromList(install) } })
+        }
+        if !row.isFreeEngine {
+            var add = addCrossOverAction(label: String(localized: "Add CrossOver\u{2026}"))
+            add.startsGroup = true
+            items.append(add)
         }
         return items
     }
@@ -962,4 +994,23 @@ struct PatchBanner: View {
         .overlay(alignment: .bottom) { Divider() }
         .accessibilityElement(children: .combine)
     }
+}
+
+// A rounded wash drawn just outside a row: the faint brand tint behind CrossOver rows, and
+// the highlight a re-added copy gets.
+private struct RowWash<Fill: ShapeStyle>: View {
+    let fill: Fill
+    var opacity: Double
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(fill)
+            .opacity(opacity)
+            .padding(-6)
+            .accessibilityHidden(true)
+    }
+}
+
+extension RowWash<LinearGradient> {
+    static var crossOver: Self { Self(fill: BP.iridescent, opacity: 0.07) }
 }

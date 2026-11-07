@@ -75,6 +75,11 @@ public struct PillButtonStyle: ButtonStyle {
 
     @Environment(\.isEnabled) private var isEnabled
 
+    // Circular, not the default continuous curve: a continuous border at full-height radius
+    // has no room for its smoothing, and AppKit's redraw of it (cacheDisplay, snapshots)
+    // leaves a short straight tick on each end of the hairline.
+    private let shape = Capsule(style: .circular)
+
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(BP.sans(large ? 14 : 13, .semibold))
@@ -86,15 +91,15 @@ public struct PillButtonStyle: ButtonStyle {
             .background {
                 switch kind {
                 case .primary:
-                    Capsule().fill(configuration.isPressed ? Color.white.opacity(0.85) : (isEnabled ? Color.white : BP.raise2))
+                    shape.fill(configuration.isPressed ? Color.white.opacity(0.85) : (isEnabled ? Color.white : BP.raise2))
                 case .secondary:
-                    Capsule().fill(configuration.isPressed ? BP.raise2 : Color.clear)
-                        .overlay(Capsule().strokeBorder(BP.lineStrong, lineWidth: 1))
+                    shape.fill(configuration.isPressed ? BP.raise2 : Color.clear)
+                        .overlay(shape.strokeBorder(BP.lineStrong, lineWidth: 1))
                 case .plain:
                     Color.clear
                 }
             }
-            .contentShape(Capsule())
+            .contentShape(shape)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.18), value: configuration.isPressed)
     }
