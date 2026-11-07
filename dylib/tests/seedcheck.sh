@@ -911,6 +911,45 @@ check lay_out_proton_profile
 check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss BACKUP")" = local
 check test ! -e "$users/.notproton-fold-moving"
 
+# A note is only cleared once the file is found where its move left it or where it began.
+# Behind a folder that cannot be searched, the launch stops and the note stays.
+split_fixture
+mkdir "$cloud/Sulfur_SaveSlot_2.sss"
+printf '%s\n%s\n%s\n' "$(stat -f %i "$mine/Sulfur_SaveSlot_2.sss")" \
+  tester/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  steamuser/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  > "$users/.notproton-fold-moving"
+command mv "$mine/Sulfur_SaveSlot_2.sss" "$cloud/Sulfur_SaveSlot_2.sss/"
+chmod 000 "$cloud/Sulfur_SaveSlot_2.sss"
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+chmod 700 "$cloud/Sulfur_SaveSlot_2.sss"
+check test -f "$users/.notproton-fold-moving"
+check lay_out_proton_profile
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss BACKUP")" = local
+check test ! -e "$users/.notproton-fold-moving"
+
+# A folder that appears at the source before the put-back takes the save inside it. The
+# note stays, so launches stop rather than fold the save in from the wrong place.
+split_fixture
+mkdir "$cloud/Sulfur_SaveSlot_2.sss"
+printf '%s\n%s\n%s\n' "$(stat -f %i "$mine/Sulfur_SaveSlot_2.sss")" \
+  tester/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  steamuser/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  > "$users/.notproton-fold-moving"
+command mv "$mine/Sulfur_SaveSlot_2.sss" "$cloud/Sulfur_SaveSlot_2.sss/"
+# shellcheck disable=SC2329 # fold_unnest calls it in place of mv
+mv() {
+  for destination; do :; done
+  case "$destination" in */tester/*/Sulfur_SaveSlot_2.sss) mkdir -p "$destination" ;; esac
+  command mv "$@"
+}
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+unset -f mv
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+check test -f "$users/.notproton-fold-moving"
+check test "$(cat "$mine/Sulfur_SaveSlot_2.sss/Sulfur_SaveSlot_2.sss")" = local
+check grep -q "is not where its move left it" "$log"
+
 # The note names paths inside users, so it still matches once the library has moved. One
 # that cannot be read is only a note: it is dropped and the launch goes on.
 split_fixture
@@ -951,6 +990,22 @@ else
   check test ! -e "$users/steamuser/AppData/LocalLow/perfect_random"
   check test "$(cat "$users/steamuser/AppData/LocalLow/Perfect_Random/Slot.sav")" = cloud
   check test "$(cat "$users/steamuser/AppData/LocalLow/Perfect_Random/Slot.sav BACKUP")" = mac
+  # A library folder whose name has a line that looks like the folder being looked for.
+  fixture
+  STEAM_COMPAT_DATA_PATH="$work/mnt.folds/A
+saves
+B/game"
+  WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
+  mkdir -p "$WINEPREFIX"
+  lay_out_proton_profile
+  rm "$WINEPREFIX/drive_c/users/tester"
+  users="$WINEPREFIX/drive_c/users"
+  mkdir -p "$users/tester/AppData/saves" "$users/steamuser/AppData/SAVES"
+  printf mac > "$users/tester/AppData/saves/two.sav"
+  printf cloud > "$users/steamuser/AppData/SAVES/one.sav"
+  check lay_out_proton_profile
+  check test ! -e "$users/steamuser/AppData/saves"
+  check test "$(cat "$users/steamuser/AppData/SAVES/two.sav")" = mac
   detach_image "$work/mnt.folds" || true
 fi
 

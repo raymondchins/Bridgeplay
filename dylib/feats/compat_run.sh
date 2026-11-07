@@ -1917,13 +1917,21 @@ present() { [ -e "$1" ] || [ -L "$1" ]; }
 # The name in $1 that $2 matches ignoring case, else $2. A case-sensitive volume keeps
 # "Saves" and "saves" apart, but Wine reads them as one.
 fold_landing() {
-  found=$(find "$1" -mindepth 1 -maxdepth 1 2>/dev/null | want=$2 awk '
-    { sub(/.*\//, "") } tolower($0) == tolower(ENVIRON["want"]) { print; exit }')
-  if [ -n "$found" ] && present "$1/$found"; then
-    printf '%s' "$1/$found"
-  else
-    printf '%s' "$1/$2"
-  fi
+  # Listed from inside, so only "./<name>" lines are names; a newline in one cannot pass
+  # for another name once checked on disk.
+  matches=$(cd -P -- "$1" 2>/dev/null && find . -mindepth 1 -maxdepth 1 | want=$2 awk '
+    substr($0, 1, 2) == "./" && tolower(substr($0, 3)) == tolower(ENVIRON["want"]) {
+      print substr($0, 3)
+    }') || matches=""
+  while IFS= read -r found; do
+    if [ -n "$found" ] && present "$1/$found"; then
+      printf '%s' "$1/$found"
+      return 0
+    fi
+  done <<EOF_MATCHES
+$matches
+EOF_MATCHES
+  printf '%s' "$1/$2"
 }
 
 # Renames $1 to the free name $2. mv puts it inside a folder that appeared at $2 since the
@@ -1939,7 +1947,8 @@ fold_move() {
 }
 
 # Puts back the move noted by fold_move if it went inside a folder at its target's name.
-# Returns 0 only for a move that landed, and keeps the note while one stays nested.
+# Returns 0 only for a move that landed. The note goes only once the file is found where it
+# landed or where it started; while it is anywhere else the note stays and launches stop.
 fold_unnest() {
   present "$fold_record" || return 0
   fold_moved="" fold_source="" fold_target=""
@@ -1962,16 +1971,22 @@ fold_unnest() {
     return 0
   fi
   fold_nested="$fold_target/${fold_source##*/}"
-  if [ "$(stat -f %i "$fold_nested" 2>/dev/null)" = "$fold_moved" ]; then
+  if [ "$(stat -f %i "$fold_nested" 2>/dev/null)" = "$fold_moved" ] && ! present "$fold_source"; then
     # A killed launch may have left the source's folder gone.
-    { ! present "$fold_source" && mkdir -p "${fold_source%/*}" \
-      && mv -n "$fold_nested" "$fold_source" 2>> "$log" \
-      && [ "$(stat -f %i "$fold_source" 2>/dev/null)" = "$fold_moved" ]; } || return 1
-    echo "=== put back ${fold_source#"$users"/}, which went inside a folder at its name ===" \
+    mkdir -p "${fold_source%/*}" 2>/dev/null || true
+    mv -n "$fold_nested" "$fold_source" 2>> "$log" || true
+    if [ "$(stat -f %i "$fold_source" 2>/dev/null)" = "$fold_moved" ]; then
+      echo "=== put back ${fold_source#"$users"/}, which went inside a folder at its name ===" \
+        >> "$log" 2>&1 || true
+    fi
+  fi
+  # A move put back, or one that never happened, did not land.
+  if [ "$(stat -f %i "$fold_source" 2>/dev/null)" = "$fold_moved" ]; then
+    rm -f "$fold_record"
+  else
+    echo "=== ${fold_source#"$users"/} is not where its move left it; put it back, then delete $fold_record ===" \
       >> "$log" 2>&1 || true
   fi
-  rm -f "$fold_record"
-  # A move put back, or one that never happened, did not land.
   return 1
 }
 
