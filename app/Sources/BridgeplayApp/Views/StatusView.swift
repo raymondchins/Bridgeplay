@@ -125,7 +125,7 @@ struct StatusRow: View {
                         .labelStyle(.iconOnly)
                 }
                 .menuStyle(.button)
-                .buttonStyle(.bordered)
+                .buttonStyle(.pillSecondary)
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .help("More actions")
