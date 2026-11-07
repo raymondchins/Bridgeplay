@@ -861,14 +861,22 @@ activate_backend() {
         *)
           if [ "$name.$arch" = d3d12.x86_64-windows ] && [ -n "$d3d12_stub" ]; then
             stage_backend_file "$d3d12_stub" "$dir/d3d12.dll" && continue
-            graphics_log "could not stage the d3d12 stub into the prefix, Apple's d3d12 stays builtin"
-            d3d12_stub=""
+            # Apple's d3d12 beside DXMT's dxgi is the crash the stub is there for.
+            graphics_log "could not stage d3d12-stub into the prefix"
+            staging_failed=1
+            continue
           fi
           restore_stock_dll "$arch" "$name" "$dir/$name.dll" \
             || graphics_log "could not restore Wine's $arch/$name.dll in the prefix" ;;
       esac
     done
   done
+  # d3d12 is managed only on a D3DMetal engine, so a stub a dxmt launch left before the
+  # engine's D3DMetal was unlinked goes back to Wine's copy here.
+  if [ -n "$WINEPREFIX" ] && ! printf '%s\n' "$managed" | grep -qx d3d12; then
+    restore_stock_dll x86_64-windows d3d12 "$WINEPREFIX/drive_c/windows/system32/d3d12.dll" \
+      || graphics_log "could not restore Wine's x86_64-windows/d3d12.dll in the prefix"
+  fi
   if [ "$staging_failed" -eq 1 ]; then
     if d3dmetal_engine; then next=d3dmetal; else next=wined3d; fi
     graphics_log "$backend could not be staged, falling back to $next"

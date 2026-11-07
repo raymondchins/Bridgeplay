@@ -458,6 +458,29 @@ launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
 is "but still runs a game importing d3d12.dll on d3dmetal" "d3dmetal" "$(got backend)"
 new_case
 full_engine
+engine d3dmetal-linked d3d12-stub/x86_64-windows/d3d12.dll
+chmod 000 "$case_dir/engine/lib/notproton-backends/d3d12-stub/x86_64-windows/d3d12.dll"
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
+chmod 644 "$case_dir/engine/lib/notproton-backends/d3d12-stub/x86_64-windows/d3d12.dll"
+is "a stub that cannot be staged falls back to d3dmetal, not Apple's d3d12 under dxmt" "d3dmetal" "$(got backend)"
+has "with the reason" "could not stage d3d12-stub into the prefix" "$case_dir/log"
+is "and every D3D DLL builtin" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
+new_case
+full_engine
+engine d3dmetal-linked d3d12-stub/x86_64-windows/d3d12.dll
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
+is "before D3DMetal is unlinked the stub is staged" "backend d3d12-stub/x86_64-windows/d3d12.dll" "$(sys system32 d3d12)"
+rm "$case_dir/engine/lib/notproton-backends/d3dmetal.enabled"
+for dll in dxgi d3d10 d3d11 d3d12; do
+	rm "$case_dir/engine/lib/wine/x86_64-windows/$dll.dll"
+	mv "$case_dir/engine/lib/notproton-backends/wine-stock/x86_64-windows/$dll.dll" "$case_dir/engine/lib/wine/x86_64-windows/$dll.dll"
+done
+rmdir "$case_dir/engine/lib/notproton-backends/wine-stock/x86_64-windows" "$case_dir/engine/lib/notproton-backends/wine-stock"
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
+is "after it is unlinked dxmt is as on any engine without D3DMetal" "d3d10core,d3d11,dxgi=n,b;$trio" "$(got WINEDLLOVERRIDES)"
+is "and the stale stub goes back to Wine's d3d12" "stock x86_64-windows d3d12" "$(sys system32 d3d12)"
+new_case
+full_engine
 engine d3dmetal-linked d3d12-stub/x86_64-windows/d3d12.dll dxmt/x86_64-windows/d3d12.dll
 pe_fixture "$case_dir/game/game.exe" 64 import
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
