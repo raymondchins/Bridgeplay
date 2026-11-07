@@ -8,6 +8,10 @@ struct CrossOverRowTests {
 
     private static let preview = SupportedRunners.all.first { $0.flavor == "fex" }!
     private static let release = SupportedRunners.all.first { $0.id == "26.3.0.39832" }!
+    private static let old = CrossOverInstall(
+        bundle: URL(filePath: "/Applications/CrossOver 24.app"), releaseVersion: "24.0.5",
+        support: .unsupportedBuild("24.0.5")
+    )
 
     private func install(_ name: String, _ build: RunnerBuild, root: String = "/Applications") -> CrossOverInstall {
         CrossOverInstall(bundle: URL(filePath: "\(root)/\(name).app"), releaseVersion: "x", support: .supported(build))
@@ -108,20 +112,14 @@ struct CrossOverRowTests {
         let swapped = install("CrossOver", Self.preview)
         #expect(CrossOverRow.listing(swapped, in: made) == nil)
 
-        let old = CrossOverInstall(
-            bundle: URL(filePath: "/Applications/CrossOver 24.app"), releaseVersion: "24.0.5",
-            support: .unsupportedBuild("24.0.5")
-        )
+        let old = Self.old
         #expect(CrossOverRow.listing(old, in: rows([old]))?.id == old.id)
         #expect(CrossOverRow.listing(old, in: made) == nil)
     }
 
     @Test("An app Bridgeplay doesn't support is listed with its version and nothing to set up")
     func unsupportedApp() {
-        let old = CrossOverInstall(
-            bundle: URL(filePath: "/Applications/CrossOver 24.app"), releaseVersion: "24.0.5",
-            support: .unsupportedBuild("24.0.5")
-        )
+        let old = Self.old
 
         let made = rows([old])
 
@@ -137,18 +135,16 @@ struct CrossOverRowTests {
         let release = install("CrossOver", Self.release)
         let odd = CrossOverInstall(
             bundle: SupportPaths.engines.appending(path: "WineHQ 9.0.app"), releaseVersion: "9.0",
-            support: .unsupportedBuild("9.0")
+            support: .unsupportedBuild("9.0"), isEngine: true
         )
-        let old = CrossOverInstall(
-            bundle: URL(filePath: "/Applications/CrossOver 24.app"), releaseVersion: "24.0.5",
-            support: .unsupportedBuild("24.0.5")
-        )
+        let old = Self.old
 
         let made = rows([engine, release, odd, old], orphaned: ["winehq-10.0", "25.0.0.1"])
         #expect(made.map(\.isFreeEngine) == [true, false, true, false, true, false])
 
         // A CrossOver build stays CrossOver wherever its app is.
-        let moved = install("CrossOver", Self.release, root: SupportPaths.engines.path(percentEncoded: false))
+        var moved = install("CrossOver", Self.release, root: SupportPaths.engines.path(percentEncoded: false))
+        moved.isEngine = true
         #expect(rows([moved]).map(\.isFreeEngine) == [false])
 
         let copies = rows([], installed: [winecx, Self.release])

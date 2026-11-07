@@ -35,6 +35,12 @@ struct StatusAction {
     var isEnabled = true
     var startsGroup = false
     let perform: () -> Void
+
+    static var getCrossOver: StatusAction {
+        StatusAction(label: String(localized: "Get CrossOver")) {
+            NSWorkspace.shared.open(URL(string: "https://www.codeweavers.com/crossover")!)
+        }
+    }
 }
 
 enum StatusMetrics {
@@ -646,6 +652,7 @@ struct StatusView: View {
     private func crossOverSection(_ snapshot: StatusSnapshot) -> some View {
         let rows = status.crossOverRows
         let crossOvers = rows.filter { !$0.isFreeEngine }
+        let freeEngines = rows.filter(\.isFreeEngine)
         let tools = SupportedRunners.tools(for: snapshot.installedRunners)
         if rows.isEmpty {
             StatusRow(
@@ -662,14 +669,12 @@ struct StatusView: View {
                 value: String(localized: "Use your own licensed copy of CrossOver. It's sold separately by CodeWeavers."),
                 tone: .neutral,
                 action: addCrossOverAction(label: String(localized: "Add\u{2026}")),
-                menu: [StatusAction(label: String(localized: "Get CrossOver")) {
-                    NSWorkspace.shared.open(URL(string: "https://www.codeweavers.com/crossover")!)
-                }]
+                menu: [.getCrossOver]
             )
-            .background { CrossOverWash() }
+            .background { RowWash.crossOver }
         }
         ForEach(crossOvers) { row in
-            engineRow(row, snapshot: snapshot, tools: tools)
+            engineRow(row, isCrossOver: true, snapshot: snapshot, tools: tools)
         }
         let winehq = status.freeEngineState(FreeEngine.current.build)
         if winehq != .current {
@@ -724,8 +729,8 @@ struct StatusView: View {
                 ) { Task { await status.rescanGameportingToolkit() } }
             )
         }
-        ForEach(rows.filter(\.isFreeEngine)) { row in
-            engineRow(row, snapshot: snapshot, tools: tools)
+        ForEach(freeEngines) { row in
+            engineRow(row, isCrossOver: false, snapshot: snapshot, tools: tools)
         }
         if case .ready = snapshot.runner, !snapshot.payload.missing(origin: .patched).isEmpty {
             StatusRow(
@@ -742,24 +747,22 @@ struct StatusView: View {
         }
     }
 
-    private func engineRow(_ row: CrossOverRow, snapshot: StatusSnapshot, tools: [InstalledTool]) -> some View {
-        StatusRow(
+    private func engineRow(_ row: CrossOverRow, isCrossOver: Bool, snapshot: StatusSnapshot, tools: [InstalledTool]) -> some View {
+        let highlighted = status.highlightedRow == row.id
+        return StatusRow(
             title: row.title,
             value: crossOverValue(row),
             tone: crossOverTone(row),
             detail: crossOverDetail(row, tools: tools),
             trailing: row.copy == .ready ? buildSize(row.buildID) : nil,
             action: crossOverAction(row, prominent: snapshot.runner == .none),
-            menu: crossOverMenu(row)
+            menu: crossOverMenu(row, addsCrossOver: isCrossOver)
         )
         .background {
-            if !row.isFreeEngine { CrossOverWash() }
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.accentColor.opacity(0.2))
-                .padding(-6)
-                .opacity(status.highlightedRow == row.id ? 1 : 0)
+            if isCrossOver { RowWash.crossOver }
+            RowWash(fill: Color.accentColor.opacity(0.2), opacity: highlighted ? 1 : 0)
         }
-        .animation(.easeInOut(duration: 0.3), value: status.highlightedRow == row.id)
+        .animation(.easeInOut(duration: 0.3), value: highlighted)
         .id(row.id)
     }
 
@@ -835,7 +838,7 @@ struct StatusView: View {
         }
     }
 
-    private func crossOverMenu(_ row: CrossOverRow) -> [StatusAction] {
+    private func crossOverMenu(_ row: CrossOverRow, addsCrossOver: Bool) -> [StatusAction] {
         var items: [StatusAction] = []
         let install = row.install
         if row.copy == .ready {
@@ -864,7 +867,7 @@ struct StatusView: View {
                 startsGroup: !items.contains(where: \.startsGroup)
             ) { Task { await status.removeFromList(install) } })
         }
-        if !row.isFreeEngine {
+        if addsCrossOver {
             var add = addCrossOverAction(label: String(localized: "Add CrossOver\u{2026}"))
             add.startsGroup = true
             items.append(add)
@@ -993,14 +996,21 @@ struct PatchBanner: View {
     }
 }
 
-// The faint brand wash behind the CrossOver rows, drawn just outside the row like the
-// highlight a re-added copy gets.
-private struct CrossOverWash: View {
+// A rounded wash drawn just outside a row: the faint brand tint behind CrossOver rows, and
+// the highlight a re-added copy gets.
+private struct RowWash<Fill: ShapeStyle>: View {
+    let fill: Fill
+    var opacity: Double
+
     var body: some View {
         RoundedRectangle(cornerRadius: 6)
-            .fill(BP.iridescent)
-            .opacity(0.07)
+            .fill(fill)
+            .opacity(opacity)
             .padding(-6)
             .accessibilityHidden(true)
     }
+}
+
+extension RowWash<LinearGradient> {
+    static var crossOver: Self { Self(fill: BP.iridescent, opacity: 0.07) }
 }

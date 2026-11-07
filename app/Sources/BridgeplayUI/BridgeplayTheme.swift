@@ -78,7 +78,7 @@ public struct PillButtonStyle: ButtonStyle {
     // Circular, not the default continuous curve: a continuous border at full-height radius
     // has no room for its smoothing, and AppKit's redraw of it (cacheDisplay, snapshots)
     // leaves a short straight tick on each end of the hairline.
-    private var shape: Capsule { Capsule(style: .circular) }
+    private let shape = Capsule(style: .circular)
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
