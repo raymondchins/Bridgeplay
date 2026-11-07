@@ -1970,7 +1970,9 @@ fold_unnest() {
   fi
   fold_nested="$fold_target/${fold_source##*/}"
   if [ "$(stat -f %i "$fold_nested" 2>/dev/null)" = "$fold_moved" ]; then
-    { [ ! -e "$fold_source" ] && [ ! -L "$fold_source" ] && mv -n "$fold_nested" "$fold_source" 2>> "$log" \
+    # A killed launch may have left the source's folder gone.
+    { [ ! -e "$fold_source" ] && [ ! -L "$fold_source" ] && mkdir -p "${fold_source%/*}" \
+      && mv -n "$fold_nested" "$fold_source" 2>> "$log" \
       && [ "$(stat -f %i "$fold_source" 2>/dev/null)" = "$fold_moved" ]; } || return 1
     echo "=== put back ${fold_source#"$users"/}, which went inside a folder at its name ===" \
       >> "$log" 2>&1 || true
@@ -1997,8 +1999,11 @@ fold_user_dir() (
     # Wine's links out to the Mac's home folders: what is behind them stays there.
     [ ! -L "$entry" ] || continue
     if [ -d "$entry" ] && [ -d "$landing" ] && [ ! -L "$landing" ]; then
-      fold_user_dir "$entry" "$landing" || status=1
-      rmdir "$entry" 2>/dev/null || true
+      if fold_user_dir "$entry" "$landing"; then
+        rmdir "$entry" 2>/dev/null || true
+      else
+        status=1
+      fi
       continue
     fi
     if [ -f "$entry" ] && [ -f "$landing" ] && [ ! -L "$landing" ] && cmp -s "$entry" "$landing"; then

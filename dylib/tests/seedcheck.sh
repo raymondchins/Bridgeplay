@@ -903,10 +903,26 @@ check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stoppe
 unset -f mv
 chmod 700 "$cloud/Sulfur_SaveSlot_2.sss"
 check test "$(sed -n 2p "$users/.notproton-fold-moving")" = "tester/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss"
-check test "$(cat "$mine/settings.json")" = mac
+check test -d "$mine"
 check lay_out_proton_profile
 check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss BACKUP")" = local
 check test "$(cat "$cloud/settings.json BACKUP")" = mac
+check test ! -e "$users/.notproton-fold-moving"
+
+# A killed launch can leave the note's source folder gone: putting it back makes it again.
+fixture
+lay_out_proton_profile
+rm "$WINEPREFIX/drive_c/users/tester"
+split_prefix
+mkdir "$cloud/Sulfur_SaveSlot_2.sss"
+printf '%s\n%s\n%s\n' "$(stat -f %i "$mine/Sulfur_SaveSlot_2.sss")" \
+  tester/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  steamuser/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  > "$users/.notproton-fold-moving"
+command mv "$mine/Sulfur_SaveSlot_2.sss" "$cloud/Sulfur_SaveSlot_2.sss/"
+rm -rf "$users/tester/AppData/LocalLow/Perfect_Random"
+check lay_out_proton_profile
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss BACKUP")" = local
 check test ! -e "$users/.notproton-fold-moving"
 
 # The note names paths inside users, so it still matches once the library has moved. One
