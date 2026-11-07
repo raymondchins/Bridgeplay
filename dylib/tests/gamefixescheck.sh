@@ -72,6 +72,15 @@ engine() {
 				ln -s "$case_dir/gptk/nvapi64.dll" "$case_dir/engine/lib/wine/x86_64-windows/nvapi.dll"
 				printf 'apple nvngx-on-metalfx\n' > "$case_dir/gptk/nvngx-on-metalfx.dll"
 				ln -s "$case_dir/gptk/nvngx-on-metalfx.dll" "$case_dir/engine/lib/wine/x86_64-windows/nvngx.dll" ;;
+			# The reverse: Wine's four back in lib/wine, the marker gone.
+			d3dmetal-unlinked)
+				stock="$case_dir/engine/lib/notproton-backends/wine-stock/x86_64-windows"
+				rm "$case_dir/engine/lib/notproton-backends/d3dmetal.enabled"
+				for dll in dxgi d3d10 d3d11 d3d12; do
+					rm "$case_dir/engine/lib/wine/x86_64-windows/$dll.dll"
+					mv "$stock/$dll.dll" "$case_dir/engine/lib/wine/x86_64-windows/$dll.dll"
+				done
+				rmdir "$stock" "${stock%/*}" ;;
 			msync) : > "$case_dir/engine/.notproton-msync" ;;
 			empty) mkdir -p "$case_dir/engine/lib/notproton-backends" ;;
 			*) mkdir -p "$case_dir/engine/lib/notproton-backends/${file%/*}"
@@ -85,6 +94,7 @@ full_engine() {
 		dxvk/x86_64-windows/d3d11.dll dxvk/x86_64-windows/d3d10core.dll \
 		dxvk/i386-windows/d3d11.dll dxvk/i386-windows/d3d10core.dll
 }
+stub=d3d12-stub/x86_64-windows/d3d12.dll
 default_conf() { printf '%s\n' "$@" > "$case_dir/support/gamefixes-default/4242.conf"; }
 user_conf() { printf '%s\n' "$@" > "$case_dir/support/gamefixes/4242.conf"; }
 sys() { cat "$case_dir/data/pfx/drive_c/windows/$1/$2.dll" 2>/dev/null || echo missing; }
@@ -350,7 +360,7 @@ has "and says so" "CX_GRAPHICS_BACKEND=dxmt replaced by d3dmetal" "$case_dir/log
 echo "== WineCX with D3DMetal linked as the builtin"
 new_case
 full_engine
-engine d3dmetal-linked d3d12-stub/x86_64-windows/d3d12.dll
+engine d3dmetal-linked "$stub"
 launch waitforexitandrun 'steam://rungameid/4242'
 is "the default is d3dmetal" "d3dmetal" "$(got backend)"
 has "logged as default" "backend=d3dmetal (default)" "$case_dir/log"
@@ -458,30 +468,25 @@ launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
 is "but still runs a game importing d3d12.dll on d3dmetal" "d3dmetal" "$(got backend)"
 new_case
 full_engine
-engine d3dmetal-linked d3d12-stub/x86_64-windows/d3d12.dll
-chmod 000 "$case_dir/engine/lib/notproton-backends/d3d12-stub/x86_64-windows/d3d12.dll"
+engine d3dmetal-linked "$stub"
+chmod 000 "$case_dir/engine/lib/notproton-backends/$stub"
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
-chmod 644 "$case_dir/engine/lib/notproton-backends/d3d12-stub/x86_64-windows/d3d12.dll"
+chmod 644 "$case_dir/engine/lib/notproton-backends/$stub"
 is "a stub that cannot be staged falls back to d3dmetal, not Apple's d3d12 under dxmt" "d3dmetal" "$(got backend)"
-has "with the reason" "could not stage d3d12-stub into the prefix" "$case_dir/log"
+has "with the reason" "could not stage d3d12-stub/x86_64-windows/d3d12.dll into the prefix" "$case_dir/log"
 is "and every D3D DLL builtin" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
 new_case
 full_engine
-engine d3dmetal-linked d3d12-stub/x86_64-windows/d3d12.dll
+engine d3dmetal-linked "$stub"
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
 is "before D3DMetal is unlinked the stub is staged" "backend d3d12-stub/x86_64-windows/d3d12.dll" "$(sys system32 d3d12)"
-rm "$case_dir/engine/lib/notproton-backends/d3dmetal.enabled"
-for dll in dxgi d3d10 d3d11 d3d12; do
-	rm "$case_dir/engine/lib/wine/x86_64-windows/$dll.dll"
-	mv "$case_dir/engine/lib/notproton-backends/wine-stock/x86_64-windows/$dll.dll" "$case_dir/engine/lib/wine/x86_64-windows/$dll.dll"
-done
-rmdir "$case_dir/engine/lib/notproton-backends/wine-stock/x86_64-windows" "$case_dir/engine/lib/notproton-backends/wine-stock"
+engine d3dmetal-unlinked
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
 is "after it is unlinked dxmt is as on any engine without D3DMetal" "d3d10core,d3d11,dxgi=n,b;$trio" "$(got WINEDLLOVERRIDES)"
 is "and the stale stub goes back to Wine's d3d12" "stock x86_64-windows d3d12" "$(sys system32 d3d12)"
 new_case
 full_engine
-engine d3dmetal-linked d3d12-stub/x86_64-windows/d3d12.dll dxmt/x86_64-windows/d3d12.dll
+engine d3dmetal-linked "$stub" dxmt/x86_64-windows/d3d12.dll
 pe_fixture "$case_dir/game/game.exe" 64 import
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
 is "a dxmt that ships its own d3d12 keeps a game importing d3d12.dll" "dxmt" "$(got backend)"
@@ -490,7 +495,7 @@ is "and in system32, not the stub" "backend dxmt/x86_64-windows/d3d12.dll" "$(sy
 lacks "and no stub is named" "d3d12-stub" "$case_dir/log"
 new_case
 full_engine
-engine d3d12-stub/x86_64-windows/d3d12.dll
+engine "$stub"
 pe_fixture "$case_dir/game/game.exe" 64 import
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
 is "without D3DMetal a forced dxmt keeps a game importing d3d12.dll" "dxmt" "$(got backend)"

@@ -91,6 +91,9 @@ struct WinecxRelease: Sendable {
     // detours for it (NtdllPatcher.byBuild).
     let runner: RunnerBuild
     let ntdllPatches: [NtdllPatch]
+
+    // The app's own files, every category above.
+    var bundled: [WinecxBundledFile] { gamepad + network + nvidia + audio + d3dx + loader + rockstar + dxmt }
 }
 
 enum FreeEngineWinecx {
@@ -442,7 +445,7 @@ enum FreeEngineWinecx {
     // checks them, since they are either Wine's own or links into a Game Porting Toolkit.
     static func expectedFiles(_ release: WinecxRelease = current) -> [String: String] {
         var table: [String: String] = [FreeEngine.macDriverPath: release.macDriver]
-        for file in release.gamepad + release.network + release.nvidia + release.audio + release.d3dx + release.loader + release.rockstar + release.dxmt { table[file.path] = file.sha256 }
+        for file in release.bundled { table[file.path] = file.sha256 }
         for file in release.backends { table["\(backendsPath)/\(file.destination)"] = file.sha256 }
         for path in release.renderer.files.keys {
             table[release.renderer.installPath(of: path)] = release.renderer.installedHash(of: path)
@@ -457,7 +460,7 @@ enum FreeEngineWinecx {
     // The runtime's own files that may stand in for a bundled one, by path.
     static func fallbackFiles(_ release: WinecxRelease = current) -> [String: String] {
         var table: [String: String] = [:]
-        for file in release.gamepad + release.network + release.nvidia + release.audio + release.d3dx + release.loader + release.rockstar + release.dxmt {
+        for file in release.bundled {
             if let fallback = file.fallback { table[file.path] = fallback }
         }
         return table
@@ -545,7 +548,7 @@ enum FreeEngineWinecx {
         try fm.createDirectory(at: root.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fm.moveItem(at: wine, to: root)
         try FreeEngine.installMacDriver(root: root, build: release.build, sha256: release.macDriver, step: step)
-        try installBundled(release.gamepad + release.network + release.nvidia + release.audio + release.d3dx + release.loader + release.rockstar + release.dxmt, root: root)
+        try installBundled(release.bundled, root: root)
 
         let libraries = wine.deletingLastPathComponent()
         for file in release.backends {

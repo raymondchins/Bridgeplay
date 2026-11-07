@@ -293,8 +293,7 @@ struct FreeEngineWinecxTests {
         }
     }
 
-    // d3d12-stub: 11.17 ships it beside the backends, outside any backend folder the run
-    // script stages for every DXMT launch.
+    // d3d12-stub: 11.17 ships it in its own folder, which the run script stages only for dxmt.
     @Test("d3d12-stub ships with the app and is pinned for 11.17",
           arguments: FreeEngineWinecx.releases.map(\.build))
     func d3d12Stub(id: String) throws {

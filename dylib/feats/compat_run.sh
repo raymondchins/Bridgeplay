@@ -602,11 +602,15 @@ backend_available() {
   esac
 }
 
-# DXMT ships no d3d12, and on a D3DMetal engine the builtin d3d12 is Apple's, which reads a
-# null pointer when it gets DXMT's dxgi adapter (#2513), before a game can fall back to D3D11.
-# d3d12-stub/ stands in for it there.
+# dxmt on a D3DMetal engine, with no d3d12 of DXMT's own. The builtin d3d12 is then Apple's,
+# which reads a null pointer on DXMT's dxgi adapter before a game can fall back to D3D11
+# (#2513), so d3d12-stub/ stands in for it: it answers D3D12CreateDevice like Windows on a
+# GPU without D3D12.
 dxmt_without_d3d12() {
-  d3dmetal_engine && ! backend_dlls "$backend_root/dxmt/x86_64-windows" | grep -qx d3d12
+  [ "$backend" = dxmt ] && d3dmetal_engine || return 1
+  for f in "$backend_root"/dxmt/x86_64-windows/[dD]3[dD]12.[dD][lL][lL]; do
+    [ ! -f "$f" ] || return 1
+  done
 }
 
 backend_record() {
@@ -768,10 +772,8 @@ select_backend() {
     backend_from="$backend_from, fell back from $backend"
     backend=$next
   done
-  # Under dxmt a D3DMetal engine's d3d12 creates no device (activate_backend), and a game
-  # whose exe imports d3d12.dll is a D3D12 game, so D3DMetal runs it.
-  if [ "$backend" = dxmt ] && dxmt_without_d3d12 && [ "$verb" = waitforexitandrun ] \
-    && imports_d3d12 "$1"; then
+  # A game whose exe imports d3d12.dll is a D3D12 game.
+  if [ "$verb" = waitforexitandrun ] && dxmt_without_d3d12 && imports_d3d12 "$1"; then
     graphics_log "dxmt has no Direct3D 12 and the game imports d3d12.dll, running it on d3dmetal instead"
     backend_from="$backend_from, moved to d3dmetal because the game imports d3d12.dll"
     backend=d3dmetal
@@ -807,6 +809,7 @@ restore_stock_dll() {
   [ -f "$stock" ] && [ ! -L "$stock" ] || stock="$CX_ROOT/lib/wine/$1/$2.dll"
   [ -f "$stock" ] && [ ! -L "$stock" ] || return 0
   ! cmp -s "$stock" "$3" || return 0
+  # d3d12-stub counts here, so a stub the backend no longer wants goes back to Wine's d3d12.
   for theirs in "$backend_root"/*/"$1"/*.[dD][lL][lL]; do
     case "$theirs" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*|"$backend_root"/rockstar-shim/*) continue ;; esac
     [ -f "$theirs" ] || continue
@@ -831,15 +834,14 @@ activate_backend() {
     dxmt|dxvk) shipped=$({ backend_dlls "$backend_root/$backend/x86_64-windows"
       backend_dlls "$backend_root/$backend/i386-windows"; } | sort -u | tr '\n' ' ') ;;
   esac
-  # d3d12-stub answers D3D12CreateDevice like Windows on a GPU without D3D12, so a game that
-  # tries D3D12 first (Unreal Engine 5, Unity 6) takes its D3D11 path on DXMT. 64-bit only,
-  # a 32-bit game keeps the builtin.
+  # The stub ships with dxmt here, 64-bit only: a 32-bit game keeps the builtin.
   d3d12_stub=""
-  if [ "$backend" = dxmt ] && dxmt_without_d3d12; then
-    d3d12_stub="$backend_root/d3d12-stub/x86_64-windows/d3d12.dll"
-    if [ ! -f "$d3d12_stub" ]; then
+  if dxmt_without_d3d12; then
+    if [ -f "$backend_root/d3d12-stub/x86_64-windows/d3d12.dll" ]; then
+      d3d12_stub=d3d12
+      shipped="$shipped d3d12"
+    else
       graphics_log "no d3d12-stub in this engine, Apple's d3d12 stays builtin under dxmt"
-      d3d12_stub=""
     fi
   fi
   staging_failed=0
@@ -851,29 +853,27 @@ activate_backend() {
     case "$backend" in
       dxmt|dxvk) ships=$(backend_dlls "$backend_root/$backend/$arch" | tr '\n' ' ') ;;
     esac
+    [ "$arch" != x86_64-windows ] || ships="$ships $d3d12_stub"
     for name in $managed; do
       case " $ships " in
         *" $name "*)
-          if ! stage_backend_file "$backend_root/$backend/$arch/$name.dll" "$dir/$name.dll"; then
-            graphics_log "could not stage $backend $arch/$name.dll into the prefix"
+          src="$backend_root/$backend/$arch/$name.dll"
+          [ -f "$src" ] || src="$backend_root/d3d12-stub/$arch/$name.dll"
+          if ! stage_backend_file "$src" "$dir/$name.dll"; then
+            graphics_log "could not stage ${src#"$backend_root/"} into the prefix"
             staging_failed=1
           fi ;;
         *)
-          if [ "$name.$arch" = d3d12.x86_64-windows ] && [ -n "$d3d12_stub" ]; then
-            stage_backend_file "$d3d12_stub" "$dir/d3d12.dll" && continue
-            # Apple's d3d12 beside DXMT's dxgi is the crash the stub is there for.
-            graphics_log "could not stage d3d12-stub into the prefix"
-            staging_failed=1
-            continue
-          fi
           restore_stock_dll "$arch" "$name" "$dir/$name.dll" \
             || graphics_log "could not restore Wine's $arch/$name.dll in the prefix" ;;
       esac
     done
   done
-  # d3d12 is managed only on a D3DMetal engine, so a stub a dxmt launch left before the
-  # engine's D3DMetal was unlinked goes back to Wine's copy here.
-  if [ -n "$WINEPREFIX" ] && ! printf '%s\n' "$managed" | grep -qx d3d12; then
+  # d3d12 is managed only on a D3DMetal engine, so a stub left from before the engine's
+  # D3DMetal was unlinked goes back to Wine's copy here.
+  stub="$backend_root/d3d12-stub/x86_64-windows/d3d12.dll"
+  if ! d3dmetal_engine && [ -n "$WINEPREFIX" ] && [ -f "$stub" ] \
+    && cmp -s "$stub" "$WINEPREFIX/drive_c/windows/system32/d3d12.dll"; then
     restore_stock_dll x86_64-windows d3d12 "$WINEPREFIX/drive_c/windows/system32/d3d12.dll" \
       || graphics_log "could not restore Wine's x86_64-windows/d3d12.dll in the prefix"
   fi
@@ -885,7 +885,6 @@ activate_backend() {
     activate_backend
     return
   fi
-  [ -z "$d3d12_stub" ] || shipped="$shipped d3d12"
   native=""
   builtin=""
   for name in $managed; do
