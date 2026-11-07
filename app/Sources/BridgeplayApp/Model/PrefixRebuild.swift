@@ -239,11 +239,15 @@ extension PrefixTools {
     // set_home_dir in Wine's ntdll does, while Steam Cloud syncs steamuser (#2618).
     // CrossOver's lineage names it crossover. Matches wine_profile_name in compat_run.sh.
     static func stockWineProfile(runner: URL, environment: [String: String]) -> String? {
-        let build = runner.deletingLastPathComponent().lastPathComponent
-        guard build.hasPrefix("crossover-winehq-") else { return nil }
+        let folder = runner.deletingLastPathComponent().lastPathComponent
+        guard folder.hasPrefix("crossover-"),
+            FreeEngine.family(ofBuild: String(folder.dropFirst("crossover-".count)))
+                == FreeEngine.families["winehq"]
+        else { return nil }
         var name = environment["USER"].flatMap { $0.isEmpty ? nil : $0 } ?? NSUserName()
-        if let cut = name.lastIndex(of: "/") { name = String(name[name.index(after: cut)...]) }
-        if let cut = name.lastIndex(of: "\\") { name = String(name[name.index(after: cut)...]) }
+        if let cut = name.lastIndex(where: { $0 == "/" || $0 == "\\" }) {
+            name = String(name[name.index(after: cut)...])
+        }
         guard !["", ".", "..", "steamuser", "crossover", "public"].contains(name.lowercased())
         else { return nil }
         return name

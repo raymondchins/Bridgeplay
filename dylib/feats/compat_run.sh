@@ -1912,22 +1912,18 @@ wine_profile_name() {
   printf '%s' "$wine_user"
 }
 
-# The name in $1 that the volume would take $2 as. A case-sensitive volume keeps
+present() { [ -e "$1" ] || [ -L "$1" ]; }
+
+# The name in $1 that $2 matches ignoring case, else $2. A case-sensitive volume keeps
 # "Saves" and "saves" apart, but Wine reads them as one.
 fold_landing() {
-  if [ -e "$1/$2" ] || [ -L "$1/$2" ] || [ "$fold_case" = 0 ]; then
+  found=$(find "$1" -mindepth 1 -maxdepth 1 2>/dev/null | want=$2 awk '
+    { sub(/.*\//, "") } tolower($0) == tolower(ENVIRON["want"]) { print; exit }')
+  if [ -n "$found" ] && present "$1/$found"; then
+    printf '%s' "$1/$found"
+  else
     printf '%s' "$1/$2"
-    return 0
   fi
-  want=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
-  for other in "$1"/* "$1"/.[!.]* "$1"/..?*; do
-    [ -e "$other" ] || [ -L "$other" ] || continue
-    if [ "$(printf '%s' "${other##*/}" | tr '[:upper:]' '[:lower:]')" = "$want" ]; then
-      printf '%s' "$other"
-      return 0
-    fi
-  done
-  printf '%s' "$1/$2"
 }
 
 # Renames $1 to the free name $2. mv puts it inside a folder that appeared at $2 since the
@@ -1935,10 +1931,9 @@ fold_landing() {
 # noted first, relative to users so a moved library still matches, and the next launch puts
 # back one that a killed launch left nested. No move starts while one is unresolved.
 fold_move() {
-  [ ! -e "$users/.notproton-fold-moving" ] && [ ! -L "$users/.notproton-fold-moving" ] || return 1
+  ! present "$fold_record" || return 1
   moving=$(stat -f %i "$1" 2>/dev/null) || return 1
-  printf '%s\n%s\n%s\n' "$moving" "${1#"$users"/}" "${2#"$users"/}" \
-    > "$users/.notproton-fold-moving" || return 1
+  printf '%s\n%s\n%s\n' "$moving" "${1#"$users"/}" "${2#"$users"/}" > "$fold_record" || return 1
   mv -n "$1" "$2" 2>> "$log" || return 1
   fold_unnest
 }
@@ -1946,8 +1941,7 @@ fold_move() {
 # Puts back the move noted by fold_move if it went inside a folder at its target's name.
 # Returns 0 only for a move that landed, and keeps the note while one stays nested.
 fold_unnest() {
-  fold_record="$users/.notproton-fold-moving"
-  [ -e "$fold_record" ] || [ -L "$fold_record" ] || return 0
+  present "$fold_record" || return 0
   fold_moved="" fold_source="" fold_target=""
   if [ -f "$fold_record" ] && [ ! -L "$fold_record" ]; then
     { read -r fold_moved && read -r fold_source && read -r fold_target; } < "$fold_record" || true
@@ -1963,15 +1957,14 @@ fold_unnest() {
   esac
   fold_source="$users/$fold_source"
   fold_target="$users/$fold_target"
-  if [ "$(stat -f %i "$fold_target" 2>/dev/null)" = "$fold_moved" ] \
-    && [ ! -e "$fold_source" ] && [ ! -L "$fold_source" ]; then
+  if [ "$(stat -f %i "$fold_target" 2>/dev/null)" = "$fold_moved" ] && ! present "$fold_source"; then
     rm -f "$fold_record"
     return 0
   fi
   fold_nested="$fold_target/${fold_source##*/}"
   if [ "$(stat -f %i "$fold_nested" 2>/dev/null)" = "$fold_moved" ]; then
     # A killed launch may have left the source's folder gone.
-    { [ ! -e "$fold_source" ] && [ ! -L "$fold_source" ] && mkdir -p "${fold_source%/*}" \
+    { ! present "$fold_source" && mkdir -p "${fold_source%/*}" \
       && mv -n "$fold_nested" "$fold_source" 2>> "$log" \
       && [ "$(stat -f %i "$fold_source" 2>/dev/null)" = "$fold_moved" ]; } || return 1
     echo "=== put back ${fold_source#"$users"/}, which went inside a folder at its name ===" \
@@ -1990,9 +1983,12 @@ fold_user_dir() (
   # Unreadable, the folder would look empty and be dropped from the live profile.
   [ -r "$1" ] && [ -x "$1" ] || exit 1
   for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
-    [ -e "$entry" ] || [ -L "$entry" ] || continue
-    landing=$(fold_landing "$2" "${entry##*/}")
-    if [ ! -e "$landing" ] && [ ! -L "$landing" ]; then
+    present "$entry" || continue
+    landing="$2/${entry##*/}"
+    if [ "$fold_case" = 1 ] && ! present "$landing"; then
+      landing=$(fold_landing "$2" "${entry##*/}")
+    fi
+    if ! present "$landing"; then
       fold_move "$entry" "$landing" || status=1
       continue
     fi
@@ -2006,24 +2002,20 @@ fold_user_dir() (
       fi
       continue
     fi
-    if [ -f "$entry" ] && [ -f "$landing" ] && [ ! -L "$landing" ] && cmp -s "$entry" "$landing"; then
-      rm -f "$entry" || status=1
-      continue
-    fi
-    parked="$landing BACKUP"
-    parked_number=2
-    already=
-    while [ -e "$parked" ] || [ -L "$parked" ]; do
+    # The live name, then "<name> BACKUP", "<name> BACKUP 2"...: a copy already there is
+    # dropped, otherwise the first free name takes it.
+    parked=$landing
+    parked_number=1
+    while present "$parked"; do
       if [ -f "$entry" ] && [ -f "$parked" ] && [ ! -L "$parked" ] && cmp -s "$entry" "$parked"; then
-        already=1
-        break
+        rm -f "$entry" || status=1
+        continue 2
       fi
-      parked="$landing BACKUP $parked_number"
+      parked="$landing BACKUP"
+      [ "$parked_number" -eq 1 ] || parked="$parked $parked_number"
       parked_number=$((parked_number + 1))
     done
-    if [ -n "$already" ]; then
-      rm -f "$entry" || status=1
-    elif fold_move "$entry" "$parked"; then
+    if fold_move "$entry" "$parked"; then
       printf '%s\n' "$parked"
     else
       status=1
@@ -2036,7 +2028,9 @@ fold_user_dir() (
 # saves from its cloud saves (#2618). Folds it into steamuser and links the name there.
 fold_wine_profile() {
   wine_user=$(wine_profile_name) || return 0
-  if ! fold_unnest && [ -e "$users/.notproton-fold-moving" ]; then
+  fold_record="$users/.notproton-fold-moving"
+  fold_unnest || true
+  if present "$fold_record"; then
     echo "=== an earlier move into steamuser could not be put back ===" >> "$log" 2>&1 || true
     return 1
   fi
@@ -2055,35 +2049,38 @@ fold_wine_profile() {
     fi
     fold_case=1
     [ ! "$users/STEAMUSER" -ef "$profile" ] || fold_case=0
-    fold_parked=$(fold_user_dir "$own" "$profile") || {
-      echo "=== users/$wine_user did not all move into steamuser, left in place ===" \
+    leftover=""
+    if fold_parked=$(fold_user_dir "$own" "$profile"); then
+      find "$own" -depth -type d -empty -delete 2>/dev/null || true
+      # Only Wine's links out to the Mac's home folders may be left.
+      if present "$own"; then
+        leftover=$(find "$own" ! -type d ! -type l 2>&1) || leftover=unreadable
+      fi
+    else
+      leftover=unmoved
+    fi
+    if [ -n "$fold_parked" ]; then
+      printf '%s\n' "$fold_parked" | sed 's/^/=== kept both copies, this one as: /; s/$/ ===/' \
         >> "$log" 2>&1 || true
-      return 1
-    }
-    find "$own" -depth -type d -empty -delete 2>/dev/null || true
-    # Anything but Wine's links still there did not move, so the profile stays split.
-    if [ -e "$own" ] && { leftover=$(find "$own" ! -type d ! -type l 2>&1) || leftover=unreadable; } \
-      && [ -n "$leftover" ]; then
+    fi
+    if [ -n "$leftover" ]; then
       echo "=== users/$wine_user did not all move into steamuser, left in place ===" \
         >> "$log" 2>&1 || true
       return 1
     fi
-    if [ -e "$own" ]; then
-      # Only links out to the Mac's home folders are left, kept as a pointer to them.
+    if present "$own"; then
+      # Kept as a pointer to the Mac's home folders the links lead to.
       aside="$own BACKUP"
       aside_number=2
-      while [ -e "$aside" ] || [ -L "$aside" ]; do
+      while present "$aside"; do
         aside="$own BACKUP $aside_number"
         aside_number=$((aside_number + 1))
       done
       mv -n "$own" "$aside" 2>> "$log" || return 1
     fi
     echo "=== moved users/$wine_user into steamuser, where Steam Cloud syncs ===" >> "$log" 2>&1 || true
-    if [ -n "$fold_parked" ]; then
-      printf '%s\n' "$fold_parked" | sed 's/^/=== kept both copies, this one as: /; s/$/ ===/' \
-        >> "$log" 2>&1 || true
-      notify_user "Saved games moved to where Steam Cloud syncs" "Files that differed from Steam Cloud's copy were kept beside it with BACKUP in the name."
-    fi
+    [ -z "$fold_parked" ] \
+      || notify_user "Saved games moved to where Steam Cloud syncs" "Files that differed from Steam Cloud's copy were kept beside it with BACKUP in the name."
   fi
   ln -s steamuser "$own" 2>/dev/null \
     || echo "=== could not point users/$wine_user at steamuser ===" >> "$log" 2>&1 || true
@@ -2612,12 +2609,9 @@ prefix_is_bare() (
         if [ "$part" = /dosdevices/s: ] && [ "$(readlink "$node")" = "$(game_drive_record)" ]; then
           continue
         fi
-        if [ -n "$own_profile" ] && [ "$part" = "/drive_c/users/$own_profile" ] \
-          && [ "$(readlink "$node")" = steamuser ]; then
-          continue
-        fi
         case "$part:$(readlink "$node")" in
           /dosdevices/c::../drive_c|/dosdevices/z::/|/drive_c/users/crossover:steamuser|\
+          "/drive_c/users/$own_profile:steamuser"|\
           '/drive_c/users/steamuser/My Documents:./Documents'|\
           '/drive_c/users/steamuser/Application Data:./AppData/Roaming'|\
           '/drive_c/users/steamuser/Local Settings/Application Data:../AppData/Local') continue ;;

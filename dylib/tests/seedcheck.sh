@@ -773,10 +773,14 @@ split_prefix() {
   printf same > "$cloud/same.txt"
   ln -s "$case_root/home/Documents" "$users/tester/Documents"
 }
-fixture
-lay_out_proton_profile
-rm "$WINEPREFIX/drive_c/users/tester"
-split_prefix
+# A fresh prefix laid out as before the fix, then split.
+split_fixture() {
+  fixture
+  lay_out_proton_profile
+  rm "$WINEPREFIX/drive_c/users/tester"
+  split_prefix
+}
+split_fixture
 check lay_out_proton_profile
 check test "$(readlink "$users/tester")" = steamuser
 check test "$(cat "$cloud/Sulfur_SaveSlot_1.sss")" = cloud
@@ -796,10 +800,7 @@ check test "$(find "$users" -name '*BACKUP*' | wc -l | tr -d ' ')" = 2
 check test "$(wc -l < "$case_root/notified" | tr -d ' ')" = 1
 
 # A file that cannot move stops the launch with everything still on one side or the other.
-fixture
-lay_out_proton_profile
-rm "$WINEPREFIX/drive_c/users/tester"
-split_prefix
+split_fixture
 chmod 500 "$mine"
 check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
 chmod 700 "$mine"
@@ -811,10 +812,7 @@ check test "$(readlink "$users/tester")" = steamuser
 check test "$(cat "$cloud/settings.json BACKUP")" = mac
 
 # An unreadable folder looks empty: it stops the launch instead of leaving the profile.
-fixture
-lay_out_proton_profile
-rm "$WINEPREFIX/drive_c/users/tester"
-split_prefix
+split_fixture
 mkdir -p "$users/tester/AppData/LocalLow/Perfect_Random/Sulfur/deep/locked"
 printf locked > "$mine/deep/locked/slot.sav"
 mkdir -p "$cloud/deep/locked"
@@ -828,10 +826,7 @@ check test "$(cat "$cloud/deep/locked/slot.sav")" = locked
 
 # A name taken between the check and the move: mv would put the save inside a folder that
 # appeared there, or not move it past a file. Either way it stays where it was.
-fixture
-lay_out_proton_profile
-rm "$WINEPREFIX/drive_c/users/tester"
-split_prefix
+split_fixture
 # shellcheck disable=SC2329 # fold_move calls it in place of mv
 mv() {
   for destination; do :; done
@@ -854,10 +849,7 @@ check test "$(cat "$cloud/settings.json BACKUP 2")" = mac
 
 # Killed right after mv put a save inside a folder that appeared at its name: the next
 # launch puts it back before it folds anything, and it is kept beside that folder.
-fixture
-lay_out_proton_profile
-rm "$WINEPREFIX/drive_c/users/tester"
-split_prefix
+split_fixture
 killed=0
 /usr/bin/perl -e 'setpgrp(0, 0); exec @ARGV' env functions="$functions" /bin/sh -c '
   eval "$functions"
@@ -884,10 +876,7 @@ check grep -q "put back tester/.*Sulfur_SaveSlot_2.sss" "$log"
 
 # A nested move that cannot be put back keeps its note: no later move may overwrite it,
 # so the next launch still finds the save.
-fixture
-lay_out_proton_profile
-rm "$WINEPREFIX/drive_c/users/tester"
-split_prefix
+split_fixture
 # shellcheck disable=SC2329 # fold_move calls it in place of mv
 mv() {
   for destination; do :; done
@@ -910,10 +899,7 @@ check test "$(cat "$cloud/settings.json BACKUP")" = mac
 check test ! -e "$users/.notproton-fold-moving"
 
 # A killed launch can leave the note's source folder gone: putting it back makes it again.
-fixture
-lay_out_proton_profile
-rm "$WINEPREFIX/drive_c/users/tester"
-split_prefix
+split_fixture
 mkdir "$cloud/Sulfur_SaveSlot_2.sss"
 printf '%s\n%s\n%s\n' "$(stat -f %i "$mine/Sulfur_SaveSlot_2.sss")" \
   tester/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
@@ -927,10 +913,7 @@ check test ! -e "$users/.notproton-fold-moving"
 
 # The note names paths inside users, so it still matches once the library has moved. One
 # that cannot be read is only a note: it is dropped and the launch goes on.
-fixture
-lay_out_proton_profile
-rm "$WINEPREFIX/drive_c/users/tester"
-split_prefix
+split_fixture
 printf '%s\n%s\n%s\n' "$(stat -f %i "$mine/settings.json")" \
   tester/AppData/LocalLow/Perfect_Random/Sulfur/settings.json \
   "steamuser/AppData/LocalLow/Perfect_Random/Sulfur/settings.json BACKUP" \
@@ -943,10 +926,7 @@ cloud="$users/steamuser/AppData/LocalLow/Perfect_Random/Sulfur"
 check lay_out_proton_profile
 check test "$(cat "$cloud/settings.json BACKUP")" = mac
 check test ! -e "$users/.notproton-fold-moving"
-fixture
-lay_out_proton_profile
-rm "$WINEPREFIX/drive_c/users/tester"
-split_prefix
+split_fixture
 printf 'garbage\n/etc\n../../x\n' > "$users/.notproton-fold-moving"
 check lay_out_proton_profile
 check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss")" = local
