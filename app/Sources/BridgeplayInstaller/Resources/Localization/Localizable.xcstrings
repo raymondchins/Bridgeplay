@@ -15,6 +15,12 @@
             "value" : "È già installata una build più recente di Bridgeplay. È stata mantenuta."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Более новая сборка Bridgeplay уже установлена. Она сохранена."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -35,6 +41,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un’altra applicazione occupa già il percorso di installazione. Spostala nel Finder prima di riprovare."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Место установки уже занято другим приложением. Переместите его в Finder и повторите попытку."
           }
         },
         "zh-Hans" : {
@@ -59,6 +71,12 @@
             "value" : "È in corso un’altra installazione o non è possibile accedere al blocco del programma di installazione. Riprova al termine."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Идёт другая установка, либо нет доступа к блокировке установщика. Повторите попытку после её завершения."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -73,6 +91,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Il Game Porting Toolkit di Apple e i livelli grafici di Bridgeplay, verificati con la firma di Bridgeplay. Più avanti Setup aggiunge il motore WineCX."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Porting Toolkit от Apple и графические слои Bridgeplay, проверенные по подписи Bridgeplay. Движок WineCX добавится позже при настройке."
           }
         },
         "zh-Hans" : {
@@ -91,6 +115,12 @@
             "value" : "Installatore Bridgeplay"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установщик Bridgeplay"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -105,6 +135,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay è installato, ma non è stato possibile configurare Steam, la grafica di Apple o il motore. Riprova."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay установлен, но не удалось настроить Steam, графику Apple или движок. Повторите попытку."
           }
         },
         "zh-Hans" : {
@@ -123,6 +159,12 @@
             "value" : "Bridgeplay è installato. Puoi espellere il programma di installazione e spostare il DMG nel Cestino dal Finder."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay установлен. Можно извлечь установщик и переместить его DMG в Корзину в Finder."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -137,6 +179,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay è pronto"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay готов"
           }
         },
         "zh-Hans" : {
@@ -155,6 +203,12 @@
             "value" : "Bridgeplay è aggiornato"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay обновлён до последней версии"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -169,6 +223,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Annulla"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отмена"
           }
         },
         "zh-Hans" : {
@@ -187,6 +247,12 @@
             "value" : "Verifica"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверить"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -201,6 +267,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Controlla l'installazione"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверьте установку"
           }
         },
         "zh-Hans" : {
@@ -219,6 +291,12 @@
             "value" : "Controllo l'ultima versione e l'applicazione su questo Mac."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка последнего релиза и приложения на этом Mac."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -235,6 +313,12 @@
             "value" : "Chiudi Bridgeplay prima di aggiornare. Dopo l'installazione, Bridgeplay configurerà Steam e richiederà le autorizzazioni necessarie."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закройте Bridgeplay перед обновлением. Настройку Steam и нужные разрешения Bridgeplay обработает после установки."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -249,6 +333,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copia della grafica di Apple, del motore e delle impostazioni"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копирование графики Apple, движка и настроек"
           }
         },
         "zh-Hans" : {
@@ -273,6 +363,12 @@
             "value" : "Impossibile raggiungere il server delle versioni. Controlla la connessione e riprova."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось подключиться к серверу релизов. Проверьте подключение и повторите попытку."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -287,6 +383,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скачать"
           }
         },
         "zh-Hans" : {
@@ -305,6 +407,12 @@
             "value" : "Download in corso"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузка"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -319,6 +427,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download della grafica di Apple"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузка графики Apple"
           }
         },
         "zh-Hans" : {
@@ -337,6 +451,12 @@
             "value" : "Download di Bridgeplay"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузка Bridgeplay"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -351,6 +471,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Espelli il programma di installazione e sposta il DMG nel Cestino"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Извлечь установщик и переместить DMG в Корзину"
           }
         },
         "zh-Hans" : {
@@ -369,6 +495,12 @@
             "value" : "Fine"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готово"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -383,6 +515,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Completa la configurazione di Bridgeplay"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершить настройку Bridgeplay"
           }
         },
         "zh-Hans" : {
@@ -401,6 +539,12 @@
             "value" : "Dati di gioco"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Данные игр"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -415,6 +559,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nel tuo Steam sul Mac."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В Steam на вашем Mac."
           }
         },
         "zh-Hans" : {
@@ -433,6 +583,12 @@
             "value" : "Installa"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установить"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -447,6 +603,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Installa Bridgeplay"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установить Bridgeplay"
           }
         },
         "zh-Hans" : {
@@ -465,6 +627,12 @@
             "value" : "Impossibile continuare l'installazione"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось продолжить установку"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -479,6 +647,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Installato"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установлено"
           }
         },
         "zh-Hans" : {
@@ -497,6 +671,12 @@
             "value" : "Impossibile completare la pulizia del programma di installazione"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось завершить очистку установщика"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -511,6 +691,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Installazione di Bridgeplay"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установка Bridgeplay"
           }
         },
         "zh-Hans" : {
@@ -529,6 +715,12 @@
             "value" : "Installazione di Steam da Valve"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установка Steam от Valve"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -543,6 +735,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Installazione di Steam, della grafica di Apple, del motore e delle impostazioni predefinite. Tieni aperto il programma di installazione."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установка Steam, графики Apple, движка и настроек по умолчанию. Не закрывайте установщик."
           }
         },
         "zh-Hans" : {
@@ -561,6 +759,12 @@
             "value" : "Conservati"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оставлено на месте"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -577,6 +781,12 @@
             "value" : "Posizione"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расположение"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -588,6 +798,12 @@
     "OK" : {
       "localizations" : {
         "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "OK"
@@ -609,6 +825,12 @@
             "value" : "Qui viene scaricata solo l'applicazione. La firma viene verificata prima dell'installazione."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Здесь загружается только приложение. Его подпись проверяется перед установкой."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -623,6 +845,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apri Bridgeplay"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть Bridgeplay"
           }
         },
         "zh-Hans" : {
@@ -641,6 +869,12 @@
             "value" : "Apri Bridgeplay per completare la configurazione: Rosetta, accesso a Steam e un paio di richieste standard di macOS."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте Bridgeplay, чтобы завершить настройку: Rosetta, вход в Steam и пара стандартных запросов macOS."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -657,6 +891,12 @@
             "value" : "Pausa"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приостановить"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -671,6 +911,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "In pausa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приостановлено"
           }
         },
         "zh-Hans" : {
@@ -695,6 +941,12 @@
             "value" : "Chiudi Bridgeplay e il suo programma di aggiornamento, poi riprova."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершите Bridgeplay и его средство обновления и повторите попытку."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -709,6 +961,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Segnala su GitHub"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сообщить на GitHub"
           }
         },
         "zh-Hans" : {
@@ -727,6 +985,12 @@
             "value" : "Riprendi"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продолжить"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -741,6 +1005,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Riepilogo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Просмотреть"
           }
         },
         "zh-Hans" : {
@@ -759,6 +1029,12 @@
             "value" : "Controlla i dettagli qui sotto e riprova. Il programma di installazione non rimuove i dati di gioco."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Посмотрите подробности ниже и повторите попытку. Установщик не удаляет данные ваших игр."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -773,6 +1049,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Configurazione di Bridgeplay"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройка Bridgeplay"
           }
         },
         "zh-Hans" : {
@@ -791,6 +1073,12 @@
             "value" : "Mostra registro"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показать журнал"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -807,6 +1095,12 @@
             "value" : "Si è verificato un problema"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Что-то пошло не так"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -821,6 +1115,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vengono installati anche Steam e la grafica di Apple. Più avanti Setup aggiunge il motore WineCX."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam и графика Apple тоже будут установлены. Движок WineCX добавится позже при настройке."
           }
         },
         "zh-Hans" : {
@@ -845,6 +1145,12 @@
             "value" : "Impossibile sostituire l’applicazione. Controlla l’app e il backup della versione precedente in Applicazioni prima di riprovare."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось заменить приложение. Проверьте приложение и резервную копию предыдущей версии в «Программах» и повторите попытку."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -859,6 +1165,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L'applicazione viene installata in Applicazioni. Le impostazioni, i prefissi di gioco e i salvataggi vengono mantenuti."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложение устанавливается в «Программы». Ваши настройки, префиксы игр и сохранения остаются."
           }
         },
         "zh-Hans" : {
@@ -883,6 +1195,12 @@
             "value" : "Il percorso dell’applicazione non può essere aggiornato in sicurezza."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расположение приложения небезопасно для обновления."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -905,6 +1223,12 @@
             "value" : "Impossibile salvare il download. Controlla lo spazio disponibile e i permessi della cartella."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось сохранить загрузку. Проверьте свободное место и права на папку."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -919,6 +1243,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossibile verificare il download. L'applicazione installata è stata conservata."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось проверить загрузку. Установленное приложение сохранено."
           }
         },
         "zh-Hans" : {
@@ -943,6 +1273,12 @@
             "value" : "Il download è incompleto o ha dimensioni inattese. Riprova."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузка неполная или имеет неожиданный размер. Повторите попытку."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -963,6 +1299,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’applicazione scaricata non ha superato la verifica. L’applicazione installata è stata mantenuta."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загруженное приложение не прошло проверку. Установленное приложение сохранено."
           }
         },
         "zh-Hans" : {
@@ -987,6 +1329,12 @@
             "value" : "Impossibile leggere l’applicazione esistente. Controllala nel Finder prima di riprovare."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось прочитать имеющееся приложение. Проверьте его в Finder и повторите попытку."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1007,6 +1355,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le informazioni sulla versione non sono valide. Riprova più tardi."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сведения о релизе недействительны. Повторите попытку позже."
           }
         },
         "zh-Hans" : {
@@ -1031,6 +1385,12 @@
             "value" : "Questa versione di Bridgeplay è già installata. Controlla di nuovo per continuare."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Эта версия Bridgeplay уже установлена. Чтобы продолжить, проверьте ещё раз."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1053,6 +1413,12 @@
             "value" : "Questa versione richiede una versione più recente di macOS o un Mac con chip Apple."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для этого релиза нужна более новая версия macOS или Mac с чипом Apple."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1067,6 +1433,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Riprova"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повторить"
           }
         },
         "zh-Hans" : {
@@ -1085,6 +1457,12 @@
             "value" : "Aggiorna"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновить"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1099,6 +1477,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aggiorna Bridgeplay"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновить Bridgeplay"
           }
         },
         "zh-Hans" : {
@@ -1117,6 +1501,12 @@
             "value" : "Verifica e installazione"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка и установка"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1131,6 +1521,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Verifica e sostituzione dell'applicazione. Tieni aperto il programma di installazione."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка и замена приложения. Не закрывайте установщик."
           }
         },
         "zh-Hans" : {
@@ -1149,6 +1545,12 @@
             "value" : "Versione"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Версия"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1163,6 +1565,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Giochi Windows."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Игры Windows."
           }
         },
         "zh-Hans" : {

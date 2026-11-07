@@ -105,7 +105,7 @@ the dylib into `Steam.app` and installs the signatures, fonts and helpers into
 - **Legacy names stay:** existing installs depend on `notproton.dylib`, the `NOTPROTON_*`
   variables, `com.notproton.*` identifiers and the fallback to the old `notproton` support
   folders. Don't rename them. User-facing names are Bridgeplay's (`BRIDGEPLAY_*`).
-- **Localization:** user-facing app strings are localized (en, it, zh-Hans) in
+- **Localization:** user-facing app strings are localized (en, it, ru, zh-Hans) in
   `app/Sources/BridgeplayApp/Resources/Localization/Localizable.xcstrings`. `make l10ncheck`
   checks them.
 - **Versions:** version bumps are separate `chore(release)` commits made with
