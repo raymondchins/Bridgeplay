@@ -585,9 +585,9 @@ managed_dlls() {
     printf '%s\n' dxgi d3d11 d3d10core
     ! d3dmetal_engine || printf '%s\n' d3d10 d3d12
     for dir in "$backend_root"/*/x86_64-windows "$backend_root"/*/i386-windows; do
-      # nvapi-shim and rockstar-shim are not Direct3D backends; their DLLs are handled with
-      # NVAPI and ROCKSTAR_SHIM below.
-      case "$dir" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*|"$backend_root"/rockstar-shim/*) continue ;; esac
+      # nvapi-shim, rockstar-shim and d3d12-stub are not Direct3D backends; their DLLs are
+      # handled with NVAPI, ROCKSTAR_SHIM and dxmt below.
+      case "$dir" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*|"$backend_root"/rockstar-shim/*|"$backend_root"/d3d12-stub/*) continue ;; esac
       [ ! -d "$dir" ] || backend_dlls "$dir"
     done
   } | sort -u
@@ -600,6 +600,13 @@ backend_available() {
     dxmt|dxvk) [ -n "$(backend_dlls "$backend_root/$1/x86_64-windows")" ] ;;
     *) return 1 ;;
   esac
+}
+
+# DXMT ships no d3d12, and on a D3DMetal engine the builtin d3d12 is Apple's, which reads a
+# null pointer when it gets DXMT's dxgi adapter (#2513), before a game can fall back to D3D11.
+# d3d12-stub/ stands in for it there.
+dxmt_without_d3d12() {
+  d3dmetal_engine && ! backend_dlls "$backend_root/dxmt/x86_64-windows" | grep -qx d3d12
 }
 
 backend_record() {
@@ -761,6 +768,14 @@ select_backend() {
     backend_from="$backend_from, fell back from $backend"
     backend=$next
   done
+  # Under dxmt a D3DMetal engine's d3d12 creates no device (activate_backend), and a game
+  # whose exe imports d3d12.dll is a D3D12 game, so D3DMetal runs it.
+  if [ "$backend" = dxmt ] && dxmt_without_d3d12 && [ "$verb" = waitforexitandrun ] \
+    && imports_d3d12 "$1"; then
+    graphics_log "dxmt has no Direct3D 12 and the game imports d3d12.dll, running it on d3dmetal instead"
+    backend_from="$backend_from, moved to d3dmetal because the game imports d3d12.dll"
+    backend=d3dmetal
+  fi
 }
 
 # Returns 0 when the destination already matches or was replaced.
@@ -816,6 +831,17 @@ activate_backend() {
     dxmt|dxvk) shipped=$({ backend_dlls "$backend_root/$backend/x86_64-windows"
       backend_dlls "$backend_root/$backend/i386-windows"; } | sort -u | tr '\n' ' ') ;;
   esac
+  # d3d12-stub answers D3D12CreateDevice like Windows on a GPU without D3D12, so a game that
+  # tries D3D12 first (Unreal Engine 5, Unity 6) takes its D3D11 path on DXMT. 64-bit only,
+  # a 32-bit game keeps the builtin.
+  d3d12_stub=""
+  if [ "$backend" = dxmt ] && dxmt_without_d3d12; then
+    d3d12_stub="$backend_root/d3d12-stub/x86_64-windows/d3d12.dll"
+    if [ ! -f "$d3d12_stub" ]; then
+      graphics_log "no d3d12-stub in this engine, Apple's d3d12 stays builtin under dxmt"
+      d3d12_stub=""
+    fi
+  fi
   staging_failed=0
   for pair in x86_64-windows:system32 i386-windows:syswow64; do
     arch=${pair%%:*}
@@ -833,6 +859,11 @@ activate_backend() {
             staging_failed=1
           fi ;;
         *)
+          if [ "$name.$arch" = d3d12.x86_64-windows ] && [ -n "$d3d12_stub" ]; then
+            stage_backend_file "$d3d12_stub" "$dir/d3d12.dll" && continue
+            graphics_log "could not stage the d3d12 stub into the prefix, Apple's d3d12 stays builtin"
+            d3d12_stub=""
+          fi
           restore_stock_dll "$arch" "$name" "$dir/$name.dll" \
             || graphics_log "could not restore Wine's $arch/$name.dll in the prefix" ;;
       esac
@@ -846,6 +877,7 @@ activate_backend() {
     activate_backend
     return
   fi
+  [ -z "$d3d12_stub" ] || shipped="$shipped d3d12"
   native=""
   builtin=""
   for name in $managed; do
@@ -856,6 +888,7 @@ activate_backend() {
   done
   backend_overrides="${native:+$native=n,b}"
   [ -z "$builtin" ] || backend_overrides="${backend_overrides:+$backend_overrides;}$builtin=b"
+  [ -z "$d3d12_stub" ] || graphics_log "d3d12 is d3d12-stub: dxmt has no Direct3D 12, so a game that tries it first falls back to Direct3D 11"
   # A linked Game Porting Toolkit can bring Apple's nvapi64 and nvngx (DLSS on MetalFX) into
   # lib/wine. An nvapi that answers sends some games down NVIDIA-only paths, so both stay
   # disabled unless the game's conf says NVAPI=1, and then only on D3DMetal, the only

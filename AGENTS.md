@@ -18,6 +18,7 @@ keeps the old upstream README.
 | `ntdll-patch/` | Detours patched into the engine's `ntdll.dll`; the prebuilt `detour*.bin` live in `app/Sources/BridgeplayApp/Resources/` | Wine |
 | `*-patch/` (win32u, winemac, winebus, winecoreaudio, wined3d, ws2_32, ngx-signer, d3dx11, hide-wine-exports) | Patches for single WineCX/WineHQ files. The rebuilt binaries are committed in `app/Sources/BridgeplayApp/Resources/` | Wine |
 | `nvapi-shim/` | Windows `nvapi64.dll` that lets games use DLSS (answered by MetalFX) | Wine |
+| `d3d12-stub/` | Windows `d3d12.dll` that creates no device, staged under DXMT on a D3DMetal engine so games fall back to D3D11 | Wine |
 | `overlay-shim/` | HDR, Metal 4 and frame generation | Game process |
 | `native-launch/`, `native-shim/` | Launch wrapper and gamepad shim for native Mac games | Native game process |
 | `helpers/` | Small tools the dylib and run script call (icons, app info, shortcuts) | Command line |
