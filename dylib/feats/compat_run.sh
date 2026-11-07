@@ -1931,16 +1931,39 @@ fold_landing() {
 }
 
 # Renames $1 to the free name $2. mv puts it inside a folder that appeared at $2 since the
-# check, so the inode says where it went, and a move that nested goes back.
+# check, so the inode says where it went, and a move that nested goes back. Each move is
+# noted first, so the next launch puts back one that a killed launch left nested.
 fold_move() {
   moving=$(stat -f %i "$1" 2>/dev/null) || return 1
+  printf '%s\n%s\n%s\n' "$moving" "$1" "$2" > "$users/.notproton-fold-moving" || return 1
   mv -n "$1" "$2" 2>> "$log" || return 1
-  if [ "$(stat -f %i "$2" 2>/dev/null)" = "$moving" ] && [ ! -e "$1" ] && [ ! -L "$1" ]; then
+  fold_unnest
+}
+
+# Puts back the move noted by fold_move if it went inside a folder at its target's name.
+fold_unnest() {
+  fold_record="$users/.notproton-fold-moving"
+  [ -e "$fold_record" ] || [ -L "$fold_record" ] || return 0
+  [ -f "$fold_record" ] && [ ! -L "$fold_record" ] || return 1
+  if ! { read -r fold_moved && read -r fold_source && read -r fold_target; } < "$fold_record"; then
+    rm -f "$fold_record"
     return 0
   fi
-  if [ "$(stat -f %i "$2/${1##*/}" 2>/dev/null)" = "$moving" ]; then
-    mv -n "$2/${1##*/}" "$1" 2>> "$log" || true
+  case "$fold_source:$fold_target" in "$users"/*:"$users"/*) ;; *) return 1 ;; esac
+  if [ "$(stat -f %i "$fold_target" 2>/dev/null)" = "$fold_moved" ] \
+    && [ ! -e "$fold_source" ] && [ ! -L "$fold_source" ]; then
+    rm -f "$fold_record"
+    return 0
   fi
+  fold_nested="$fold_target/${fold_source##*/}"
+  if [ "$(stat -f %i "$fold_nested" 2>/dev/null)" = "$fold_moved" ]; then
+    { [ ! -e "$fold_source" ] && [ ! -L "$fold_source" ] && mv -n "$fold_nested" "$fold_source" 2>> "$log" \
+      && [ "$(stat -f %i "$fold_source" 2>/dev/null)" = "$fold_moved" ]; } || return 1
+    echo "=== put back ${fold_source#"$users"/}, which went inside a folder at its name ===" \
+      >> "$log" 2>&1 || true
+  fi
+  rm -f "$fold_record"
+  # A move put back, or one that never happened, did not land.
   return 1
 }
 
@@ -1995,6 +2018,10 @@ fold_user_dir() (
 # saves from its cloud saves (#2618). Folds it into steamuser and links the name there.
 fold_wine_profile() {
   wine_user=$(wine_profile_name) || return 0
+  if ! fold_unnest && [ -e "$users/.notproton-fold-moving" ]; then
+    echo "=== an earlier move into steamuser could not be put back ===" >> "$log" 2>&1 || true
+    return 1
+  fi
   own="$users/$wine_user"
   if [ -L "$own" ]; then
     [ "$(readlink "$own")" = steamuser ] \

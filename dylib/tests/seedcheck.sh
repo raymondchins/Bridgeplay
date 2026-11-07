@@ -852,6 +852,36 @@ check lay_out_proton_profile
 check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss")" = local
 check test "$(cat "$cloud/settings.json BACKUP 2")" = mac
 
+# Killed right after mv put a save inside a folder that appeared at its name: the next
+# launch puts it back before it folds anything, and it is kept beside that folder.
+fixture
+lay_out_proton_profile
+rm "$WINEPREFIX/drive_c/users/tester"
+split_prefix
+killed=0
+/usr/bin/perl -e 'setpgrp(0, 0); exec @ARGV' env functions="$functions" /bin/sh -c '
+  eval "$functions"
+  notify_user() { :; }
+  mv() {
+    for destination; do :; done
+    case "$destination" in */steamuser/*/Sulfur_SaveSlot_2.sss)
+      mkdir -p "$destination"
+      command mv "$@"
+      kill -KILL 0 ;;
+    esac
+    command mv "$@"
+  }
+  lay_out_proton_profile
+' 2>/dev/null || killed=$?
+check test "$killed" -ne 0
+check test -f "$cloud/Sulfur_SaveSlot_2.sss/Sulfur_SaveSlot_2.sss"
+check test -f "$users/.notproton-fold-moving"
+check lay_out_proton_profile
+check test ! -e "$cloud/Sulfur_SaveSlot_2.sss/Sulfur_SaveSlot_2.sss"
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss BACKUP")" = local
+check test ! -e "$users/.notproton-fold-moving"
+check grep -q "put back tester/.*Sulfur_SaveSlot_2.sss" "$log"
+
 # A case-sensitive volume keeps names apart that Wine reads as one.
 if ! attach_image "Case-sensitive APFS" folds; then
   no_image "case-sensitive APFS" "the case-sensitive fold"
