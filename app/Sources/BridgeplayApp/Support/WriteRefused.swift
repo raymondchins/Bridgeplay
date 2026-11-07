@@ -107,21 +107,15 @@ enum Remedy: Hashable {
         return uid_t(owner.uint32Value)
     }
 
-    private static func plainPath(_ url: URL) -> String {
-        var path = url.path(percentEncoded: false)
-        if path.count > 1, path.hasSuffix("/") { path.removeLast() }
-        return path
-    }
-
     // The folder whose permissions decide a create, rename or delete: the path when it is a
     // folder, else the one it sits in.
     static func folder(holding path: String) -> String? {
         let url = URL(filePath: path)
         for candidate in [url, url.deletingLastPathComponent()] {
             var isDirectory: ObjCBool = false
-            if FileManager.default.fileExists(atPath: plainPath(candidate), isDirectory: &isDirectory),
+            if FileManager.default.fileExists(atPath: candidate.plainPath, isDirectory: &isDirectory),
                isDirectory.boolValue {
-                return plainPath(candidate)
+                return candidate.plainPath
             }
         }
         return nil
@@ -135,7 +129,7 @@ enum Remedy: Hashable {
         while directory.pathComponents.count > 1 {
             let plist = directory.appending(path: "Contents/Info.plist")
             if files.fileExists(atPath: plist.path(percentEncoded: false)) {
-                outermost = plainPath(directory)
+                outermost = directory.plainPath
             }
             directory = directory.deletingLastPathComponent()
         }
@@ -149,11 +143,11 @@ enum Remedy: Hashable {
         guard folder.hasPrefix(inside) else { return nil }
         var top = URL(filePath: folder)
         while true {
-            let parent = plainPath(top.deletingLastPathComponent())
+            let parent = top.deletingLastPathComponent().plainPath
             guard parent.hasPrefix(inside), lookup.owner(parent) == 0 else { break }
             top = URL(filePath: parent)
         }
-        return plainPath(top)
+        return top.plainPath
     }
 
     init(forPath path: String, errno code: Int32? = nil, lookup: Lookup = Lookup()) {

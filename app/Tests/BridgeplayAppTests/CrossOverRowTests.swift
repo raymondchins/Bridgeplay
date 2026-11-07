@@ -112,16 +112,13 @@ struct CrossOverRowTests {
         let swapped = install("CrossOver", Self.preview)
         #expect(CrossOverRow.listing(swapped, in: made) == nil)
 
-        let old = Self.old
-        #expect(CrossOverRow.listing(old, in: rows([old]))?.id == old.id)
-        #expect(CrossOverRow.listing(old, in: made) == nil)
+        #expect(CrossOverRow.listing(Self.old, in: rows([Self.old]))?.id == Self.old.id)
+        #expect(CrossOverRow.listing(Self.old, in: made) == nil)
     }
 
     @Test("An app Bridgeplay doesn't support is listed with its version and nothing to set up")
     func unsupportedApp() {
-        let old = Self.old
-
-        let made = rows([old])
+        let made = rows([Self.old])
 
         #expect(made.count == 1)
         #expect(made[0].unsupportedVersion == "24.0.5")
@@ -137,9 +134,7 @@ struct CrossOverRowTests {
             bundle: SupportPaths.engines.appending(path: "WineHQ 9.0.app"), releaseVersion: "9.0",
             support: .unsupportedBuild("9.0"), isEngine: true
         )
-        let old = Self.old
-
-        let made = rows([engine, release, odd, old], orphaned: ["winehq-10.0", "25.0.0.1"])
+        let made = rows([engine, release, odd, Self.old], orphaned: ["winehq-10.0", "25.0.0.1"])
         #expect(made.map(\.isFreeEngine) == [true, false, true, false, true, false])
 
         // A CrossOver build stays CrossOver wherever its app is.

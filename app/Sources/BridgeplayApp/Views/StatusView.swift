@@ -674,7 +674,7 @@ struct StatusView: View {
             .background { RowWash.crossOver }
         }
         ForEach(crossOvers) { row in
-            engineRow(row, isCrossOver: true, snapshot: snapshot, tools: tools)
+            engineRow(row, snapshot: snapshot, tools: tools)
         }
         let winehq = status.freeEngineState(FreeEngine.current.build)
         if winehq != .current {
@@ -730,7 +730,7 @@ struct StatusView: View {
             )
         }
         ForEach(freeEngines) { row in
-            engineRow(row, isCrossOver: false, snapshot: snapshot, tools: tools)
+            engineRow(row, snapshot: snapshot, tools: tools)
         }
         if case .ready = snapshot.runner, !snapshot.payload.missing(origin: .patched).isEmpty {
             StatusRow(
@@ -747,8 +747,9 @@ struct StatusView: View {
         }
     }
 
-    private func engineRow(_ row: CrossOverRow, isCrossOver: Bool, snapshot: StatusSnapshot, tools: [InstalledTool]) -> some View {
+    private func engineRow(_ row: CrossOverRow, snapshot: StatusSnapshot, tools: [InstalledTool]) -> some View {
         let highlighted = status.highlightedRow == row.id
+        let isCrossOver = !row.isFreeEngine
         return StatusRow(
             title: row.title,
             value: crossOverValue(row),
@@ -756,9 +757,10 @@ struct StatusView: View {
             detail: crossOverDetail(row, tools: tools),
             trailing: row.copy == .ready ? buildSize(row.buildID) : nil,
             action: crossOverAction(row, prominent: snapshot.runner == .none),
-            menu: crossOverMenu(row, addsCrossOver: isCrossOver)
+            menu: crossOverMenu(row)
         )
-        .help(row.install.map { Self.location($0.bundle) } ?? "")
+        // The app's folder shows on hover rather than as a line on the row.
+        .help(row.install?.bundle.plainPath ?? "")
         .background {
             if isCrossOver { RowWash.crossOver }
             RowWash(fill: Color.accentColor.opacity(0.2), opacity: highlighted ? 1 : 0)
@@ -798,13 +800,6 @@ struct StatusView: View {
         }
     }
 
-    // Where the app is, shown on hover rather than on the row.
-    private static func location(_ bundle: URL) -> String {
-        var path = bundle.path(percentEncoded: false)
-        if path.count > 1, path.hasSuffix("/") { path.removeLast() }
-        return path
-    }
-
     private func crossOverDetail(_ row: CrossOverRow, tools: [InstalledTool]) -> String? {
         var lines: [String] = []
         if row.copy == .ready || row.copy == .unpatched {
@@ -842,7 +837,7 @@ struct StatusView: View {
         }
     }
 
-    private func crossOverMenu(_ row: CrossOverRow, addsCrossOver: Bool) -> [StatusAction] {
+    private func crossOverMenu(_ row: CrossOverRow) -> [StatusAction] {
         var items: [StatusAction] = []
         let install = row.install
         if row.copy == .ready {
@@ -871,7 +866,7 @@ struct StatusView: View {
                 startsGroup: !items.contains(where: \.startsGroup)
             ) { Task { await status.removeFromList(install) } })
         }
-        if addsCrossOver {
+        if !row.isFreeEngine {
             var add = addCrossOverAction(label: String(localized: "Add CrossOver\u{2026}"))
             add.startsGroup = true
             items.append(add)

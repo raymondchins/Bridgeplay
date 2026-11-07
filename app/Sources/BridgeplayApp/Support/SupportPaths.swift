@@ -176,3 +176,12 @@ enum ToolName {
 
     static func isOurs(_ name: String) -> Bool { name.hasPrefix(prefix) || isLegacy(name) }
 }
+
+extension URL {
+    // The file path as shown to people: no percent escapes and no trailing slash.
+    var plainPath: String {
+        var path = self.path(percentEncoded: false)
+        if path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        return path
+    }
+}

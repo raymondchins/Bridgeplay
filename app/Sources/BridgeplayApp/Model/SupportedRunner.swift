@@ -34,6 +34,9 @@ struct RunnerBuild: Sendable, Equatable, Identifiable {
     // install. It has no license to check.
     var isFree = false
 
+    // A CrossOver Preview build. Its release version is the build date.
+    var isPreview = false
+
     var rebuilds: [RunnerRebuild] = []
 
     var id: String { flavor.map { "\(bundleVersion)-\($0)" } ?? bundleVersion }
@@ -44,12 +47,9 @@ struct RunnerBuild: Sendable, Equatable, Identifiable {
         return RunnerBuild(
             bundleVersion: bundleVersion, releaseVersion: releaseVersion, flavor: flavor,
             loaderSHA256: rebuild.loaderSHA256, cleanNtdll: rebuild.cleanNtdll,
-            patchedNtdll: rebuild.patchedNtdll, tools: tools, isFree: isFree, rebuilds: rebuilds
+            patchedNtdll: rebuild.patchedNtdll, tools: tools, isFree: isFree, isPreview: isPreview, rebuilds: rebuilds
         )
     }
-
-    // CrossOver Preview builds are versioned by their build date.
-    var isPreview: Bool { !isFree && releaseVersion.allSatisfy(\.isNumber) }
 
     var flavorName: String { flavor?.uppercased() ?? "Rosetta" }
 
@@ -188,7 +188,8 @@ enum SupportedRunners {
             ],
             tools: [
                 CompatTool(name: "bridgeplay-proton-preview", flavor: .rosetta, display: "CrossOver 2026 08 21-X86 - Rosetta"),
-            ]
+            ],
+            isPreview: true
         ),
         RunnerBuild(
             bundleVersion: "27.0.0.40921",
@@ -208,7 +209,8 @@ enum SupportedRunners {
             tools: [
                 CompatTool(name: "bridgeplay-proton-fex", flavor: .fex, display: "CrossOver 2026 08 21-ARM64 - FEX"),
                 CompatTool(name: "bridgeplay-proton-fex-rosetta", flavor: .rosetta, display: "CrossOver 2026 08 21-ARM64 - Rosetta"),
-            ]
+            ],
+            isPreview: true
         ),
         RunnerBuild(
             bundleVersion: "27.0.0.41069",
@@ -225,7 +227,8 @@ enum SupportedRunners {
             ],
             tools: [
                 CompatTool(name: "bridgeplay-proton-preview-41069", flavor: .rosetta, display: "CrossOver 2026 10 06-X86 - Rosetta"),
-            ]
+            ],
+            isPreview: true
         ),
         RunnerBuild(
             bundleVersion: "27.0.0.41069",
@@ -245,7 +248,8 @@ enum SupportedRunners {
             tools: [
                 CompatTool(name: "bridgeplay-proton-fex-41069", flavor: .fex, display: "CrossOver 2026 10 06-ARM64 - FEX"),
                 CompatTool(name: "bridgeplay-proton-fex-rosetta-41069", flavor: .rosetta, display: "CrossOver 2026 10 06-ARM64 - Rosetta"),
-            ]
+            ],
+            isPreview: true
         ),
         RunnerBuild(
             bundleVersion: "winehq-11.15",
@@ -280,7 +284,8 @@ enum SupportedRunners {
             ],
             tools: [
                 CompatTool(name: "bridgeplay-proton-preview-41073", flavor: .rosetta, display: "CrossOver 2026 10 15-X86 - Rosetta"),
-            ]
+            ],
+            isPreview: true
         ),
         RunnerBuild(
             bundleVersion: "27.0.0.41073",
@@ -300,7 +305,8 @@ enum SupportedRunners {
             tools: [
                 CompatTool(name: "bridgeplay-proton-fex-41073", flavor: .fex, display: "CrossOver 2026 10 15-ARM64 - FEX"),
                 CompatTool(name: "bridgeplay-proton-fex-rosetta-41073", flavor: .rosetta, display: "CrossOver 2026 10 15-ARM64 - Rosetta"),
-            ]
+            ],
+            isPreview: true
         ),
     ] + FreeEngineWinecx.runnerBuilds
 
@@ -319,20 +325,21 @@ enum SupportedRunners {
     // The CrossOver versions to tell someone to use, for a row already titled CrossOver:
     // "26.3 or Preview 20260821, 20261006, or 20261015". Free engines aren't CrossOver.
     static var crossOverVersions: String {
-        func versions(_ preview: Bool) -> String? {
-            var seen = Set<String>()
-            let list = all.filter { !$0.isFree && $0.isPreview == preview }.map(\.releaseVersion)
-                .filter { seen.insert($0).inserted }
-            return list.isEmpty ? nil : list.formatted(.list(type: .or))
-        }
-        return [versions(false), versions(true).map { "Preview \($0)" }]
-            .compactMap { $0 }.formatted(.list(type: .or))
+        let crossOver = all.filter { !$0.isFree }
+        let releases = versions(of: crossOver.filter { !$0.isPreview })
+        let previews = versions(of: crossOver.filter(\.isPreview))
+        var named = releases.isEmpty ? [] : [releases.formatted(.list(type: .or))]
+        if !previews.isEmpty { named.append("Preview \(previews.formatted(.list(type: .or)))") }
+        return named.formatted(.list(type: .or))
     }
 
     static var versionList: String {
+        versions(of: all).joined(separator: ", ")
+    }
+
+    // Release versions in table order, each once (flavors of a build share one).
+    private static func versions(of builds: [RunnerBuild]) -> [String] {
         var seen = Set<String>()
-        return all.map(\.releaseVersion)
-            .filter { seen.insert($0).inserted }
-            .joined(separator: ", ")
+        return builds.map(\.releaseVersion).filter { seen.insert($0).inserted }
     }
 }
