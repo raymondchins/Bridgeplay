@@ -129,6 +129,27 @@ struct CrossOverRowTests {
         #expect(made[0].unsupportedVersion == "24.0.5")
         #expect(!made[0].canSetUp)
     }
+
+    @Test("Free engines are told apart from CrossOver, so CrossOver can be listed first")
+    func freeEnginesApart() throws {
+        let winecx = try #require(SupportedRunners.all.first { $0.bundleVersion.hasPrefix("winecx-") })
+        let engine = install("WineCX", winecx, root: SupportPaths.engines.path(percentEncoded: false))
+        let release = install("CrossOver", Self.release)
+        let odd = CrossOverInstall(
+            bundle: SupportPaths.engines.appending(path: "WineHQ 9.0.app"), releaseVersion: "9.0",
+            support: .unsupportedBuild("9.0")
+        )
+        let old = CrossOverInstall(
+            bundle: URL(filePath: "/Applications/CrossOver 24.app"), releaseVersion: "24.0.5",
+            support: .unsupportedBuild("24.0.5")
+        )
+
+        let made = rows([engine, release, odd, old], orphaned: ["winehq-10.0", "25.0.0.1"])
+        #expect(made.map(\.isFreeEngine) == [true, false, true, false, true, false])
+
+        let copies = rows([], installed: [winecx, Self.release])
+        #expect(copies.map(\.isFreeEngine) == [true, false])
+    }
 }
 
 @Suite("Manually added CrossOver copies")

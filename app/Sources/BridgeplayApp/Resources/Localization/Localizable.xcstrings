@@ -2036,6 +2036,28 @@
         }
       }
     },
+    "Add…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавить…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加…"
+          }
+        }
+      }
+    },
     "Advanced" : {
       "localizations" : {
         "it" : {
@@ -16319,6 +16341,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用“下载”中的文件"
+          }
+        }
+      }
+    },
+    "Use your own licensed copy of CrossOver. It's sold separately by CodeWeavers." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa una tua copia di CrossOver con licenza. È venduto separatamente da CodeWeavers."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Используйте свою лицензионную копию CrossOver. CodeWeavers продаёт её отдельно."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你自己已授权的 CrossOver。它由 CodeWeavers 单独销售。"
           }
         }
       }

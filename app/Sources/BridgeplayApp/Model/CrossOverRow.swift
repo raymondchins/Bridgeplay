@@ -28,6 +28,17 @@ struct CrossOverRow: Identifiable, Equatable {
     var canSetUp: Bool { install != nil && unsupportedVersion == nil }
     var isManual: Bool { install?.isManual ?? false }
 
+    // The free engines Bridgeplay downloads list here too: apps in its engines folder, and
+    // copies made from them.
+    var isFreeEngine: Bool {
+        if let install {
+            let folder = install.bundle.standardizedFileURL.deletingLastPathComponent()
+            return install.isFree || folder.pathComponents == SupportPaths.engines.standardizedFileURL.pathComponents
+        }
+        if let build = SupportedRunners.build(id: buildID) { return build.isFree }
+        return buildID.hasPrefix("winehq-") || buildID.hasPrefix("winecx-")
+    }
+
     static func == (a: CrossOverRow, b: CrossOverRow) -> Bool {
         a.buildID == b.buildID && a.install?.id == b.install?.id && a.copy == b.copy
             && a.licensed == b.licensed && a.unsupportedVersion == b.unsupportedVersion
