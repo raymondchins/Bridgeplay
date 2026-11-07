@@ -373,9 +373,7 @@ struct SetupAssistantView: View {
         return StatusRow(title: title,
                          value: String(localized: "Own CrossOver? Bridgeplay can run games on it. Buying it funds Wine."),
                          tone: .neutral,
-                         action: StatusAction(label: String(localized: "Get CrossOver")) {
-                             NSWorkspace.shared.open(URL(string: "https://www.codeweavers.com/crossover")!)
-                         })
+                         action: .getCrossOver)
     }
 
     @ViewBuilder

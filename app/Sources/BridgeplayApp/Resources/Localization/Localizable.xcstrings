@@ -2036,6 +2036,28 @@
         }
       }
     },
+    "Add…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавить…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加…"
+          }
+        }
+      }
+    },
     "Advanced" : {
       "localizations" : {
         "it" : {
@@ -9588,24 +9610,24 @@
         }
       }
     },
-    "None found. Download the free WineHQ or WineCX engine, or use CrossOver (%@)." : {
+    "None set up yet. Choose one below." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessuno trovato. Scarica il motore gratuito WineHQ o WineCX, oppure usa CrossOver (%@)."
+            "value" : "Nessuno ancora configurato. Scegline uno qui sotto."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ничего не найдено. Загрузите бесплатный движок WineHQ или WineCX либо используйте CrossOver (%@)."
+            "value" : "Пока ничего не настроено. Выберите вариант ниже."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未找到。请下载免费的 WineHQ 或 WineCX 引擎，或使用 CrossOver（%@）。"
+            "value" : "尚未设置。请从下方选择一个。"
           }
         }
       }
@@ -16323,6 +16345,28 @@
         }
       }
     },
+    "Use your own licensed copy of CrossOver. It's sold separately by CodeWeavers." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa una tua copia di CrossOver con licenza. È venduto separatamente da CodeWeavers."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Используйте свою лицензионную копию CrossOver. CodeWeavers продаёт её отдельно."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你自己已授权的 CrossOver。它由 CodeWeavers 单独销售。"
+          }
+        }
+      }
+    },
     "Verify CrossOver" : {
       "localizations" : {
         "it" : {
@@ -16389,24 +16433,24 @@
         }
       }
     },
-    "Version %@ not supported (supported: %@)" : {
+    "Version %@ isn't supported. Use %@." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Versione %1$@ non supportata (supportate: %2$@)"
+            "value" : "La versione %1$@ non è supportata. Usa %2$@."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Версия %@ не поддерживается (поддерживается: %@)"
+            "value" : "Версия %1$@ не поддерживается. Используйте %2$@."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不支持版本 %@（支持：%@）"
+            "value" : "不支持版本 %1$@。请使用 %2$@。"
           }
         }
       }

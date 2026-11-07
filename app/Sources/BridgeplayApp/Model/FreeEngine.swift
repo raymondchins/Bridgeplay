@@ -74,6 +74,13 @@ enum FreeEngine {
 
     static let step = "Download free Wine engine"
 
+    // A free engine's build id starts with its family: "winecx-11.17".
+    static let families = ["winecx": "WineCX", "winehq": "WineHQ"]
+
+    static func family(ofBuild id: String) -> String? {
+        id.split(separator: "-", maxSplits: 1).first.flatMap { families[String($0)] }
+    }
+
     // Gcenx's WineHQ packages. 11.15 is the Wine the bridge components are built
     // against (bridge/setup-wine-tree.sh), so the unix halves speak its protocol.
     static let current = FreeEngineRelease(
