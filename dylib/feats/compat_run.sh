@@ -1930,16 +1930,32 @@ fold_landing() {
   printf '%s' "$1/$2"
 }
 
+# Renames $1 to the free name $2. mv puts it inside a folder that appeared at $2 since the
+# check, so the inode says where it went, and a move that nested goes back.
+fold_move() {
+  moving=$(stat -f %i "$1" 2>/dev/null) || return 1
+  mv -n "$1" "$2" 2>> "$log" || return 1
+  if [ "$(stat -f %i "$2" 2>/dev/null)" = "$moving" ] && [ ! -e "$1" ] && [ ! -L "$1" ]; then
+    return 0
+  fi
+  if [ "$(stat -f %i "$2/${1##*/}" 2>/dev/null)" = "$moving" ]; then
+    mv -n "$2/${1##*/}" "$1" 2>> "$log" || true
+  fi
+  return 1
+}
+
 # Moves what is in $1 into $2. Renames only, so a launch killed partway leaves every file
 # whole on one side or the other. A file that differs from the one already in $2 is kept
 # beside it as "<name> BACKUP" and printed. Fails if anything could not move.
 fold_user_dir() (
   status=0
+  # Unreadable, the folder would look empty and be dropped from the live profile.
+  [ -r "$1" ] && [ -x "$1" ] || exit 1
   for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
     [ -e "$entry" ] || [ -L "$entry" ] || continue
     landing=$(fold_landing "$2" "${entry##*/}")
     if [ ! -e "$landing" ] && [ ! -L "$landing" ]; then
-      mv -n "$entry" "$landing" 2>> "$log" && [ ! -e "$entry" ] && [ ! -L "$entry" ] || status=1
+      fold_move "$entry" "$landing" || status=1
       continue
     fi
     # Wine's links out to the Mac's home folders: what is behind them stays there.
@@ -1955,16 +1971,18 @@ fold_user_dir() (
     fi
     parked="$landing BACKUP"
     parked_number=2
+    already=
     while [ -e "$parked" ] || [ -L "$parked" ]; do
       if [ -f "$entry" ] && [ -f "$parked" ] && [ ! -L "$parked" ] && cmp -s "$entry" "$parked"; then
+        already=1
         break
       fi
       parked="$landing BACKUP $parked_number"
       parked_number=$((parked_number + 1))
     done
-    if [ -e "$parked" ]; then
+    if [ -n "$already" ]; then
       rm -f "$entry" || status=1
-    elif mv -n "$entry" "$parked" 2>> "$log" && [ ! -e "$entry" ]; then
+    elif fold_move "$entry" "$parked"; then
       printf '%s\n' "$parked"
     else
       status=1
@@ -1998,6 +2016,13 @@ fold_wine_profile() {
       return 1
     }
     find "$own" -depth -type d -empty -delete 2>/dev/null || true
+    # Anything but Wine's links still there did not move, so the profile stays split.
+    if [ -e "$own" ] && { leftover=$(find "$own" ! -type d ! -type l 2>&1) || leftover=unreadable; } \
+      && [ -n "$leftover" ]; then
+      echo "=== users/$wine_user did not all move into steamuser, left in place ===" \
+        >> "$log" 2>&1 || true
+      return 1
+    fi
     if [ -e "$own" ]; then
       # Only links out to the Mac's home folders are left, kept as a pointer to them.
       aside="$own BACKUP"

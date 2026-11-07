@@ -810,6 +810,48 @@ check lay_out_proton_profile
 check test "$(readlink "$users/tester")" = steamuser
 check test "$(cat "$cloud/settings.json BACKUP")" = mac
 
+# An unreadable folder looks empty: it stops the launch instead of leaving the profile.
+fixture
+lay_out_proton_profile
+rm "$WINEPREFIX/drive_c/users/tester"
+split_prefix
+mkdir -p "$users/tester/AppData/LocalLow/Perfect_Random/Sulfur/deep/locked"
+printf locked > "$mine/deep/locked/slot.sav"
+mkdir -p "$cloud/deep/locked"
+chmod 000 "$mine/deep/locked"
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+chmod 700 "$mine/deep/locked"
+check test -d "$users/tester" -a ! -L "$users/tester"
+check test "$(cat "$mine/deep/locked/slot.sav")" = locked
+check lay_out_proton_profile
+check test "$(cat "$cloud/deep/locked/slot.sav")" = locked
+
+# A name taken between the check and the move: mv would put the save inside a folder that
+# appeared there, or not move it past a file. Either way it stays where it was.
+fixture
+lay_out_proton_profile
+rm "$WINEPREFIX/drive_c/users/tester"
+split_prefix
+# shellcheck disable=SC2329 # fold_move calls it in place of mv
+mv() {
+  for destination; do :; done
+  case "$destination" in
+    */steamuser/*/Sulfur_SaveSlot_2.sss) mkdir -p "$destination" ;;
+    *"/settings.json BACKUP") printf other > "$destination" ;;
+  esac
+  command mv "$@"
+}
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+unset -f mv
+check test "$(cat "$mine/Sulfur_SaveSlot_2.sss")" = local
+check test "$(cat "$mine/settings.json")" = mac
+check test ! -e "$cloud/Sulfur_SaveSlot_2.sss/Sulfur_SaveSlot_2.sss"
+check test "$(cat "$cloud/settings.json BACKUP")" = other
+rmdir "$cloud/Sulfur_SaveSlot_2.sss"
+check lay_out_proton_profile
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss")" = local
+check test "$(cat "$cloud/settings.json BACKUP 2")" = mac
+
 # A case-sensitive volume keeps names apart that Wine reads as one.
 if ! attach_image "Case-sensitive APFS" folds; then
   no_image "case-sensitive APFS" "the case-sensitive fold"
