@@ -882,6 +882,61 @@ check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss BACKUP")" = local
 check test ! -e "$users/.notproton-fold-moving"
 check grep -q "put back tester/.*Sulfur_SaveSlot_2.sss" "$log"
 
+# A nested move that cannot be put back keeps its note: no later move may overwrite it,
+# so the next launch still finds the save.
+fixture
+lay_out_proton_profile
+rm "$WINEPREFIX/drive_c/users/tester"
+split_prefix
+# shellcheck disable=SC2329 # fold_move calls it in place of mv
+mv() {
+  for destination; do :; done
+  case "$destination" in */steamuser/*/Sulfur_SaveSlot_2.sss)
+    mkdir -p "$destination"
+    command mv "$@"
+    chmod 500 "$destination"
+    return ;;
+  esac
+  command mv "$@"
+}
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+unset -f mv
+chmod 700 "$cloud/Sulfur_SaveSlot_2.sss"
+check test "$(sed -n 2p "$users/.notproton-fold-moving")" = "tester/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss"
+check test "$(cat "$mine/settings.json")" = mac
+check lay_out_proton_profile
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss BACKUP")" = local
+check test "$(cat "$cloud/settings.json BACKUP")" = mac
+check test ! -e "$users/.notproton-fold-moving"
+
+# The note names paths inside users, so it still matches once the library has moved. One
+# that cannot be read is only a note: it is dropped and the launch goes on.
+fixture
+lay_out_proton_profile
+rm "$WINEPREFIX/drive_c/users/tester"
+split_prefix
+printf '%s\n%s\n%s\n' "$(stat -f %i "$mine/settings.json")" \
+  tester/AppData/LocalLow/Perfect_Random/Sulfur/settings.json \
+  "steamuser/AppData/LocalLow/Perfect_Random/Sulfur/settings.json BACKUP" \
+  > "$users/.notproton-fold-moving"
+command mv "$STEAM_COMPAT_DATA_PATH" "$case_root/moved"
+STEAM_COMPAT_DATA_PATH="$case_root/moved"
+WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
+users="$WINEPREFIX/drive_c/users"
+cloud="$users/steamuser/AppData/LocalLow/Perfect_Random/Sulfur"
+check lay_out_proton_profile
+check test "$(cat "$cloud/settings.json BACKUP")" = mac
+check test ! -e "$users/.notproton-fold-moving"
+fixture
+lay_out_proton_profile
+rm "$WINEPREFIX/drive_c/users/tester"
+split_prefix
+printf 'garbage\n/etc\n../../x\n' > "$users/.notproton-fold-moving"
+check lay_out_proton_profile
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss")" = local
+check test ! -e "$users/.notproton-fold-moving"
+check grep -q "dropped an unreadable note" "$log"
+
 # A case-sensitive volume keeps names apart that Wine reads as one.
 if ! attach_image "Case-sensitive APFS" folds; then
   no_image "case-sensitive APFS" "the case-sensitive fold"

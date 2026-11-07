@@ -1932,24 +1932,37 @@ fold_landing() {
 
 # Renames $1 to the free name $2. mv puts it inside a folder that appeared at $2 since the
 # check, so the inode says where it went, and a move that nested goes back. Each move is
-# noted first, so the next launch puts back one that a killed launch left nested.
+# noted first, relative to users so a moved library still matches, and the next launch puts
+# back one that a killed launch left nested. No move starts while one is unresolved.
 fold_move() {
+  [ ! -e "$users/.notproton-fold-moving" ] && [ ! -L "$users/.notproton-fold-moving" ] || return 1
   moving=$(stat -f %i "$1" 2>/dev/null) || return 1
-  printf '%s\n%s\n%s\n' "$moving" "$1" "$2" > "$users/.notproton-fold-moving" || return 1
+  printf '%s\n%s\n%s\n' "$moving" "${1#"$users"/}" "${2#"$users"/}" \
+    > "$users/.notproton-fold-moving" || return 1
   mv -n "$1" "$2" 2>> "$log" || return 1
   fold_unnest
 }
 
 # Puts back the move noted by fold_move if it went inside a folder at its target's name.
+# Returns 0 only for a move that landed, and keeps the note while one stays nested.
 fold_unnest() {
   fold_record="$users/.notproton-fold-moving"
   [ -e "$fold_record" ] || [ -L "$fold_record" ] || return 0
-  [ -f "$fold_record" ] && [ ! -L "$fold_record" ] || return 1
-  if ! { read -r fold_moved && read -r fold_source && read -r fold_target; } < "$fold_record"; then
-    rm -f "$fold_record"
-    return 0
+  fold_moved="" fold_source="" fold_target=""
+  if [ -f "$fold_record" ] && [ ! -L "$fold_record" ]; then
+    { read -r fold_moved && read -r fold_source && read -r fold_target; } < "$fold_record" || true
   fi
-  case "$fold_source:$fold_target" in "$users"/*:"$users"/*) ;; *) return 1 ;; esac
+  case "/$fold_source/:/$fold_target/" in
+    *//*|*/../*|*/./*) fold_moved="" ;;
+  esac
+  case "$fold_moved" in ''|*[!0-9]*)
+    # Only a note, never a file a game wrote: dropping it leaves every save where it is.
+    echo "=== dropped an unreadable note of a move into steamuser ===" >> "$log" 2>&1 || true
+    rm -f "$fold_record" 2>/dev/null || true
+    return 1 ;;
+  esac
+  fold_source="$users/$fold_source"
+  fold_target="$users/$fold_target"
   if [ "$(stat -f %i "$fold_target" 2>/dev/null)" = "$fold_moved" ] \
     && [ ! -e "$fold_source" ] && [ ! -L "$fold_source" ]; then
     rm -f "$fold_record"
