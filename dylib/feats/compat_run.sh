@@ -2083,7 +2083,15 @@ fold_wine_profile() {
         >> "$log" 2>&1 || true
       return 1
     fi
+    fold_homes=""
     if present "$own"; then
+      # What a game saved through these is in the Mac's home folders, and stays there.
+      fold_homes=$(find "$own" -type l 2>/dev/null) || fold_homes=""
+      printf '%s\n' "$fold_homes" | while IFS= read -r home_link; do
+        [ -n "$home_link" ] || continue
+        echo "=== ${home_link#"$users"/} led to $(readlink "$home_link"), whose files stay there ===" \
+          >> "$log" 2>&1 || true
+      done
       # Kept as a pointer to the Mac's home folders the links lead to.
       aside="$own BACKUP"
       aside_number=2
@@ -2094,8 +2102,12 @@ fold_wine_profile() {
       mv -n "$own" "$aside" 2>> "$log" || return 1
     fi
     echo "=== moved users/$wine_user into steamuser, where Steam Cloud syncs ===" >> "$log" 2>&1 || true
+    fold_note=""
     [ -z "$fold_parked" ] \
-      || notify_user "Saved games moved to where Steam Cloud syncs" "Files that differed from Steam Cloud's copy were kept beside it with BACKUP in the name."
+      || fold_note="Files that differed from Steam Cloud's copy were kept beside it with BACKUP in the name."
+    [ -z "$fold_homes" ] \
+      || fold_note="${fold_note:+$fold_note }Files the game kept in your Mac's Documents and other home folders stay there."
+    [ -z "$fold_note" ] || notify_user "Saved games moved to where Steam Cloud syncs" "$fold_note"
   fi
   ln -s steamuser "$own" 2>/dev/null \
     || echo "=== could not point users/$wine_user at steamuser ===" >> "$log" 2>&1 || true

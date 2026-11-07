@@ -799,6 +799,18 @@ check lay_out_proton_profile
 check test "$(find "$users" -name '*BACKUP*' | wc -l | tr -d ' ')" = 2
 check test "$(wc -l < "$case_root/notified" | tr -d ' ')" = 1
 
+# Wine linked the profile's Documents to the Mac's. What a game saved there stays there,
+# and the player is told so even when nothing else needed keeping.
+split_fixture
+mkdir -p "$case_root/home/Documents/Game"
+printf mine > "$case_root/home/Documents/Game/slot.sav"
+rm "$mine/settings.json"
+check lay_out_proton_profile
+check test "$(cat "$case_root/home/Documents/Game/slot.sav")" = mine
+check test "$(readlink "$users/tester BACKUP/Documents")" = "$case_root/home/Documents"
+check grep -qF "tester/Documents led to $case_root/home/Documents, whose files stay there" "$log"
+check test "$(wc -l < "$case_root/notified" | tr -d ' ')" = 1
+
 # A file that cannot move stops the launch with everything still on one side or the other.
 split_fixture
 chmod 500 "$mine"
