@@ -32,8 +32,9 @@ struct CrossOverRow: Identifiable, Equatable {
     // copies made from them.
     var isFreeEngine: Bool {
         if let install {
+            if case .supported(let build) = install.support { return build.isFree }
             let folder = install.bundle.standardizedFileURL.deletingLastPathComponent()
-            return install.isFree || folder.pathComponents == SupportPaths.engines.standardizedFileURL.pathComponents
+            return folder.pathComponents == SupportPaths.engines.standardizedFileURL.pathComponents
         }
         if let build = SupportedRunners.build(id: buildID) { return build.isFree }
         return buildID.hasPrefix("winehq-") || buildID.hasPrefix("winecx-")

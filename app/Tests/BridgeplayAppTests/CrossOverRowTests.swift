@@ -147,6 +147,10 @@ struct CrossOverRowTests {
         let made = rows([engine, release, odd, old], orphaned: ["winehq-10.0", "25.0.0.1"])
         #expect(made.map(\.isFreeEngine) == [true, false, true, false, true, false])
 
+        // A CrossOver build stays CrossOver wherever its app is.
+        let moved = install("CrossOver", Self.release, root: SupportPaths.engines.path(percentEncoded: false))
+        #expect(rows([moved]).map(\.isFreeEngine) == [false])
+
         let copies = rows([], installed: [winecx, Self.release])
         #expect(copies.map(\.isFreeEngine) == [true, false])
     }
