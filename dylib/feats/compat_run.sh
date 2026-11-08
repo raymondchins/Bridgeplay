@@ -1998,6 +1998,13 @@ fold_unnest() {
   return 1
 }
 
+fold_inside_profile() {
+  fold_resolved=$(cd -P -- "$1" 2>/dev/null && pwd) || return 1
+  fold_profile=$(cd -P -- "$profile" 2>/dev/null && pwd) || return 1
+  case "$fold_resolved/" in "$fold_profile"/?*) return 0 ;; esac
+  return 1
+}
+
 # Moves what is in $1 into $2. Renames only, so a launch killed partway leaves every file
 # whole on one side or the other. A file that differs from the one already in $2 is kept
 # beside it as "<name> BACKUP" and printed. Fails if anything could not move.
@@ -2017,7 +2024,9 @@ fold_user_dir() (
     fi
     # Wine's links out to the Mac's home folders: what is behind them stays there.
     [ ! -L "$entry" ] || continue
-    if [ -d "$entry" ] && [ -d "$landing" ] && [ ! -L "$landing" ]; then
+    # A link inside steamuser (My Documents to Documents) is merged through, as
+    # migrate_user_paths does; one that leads out of the profile is not.
+    if [ -d "$entry" ] && [ -d "$landing" ] && { [ ! -L "$landing" ] || fold_inside_profile "$landing"; }; then
       if fold_user_dir "$entry" "$landing"; then
         rmdir "$entry" 2>/dev/null || true
       else

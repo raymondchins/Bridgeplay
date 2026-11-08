@@ -811,6 +811,24 @@ check test "$(readlink "$users/tester BACKUP/Documents")" = "$case_root/home/Doc
 check grep -qF "tester/Documents led to $case_root/home/Documents, whose files stay there" "$log"
 check test "$(wc -l < "$case_root/notified" | tr -d ' ')" = 1
 
+# Old folder names are merged through steamuser's links to their new ones, but a link that
+# leads out of the profile is never followed.
+split_fixture
+mkdir -p "$users/tester/My Documents/Game" "$users/tester/Application Data/Roam" \
+  "$users/tester/Local Settings/Application Data/Loc" "$users/tester/Away" "$case_root/outside"
+printf docs > "$users/tester/My Documents/Game/slot.sav"
+printf roam > "$users/tester/Application Data/Roam/slot.sav"
+printf loc > "$users/tester/Local Settings/Application Data/Loc/slot.sav"
+printf away > "$users/tester/Away/slot.sav"
+ln -s "$case_root/outside" "$users/steamuser/Away"
+check lay_out_proton_profile
+check test "$(cat "$users/steamuser/Documents/Game/slot.sav")" = docs
+check test "$(cat "$users/steamuser/AppData/Roaming/Roam/slot.sav")" = roam
+check test "$(cat "$users/steamuser/AppData/Local/Loc/slot.sav")" = loc
+check test ! -e "$users/steamuser/My Documents BACKUP"
+check test "$(cat "$users/steamuser/Away BACKUP/slot.sav")" = away
+check test -z "$(ls "$case_root/outside")"
+
 # Names that end in a space or a tab move, and their note is cleared.
 split_fixture
 printf space > "$mine/trailing "
