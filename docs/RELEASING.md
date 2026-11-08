@@ -83,6 +83,33 @@ crash hotfix from upstream, it still bumps the patch.
 `release-local.sh` does not publish betas: a stamped build no longer matches `dylib/version.h`, so
 its version check stops it. `make versioncheck` covers the stamp, the bump and the sync.
 
+### Stable releases and betas
+
+`release-local.sh` reads every published `vX.Y.Z-beta.N` release: the build, commit and source
+branch from its ledger, the commit also from its tag, which must agree. It stops if any of them
+can't be read. The stable lists the betas whose commit HEAD contains in its feed item as
+`<bridgeplay:containsBetas>` (namespace `https://bridgeplay.dev/ns/appcast/1`): ascending builds
+with runs folded into ranges, `82-83,86`, empty for none. A beta app takes a stable only if its own
+build is in that list.
+
+A stable that contains a beta the previous stable did not is a promotion of the newest such beta,
+which must have been built from a `release/*` branch, and HEAD must have exactly that beta's tree.
+Only the version header (`BRIDGEPLAY_VERSION` and `BRIDGEPLAY_BUILD` in `dylib/version.h`) and
+`compat/**`, where the weekly compat bot commits, may differ. The changed `compat/**` paths are
+printed and listed in the release body under "Data changed since the beta". Anything else stops
+the release with the paths that differ: merge `main` into the release branch, publish a new
+release-candidate beta from it, merge the release branch into `main` with a merge commit and
+release again. A stable that contains no new beta is a hotfix or a plain stable and is not gated
+(`promoted-from: none`), unless its tree, outside the version header and `compat/**`, equals a
+published beta it does not contain: the release branch was squashed or rebased into `main`, and
+the release stops.
+
+The stable feed (I-6) must have exactly one item, no `sparkle:channel`, a plain `X.Y.Z` short
+version, this build, its enclosure on this tag with an EdDSA signature, `minimumSystemVersion`
+26.0, one `containsBetas`, and a valid feed signature. The legacy NotProton feed (`--legacy-feed`)
+stays as it was: unsigned, with no `containsBetas`. `make stablecheck` covers all of this with a
+local repository, a stub `gh`, a throwaway key and Sparkle's own tools.
+
 ### Build numbers
 
 Every build number is used once and is above all earlier ones, a stable bumped on `main` but not
@@ -97,7 +124,8 @@ It finds the remote by URL, fetches what it needs, and fails without a number if
 can't be read. `scripts/build-ledger.sh claim N [COMMIT]` claims build N by pushing the lightweight
 tag `build/N` at the commit, before anything is built or signed. It exits 0 when it claimed the
 build or the tag is already at that commit (a resume), 2 when another commit holds it, and 3 when
-the remote can't be reached; `--dry-run` pushes nothing. Claim tags are never moved or deleted, and
+the remote can't be reached; `--dry-run` pushes nothing. `release-local.sh` claims its build this
+way before building. Claim tags are never moved or deleted, and
 gaps in the numbers are fine. The release ledger's v1 format is frozen in `scripts/ledger-lib.sh`,
 which also reads it. `make ledgercheck` covers all of this against a local repository and a stub `gh`.
 
@@ -123,19 +151,29 @@ which also reads it. `make ledgercheck` covers all of this against a local repos
 2. Push to `main` of `raymondchins/Bridgeplay` (the script refuses anything else).
 3. Optionally rehearse: `scripts/release-local.sh --dry-run` takes an app already built
    (`build/Bridgeplay.app`, else `out/Bridgeplay.app`) and writes the zip, appcast, an unsigned
-   DMG and an ad hoc native installer to `out/release/`, without publishing or reading the
-   keychain. Like the release, it computes the installer fingerprint, which needs this Mac's
+   DMG and an ad hoc native installer to `out/release/`, without publishing, claiming or reading
+   the keychain. It signs with `SPARKLE_KEY_FILE` (`generate_keys -x`), or else with a throwaway
+   key that signs the feed but not the zip, so its I-6 check reports the missing enclosure
+   signature. Like the release, it computes the installer fingerprint, which needs this Mac's
    engine cache and GPTK, and packages the installer zip only when the fingerprint changed.
 4. Release: `scripts/release-local.sh` (notes default to the commit subjects since the
-   previous `vX.Y.Z` release; pass a string to override). It builds with
+   previous `vX.Y.Z` release; pass a string to override). It checks the betas HEAD contains
+   (see Stable releases and betas), claims `build/<build>` for HEAD, and stops if another commit
+   holds it: bump again, which reads the current H. It then builds with
    `scripts/build-local.sh --checks`, signs the app with the Developer ID and notarizes it (see
-   Signing), signs the zip with the EdDSA key in the login keychain, writes the appcast
-   (`minimumSystemVersion` 26.0), builds the notarized DMG and native installer, and publishes
-   all four on `vX.Y.Z` as Latest. It then uploads a new `Bridgeplay-Installer.zip` to the
-   `installer` release if its fingerprint changed. That fingerprint checks this Mac's engine
-   cache and GPTK even when the installer is unchanged, so set both up before releasing: if
-   the check fails after the app release is published, the installer is not updated, and a
-   rerun refuses the existing release.
+   Signing), and checks that the app's `LSMinimumSystemVersion` is 26.0, the
+   `minimumSystemVersion` the appcast must carry. It signs the zip with the EdDSA key in the login
+   keychain, writes the appcast, adds `containsBetas` to it, signs the appcast itself and checks
+   it (I-6), builds the notarized DMG and native installer, and uploads all four to `vX.Y.Z`.
+   The release is created without Latest; once the uploaded digests match the local files it is
+   marked Latest, the one step that offers it to installed apps. If a run stops between the two,
+   run it again: it checks the release against its ledger and the signatures, marks it Latest and
+   uploads nothing. A release whose uploads don't match is deleted (it was never Latest), so the
+   next run starts clean. The release body ends with the ledger (see Build numbers).
+   It then uploads a new `Bridgeplay-Installer.zip` to the `installer` release if its fingerprint
+   changed. That fingerprint checks this Mac's engine cache and GPTK even when the installer is
+   unchanged, so set both up before releasing: if the check fails after the release is marked
+   Latest, the installer is not updated, and a rerun refuses the existing release.
 
 Any other release in the repository (a DXMT build, say) must be created with
 `--latest=false`, or the feed URL stops serving `appcast.xml` until the next app release.
