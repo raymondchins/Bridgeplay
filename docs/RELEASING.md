@@ -55,7 +55,7 @@ BRIDGEPLAY_BETA=2 BRIDGEPLAY_BETA_BUILD=47 BRIDGEPLAY_BETA_PLANNED=0.8.0 make ap
 | Variable | Meaning |
 |---|---|
 | `BRIDGEPLAY_BETA` | The beta number N, a positive integer. Setting it at all asks for a beta; anything but a positive integer fails the build, and so does setting the two below without it |
-| `BRIDGEPLAY_BETA_BUILD` | The build number: the highest build ever published, stable or beta, plus one. Required, and above the committed build, so the beta orders above the stable it branched from |
+| `BRIDGEPLAY_BETA_BUILD` | The build number: H plus one (see Build numbers below), claimed before the build. Required, and above the committed build, so the beta orders above the stable it branched from |
 | `BRIDGEPLAY_BETA_PLANNED` | The release the beta is named after. Defaults to the next patch of the committed version; name a milestone minor (`0.8.0`) to override it. Must be above the committed version |
 
 A beta built from committed `0.7.2` therefore reads `0.7.3-beta.1` by default (`CFBundleShortVersionString`,
@@ -66,14 +66,15 @@ Installs and updates are ordered by the build alone, never by the label (`AppVer
 which is why every published build, prerelease or not, must take a higher number than all before it.
 
 The stable that ships the beta is bumped as the version policy says, usually a patch, to the number
-the beta was named after, and takes the highest published build into account so it outranks every beta:
+the beta was named after, and takes H, the highest build, into account so it outranks every beta:
 
 ```sh
-scripts/bump-version.sh patch --named 0.7.3 --highest-build 47    # minor --named 0.8.0 for a milestone
+scripts/bump-version.sh patch --named 0.7.3    # minor --named 0.8.0 for a milestone
 ```
 
-`--named` fails the bump when it would land anywhere else, and `BRIDGEPLAY_HIGHEST_BUILD` can stand in
-for `--highest-build`. Without it the bump only knows the committed build, so give it the real maximum.
+`--named` fails the bump when it would land anywhere else. Without `--highest-build` (or
+`BRIDGEPLAY_HIGHEST_BUILD`) the bump reads H online, and stops if it can't; pass `--highest-build N`
+to bump offline.
 
 Betas are built from `develop` or `release/*`, and upstream merges go to `develop`: `scripts/sync-upstream.sh` merges and
 commits no version bump on it (`BRIDGEPLAY_BETA_BRANCH` names the branch, default `develop`). On `main`, the exception for a security or
@@ -81,6 +82,24 @@ crash hotfix from upstream, it still bumps the patch.
 
 `release-local.sh` does not publish betas: a stamped build no longer matches `dylib/version.h`, so
 its version check stops it. `make versioncheck` covers the stamp, the bump and the sync.
+
+### Build numbers
+
+Every build number is used once and is above all earlier ones, a stable bumped on `main` but not
+yet released included. `scripts/build-ledger.sh highest` prints H, the highest of:
+
+- the build every app release (`v*`) records: its ledger block, its `Build N, based on NotProton X.`
+  line, or its `appcast.xml` (the higher wins, with a warning, when they disagree);
+- every `build/<n>` claim tag;
+- the committed build on `main`, `develop` and every `release/*`.
+
+It finds the remote by URL, fetches what it needs, and fails without a number if any of these
+can't be read. `scripts/build-ledger.sh claim N [COMMIT]` claims build N by pushing the lightweight
+tag `build/N` at the commit, before anything is built or signed. It exits 0 when it claimed the
+build or the tag is already at that commit (a resume), 2 when another commit holds it, and 3 when
+the remote can't be reached; `--dry-run` pushes nothing. Claim tags are never moved or deleted, and
+gaps in the numbers are fine. The release ledger's v1 format is frozen in `scripts/ledger-lib.sh`,
+which also reads it. `make ledgercheck` covers all of this against a local repository and a stub `gh`.
 
 ## Steps
 
@@ -98,8 +117,9 @@ its version check stops it. `make versioncheck` covers the stamp, the bump and t
    `set X.Y.Z` takes any version above the committed one, such as `0.7.31` after `0.7.3` for a
    small follow-up. The numbers compare as integers, so `0.7.31` sorts above `0.7.4`: after it,
    go on with `0.7.32` (or `patch`) or a minor. Updates still order by the build, which goes up
-   by one. `scripts/sync-upstream.sh` already bumps the patch after an upstream merge on `main`;
-   on `develop` it commits no bump (see Betas).
+   by one. The bump reads H online; offline, pass `--highest-build N`. `scripts/sync-upstream.sh`
+   already bumps the patch after an upstream merge on `main`, and reads H before merging (or takes
+   `BRIDGEPLAY_HIGHEST_BUILD`); on `develop` it commits no bump (see Betas).
 2. Push to `main` of `raymondchins/Bridgeplay` (the script refuses anything else).
 3. Optionally rehearse: `scripts/release-local.sh --dry-run` takes an app already built
    (`build/Bridgeplay.app`, else `out/Bridgeplay.app`) and writes the zip, appcast, an unsigned

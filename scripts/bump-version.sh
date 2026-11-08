@@ -7,8 +7,9 @@
 # docs/RELEASING.md. set picks any X.Y.Z above the committed one (0.7.3 -> 0.7.31). BRIDGEPLAY_BUILD goes up by one every time, since Sparkle orders updates by it.
 # --upstream records the NotProton release this build is based on (NOTPROTON_VERSION);
 # a clean upstream merge already brings upstream's value, so it is rarely needed.
-# --highest-build N (or BRIDGEPLAY_HIGHEST_BUILD) is the highest build ever published, stable or
-# beta. The new build is one above the larger of N and the committed build, so the stable that
+# --highest-build N (or BRIDGEPLAY_HIGHEST_BUILD) is H, the highest build ever published, claimed
+# or committed. Without it the bump reads H online (scripts/build-ledger.sh highest) and stops if
+# it can't. The new build is one above the larger of H and the committed build, so the stable that
 # ships a beta outranks every beta. --named X.Y.Z is the release that beta was named after: the
 # bump fails unless it lands exactly there.
 # The committed version is always a plain X.Y.Z; a beta label is stamped at build time
@@ -89,6 +90,12 @@ else
 fi
 [ -z "$named" ] || [ "$named" = "$next" ] \
 	|| die "a $part bump of $version gives $next, not $named, the release the beta was named after; pick the matching part"
+if [ -z "$highest" ]; then
+	highest=$(sh "$repo/scripts/build-ledger.sh" highest -q) \
+		|| die "can't read the highest build online; pass --highest-build N, the highest build published, claimed or committed"
+	is_posint "$highest" || die "scripts/build-ledger.sh gave '$highest', not a build number"
+	echo "==> highest build online: $highest"
+fi
 base_build=$build
 if [ -n "$highest" ] && [ "$highest" -gt "$base_build" ]; then
 	base_build=$highest

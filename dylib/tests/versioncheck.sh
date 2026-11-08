@@ -67,7 +67,7 @@ EOF
 # fixture DIR VERSION BUILD: the version scripts around a header of our own.
 fixture() {
 	mkdir -p "$1/scripts" "$1/dylib" "$1/app"
-	for s in version-lib stamp-beta bump-version sync-upstream; do
+	for s in version-lib stamp-beta bump-version sync-upstream ledger-lib build-ledger; do
 		tr -d '\r' <"$repo/scripts/$s.sh" >"$1/scripts/$s.sh"
 		chmod +x "$1/scripts/$s.sh"
 	done
@@ -229,10 +229,11 @@ done
 # --- bump-version.sh --------------------------------------------------------------
 
 bumpfx=$work/bump
+# The highest build is given here; scripts/tests/ledgercheck.sh covers reading it online.
 bump() { # bump PART [ARGS]: from 0.7.2 build 44
 	rm -rf "$bumpfx"
 	fixture "$bumpfx" 0.7.2 44
-	env "${bump_env:-x=1}" sh "$bumpfx/scripts/bump-version.sh" "$@"
+	env "${bump_env:-BRIDGEPLAY_HIGHEST_BUILD=44}" sh "$bumpfx/scripts/bump-version.sh" "$@"
 }
 bumped() { # bumped VERSION BUILD: what the header says now
 	expect_eq "bumped version" "$1" "$(define "$bumpfx/dylib/version.h" BRIDGEPLAY_VERSION)"
@@ -257,7 +258,7 @@ bumped 0.7.3 45
 bump_env=BRIDGEPLAY_HIGHEST_BUILD=60
 expect_ok "highest build from the environment" bump patch
 bumped 0.7.3 61
-bump_env=x=1
+bump_env=""
 for b in 0 abc -3 4.5 ""; do
 	expect_refused "highest build '$b'" bump patch --highest-build "$b"
 done
@@ -289,6 +290,16 @@ done
 expect_refused "set named elsewhere" bump set 0.7.31 --named 0.7.3
 expect_refused "no part" bump
 expect_refused "unknown part" bump beta
+
+# Without --highest-build the bump reads it online; a fixture with no Bridgeplay remote can't.
+bump_env=x=1
+expect_refused "no highest build offline" bump patch
+case $out in
+	*"--highest-build N"*) pass ;;
+	*) fail "the offline bump does not ask for --highest-build: $out" ;;
+esac
+expect_same "an offline bump leaves version.h alone" "$work/version.h.orig" "$bumpfx/dylib/version.h"
+bump_env=""
 
 # A beta, then the stable it was named after: the beta is above the stable it branched from,
 # and the next stable is above the beta.
@@ -342,11 +353,20 @@ sync_fixture onmain
 echo more >"$up/file.txt"
 git_in "$up" commit -q -am "upstream change"
 git_in "$wk" checkout -q -B main
-expect_ok "sync on main" sync_upstream x=1
+expect_ok "sync on main" sync_upstream BRIDGEPLAY_HIGHEST_BUILD=44
 expect_eq "main version" 0.7.3 "$(version_in BRIDGEPLAY_VERSION)"
 expect_eq "main build" 45 "$(version_in BRIDGEPLAY_BUILD)"
 expect_eq "main commits the bump" "chore(release): bump Bridgeplay to 0.7.3 after upstream merge" \
 	"$(git_in "$wk" log -1 --format=%s)"
+
+# On main without the highest build, and no way to read it, the sync stops before merging.
+sync_fixture offline
+echo more >"$up/file.txt"
+git_in "$up" commit -q -am "upstream change"
+git_in "$wk" checkout -q -B main
+offline_head=$(git_in "$wk" rev-parse HEAD)
+expect_refused "sync on main offline" sync_upstream x=1
+expect_eq "an offline sync merges nothing" "$offline_head" "$(git_in "$wk" rev-parse HEAD)"
 
 # On develop it merges and commits no version change.
 sync_fixture ondevelop
@@ -374,13 +394,13 @@ sync_fixture other
 echo more >"$up/file.txt"
 git_in "$up" commit -q -am "upstream change"
 git_in "$wk" checkout -q -B feature
-expect_ok "sync on another branch" sync_upstream x=1
+expect_ok "sync on another branch" sync_upstream BRIDGEPLAY_HIGHEST_BUILD=44
 expect_eq "other branch version" 0.7.3 "$(version_in BRIDGEPLAY_VERSION)"
 sync_fixture olddev
 echo more >"$up/file.txt"
 git_in "$up" commit -q -am "upstream change"
 git_in "$wk" checkout -q -B dev
-expect_ok "sync on dev, no longer special" sync_upstream x=1
+expect_ok "sync on dev, no longer special" sync_upstream BRIDGEPLAY_HIGHEST_BUILD=44
 expect_eq "dev version bumps like any branch" 0.7.3 "$(version_in BRIDGEPLAY_VERSION)"
 
 # A version.h conflict is still resolved: Bridgeplay's lines stay, NotProton takes upstream's.
@@ -395,7 +415,7 @@ for branch in main develop; do
 	cat "$wk/version.h.new" >"$wk/dylib/version.h"
 	rm "$wk/version.h.new"
 	git_in "$wk" commit -q -am "local change"
-	expect_ok "conflicting sync on $branch" sync_upstream x=1
+	expect_ok "conflicting sync on $branch" sync_upstream BRIDGEPLAY_HIGHEST_BUILD=44
 	expect_eq "$branch upstream version" 1.3.0 "$(version_in NOTPROTON_VERSION)"
 done
 expect_eq "conflict on main bumps the patch" 0.7.3 "$(define "$work/conflict-main/dylib/version.h" BRIDGEPLAY_VERSION)"
