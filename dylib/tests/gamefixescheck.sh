@@ -8,7 +8,7 @@ functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
 	load_gamefixes resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available dxmt_without_d3d12 \
 	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
-	activate_backend record_backend rockstar_shim_copy rockstar_shim_lock_fd rockstar_shim_in_use rockstar_shim_folders stage_rockstar_shim compose_dll_overrides; do
+	activate_backend record_backend rockstar_shim_copy rockstar_put_back rockstar_dxgi_copy rockstar_note rockstar_shim_lock_fd rockstar_shim_in_use rockstar_shim_folders stage_rockstar_shim compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -1046,6 +1046,309 @@ rockstar_case
 user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
 rockstar_launch run "$case_dir/game/game.exe"
 is "helpers (verb run) stage nothing" "no" "$([ -e "$social/version.dll" ] && echo yes || echo no)"
+
+# Unreal's exe is in Gameface/Binaries/Win64 (GTA San Andreas DE's SanAndreas.exe).
+rockstar_case
+mkdir -p "$case_dir/game/Gameface/Binaries/Win64"
+win64="$case_dir/game/Gameface/Binaries/Win64"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+# The shim does nothing in SanAndreas.exe, so that folder gets no version.dll.
+is "no version.dll is staged next to an Unreal game's exe" "no" "$([ -e "$win64/version.dll" ] && echo yes || echo no)"
+is "an Unreal game's exe gets no dxgx.dll beside it" "no" "$([ -e "$win64/dxgx.dll" ] && echo yes || echo no)"
+# It imports dxgi.dll statically, so DXVK's dxgi is its dxgi.dll, native first.
+is "DXVK's dxgi is staged as dxgi.dll next to an Unreal game's exe" "yes" \
+	"$(cmp -s "$shim_src/dxgx.dll" "$win64/dxgi.dll" && echo yes || echo no)"
+case "$(got WINEDLLOVERRIDES)" in *';dxgi=n,b'*) v=yes ;; *) v=no ;; esac
+is "dxgi=n,b follows the backend's overrides" "yes" "$v"
+is "the game folder's root gets no dxgi.dll" "no" "$([ -e "$case_dir/game/dxgi.dll" ] && echo yes || echo no)"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "without the key the copy leaves the Unreal folder" "no" "$([ -e "$win64/version.dll" ] && echo yes || echo no)"
+is "and so does DXVK's dxgi.dll" "no" "$([ -e "$win64/dxgi.dll" ] && echo yes || echo no)"
+case "$(got WINEDLLOVERRIDES)" in *dxgi=n*) v=yes ;; *) v=no ;; esac
+is "and dxgi=n,b is not added" "no" "$v"
+
+# Off dxvk there is no DXVK dxgi to stage.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+user_conf 'BACKEND=dxmt' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "off dxvk the Unreal folder gets no dxgi.dll" "no" "$([ -e "$win64/dxgi.dll" ] && echo yes || echo no)"
+is "and says nothing about one" "0" "$(grep -c "DXVK's dxgi staged" "$case_dir/log" || true)"
+
+# Switching away from dxvk with the key still on takes DXVK's dxgi.dll out again, though this
+# launch holds its own in-use mark, and puts the user's own one back.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'user dxgi' > "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+user_conf 'BACKEND=dxmt' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "off dxvk with the key on the user's dxgi.dll is back" "user dxgi|no" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+is "and the staged note goes with it" "no" "$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+
+# A dxgi.dll of the user's own is backed up, then put back; a stale one left over after a
+# backup was made is left alone and not loaded first.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'user dxgi' > "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "the Unreal folder's own dxgi.dll is backed up and DXVK's staged" "yes|user dxgi" \
+	"$(cmp -s "$shim_src/dxgx.dll" "$win64/dxgi.dll" && echo yes || echo no)|$(cat "$win64/dxgi.dll.bridgeplay-orig" 2>/dev/null)"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "a second launch keeps both" "yes|user dxgi" \
+	"$(cmp -s "$shim_src/dxgx.dll" "$win64/dxgi.dll" && echo yes || echo no)|$(cat "$win64/dxgi.dll.bridgeplay-orig" 2>/dev/null)"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "without the key the Unreal folder's own dxgi.dll is put back" "user dxgi|no" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'user dxgi' > "$win64/dxgi.dll"
+printf 'older user dxgi' > "$win64/dxgi.dll.bridgeplay-orig"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "with its own dxgi.dll and a backup both are left alone" "user dxgi|older user dxgi" \
+	"$(cat "$win64/dxgi.dll")|$(cat "$win64/dxgi.dll.bridgeplay-orig")"
+case "$(got WINEDLLOVERRIDES)" in *dxgi=n*) v=yes ;; *) v=no ;; esac
+is "and the user's dxgi.dll is not loaded first" "no" "$v"
+
+# A mod loader's version.dll in the Unreal folder stays in place and keeps loading.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'a mod loader' > "$win64/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "the Unreal folder's own version.dll is left in place" "a mod loader|no" \
+	"$(cat "$win64/version.dll" 2>/dev/null)|$([ -e "$win64/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+# A shim an earlier build staged there comes out, and the mod loader it set aside goes back.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'a mod loader' > "$win64/version.dll.bridgeplay-orig"
+cp "$shim_src/version.dll" "$win64/version.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "an earlier build's shim in the Unreal folder gives way to the mod loader" "a mod loader|no" \
+	"$(cat "$win64/version.dll" 2>/dev/null)|$([ -e "$win64/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
+# DXVK's dxgi.dll is known as staged by its noted sha256: on an engine without the shim it
+# comes out and the user's own goes back.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'user dxgi' > "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "the staged dxgi.dll's sha256 is noted" "$(/usr/bin/shasum -a 256 "$shim_src/dxgx.dll" | cut -d ' ' -f 1)" \
+	"$(cat "$win64/dxgi.dll.bridgeplay-staged" 2>/dev/null)"
+rm -rf "$case_dir/engine/lib/notproton-backends/rockstar-shim"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "on an engine without the shim DXVK's dxgi.dll comes out and the user's is back" "user dxgi|no|no" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+# After an engine update changes dxgx.dll, the old copy is still ours: replaced, not set aside.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+printf 'newer dxvk dxgi' > "$shim_src/dxgx.dll"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "an engine update's dxgx.dll replaces the old staged copy" "newer dxvk dxgi|no" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "and without the key nothing of ours is left" "no|no|no" \
+	"$([ -e "$win64/dxgi.dll" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+# The same DXVK release copied there by hand has no note, so it is the player's: set aside
+# while the key is on and put back after.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+cp "$shim_src/dxgx.dll" "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "a hand-copied DXVK dxgi.dll is set aside, not taken as ours" "yes" \
+	"$(cmp -s "$shim_src/dxgx.dll" "$win64/dxgi.dll.bridgeplay-orig" && echo yes || echo no)"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "and without the key it is back, not deleted" "yes|no" \
+	"$(cmp -s "$shim_src/dxgx.dll" "$win64/dxgi.dll" && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+# A link another user put at the note's name is replaced, never written through, and a note
+# this user cannot write is still updated.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'keep me' > "$case_dir/victim"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+rm "$win64/dxgi.dll.bridgeplay-staged"
+ln -s "$case_dir/victim" "$win64/dxgi.dll.bridgeplay-staged"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "a linked note's target is untouched" "keep me" "$(cat "$case_dir/victim")"
+is "and the note is a file of its own" "file" "$([ -f "$win64/dxgi.dll.bridgeplay-staged" ] && [ ! -L "$win64/dxgi.dll.bridgeplay-staged" ] && echo file || echo other)"
+chmod 444 "$win64/dxgi.dll.bridgeplay-staged"
+printf 'newer dxvk dxgi' > "$shim_src/dxgx.dll"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "a read-only note is updated with the new copy" "$(/usr/bin/shasum -a 256 "$shim_src/dxgx.dll" | cut -d ' ' -f 1)" \
+	"$(cat "$win64/dxgi.dll.bridgeplay-staged")"
+
+# A note that cannot be replaced leaves the staged copy and the backup as they were, both
+# still known, and a copy that cannot be removed keeps its note.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'user dxgi' > "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+printf 'newer dxvk dxgi' > "$shim_src/dxgx.dll"
+chmod +a "everyone deny delete" "$win64/dxgi.dll.bridgeplay-staged"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+chmod -a "everyone deny delete" "$win64/dxgi.dll.bridgeplay-staged"
+is "an unnotable update leaves the staged copy and the backup" "backend rockstar-shim/x86_64-windows/dxgx.dll|user dxgi" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$(cat "$win64/dxgi.dll.bridgeplay-orig" 2>/dev/null)"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+chmod +a "everyone deny delete" "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+chmod -a "everyone deny delete" "$win64/dxgi.dll"
+is "a copy that could not be removed keeps its note" "yes" "$([ -f "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "and comes out on a later launch, the player's back" "user dxgi|no|no" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+
+# A note that cannot be removed never comes to name the player's file: a player's copy of the
+# old DXVK release stays in its backup until the note can go, then comes back and stays.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+cp "$shim_src/dxgx.dll" "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+printf 'newer dxvk dxgi' > "$shim_src/dxgx.dll"
+chmod +a "everyone deny delete" "$win64/dxgi.dll.bridgeplay-staged"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "while the note stays the player's copy stays in its backup" "yes|yes" \
+	"$([ -e "$win64/dxgi.dll" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+chmod -a "everyone deny delete" "$win64/dxgi.dll.bridgeplay-staged"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "then it is back for good, with no note" "old dxvk|no|no" \
+	"$(LC_ALL=C grep -q newer "$win64/dxgi.dll" 2>/dev/null && echo new || echo old) dxvk|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+is "and is still there" "yes" "$([ -f "$win64/dxgi.dll" ] && echo yes || echo no)"
+
+# A folder at the note's name: nothing is staged and the player's dxgi.dll stays in place.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64/dxgi.dll.bridgeplay-staged"
+printf 'user dxgi' > "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "a folder at the note's name stages nothing and leaves the player's dxgi.dll" "user dxgi|no" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+is "and the folder is left empty" "" "$(ls "$win64/dxgi.dll.bridgeplay-staged")"
+
+# A launch killed just before or just after staging DXVK's dxgi leaves nothing unknown: the
+# next launch stages it, and one without the key puts the player's dxgi.dll back.
+real_stage=$(printf '%s\n' "$functions" | sed -n '/^stage_backend_file() {$/,/^}$/p' | sed '1s/^stage_backend_file/real_stage_backend_file/')
+for when in before after; do
+	case "$when" in
+		# The folders run in a subshell: the kill takes it and the launch's shell together.
+		before) hook='case "$2" in */Win64/dxgi.dll) perl -e "kill 9, getppid(), \$ARGV[0]" $$ ;; esac; real_stage_backend_file "$@"' ;;
+		after) hook='real_stage_backend_file "$@"; case "$2" in */Win64/dxgi.dll) perl -e "kill 9, getppid(), \$ARGV[0]" $$ ;; esac' ;;
+	esac
+	for next in key no-key; do
+		rockstar_case
+		win64="$case_dir/game/Gameface/Binaries/Win64"
+		mkdir -p "$win64"
+		printf 'user dxgi' > "$win64/dxgi.dll"
+		user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+		# In a subshell: the killed launch's own "ran to the end" failure is expected.
+		(functions="$functions
+$real_stage
+stage_backend_file() { $hook; }"
+			rockstar_launch waitforexitandrun "$win64/SanAndreas.exe") > /dev/null 2>&1
+		is "a launch killed $when staging dxgi.dll keeps the player's in its backup ($next)" "user dxgi" \
+			"$(cat "$win64/dxgi.dll.bridgeplay-orig" 2>/dev/null)"
+		if [ "$next" = key ]; then
+			rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+			is "then a launch stages DXVK's dxgi.dll and keeps the backup ($when)" "yes|user dxgi" \
+				"$(cmp -s "$shim_src/dxgx.dll" "$win64/dxgi.dll" && echo yes || echo no)|$(cat "$win64/dxgi.dll.bridgeplay-orig" 2>/dev/null)"
+		fi
+		user_conf 'BACKEND=dxvk'
+		rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+		is "and without the key the player's dxgi.dll is back ($when, $next)" "user dxgi|no|no" \
+			"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+	done
+done
+
+# A dxgi.dll the user put over the staged one is theirs.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+printf 'reshade' > "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "a dxgi.dll put over the staged one stays" "reshade|no" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+
+# The Unreal folder is under the game folder's in-use marks: a launch of another macOS user
+# still running leaves its shim and the backup alone.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'a mod loader' > "$win64/version.dll"
+printf 'user dxgi' > "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "DXVK's dxgi.dll is readable by other macOS users" "-rw-r--r--" "$(stat -f %Sp "$win64/dxgi.dll")"
+is "and so is its note" "-rw-r--r--" "$(stat -f %Sp "$win64/dxgi.dll.bridgeplay-staged")"
+/usr/bin/lockf -k "$case_dir/game/.bridgeplay-rockstar-shim.4243.inuse" sleep 3 &
+holder=$!
+sleep 0.5
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+has "a launch without the key says another session uses the Unreal folder" "another launch is using the dxgi.dll in $win64, left alone" "$case_dir/log"
+is "and leaves DXVK's dxgi.dll and the backup" "yes|user dxgi" \
+	"$(cmp -s "$shim_src/dxgx.dll" "$win64/dxgi.dll" && echo yes || echo no)|$(cat "$win64/dxgi.dll.bridgeplay-orig" 2>/dev/null)"
+wait "$holder"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "the mod loader stays throughout" "a mod loader|no" \
+	"$(cat "$win64/version.dll")|$([ -e "$win64/version.dll.bridgeplay-orig" ] && echo yes || echo no)"
+is "once that session ends its own dxgi.dll is back" "user dxgi|no" \
+	"$(cat "$win64/dxgi.dll")|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+
+# The shipped San Andreas conf, as it is, with the game's real exe path.
+sa_conf="$(dirname "$SRC")/../../gamefixes/1547000.conf"
+if [ -f "$sa_conf" ]; then
+	rockstar_case
+	mkdir -p "$case_dir/game/Gameface/Binaries/Win64"
+	cp "$sa_conf" "$case_dir/support/gamefixes-default/4242.conf"
+	rockstar_launch waitforexitandrun "$case_dir/game/Gameface/Binaries/Win64/SanAndreas.exe"
+	is "gamefixes/1547000.conf selects dxvk" "dxvk" "$(got backend)"
+	is "gamefixes/1547000.conf stages no version.dll next to SanAndreas.exe" "no" \
+		"$([ -e "$case_dir/game/Gameface/Binaries/Win64/version.dll" ] && echo yes || echo no)"
+	is "gamefixes/1547000.conf stages the shim next to Social Club" "yes" \
+		"$(cmp -s "$shim_src/version.dll" "$social/version.dll" && echo yes || echo no)"
+	is "gamefixes/1547000.conf stages DXVK's dxgi.dll next to SanAndreas.exe" "yes" \
+		"$(cmp -s "$shim_src/dxgx.dll" "$case_dir/game/Gameface/Binaries/Win64/dxgi.dll" && echo yes || echo no)"
+	case "$(got WINEDLLOVERRIDES)" in *';dxgi=n,b'*) v=yes ;; *) v=no ;; esac
+	is "gamefixes/1547000.conf adds dxgi=n,b" "yes" "$v"
+fi
 
 new_case
 full_engine
