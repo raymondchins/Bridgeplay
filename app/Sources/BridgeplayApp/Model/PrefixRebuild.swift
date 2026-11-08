@@ -87,7 +87,8 @@ extension PrefixTools {
         progress(.settingUp)
         var environment = environment(prefix: prefix, runner: runner, flavor: flavor)
         environment["WINEPREFIX"] = fresh.path(percentEncoded: false)
-        layOutProfile(in: fresh)
+        let wineUser = stockWineProfile(runner: runner, environment: environment)
+        layOutProfile(in: fresh, wineUser: wineUser)
         let server = layout(runner: runner, flavor: flavor).server.path(percentEncoded: false)
         do {
             _ = try Shell.check(
@@ -117,7 +118,7 @@ extension PrefixTools {
         }
 
         progress(.copying)
-        let carry = Carry(from: prefix.pfx, to: fresh)
+        let carry = Carry(from: prefix.pfx, to: fresh, wineUser: wineUser)
         carry.userData()
         carry.strayFolders()
 
@@ -234,7 +235,25 @@ extension PrefixTools {
             && keys.contains(#"[software\\wow6432node\\microsoft\\windows nt\\currentversion\\aedebug]"#)
     }
 
-    private static func layOutProfile(in fresh: URL) {
+    // Stock Wine (the WineHQ engine) names the profile after the Mac user, the way
+    // set_home_dir in Wine's ntdll does, while Steam Cloud syncs steamuser (#2618).
+    // CrossOver's lineage names it crossover. Matches wine_profile_name in compat_run.sh.
+    static func stockWineProfile(runner: URL, environment: [String: String]) -> String? {
+        let folder = runner.deletingLastPathComponent().lastPathComponent
+        guard folder.hasPrefix("crossover-"),
+            FreeEngine.family(ofBuild: String(folder.dropFirst("crossover-".count)))
+                == FreeEngine.families["winehq"]
+        else { return nil }
+        var name = environment["USER"].flatMap { $0.isEmpty ? nil : $0 } ?? NSUserName()
+        if let cut = name.lastIndex(where: { $0 == "/" || $0 == "\\" }) {
+            name = String(name[name.index(after: cut)...])
+        }
+        guard !["", ".", "..", "steamuser", "crossover", "public"].contains(name.lowercased())
+        else { return nil }
+        return name
+    }
+
+    private static func layOutProfile(in fresh: URL, wineUser: String?) {
         let fm = FileManager.default
         let users = fresh.appending(path: "drive_c/users")
         let profile = users.appending(path: "steamuser")
@@ -262,12 +281,19 @@ extension PrefixTools {
         try? fm.createSymbolicLink(
             atPath: users.appending(path: "crossover").path(percentEncoded: false),
             withDestinationPath: "steamuser")
+        // In place before wineboot, so it fills steamuser instead of making its own.
+        if let wineUser {
+            try? fm.createSymbolicLink(
+                atPath: users.appending(path: wineUser).path(percentEncoded: false),
+                withDestinationPath: "steamuser")
+        }
     }
 }
 
 private final class Carry {
     private let old: URL
     private let fresh: URL
+    private let wineUser: String?
     private let fm = FileManager.default
 
     private(set) var lost: [String] = []
@@ -276,16 +302,19 @@ private final class Carry {
 
     private var pendingLinks: [(from: URL, to: URL)] = []
 
-    init(from old: URL, to fresh: URL) {
+    init(from old: URL, to fresh: URL, wineUser: String? = nil) {
         self.old = old
         self.fresh = fresh
+        self.wineUser = wineUser?.lowercased()
     }
 
     func userData() {
         let source = old.appending(path: "drive_c/users")
         let destination = fresh.appending(path: "drive_c/users")
 
-        let profiles = realEntries(in: source).filter(directoryExists)
+        // Stock Wine's profile goes after steamuser's, so Steam Cloud's copy stays the live one.
+        let real = realEntries(in: source).filter(directoryExists)
+        let profiles = real.filter { !isWineUser($0) } + real.filter(isWineUser)
         for profile in profiles {
             merge(profile, into: landing(forProfile: profile, under: destination))
         }
@@ -358,8 +387,12 @@ private final class Carry {
 
     private func landing(forProfile profile: URL, under users: URL) -> URL {
         let name = profile.lastPathComponent
-        let shared = name == "crossover" || name == "steamuser"
+        let shared = name == "crossover" || name == "steamuser" || isWineUser(profile)
         return users.appending(path: shared ? "steamuser" : name)
+    }
+
+    private func isWineUser(_ profile: URL) -> Bool {
+        wineUser != nil && profile.lastPathComponent.lowercased() == wineUser
     }
 
     private func merge(_ source: URL, into landing: URL) {

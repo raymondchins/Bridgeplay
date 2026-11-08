@@ -765,6 +765,83 @@ struct PrefixToolsTests {
         #expect(text("AppData/LocalLow/other/save.txt") == "theirs")
     }
 
+    @Test("Only the WineHQ engine names its profile after the Mac user")
+    func stockWineProfileName() {
+        let runners = URL(filePath: "/runners")
+        let winehq = runners.appending(path: "crossover-winehq-11.15/CrossOver")
+        let winecx = runners.appending(path: "crossover-winecx-11.17/CrossOver")
+        #expect(PrefixTools.stockWineProfile(runner: winehq, environment: ["USER": "anna"]) == "anna")
+        #expect(PrefixTools.stockWineProfile(runner: winehq, environment: ["USER": "a/b\\anna"]) == "anna")
+        #expect(PrefixTools.stockWineProfile(runner: winehq, environment: ["USER": "SteamUser"]) == nil)
+        #expect(PrefixTools.stockWineProfile(runner: winecx, environment: ["USER": "anna"]) == nil)
+    }
+
+    // #2618: stock Wine left the game's saves under the Mac user while Steam Cloud's were in
+    // steamuser. A rebuild on the WineHQ engine folds the two, Steam Cloud's copy staying live.
+    @Test("A WineHQ rebuild folds the Mac user's profile into steamuser")
+    func winehqRebuildFoldsTheProfile() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let runner = try fakeRunner(
+            in: dir.appending(path: "crossover-winehq-11.15"), home: home,
+            extra: #"mkdir -p "$WINEPREFIX/drive_c/users/$USER/AppData/LocalLow""#)
+        let prefix = try usedPrefix(in: dir, home: home)
+        let user = try #require(PrefixTools.stockWineProfile(
+            runner: runner, environment: ProcessInfo.processInfo.environment))
+
+        let users = prefix.pfx.appending(path: "drive_c/users")
+        for (path, text) in [("\(user)/AppData/LocalLow/Game/slot1.sav", "local"),
+                             ("\(user)/AppData/LocalLow/Game/settings.json", "mac"),
+                             ("steamuser/AppData/LocalLow/Game/slot0.sav", "cloud"),
+                             ("steamuser/AppData/LocalLow/Game/settings.json", "steam")] {
+            let file = users.appending(path: path)
+            try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: file)
+        }
+        try fm.createSymbolicLink(at: users.appending(path: "\(user)/Documents"), withDestinationURL: home)
+
+        try PrefixTools.recreate(prefix, runner: runner, keepBackup: false)
+
+        #expect(try fm.destinationOfSymbolicLink(
+            atPath: users.appending(path: user).path(percentEncoded: false)) == "steamuser")
+        let game = users.appending(path: "steamuser/AppData/LocalLow/Game")
+        func text(_ name: String) -> String? {
+            try? String(contentsOf: game.appending(path: name), encoding: .utf8)
+        }
+        // A folder both profiles carried is kept whole beside Steam Cloud's, as for crossover.
+        #expect(text("slot0.sav") == "cloud")
+        #expect(text("settings.json") == "steam")
+        #expect(text("../Game BACKUP/slot1.sav") == "local")
+        #expect(text("../Game BACKUP/settings.json") == "mac")
+        let documents = users.appending(path: "steamuser/Documents")
+        #expect((try? documents.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink != true)
+    }
+
+    @Test("A WineCX rebuild leaves a profile under the Mac user's name as it is")
+    func winecxRebuildKeepsTheUserProfile() throws {
+        let fm = FileManager.default
+        let dir = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        let runner = try fakeRunner(in: dir.appending(path: "crossover-winecx-11.17"), home: home)
+        let prefix = try usedPrefix(in: dir, home: home)
+        let users = prefix.pfx.appending(path: "drive_c/users")
+        let user = ProcessInfo.processInfo.environment["USER"] ?? NSUserName()
+        let save = users.appending(path: "\(user)/AppData/save.sav")
+        try fm.createDirectory(at: save.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("mine".utf8).write(to: save)
+
+        try PrefixTools.recreate(prefix, runner: runner, keepBackup: false)
+
+        #expect((try? users.appending(path: user).resourceValues(forKeys: [.isSymbolicLinkKey]))?
+            .isSymbolicLink == false)
+        #expect(try String(contentsOf: save, encoding: .utf8) == "mine")
+    }
+
     @Test("The run script looks for the server in the folder the app does")
     func runScriptAgreesOnTheServerFolder() throws {
         #expect(try Self.compatSource().contains(#"/tmp/.wine-$(id -u)/server-$(printf '%x-%x'"#))

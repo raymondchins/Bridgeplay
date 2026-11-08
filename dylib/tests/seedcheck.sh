@@ -742,5 +742,344 @@ check test "$cache_status" -eq 0
 check test ! -e "$WINEPREFIX/system.reg"
 check test "$(cat "$template_dir/ready")" = stale
 
+# The WineHQ engine is stock Wine, which names the profile after the Mac user while Steam
+# Cloud syncs steamuser (#2618). That name is folded into steamuser and linked there.
+notify_user() { printf '%s\n' "$1" >> "$case_root/notified"; }
+saved_user=${USER:-}
+USER=tester
+np_build=winehq-11.15
+
+fixture
+check test "$(readlink "$template_dir/pfx/drive_c/users/tester")" = steamuser
+check test "$(prefix_is_bare && echo bare || echo refused)" = bare
+lay_out_proton_profile
+check test "$(readlink "$WINEPREFIX/drive_c/users/tester")" = steamuser
+check test "$(prefix_is_bare && echo bare || echo refused)" = bare
+
+# A prefix an earlier launch split: the game's saves under the Mac user, Steam Cloud's under
+# steamuser, Wine's links out to the home folders, and a copy that differs on each side.
+split_prefix() {
+  users="$WINEPREFIX/drive_c/users"
+  mine="$users/tester/AppData/LocalLow/Perfect_Random/Sulfur"
+  cloud="$users/steamuser/AppData/LocalLow/Perfect_Random/Sulfur"
+  mkdir -p "$mine/deep" "$cloud" "$case_root/home/Documents" "$users/tester/Saved Games/Other"
+  printf local > "$mine/Sulfur_SaveSlot_2.sss"
+  printf mac > "$mine/settings.json"
+  printf same > "$mine/same.txt"
+  printf deep > "$mine/deep/inner.sav"
+  printf other > "$users/tester/Saved Games/Other/slot.sav"
+  printf cloud > "$cloud/Sulfur_SaveSlot_1.sss"
+  printf steam > "$cloud/settings.json"
+  printf same > "$cloud/same.txt"
+  ln -s "$case_root/home/Documents" "$users/tester/Documents"
+}
+# A fresh prefix laid out as before the fix, then split.
+split_fixture() {
+  fixture
+  lay_out_proton_profile
+  rm "$WINEPREFIX/drive_c/users/tester"
+  split_prefix
+}
+split_fixture
+check lay_out_proton_profile
+check test "$(readlink "$users/tester")" = steamuser
+check test "$(cat "$cloud/Sulfur_SaveSlot_1.sss")" = cloud
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss")" = local
+check test "$(cat "$cloud/settings.json")" = steam
+check test "$(cat "$cloud/settings.json BACKUP")" = mac
+check test "$(cat "$cloud/same.txt")" = same
+check test ! -e "$cloud/same.txt BACKUP"
+check test "$(cat "$cloud/deep/inner.sav")" = deep
+check test "$(cat "$users/steamuser/Saved Games/Other/slot.sav")" = other
+check test ! -L "$users/steamuser/Documents"
+check test "$(readlink "$users/tester BACKUP/Documents")" = "$case_root/home/Documents"
+check grep -q "kept both copies, this one as: .*settings.json BACKUP" "$log"
+check test "$(wc -l < "$case_root/notified" | tr -d ' ')" = 1
+check lay_out_proton_profile
+check test "$(find "$users" -name '*BACKUP*' | wc -l | tr -d ' ')" = 2
+check test "$(wc -l < "$case_root/notified" | tr -d ' ')" = 1
+
+# Wine linked the profile's Documents to the Mac's. What a game saved there stays there,
+# and the player is told so even when nothing else needed keeping.
+split_fixture
+mkdir -p "$case_root/home/Documents/Game"
+printf mine > "$case_root/home/Documents/Game/slot.sav"
+rm "$mine/settings.json"
+check lay_out_proton_profile
+check test "$(cat "$case_root/home/Documents/Game/slot.sav")" = mine
+check test "$(readlink "$users/tester BACKUP/Documents")" = "$case_root/home/Documents"
+check grep -qF "tester/Documents led to $case_root/home/Documents, whose files stay there" "$log"
+check test "$(wc -l < "$case_root/notified" | tr -d ' ')" = 1
+
+# Old folder names are merged through steamuser's links to their new ones, but a link that
+# leads out of the profile is never followed.
+split_fixture
+mkdir -p "$users/tester/My Documents/Game" "$users/tester/Application Data/Roam" \
+  "$users/tester/Local Settings/Application Data/Loc" "$users/tester/Away" "$case_root/outside"
+printf docs > "$users/tester/My Documents/Game/slot.sav"
+printf roam > "$users/tester/Application Data/Roam/slot.sav"
+printf loc > "$users/tester/Local Settings/Application Data/Loc/slot.sav"
+printf away > "$users/tester/Away/slot.sav"
+ln -s "$case_root/outside" "$users/steamuser/Away"
+check lay_out_proton_profile
+check test "$(cat "$users/steamuser/Documents/Game/slot.sav")" = docs
+check test "$(cat "$users/steamuser/AppData/Roaming/Roam/slot.sav")" = roam
+check test "$(cat "$users/steamuser/AppData/Local/Loc/slot.sav")" = loc
+check test ! -e "$users/steamuser/My Documents BACKUP"
+check test "$(cat "$users/steamuser/Away BACKUP/slot.sav")" = away
+check test -z "$(ls "$case_root/outside")"
+
+# Names that end in a space or a tab move, and their note is cleared.
+split_fixture
+printf space > "$mine/trailing "
+printf tab > "$mine/tab	"
+mkdir -p "$mine/folder "
+printf inner > "$mine/folder /slot.sav"
+mkdir -p "$cloud/folder "
+check lay_out_proton_profile
+check test "$(cat "$cloud/trailing ")" = space
+check test "$(cat "$cloud/tab	")" = tab
+check test "$(cat "$cloud/folder /slot.sav")" = inner
+check test ! -e "$users/.notproton-fold-moving"
+check test "$(readlink "$users/tester")" = steamuser
+
+# A line break would split the note, so that name stays where it is and the launch stops.
+split_fixture
+printf broken > "$mine/line
+break.sav"
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+check test "$(cat "$mine/line
+break.sav")" = broken
+check test ! -e "$users/.notproton-fold-moving"
+check grep -q 'has a line break in its name' "$log"
+rm "$mine/line
+break.sav"
+check lay_out_proton_profile
+check test "$(readlink "$users/tester")" = steamuser
+
+# A file that cannot move stops the launch with everything still on one side or the other.
+split_fixture
+chmod 500 "$mine"
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+chmod 700 "$mine"
+check test -d "$users/tester" -a ! -L "$users/tester"
+check test "$(cat "$mine/settings.json")" = mac
+check test "$(cat "$cloud/settings.json")" = steam
+check lay_out_proton_profile
+check test "$(readlink "$users/tester")" = steamuser
+check test "$(cat "$cloud/settings.json BACKUP")" = mac
+
+# An unreadable folder looks empty: it stops the launch instead of leaving the profile.
+split_fixture
+mkdir -p "$users/tester/AppData/LocalLow/Perfect_Random/Sulfur/deep/locked"
+printf locked > "$mine/deep/locked/slot.sav"
+mkdir -p "$cloud/deep/locked"
+chmod 000 "$mine/deep/locked"
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+chmod 700 "$mine/deep/locked"
+check test -d "$users/tester" -a ! -L "$users/tester"
+check test "$(cat "$mine/deep/locked/slot.sav")" = locked
+check lay_out_proton_profile
+check test "$(cat "$cloud/deep/locked/slot.sav")" = locked
+
+# A name taken between the check and the move: mv would put the save inside a folder that
+# appeared there, or not move it past a file. Either way it stays where it was.
+split_fixture
+# shellcheck disable=SC2329 # fold_move calls it in place of mv
+mv() {
+  for destination; do :; done
+  case "$destination" in
+    */steamuser/*/Sulfur_SaveSlot_2.sss) mkdir -p "$destination" ;;
+    *"/settings.json BACKUP") printf other > "$destination" ;;
+  esac
+  command mv "$@"
+}
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+unset -f mv
+check test "$(cat "$mine/Sulfur_SaveSlot_2.sss")" = local
+check test "$(cat "$mine/settings.json")" = mac
+check test ! -e "$cloud/Sulfur_SaveSlot_2.sss/Sulfur_SaveSlot_2.sss"
+check test "$(cat "$cloud/settings.json BACKUP")" = other
+rmdir "$cloud/Sulfur_SaveSlot_2.sss"
+check lay_out_proton_profile
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss")" = local
+check test "$(cat "$cloud/settings.json BACKUP 2")" = mac
+
+# Killed right after mv put a save inside a folder that appeared at its name: the next
+# launch puts it back before it folds anything, and it is kept beside that folder.
+split_fixture
+killed=0
+/usr/bin/perl -e 'setpgrp(0, 0); exec @ARGV' env functions="$functions" /bin/sh -c '
+  eval "$functions"
+  notify_user() { :; }
+  mv() {
+    for destination; do :; done
+    case "$destination" in */steamuser/*/Sulfur_SaveSlot_2.sss)
+      mkdir -p "$destination"
+      command mv "$@"
+      kill -KILL 0 ;;
+    esac
+    command mv "$@"
+  }
+  lay_out_proton_profile
+' 2>/dev/null || killed=$?
+check test "$killed" -ne 0
+check test -f "$cloud/Sulfur_SaveSlot_2.sss/Sulfur_SaveSlot_2.sss"
+check test -f "$users/.notproton-fold-moving"
+check lay_out_proton_profile
+check test ! -e "$cloud/Sulfur_SaveSlot_2.sss/Sulfur_SaveSlot_2.sss"
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss BACKUP")" = local
+check test ! -e "$users/.notproton-fold-moving"
+check grep -q "put back tester/.*Sulfur_SaveSlot_2.sss" "$log"
+
+# A nested move that cannot be put back keeps its note: no later move may overwrite it,
+# so the next launch still finds the save.
+split_fixture
+# shellcheck disable=SC2329 # fold_move calls it in place of mv
+mv() {
+  for destination; do :; done
+  case "$destination" in */steamuser/*/Sulfur_SaveSlot_2.sss)
+    mkdir -p "$destination"
+    command mv "$@"
+    chmod 500 "$destination"
+    return ;;
+  esac
+  command mv "$@"
+}
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+unset -f mv
+chmod 700 "$cloud/Sulfur_SaveSlot_2.sss"
+check test "$(sed -n 2p "$users/.notproton-fold-moving")" = "tester/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss"
+check test -d "$mine"
+check lay_out_proton_profile
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss BACKUP")" = local
+check test "$(cat "$cloud/settings.json BACKUP")" = mac
+check test ! -e "$users/.notproton-fold-moving"
+
+# A killed launch can leave the note's source folder gone: putting it back makes it again.
+split_fixture
+mkdir "$cloud/Sulfur_SaveSlot_2.sss"
+printf '%s\n%s\n%s\n' "$(stat -f %i "$mine/Sulfur_SaveSlot_2.sss")" \
+  tester/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  steamuser/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  > "$users/.notproton-fold-moving"
+command mv "$mine/Sulfur_SaveSlot_2.sss" "$cloud/Sulfur_SaveSlot_2.sss/"
+rm -rf "$users/tester/AppData/LocalLow/Perfect_Random"
+check lay_out_proton_profile
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss BACKUP")" = local
+check test ! -e "$users/.notproton-fold-moving"
+
+# A note is only cleared once the file is found where its move left it or where it began.
+# Behind a folder that cannot be searched, the launch stops and the note stays.
+split_fixture
+mkdir "$cloud/Sulfur_SaveSlot_2.sss"
+printf '%s\n%s\n%s\n' "$(stat -f %i "$mine/Sulfur_SaveSlot_2.sss")" \
+  tester/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  steamuser/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  > "$users/.notproton-fold-moving"
+command mv "$mine/Sulfur_SaveSlot_2.sss" "$cloud/Sulfur_SaveSlot_2.sss/"
+chmod 000 "$cloud/Sulfur_SaveSlot_2.sss"
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+chmod 700 "$cloud/Sulfur_SaveSlot_2.sss"
+check test -f "$users/.notproton-fold-moving"
+check lay_out_proton_profile
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss BACKUP")" = local
+check test ! -e "$users/.notproton-fold-moving"
+
+# A folder that appears at the source before the put-back takes the save inside it. The
+# note stays, so launches stop rather than fold the save in from the wrong place.
+split_fixture
+mkdir "$cloud/Sulfur_SaveSlot_2.sss"
+printf '%s\n%s\n%s\n' "$(stat -f %i "$mine/Sulfur_SaveSlot_2.sss")" \
+  tester/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  steamuser/AppData/LocalLow/Perfect_Random/Sulfur/Sulfur_SaveSlot_2.sss \
+  > "$users/.notproton-fold-moving"
+command mv "$mine/Sulfur_SaveSlot_2.sss" "$cloud/Sulfur_SaveSlot_2.sss/"
+# shellcheck disable=SC2329 # fold_unnest calls it in place of mv
+mv() {
+  for destination; do :; done
+  case "$destination" in */tester/*/Sulfur_SaveSlot_2.sss) mkdir -p "$destination" ;; esac
+  command mv "$@"
+}
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+unset -f mv
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+check test -f "$users/.notproton-fold-moving"
+check test "$(cat "$mine/Sulfur_SaveSlot_2.sss/Sulfur_SaveSlot_2.sss")" = local
+check grep -q "is not where its move left it" "$log"
+
+# The note names paths inside users, so it still matches once the library has moved. One
+# that cannot be read is only a note: it is dropped and the launch goes on.
+split_fixture
+printf '%s\n%s\n%s\n' "$(stat -f %i "$mine/settings.json")" \
+  tester/AppData/LocalLow/Perfect_Random/Sulfur/settings.json \
+  "steamuser/AppData/LocalLow/Perfect_Random/Sulfur/settings.json BACKUP" \
+  > "$users/.notproton-fold-moving"
+command mv "$STEAM_COMPAT_DATA_PATH" "$case_root/moved"
+STEAM_COMPAT_DATA_PATH="$case_root/moved"
+WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
+users="$WINEPREFIX/drive_c/users"
+cloud="$users/steamuser/AppData/LocalLow/Perfect_Random/Sulfur"
+check lay_out_proton_profile
+check test "$(cat "$cloud/settings.json BACKUP")" = mac
+check test ! -e "$users/.notproton-fold-moving"
+split_fixture
+printf 'garbage\n/etc\n../../x\n' > "$users/.notproton-fold-moving"
+check lay_out_proton_profile
+check test "$(cat "$cloud/Sulfur_SaveSlot_2.sss")" = local
+check test ! -e "$users/.notproton-fold-moving"
+check grep -q "dropped an unreadable note" "$log"
+
+# A case-sensitive volume keeps names apart that Wine reads as one.
+if ! attach_image "Case-sensitive APFS" folds; then
+  no_image "case-sensitive APFS" "the case-sensitive fold"
+else
+  fixture
+  STEAM_COMPAT_DATA_PATH="$work/mnt.folds/game"
+  WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
+  mkdir -p "$WINEPREFIX"
+  lay_out_proton_profile
+  rm "$WINEPREFIX/drive_c/users/tester"
+  users="$WINEPREFIX/drive_c/users"
+  mkdir -p "$users/tester/AppData/LocalLow/perfect_random" "$users/steamuser/AppData/LocalLow/Perfect_Random"
+  printf mac > "$users/tester/AppData/LocalLow/perfect_random/slot.sav"
+  printf cloud > "$users/steamuser/AppData/LocalLow/Perfect_Random/Slot.sav"
+  check lay_out_proton_profile
+  check test ! -e "$users/steamuser/AppData/LocalLow/perfect_random"
+  check test "$(cat "$users/steamuser/AppData/LocalLow/Perfect_Random/Slot.sav")" = cloud
+  check test "$(cat "$users/steamuser/AppData/LocalLow/Perfect_Random/Slot.sav BACKUP")" = mac
+  # A library folder whose name has a line that looks like the folder being looked for.
+  fixture
+  STEAM_COMPAT_DATA_PATH="$work/mnt.folds/A
+saves
+B/game"
+  WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
+  mkdir -p "$WINEPREFIX"
+  lay_out_proton_profile
+  rm "$WINEPREFIX/drive_c/users/tester"
+  users="$WINEPREFIX/drive_c/users"
+  mkdir -p "$users/tester/AppData/saves" "$users/steamuser/AppData/SAVES"
+  printf mac > "$users/tester/AppData/saves/two.sav"
+  printf cloud > "$users/steamuser/AppData/SAVES/one.sav"
+  check lay_out_proton_profile
+  check test ! -e "$users/steamuser/AppData/saves"
+  check test "$(cat "$users/steamuser/AppData/SAVES/two.sav")" = mac
+  detach_image "$work/mnt.folds" || true
+fi
+
+# CrossOver's lineage names its profile crossover: a folder under the Mac user is left be.
+np_build=winecx-11.17
+fixture
+lay_out_proton_profile
+check test ! -e "$WINEPREFIX/drive_c/users/tester"
+check test ! -e "$template_dir/pfx/drive_c/users/tester"
+mkdir -p "$WINEPREFIX/drive_c/users/tester/AppData"
+printf mine > "$WINEPREFIX/drive_c/users/tester/AppData/save.sav"
+check lay_out_proton_profile
+check test ! -L "$WINEPREFIX/drive_c/users/tester"
+check test "$(cat "$WINEPREFIX/drive_c/users/tester/AppData/save.sav")" = mine
+np_build=fixture
+USER=$saved_user
+
 printf 'seedcheck: %s failures\n' "$fails"
 test "$fails" -eq 0
