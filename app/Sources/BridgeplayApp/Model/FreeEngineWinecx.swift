@@ -83,10 +83,17 @@ struct WinecxRelease: Sendable {
     // game for ROCKSTAR_SHIM=1 (GTA V Legacy), and DXVK's dxgi as dxgx.dll, which that shim
     // hands GTA5.exe on the dxvk backend. Empty where it is not shipped.
     let rockstar: [WinecxBundledFile]
+    // d3d12-stub/: a d3d12.dll that creates no device, which the run script stages for the
+    // dxmt backend on a D3DMetal engine, so games that try D3D12 first fall back to D3D11
+    // instead of crashing in Apple's d3d12 (#2513). Empty where it is not shipped.
+    let dxmt: [WinecxBundledFile]
     // The runner build this release unpacks to, keyed by its pinned loader, and the ntdll
     // detours for it (NtdllPatcher.byBuild).
     let runner: RunnerBuild
     let ntdllPatches: [NtdllPatch]
+
+    // The app's own files, every category above.
+    var bundled: [WinecxBundledFile] { gamepad + network + nvidia + audio + d3dx + loader + rockstar + dxmt }
 }
 
 enum FreeEngineWinecx {
@@ -247,6 +254,12 @@ enum FreeEngineWinecx {
                               path: "lib/notproton-backends/rockstar-shim/x86_64-windows/dxgx.dll",
                               sha256: "e74f5c985fe98f38f1a096258ef35d62e03a64df7096837965c7383e3cfe153d"),
         ],
+        // d3d12.dll: d3d12-stub/build.sh.
+        dxmt: [
+            WinecxBundledFile(resource: "d3d12-stub", ext: "dll",
+                              path: "lib/notproton-backends/d3d12-stub/x86_64-windows/d3d12.dll",
+                              sha256: "d802d04ae9fb18a3dda90984bb11def0bda89b4d929b6297fe026b6cf883d1db"),
+        ],
         runner: RunnerBuild(
             bundleVersion: "winecx-11.17",
             releaseVersion: "WineCX 11.17",
@@ -339,6 +352,7 @@ enum FreeEngineWinecx {
         d3dx: [],
         loader: [],
         rockstar: [],
+        dxmt: [],
         // The hash-pinned loader is what makes it free, so a CrossOver install can never be
         // taken for it.
         runner: RunnerBuild(
@@ -431,7 +445,7 @@ enum FreeEngineWinecx {
     // checks them, since they are either Wine's own or links into a Game Porting Toolkit.
     static func expectedFiles(_ release: WinecxRelease = current) -> [String: String] {
         var table: [String: String] = [FreeEngine.macDriverPath: release.macDriver]
-        for file in release.gamepad + release.network + release.nvidia + release.audio + release.d3dx + release.loader + release.rockstar { table[file.path] = file.sha256 }
+        for file in release.bundled { table[file.path] = file.sha256 }
         for file in release.backends { table["\(backendsPath)/\(file.destination)"] = file.sha256 }
         for path in release.renderer.files.keys {
             table[release.renderer.installPath(of: path)] = release.renderer.installedHash(of: path)
@@ -446,7 +460,7 @@ enum FreeEngineWinecx {
     // The runtime's own files that may stand in for a bundled one, by path.
     static func fallbackFiles(_ release: WinecxRelease = current) -> [String: String] {
         var table: [String: String] = [:]
-        for file in release.gamepad + release.network + release.nvidia + release.audio + release.d3dx + release.loader + release.rockstar {
+        for file in release.bundled {
             if let fallback = file.fallback { table[file.path] = fallback }
         }
         return table
@@ -534,7 +548,7 @@ enum FreeEngineWinecx {
         try fm.createDirectory(at: root.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fm.moveItem(at: wine, to: root)
         try FreeEngine.installMacDriver(root: root, build: release.build, sha256: release.macDriver, step: step)
-        try installBundled(release.gamepad + release.network + release.nvidia + release.audio + release.d3dx + release.loader + release.rockstar, root: root)
+        try installBundled(release.bundled, root: root)
 
         let libraries = wine.deletingLastPathComponent()
         for file in release.backends {

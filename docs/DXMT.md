@@ -88,6 +88,11 @@ together with the other DLLs, and never mix them with v0.80 files.
 
 ## D3D12
 
+The engine does not install DXMT's `d3d12.dll`. Under DXMT on an engine with D3DMetal the
+run script stages `d3d12-stub/`'s `d3d12.dll`, which creates no device, so games that try
+D3D12 first fall back to D3D11, and a game that imports `d3d12.dll` runs on D3DMetal (see
+[GAMEFIXES.md](GAMEFIXES.md)).
+
 This build is for testing only. Upstream marks the backend unfinished: PR #182 ("D3D12
 implementation, part 2") and PR #212 ("part 9") both say "DO NOT USE". In issue #194 the maintainer
 answers "Don't (at the moment)" to a question about testing it. There are 153 commits to

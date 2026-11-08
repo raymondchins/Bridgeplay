@@ -104,6 +104,12 @@ are set aside. So on that engine:
   staged into the prefix
 - `dxmt` and `dxvk` still work per game: their DLLs go into the prefix as natives (`n,b`),
   and `d3d10`/`d3d12` stay builtin, which is Apple's
+- except `d3d12` under `dxmt`: Apple's d3d12 crashes on DXMT's adapter, so the 64-bit
+  `d3d12` is Bridgeplay's `d3d12-stub` instead, staged into `system32` as a native. It
+  creates no device, as Windows on a GPU without D3D12, so a game that tries D3D12 first
+  (Unreal Engine 5, Unity 6) falls back to D3D11. A game whose `.exe` imports `d3d12.dll`
+  runs on `d3dmetal`, and the run log says so. An engine without the stub keeps Apple's
+  d3d12, and a DXMT build that ships its own `d3d12.dll` keeps that one
 - `d3dmetal` sets every D3D DLL (`d3d10`, `d3d10core`, `d3d11`, `d3d12`, `dxgi`) to `b`,
   exports `CX_GRAPHICS_BACKEND=d3dmetal` and `CX_APPLEGPTK_LIBD3DSHARED_PATH`
 - Apple's `nvapi64` and `nvngx` are set to `d` unless the conf says `NVAPI=1` and the backend is
