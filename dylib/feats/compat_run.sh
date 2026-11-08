@@ -1055,7 +1055,10 @@ rockstar_shim_folders() {
                 && mv -f "$note.$$" "$note"
             } 2>> "$log"; then
               rm -f "$note.$$" 2>/dev/null || true
-              graphics_log "rockstar-shim: could not note the dxgi.dll staged in $dir"
+              # Unnoted, it could not be told from the player's own later, so it comes out.
+              graphics_log "rockstar-shim: could not note the dxgi.dll staged in $dir, taken out again"
+              rm -f "$target" 2>> "$log" && { { [ ! -e "$saved" ] && [ ! -L "$saved" ]; } \
+                || mv "$saved" "$target" 2>> "$log"; } || true
             fi
           fi
           continue
@@ -1068,8 +1071,9 @@ rockstar_shim_folders() {
           continue
         fi
         if [ "$is_shim" = 1 ]; then
-          rm -f "$target" 2>> "$log" && graphics_log "rockstar-shim: removed $name from $dir"
-          rm -f "$target.bridgeplay-staged" 2>/dev/null || true
+          # The note goes only with the copy it names.
+          rm -f "$target" 2>> "$log" && graphics_log "rockstar-shim: removed $name from $dir" \
+            && rm -f "$target.bridgeplay-staged" 2>/dev/null || true
         fi
         if [ -e "$saved" ] || [ -L "$saved" ]; then
           if [ -e "$target" ] || [ -L "$target" ]; then

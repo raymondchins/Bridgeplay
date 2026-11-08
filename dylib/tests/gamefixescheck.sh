@@ -1127,6 +1127,31 @@ rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
 is "a read-only note is updated with the new copy" "$(/usr/bin/shasum -a 256 "$shim_src/dxgx.dll" | cut -d ' ' -f 1)" \
 	"$(cat "$win64/dxgi.dll.bridgeplay-staged")"
 
+# A note that cannot be replaced takes the new copy out again and puts the player's back, and
+# a copy that cannot be removed keeps its note.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'user dxgi' > "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+printf 'newer dxvk dxgi' > "$shim_src/dxgx.dll"
+chmod +a "everyone deny delete" "$win64/dxgi.dll.bridgeplay-staged"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+chmod -a "everyone deny delete" "$win64/dxgi.dll.bridgeplay-staged"
+is "an unnotable copy is taken out and the player's put back" "user dxgi|no" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+chmod +a "everyone deny delete" "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+chmod -a "everyone deny delete" "$win64/dxgi.dll"
+is "a copy that could not be removed keeps its note" "yes" "$([ -f "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "and comes out on a later launch, the player's back" "user dxgi|no|no" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+
 # A dxgi.dll the user put over the staged one is theirs.
 rockstar_case
 win64="$case_dir/game/Gameface/Binaries/Win64"
