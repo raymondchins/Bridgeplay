@@ -21,16 +21,21 @@ enum GameReport {
         var bridgeplay: String
         var model: String? = nil
         var setup: [String: String] = [:]
-        // A newer release the updater found, "0.7.38 (55)".
+        // A newer release the updater found in the current state, "0.7.38 (55)".
         var newerRelease: String?
+        // The updater state (stable, beta, leaving) and the running build's channel.
+        var updateState: String?
+        var buildChannel: String?
     }
 
     static var thisMac: Machine {
-        Machine(chip: SetupChecks.chipName, memoryBytes: ProcessInfo.processInfo.physicalMemory,
-                macOS: SetupChecks.macOSDisplay,
-                bridgeplay: ProductVersion.build.map { "\(ProductVersion.short) (\($0))" } ?? ProductVersion.short,
-                model: sysctl("hw.model"),
-                newerRelease: LatestRelease.newer(than: ProductVersion.build))
+        let state = UpdaterState.current
+        return Machine(chip: SetupChecks.chipName, memoryBytes: ProcessInfo.processInfo.physicalMemory,
+                       macOS: SetupChecks.macOSDisplay,
+                       bridgeplay: ProductVersion.build.map { "\(ProductVersion.short) (\($0))" } ?? ProductVersion.short,
+                       model: sysctl("hw.model"),
+                       newerRelease: LatestRelease.newer(than: ProductVersion.build, state: state),
+                       updateState: state.rawValue, buildChannel: ProductVersion.channel.rawValue)
     }
 
     private static func sysctl(_ name: String) -> String? {

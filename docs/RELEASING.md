@@ -6,7 +6,7 @@ Every stable release is a GitHub release of `raymondchins/Bridgeplay`, tag `vX.Y
 | Asset | What it is |
 |---|---|
 | `Bridgeplay.zip` | The app, notarized; the Sparkle update |
-| `appcast.xml` | The Sparkle feed. Installed apps read `https://github.com/raymondchins/Bridgeplay/releases/latest/download/appcast.xml` (`SUFeedURL`), so whatever release is **Latest** is the update feed |
+| `appcast.xml` | The Sparkle feed. Installed apps read `https://github.com/raymondchins/Bridgeplay/releases/latest/download/appcast.xml` (`SUFeedURL`), so whatever release is **Latest** is the update feed. Apps enrolled in beta updates, and beta builds leaving them, read the beta feed instead (see Betas) |
 | `Bridgeplay.dmg` | The download bridgeplay.dev links to: the app in a disk image with an Applications link (`scripts/package-dmg.sh`), notarized. Built after the appcast so Sparkle never indexes it |
 | `Bridgeplay-Setup.zip` | The native installer ([NATIVE-INSTALLER.md](NATIVE-INSTALLER.md)), notarized |
 
@@ -180,6 +180,18 @@ the remote can't be reached; `--dry-run` pushes nothing. `release-local.sh` clai
 way before building. Claim tags are never moved or deleted, and
 gaps in the numbers are fine. The release ledger's v1 format is frozen in `scripts/ledger-lib.sh`,
 which also reads it. `make ledgercheck` covers all of this against a local repository and a stub `gh`.
+
+The app works out its updater state on every check from the `BetaUpdates` default (a boolean,
+off when missing or unreadable) and the running build's channel: `stable` (off, stable build)
+reads `SUFeedURL` exactly as before; `beta` (on) and `leaving` (off, beta build) read
+`https://github.com/raymondchins/Bridgeplay/releases/download/beta-feed/appcast.xml`. `beta` takes
+items on the `beta` and `beta-critical` channels, `leaving` only `beta-critical`, and both take the
+highest build above the running one. A stable item reaches a beta build only when its
+`<bridgeplay:containsBetas>` list (`81-85,87`) names that build, so nobody is downgraded. After a
+failed beta-feed check, the next check reads the stable feed under the same rules. Each check
+writes one `update check:` line to `bridgeplay.log` and the app log. For testing,
+`BetaFeedURLOverride` and `StableFeedURLOverride` replace the feeds in any build and are named in
+that line; enclosure signatures are still required.
 
 ## Steps
 
