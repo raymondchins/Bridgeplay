@@ -8,7 +8,7 @@ functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
 	load_gamefixes resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available \
 	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
-	activate_backend record_backend rockstar_shim_copy rockstar_dxgi_copy rockstar_shim_lock_fd rockstar_shim_in_use rockstar_shim_folders stage_rockstar_shim compose_dll_overrides; do
+	activate_backend record_backend rockstar_shim_copy rockstar_put_back rockstar_dxgi_copy rockstar_shim_lock_fd rockstar_shim_in_use rockstar_shim_folders stage_rockstar_shim compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -1151,6 +1151,27 @@ is "a copy that could not be removed keeps its note" "yes" "$([ -f "$win64/dxgi.
 rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
 is "and comes out on a later launch, the player's back" "user dxgi|no|no" \
 	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+
+# A note that cannot be removed never comes to name the player's file: a player's copy of the
+# old DXVK release stays in its backup until the note can go, then comes back and stays.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+cp "$shim_src/dxgx.dll" "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+printf 'newer dxvk dxgi' > "$shim_src/dxgx.dll"
+chmod +a "everyone deny delete" "$win64/dxgi.dll.bridgeplay-staged"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "while the note stays the player's copy stays in its backup" "no|yes" \
+	"$([ -e "$win64/dxgi.dll" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+chmod -a "everyone deny delete" "$win64/dxgi.dll.bridgeplay-staged"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "then it is back for good, with no note" "old dxvk|no|no" \
+	"$(LC_ALL=C grep -q newer "$win64/dxgi.dll" 2>/dev/null && echo new || echo old) dxvk|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+is "and is still there" "yes" "$([ -f "$win64/dxgi.dll" ] && echo yes || echo no)"
 
 # A dxgi.dll the user put over the staged one is theirs.
 rockstar_case

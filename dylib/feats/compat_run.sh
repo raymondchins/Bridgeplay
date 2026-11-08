@@ -916,6 +916,19 @@ rockstar_shim_copy() {
   cmp -s "$1" "$2" || LC_ALL=C grep -qaF 'rockstar-shim: ' "$2"
 }
 
+# Puts the player's $2 back from $1. A dxgi.dll's note goes first, so it can never name the
+# player's file; while one that would cannot be removed, the file stays in its backup.
+rockstar_put_back() {
+  case "$2" in */dxgi.dll)
+    if ! rm -f "$2.bridgeplay-staged" 2>> "$log" \
+      && [ "$(sed -n 1p "$2.bridgeplay-staged" 2>/dev/null)" \
+        = "$(/usr/bin/shasum -a 256 "$1" 2>/dev/null | cut -d ' ' -f 1)" ]; then
+      return 1
+    fi ;;
+  esac
+  mv "$1" "$2" 2>> "$log"
+}
+
 # DXVK's dxgi carries no such prefix and a player may copy the same release there by hand, so
 # a dxgi.dll is ours only when it has the sha256 a launch noted beside it on staging. That
 # also holds after an engine update changed dxgx.dll and on an engine without it.
@@ -1042,7 +1055,7 @@ rockstar_shim_folders() {
           fi
           if ! stage_backend_file "$src" "$target"; then
             graphics_log "rockstar-shim: could not stage $name into $dir"
-            [ "$moved" = 0 ] || mv "$saved" "$target" 2>> "$log" || true
+            [ "$moved" = 0 ] || rockstar_put_back "$saved" "$target" || true
           elif [ "$dir" != "$social_club" ]; then
             # Other macOS users' launches read it too.
             chmod a+r "$target" 2>/dev/null || true
@@ -1058,7 +1071,7 @@ rockstar_shim_folders() {
               # Unnoted, it could not be told from the player's own later, so it comes out.
               graphics_log "rockstar-shim: could not note the dxgi.dll staged in $dir, taken out again"
               rm -f "$target" 2>> "$log" && { { [ ! -e "$saved" ] && [ ! -L "$saved" ]; } \
-                || mv "$saved" "$target" 2>> "$log"; } || true
+                || rockstar_put_back "$saved" "$target"; } || true
             fi
           fi
           continue
@@ -1078,7 +1091,7 @@ rockstar_shim_folders() {
         if [ -e "$saved" ] || [ -L "$saved" ]; then
           if [ -e "$target" ] || [ -L "$target" ]; then
             graphics_log "rockstar-shim: $dir has a new $name, $name.bridgeplay-orig left alone"
-          elif mv "$saved" "$target" 2>> "$log"; then
+          elif rockstar_put_back "$saved" "$target"; then
             graphics_log "rockstar-shim: put the $name in $dir back"
           fi
         fi
