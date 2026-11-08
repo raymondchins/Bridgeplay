@@ -106,6 +106,110 @@ struct InstallerReleaseTests {
         #expect(throws: InstallerError.self) { try InstallerRelease.parse(appcast: appcast(hardware: "x86_64")) }
     }
 
+    private func item(
+        channel: String? = nil,
+        build: String = "35",
+        version: String = "3.5.0",
+        hardware: String? = "arm64"
+    ) -> String {
+        """
+        <item>
+            \(channel.map { "<sparkle:channel>\($0)</sparkle:channel>" } ?? "")
+            <sparkle:version>\(build)</sparkle:version>
+            <sparkle:shortVersionString>\(version)</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            \(hardware.map { "<sparkle:hardwareRequirements>\($0)</sparkle:hardwareRequirements>" } ?? "")
+            <enclosure url="https://github.com/raymondchins/Bridgeplay/releases/download/v\(version)/Bridgeplay.zip"
+                       length="1234" type="application/octet-stream"
+                       sparkle:edSignature="\(Data(repeating: 0xA5, count: 64).base64EncodedString())" />
+        </item>
+        """
+    }
+
+    private func feed(_ items: [String], extra: String = "") -> Data {
+        Data("""
+        <?xml version="1.0" standalone="yes"?>
+        <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+             xmlns:bridgeplay="https://bridgeplay.dev/ns/appcast/1" version="2.0">
+          <channel>\(extra)\(items.joined(separator: "\n"))</channel>
+        </rss>
+        """.utf8)
+    }
+
+    @Test(arguments: ["beta", "beta-critical", "", "anything"])
+    func skipsChannelItemsAndTakesTheStableOne(_ channel: String) throws {
+        let data = feed([item(channel: channel, build: "90", version: "3.6.0"), item()])
+        let value = try InstallerRelease.parse(appcast: data)
+        #expect(value.build == 35)
+        #expect(value.shortVersion == "3.5.0")
+    }
+
+    @Test func takesTheFirstStableItemAmongChannelItems() throws {
+        let data = feed([item(channel: "beta", build: "91", version: "3.7.0"), item(build: "36", version: "3.5.1"),
+                         item(channel: "beta", build: "92", version: "3.8.0"), item()])
+        #expect(try InstallerRelease.parse(appcast: data).build == 36)
+    }
+
+    @Test func refusesAFeedWithOnlyChannelItems() {
+        #expect(throws: InstallerError.self) {
+            try InstallerRelease.parse(appcast: feed([item(channel: "beta"), item(channel: "beta-critical")]))
+        }
+        #expect(throws: InstallerError.self) { try InstallerRelease.parse(appcast: feed([])) }
+    }
+
+    @Test func stillChecksTheStableItemWhenAChannelItemIsValid() {
+        #expect(throws: InstallerError.self) {
+            try InstallerRelease.parse(appcast: feed([item(channel: "beta"), item(version: "3.5.beta")]))
+        }
+        #expect(throws: InstallerError.self) {
+            try InstallerRelease.parse(appcast: feed([item(channel: "beta"), item(hardware: "x86_64")]))
+        }
+        #expect(throws: InstallerError.self) {
+            try InstallerRelease.parse(appcast: feed([item(channel: "beta"), item(hardware: nil)]))
+        }
+    }
+
+    @Test(arguments: ["", "81-85,87"])
+    func acceptsTheContainsBetasElement(_ text: String) throws {
+        let element = "<bridgeplay:containsBetas>\(text)</bridgeplay:containsBetas>"
+        let value = try InstallerRelease.parse(appcast: feed([item().replacingOccurrences(of: "<enclosure", with: "\(element)<enclosure")]))
+        #expect(value.build == 35)
+        #expect(value.archiveURL == validURL)
+    }
+
+    @Test(arguments: ["signed.xml", "signed-betas-empty.xml", "signed-betas-list.xml"])
+    func acceptsFeedsSignedByTheSparkleTool(_ name: String) throws {
+        // Made by Sparkle's generate_appcast with a throwaway key; see the folder's README.
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "installer/tests/fixtures/appcast/\(name)")
+        let data = try Data(contentsOf: url)
+        #expect(String(decoding: data, as: UTF8.self).contains("sparkle-signatures"))
+        let value = try InstallerRelease.parse(appcast: data)
+        #expect(value.build == 35)
+        #expect(value.shortVersion == "3.5.0")
+        #expect(value.minimumOS == "26.0")
+        #expect(value.archiveURL == validURL)
+        #expect(value.signature.count == 64)
+    }
+
+    @Test func refusesChannelFirstFeedOnceSigned() throws {
+        // A signed feed whose only item is in a channel is as unusable as an unsigned one.
+        let signed = Data((String(decoding: feed([item(channel: "beta")]), as: UTF8.self)
+            + "<!-- sparkle-signatures:\nedSignature: AAAA\nlength: 1\n-->\n").utf8)
+        #expect(throws: InstallerError.self) { try InstallerRelease.parse(appcast: signed) }
+    }
+
+    @Test func rejectsOversizedAndEntityFeedsWhateverTheItems() {
+        #expect(throws: InstallerError.self) {
+            try InstallerRelease.parse(appcast: feed([item()], extra: String(repeating: " ", count: 256_000)))
+        }
+        let doctype = "<!DOCTYPE rss [<!ENTITY x \"y\">]>"
+        let data = Data((doctype + String(decoding: feed([item(channel: "beta"), item()]), as: UTF8.self)).utf8)
+        #expect(throws: InstallerError.self) { try InstallerRelease.parse(appcast: data) }
+    }
+
     @Test func requiresAppleSiliconHardwareRequirement() {
         #expect(throws: InstallerError.self) {
             try InstallerRelease.parse(appcast: appcast(hardware: nil))

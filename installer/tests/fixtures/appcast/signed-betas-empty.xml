@@ -1,0 +1,22 @@
+<?xml version="1.0" standalone="yes"?>
+<!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+-->
+<rss xmlns:bridgeplay="https://bridgeplay.dev/ns/appcast/1" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Bridgeplay</title>
+        <item>
+            <title>3.5.0</title>
+            <pubDate>Mon, 09 Nov 2026 01:13:23 +0700</pubDate>
+            <sparkle:version>35</sparkle:version>
+            <sparkle:shortVersionString>3.5.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <bridgeplay:containsBetas/>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/raymondchins/Bridgeplay/releases/download/v3.5.0/Bridgeplay.zip" length="4601" type="application/octet-stream" sparkle:edSignature="yxMC2ZuPR8zY+lIPj1GbvkKkxnIIbgp22EY6k336dLlLp49/Yie0XDUCY5Uy7DjTIED2erjuXY35hbXjVYLmCw=="/>
+        </item>
+    </channel>
+</rss><!-- sparkle-signatures:
+edSignature: nBR0OGDB4U+KA+fTqRHtu1utqAhTPCTQQXAWAGNGYN9L6EaznH9Y8S6AG9SsnCExhZ8n637W8ToFPDLmMLp6Bg==
+length: 1208
+-->

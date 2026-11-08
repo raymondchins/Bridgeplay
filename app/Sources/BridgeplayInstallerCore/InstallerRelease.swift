@@ -85,7 +85,7 @@ public struct InstallerRelease: Sendable, Equatable {
         self.verificationKey = verificationKey
     }
 
-    /// Parse the first release in Bridgeplay's Sparkle feed.
+    /// Parse the first release without a channel in Bridgeplay's Sparkle feed.
     public static func parse(appcast: Data) throws -> InstallerRelease {
         let reader = AppcastReader()
         let parser = XMLParser(data: appcast)
@@ -251,15 +251,27 @@ public struct InstallerRelease: Sendable, Equatable {
 }
 
 private final class AppcastReader: NSObject, XMLParserDelegate {
-    private(set) var enclosure: [String: String]?
-    private(set) var build: String?
-    private(set) var shortVersion: String?
-    private(set) var minimumOS: String?
-    private(set) var hardwareRequirements: String?
-    private var readingItem = false
-    private var sawItem = false
+    private struct Item {
+        var enclosure: [String: String]?
+        var build: String?
+        var shortVersion: String?
+        var minimumOS: String?
+        var hardwareRequirements: String?
+        var hasChannel = false
+    }
+
+    /// The first item without a sparkle:channel. An item in any channel is skipped, whatever
+    /// its value: the stable feed carries none, so one that appears is not for this installer.
+    private var stable: Item?
+    private var current: Item?
     private var capturedElement: String?
     private var capturedText = ""
+
+    var enclosure: [String: String]? { stable?.enclosure }
+    var build: String? { stable?.build }
+    var shortVersion: String? { stable?.shortVersion }
+    var minimumOS: String? { stable?.minimumOS }
+    var hardwareRequirements: String? { stable?.hardwareRequirements }
 
     func parser(
         _ parser: XMLParser,
@@ -268,14 +280,16 @@ private final class AppcastReader: NSObject, XMLParserDelegate {
         qualifiedName qName: String?,
         attributes attributeDict: [String: String] = [:]
     ) {
-        if elementName == "item", !sawItem {
-            sawItem = true
-            readingItem = true
+        // Once the stable item is found, later items are not read (as before).
+        guard stable == nil else { return }
+        if elementName == "item", current == nil {
+            current = Item()
             return
         }
-        guard readingItem else { return }
-        if elementName == "enclosure", enclosure == nil {
-            enclosure = attributeDict
+        guard current != nil else { return }
+        if elementName == "sparkle:channel" { current?.hasChannel = true }
+        if elementName == "enclosure", current?.enclosure == nil {
+            current?.enclosure = attributeDict
         }
         if ["sparkle:version", "sparkle:shortVersionString", "sparkle:minimumSystemVersion",
             "sparkle:hardwareRequirements"].contains(elementName) {
@@ -302,20 +316,23 @@ private final class AppcastReader: NSObject, XMLParserDelegate {
         namespaceURI: String?,
         qualifiedName qName: String?
     ) {
-        guard readingItem else { return }
+        guard current != nil else { return }
         if elementName == capturedElement {
             let value = capturedText.trimmingCharacters(in: .whitespacesAndNewlines)
             switch elementName {
-            case "sparkle:version": build = value
-            case "sparkle:shortVersionString": shortVersion = value
-            case "sparkle:minimumSystemVersion": minimumOS = value
-            case "sparkle:hardwareRequirements": hardwareRequirements = value
+            case "sparkle:version": current?.build = value
+            case "sparkle:shortVersionString": current?.shortVersion = value
+            case "sparkle:minimumSystemVersion": current?.minimumOS = value
+            case "sparkle:hardwareRequirements": current?.hardwareRequirements = value
             default: break
             }
             capturedElement = nil
             capturedText = ""
         }
-        if elementName == "item" { readingItem = false }
+        if elementName == "item" {
+            if stable == nil, let item = current, !item.hasChannel { stable = item }
+            current = nil
+        }
     }
 }
 
