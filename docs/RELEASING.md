@@ -1,6 +1,6 @@
 # Releasing Bridgeplay
 
-Every release is a GitHub release of `raymondchins/Bridgeplay`, tag `vX.Y.Z`, marked
+Every stable release is a GitHub release of `raymondchins/Bridgeplay`, tag `vX.Y.Z`, marked
 **Latest**, with four assets:
 
 | Asset | What it is |
@@ -80,8 +80,9 @@ Betas are built from `develop` or `release/*`, and upstream merges go to `develo
 commits no version bump on it (`BRIDGEPLAY_BETA_BRANCH` names the branch, default `develop`). On `main`, the exception for a security or
 crash hotfix from upstream, it still bumps the patch.
 
-`release-local.sh` does not publish betas: a stamped build no longer matches `dylib/version.h`, so
-its version check stops it. `make versioncheck` covers the stamp, the bump and the sync.
+`release-local.sh` publishes a beta only in its beta mode (see Beta releases), which stamps the
+build itself; without `--beta` a stamped build no longer matches `dylib/version.h`, so its version
+check stops it. `make versioncheck` covers the stamp, the bump and the sync.
 
 ### Stable releases and betas
 
@@ -109,6 +110,57 @@ version, this build, its enclosure on this tag with an EdDSA signature, `minimum
 26.0, one `containsBetas`, and a valid feed signature. The legacy NotProton feed (`--legacy-feed`)
 stays as it was: unsigned, with no `containsBetas`. `make stablecheck` covers all of this with a
 local repository, a stub `gh`, a throwaway key and Sparkle's own tools.
+
+### Beta releases
+
+```sh
+scripts/release-local.sh --beta "release notes"                       # --dry-run to rehearse
+scripts/release-local.sh --beta --critical "security: ..." "notes"    # or "data-loss: ..."
+scripts/release-local.sh --beta --waive-stable vX.Y.Z --reason "why" "notes"
+scripts/release-local.sh --beta --rebuild-feeds [--withdraw vX.Y.Z-beta.N --reason "why"]
+```
+
+HEAD must be the tip of `develop` or a `release/*` branch on the remote found by URL, the tree
+clean, and the newest stable (the `vX.Y.Z` release marked Latest) an ancestor of HEAD (I-2).
+`--waive-stable` names that stable to publish without it: the waiver is printed loudly and
+recorded in the ledger (`waived-stable`, `waiver-reason`). A dry run reports a failed check and
+carries on; a real run stops. Release notes are required. `--critical` puts the beta on the
+`beta-critical` channel and is only for a security or data-loss fix, recorded as `critical-reason`.
+
+The label is `X.Y.Z-beta.N`: `X.Y.Z` from `release/X.Y.Z`, or on `develop` the next patch above
+the newest stable, and N one above the highest beta of that `X.Y.Z` published, drafted or tagged.
+A release branch named after a version that is already a stable is refused: rename it. The build
+is H+1, claimed for HEAD before anything is built; if another release claims it first, the script
+reads H again and tries once more, then stops. It builds with the beta stamp (see Betas), signs
+and notarizes the app as a stable is, signs the zip with the same EdDSA key, and creates the
+`vX.Y.Z-beta.N` prerelease, never Latest, at HEAD, carrying `Bridgeplay.zip` and nothing else
+(no appcast, Setup or DMG), its body ending with the ledger. Once the uploaded digest matches, it
+regenerates the beta feed and swaps it onto the `beta-feed` release by upload, rename and delete,
+the one step that offers the beta. A real run then downloads the feed and the zip again and checks
+the item's length and signature and the feed signature. A beta never touches the stable feed, a
+`vX.Y.Z` release, the `installer` release or the legacy feed (`--legacy-feed` is refused).
+
+The beta feed, `https://github.com/raymondchins/Bridgeplay/releases/download/beta-feed/appcast.xml`,
+is rebuilt from the releases each time, never edited: the newest stable, with no channel and its
+`containsBetas`, then the newest beta above it, then the newest `beta-critical` above it if that is
+not the newest beta. Each item is copied from its release's ledger (a stable from before the
+ledger, from its own `appcast.xml`), so no old zip is signed again; the whole feed is, after its
+last edit. A beta whose ledger can't be read, or whose zip is not the one its ledger records,
+stops it. The first real beta creates the `beta-feed` release (prerelease, never Latest, at the
+newest stable's commit); a dry run says it would.
+
+After a stable is marked Latest, the stable mode rebuilds the beta feed if `beta-feed` exists, so
+it carries the new stable and the betas above it. If that fails, the stable stays released, the
+run exits 1 and prints the recovery command, `scripts/release-local.sh --beta --rebuild-feeds`.
+That command rebuilds the beta feed alone; `--withdraw` first marks a bad beta withdrawn (a line at
+the top of its release body), so this and every later feed leave it out.
+
+A rerun on a HEAD that is already published as a beta checks that release against its ledger and
+this run's options, uploads nothing, and only exposes it; anything different stops, and no
+published asset is overwritten. A beta whose upload doesn't match is deleted, so the next run
+starts clean. The beta mode takes the same lock as the stable mode. `make betacheck` runs all of
+this through a scripted history with a local repository, a stub `gh`, a throwaway key and
+Sparkle's own tools.
 
 ### Build numbers
 
@@ -173,7 +225,8 @@ which also reads it. `make ledgercheck` covers all of this against a local repos
    It then uploads a new `Bridgeplay-Installer.zip` to the `installer` release if its fingerprint
    changed. That fingerprint checks this Mac's engine cache and GPTK even when the installer is
    unchanged, so set both up before releasing: if the check fails after the release is marked
-   Latest, the installer is not updated, and a rerun refuses the existing release.
+   Latest, the installer is not updated, and a rerun refuses the existing release. Last, the beta
+   feed, if there is one, is rebuilt with the new stable (see Beta releases).
 
 Any other release in the repository (a DXMT build, say) must be created with
 `--latest=false`, or the feed URL stops serving `appcast.xml` until the next app release.

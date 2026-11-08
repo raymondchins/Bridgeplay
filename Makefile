@@ -88,7 +88,7 @@ DEPS := $(OBJS:.o=.d)
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
         compatsvc-check prefixstate-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck \
-        gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck cicheck compat-reported-check FORCE
+        gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck compat-reported-check FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
 
@@ -124,6 +124,11 @@ ledgercheck:
 stablecheck:
 	@if [ ! -f scripts/tests/stablecheck.sh ]; then $(call SKIP,stablecheck,scripts/tests/stablecheck.sh); exit 0; fi; \
 	sh scripts/tests/stablecheck.sh
+
+# The beta release mode; needs Sparkle's tools like stablecheck.
+betacheck:
+	@if [ ! -f scripts/tests/betacheck.sh ]; then $(call SKIP,betacheck,scripts/tests/betacheck.sh); exit 0; fi; \
+	sh scripts/tests/betacheck.sh
 
 cicheck:
 	@if [ ! -f scripts/tests/cicheck.sh ]; then $(call SKIP,cicheck,scripts/tests/cicheck.sh); exit 0; fi; \
@@ -954,12 +959,13 @@ CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck launchercheck \
-	seedcheck gamefixescheck versioncheck ledgercheck stablecheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
+	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
 	app-tests native-installercheck
 
 # app.yml runs the checks that need the built app in its build job and the rest in a
-# parallel job; both lists together are CI_CHECKS. stablecheck needs the build's Sparkle tools.
-CI_CHECKS_BUILT := mincheck l10ncheck app-tests stablecheck
+# parallel job; both lists together are CI_CHECKS. stablecheck and betacheck need the build's
+# Sparkle tools.
+CI_CHECKS_BUILT := mincheck l10ncheck app-tests stablecheck betacheck
 CI_CHECKS_SOURCE := $(filter-out $(CI_CHECKS_BUILT),$(CI_CHECKS))
 
 .PHONY: ci-checks ci-checks-built ci-checks-source

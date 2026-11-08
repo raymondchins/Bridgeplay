@@ -203,7 +203,7 @@ origin=$work/origin.git
 git_in "$work" init -q --bare "$origin"
 fx=$work/fx
 mkdir -p "$fx/scripts" "$fx/dylib" "$fx/compat" "$fx/src" "$fx/app/Sources/BridgeplayApp/Model"
-for s in release-local release-lib ledger-lib build-ledger; do
+for s in release-local release-lib ledger-lib build-ledger version-lib; do
 	tr -d '\r' <"$repo/scripts/$s.sh" >"$fx/scripts/$s.sh"
 done
 printf 'build/\nout/\n.build/\n' >"$fx/.gitignore"
