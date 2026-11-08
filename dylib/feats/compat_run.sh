@@ -1940,6 +1940,13 @@ EOF_MATCHES
 # back one that a killed launch left nested. No move starts while one is unresolved.
 fold_move() {
   ! present "$fold_record" || return 1
+  # The note is one path per line, so a name with a line break stays put.
+  case "${1#"$users"/}${2#"$users"/}" in *'
+'*)
+    echo "=== ${1#"$users"/} has a line break in its name, rename it to move it into steamuser ===" \
+      >> "$log" 2>&1 || true
+    return 1 ;;
+  esac
   moving=$(stat -f %i "$1" 2>/dev/null) || return 1
   printf '%s\n%s\n%s\n' "$moving" "${1#"$users"/}" "${2#"$users"/}" > "$fold_record" || return 1
   mv -n "$1" "$2" 2>> "$log" || return 1
@@ -1953,7 +1960,8 @@ fold_unnest() {
   present "$fold_record" || return 0
   fold_moved="" fold_source="" fold_target=""
   if [ -f "$fold_record" ] && [ ! -L "$fold_record" ]; then
-    { read -r fold_moved && read -r fold_source && read -r fold_target; } < "$fold_record" || true
+    { IFS= read -r fold_moved && IFS= read -r fold_source && IFS= read -r fold_target; } \
+      < "$fold_record" || true
   fi
   case "/$fold_source/:/$fold_target/" in
     *//*|*/../*|*/./*) fold_moved="" ;;

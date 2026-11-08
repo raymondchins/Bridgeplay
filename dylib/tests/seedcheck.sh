@@ -811,6 +811,34 @@ check test "$(readlink "$users/tester BACKUP/Documents")" = "$case_root/home/Doc
 check grep -qF "tester/Documents led to $case_root/home/Documents, whose files stay there" "$log"
 check test "$(wc -l < "$case_root/notified" | tr -d ' ')" = 1
 
+# Names that end in a space or a tab move, and their note is cleared.
+split_fixture
+printf space > "$mine/trailing "
+printf tab > "$mine/tab	"
+mkdir -p "$mine/folder "
+printf inner > "$mine/folder /slot.sav"
+mkdir -p "$cloud/folder "
+check lay_out_proton_profile
+check test "$(cat "$cloud/trailing ")" = space
+check test "$(cat "$cloud/tab	")" = tab
+check test "$(cat "$cloud/folder /slot.sav")" = inner
+check test ! -e "$users/.notproton-fold-moving"
+check test "$(readlink "$users/tester")" = steamuser
+
+# A line break would split the note, so that name stays where it is and the launch stops.
+split_fixture
+printf broken > "$mine/line
+break.sav"
+check test "$(lay_out_proton_profile && echo launched || echo stopped)" = stopped
+check test "$(cat "$mine/line
+break.sav")" = broken
+check test ! -e "$users/.notproton-fold-moving"
+check grep -q 'has a line break in its name' "$log"
+rm "$mine/line
+break.sav"
+check lay_out_proton_profile
+check test "$(readlink "$users/tester")" = steamuser
+
 # A file that cannot move stops the launch with everything still on one side or the other.
 split_fixture
 chmod 500 "$mine"
