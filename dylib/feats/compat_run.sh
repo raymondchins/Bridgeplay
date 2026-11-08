@@ -916,13 +916,13 @@ rockstar_shim_copy() {
   cmp -s "$1" "$2" || LC_ALL=C grep -qaF 'rockstar-shim: ' "$2"
 }
 
-# DXVK's dxgi carries no such prefix, so a dxgi.dll a launch staged is known by the sha256 it
-# noted beside it, also after an engine update changed dxgx.dll or on an engine without it.
+# DXVK's dxgi carries no such prefix and a player may copy the same release there by hand, so
+# a dxgi.dll is ours only when it has the sha256 a launch noted beside it on staging. That
+# also holds after an engine update changed dxgx.dll and on an engine without it.
 rockstar_dxgi_copy() {
-  rockstar_shim_copy "$shim/dxgx.dll" "$1" && return 0
-  [ -f "$1.bridgeplay-staged" ] && [ ! -L "$1.bridgeplay-staged" ] || return 1
-  [ "$(sed -n 1p "$1.bridgeplay-staged" 2>/dev/null)" \
-    = "$(/usr/bin/shasum -a 256 "$1" 2>/dev/null | cut -d ' ' -f 1)" ]
+  [ -f "$1" ] && [ ! -L "$1" ] && [ -f "$1.bridgeplay-staged" ] && [ ! -L "$1.bridgeplay-staged" ] || return 1
+  noted=$(sed -n 1p "$1.bridgeplay-staged" 2>/dev/null)
+  [ -n "$noted" ] && [ "$noted" = "$(/usr/bin/shasum -a 256 "$1" 2>/dev/null | cut -d ' ' -f 1)" ]
 }
 
 # Opens fd $1 on the lock file $2, created readable by every macOS user sharing the folder:
@@ -1046,11 +1046,17 @@ rockstar_shim_folders() {
           elif [ "$dir" != "$social_club" ]; then
             # Other macOS users' launches read it too.
             chmod a+r "$target" 2>/dev/null || true
-            if [ "$name" = dxgi.dll ] \
-              && ! { /usr/bin/shasum -a 256 "$target" | cut -d ' ' -f 1 > "$target.bridgeplay-staged"; } 2>> "$log"; then
+            # Written aside and renamed over, so a link another user puts at the note's name is
+            # replaced, never written through, and a note another user wrote is still updated.
+            note="$target.bridgeplay-staged"
+            if [ "$name" = dxgi.dll ] && ! {
+              sum=$(/usr/bin/shasum -a 256 "$target" | cut -d ' ' -f 1) && [ -n "$sum" ] \
+                && rm -f "$note.$$" && (umask 022; set -C; printf '%s\n' "$sum" > "$note.$$") \
+                && mv -f "$note.$$" "$note"
+            } 2>> "$log"; then
+              rm -f "$note.$$" 2>/dev/null || true
               graphics_log "rockstar-shim: could not note the dxgi.dll staged in $dir"
             fi
-            chmod a+r "$target.bridgeplay-staged" 2>/dev/null || true
           fi
           continue
         fi

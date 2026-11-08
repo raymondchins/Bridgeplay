@@ -62,7 +62,7 @@ the shim's `DllMain` runs and the substitution above would come too late (the ga
 dxgi. A `dxgi.dll` the folder already had is moved to `dxgi.dll.bridgeplay-orig` and put back, with the same lock and
 in-use marks as `version.dll`. The staged copy's sha256 goes in `dxgi.dll.bridgeplay-staged`, so
 it is still known as ours after an engine update changes `dxgx.dll` or on an engine without the
-shim, and comes out. That folder gets no `version.dll`: `DllMain` does nothing in
+shim, and comes out. A `dxgi.dll` without that note, even one identical to `dxgx.dll`, is the player's. That folder gets no `version.dll`: `DllMain` does nothing in
 `SanAndreas.exe`, and a mod loader's `version.dll` there keeps loading.
 
 ## Build

@@ -1094,6 +1094,39 @@ user_conf 'BACKEND=dxvk'
 rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
 is "and without the key nothing of ours is left" "no|no|no" \
 	"$([ -e "$win64/dxgi.dll" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
+# The same DXVK release copied there by hand has no note, so it is the player's: set aside
+# while the key is on and put back after.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+cp "$shim_src/dxgx.dll" "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "a hand-copied DXVK dxgi.dll is set aside, not taken as ours" "yes" \
+	"$(cmp -s "$shim_src/dxgx.dll" "$win64/dxgi.dll.bridgeplay-orig" && echo yes || echo no)"
+user_conf 'BACKEND=dxvk'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "and without the key it is back, not deleted" "yes|no" \
+	"$(cmp -s "$shim_src/dxgx.dll" "$win64/dxgi.dll" && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+# A link another user put at the note's name is replaced, never written through, and a note
+# this user cannot write is still updated.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64"
+printf 'keep me' > "$case_dir/victim"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+rm "$win64/dxgi.dll.bridgeplay-staged"
+ln -s "$case_dir/victim" "$win64/dxgi.dll.bridgeplay-staged"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "a linked note's target is untouched" "keep me" "$(cat "$case_dir/victim")"
+is "and the note is a file of its own" "file" "$([ -f "$win64/dxgi.dll.bridgeplay-staged" ] && [ ! -L "$win64/dxgi.dll.bridgeplay-staged" ] && echo file || echo other)"
+chmod 444 "$win64/dxgi.dll.bridgeplay-staged"
+printf 'newer dxvk dxgi' > "$shim_src/dxgx.dll"
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "a read-only note is updated with the new copy" "$(/usr/bin/shasum -a 256 "$shim_src/dxgx.dll" | cut -d ' ' -f 1)" \
+	"$(cat "$win64/dxgi.dll.bridgeplay-staged")"
+
 # A dxgi.dll the user put over the staged one is theirs.
 rockstar_case
 win64="$case_dir/game/Gameface/Binaries/Win64"
