@@ -920,22 +920,35 @@ rockstar_shim_copy() {
 # player's file; while one that would cannot be removed, the file stays in its backup.
 rockstar_put_back() {
   case "$2" in */dxgi.dll)
-    if ! rm -f "$2.bridgeplay-staged" 2>> "$log" \
-      && [ "$(sed -n 1p "$2.bridgeplay-staged" 2>/dev/null)" \
-        = "$(/usr/bin/shasum -a 256 "$1" 2>/dev/null | cut -d ' ' -f 1)" ]; then
-      return 1
+    if ! rm -f "$2.bridgeplay-staged" 2>> "$log"; then
+      sum=$(/usr/bin/shasum -a 256 "$1" 2>/dev/null | cut -d ' ' -f 1)
+      [ -n "$sum" ] && ! grep -qxF -- "$sum" "$2.bridgeplay-staged" 2>/dev/null || return 1
     fi ;;
   esac
   mv "$1" "$2" 2>> "$log"
 }
 
 # DXVK's dxgi carries no such prefix and a player may copy the same release there by hand, so
-# a dxgi.dll is ours only when it has the sha256 a launch noted beside it on staging. That
+# a dxgi.dll is ours only when its sha256 is one a launch noted beside it before staging. That
 # also holds after an engine update changed dxgx.dll and on an engine without it.
 rockstar_dxgi_copy() {
   [ -f "$1" ] && [ ! -L "$1" ] && [ -f "$1.bridgeplay-staged" ] && [ ! -L "$1.bridgeplay-staged" ] || return 1
-  noted=$(sed -n 1p "$1.bridgeplay-staged" 2>/dev/null)
-  [ -n "$noted" ] && [ "$noted" = "$(/usr/bin/shasum -a 256 "$1" 2>/dev/null | cut -d ' ' -f 1)" ]
+  sum=$(/usr/bin/shasum -a 256 "$1" 2>/dev/null | cut -d ' ' -f 1)
+  [ -n "$sum" ] && grep -qxF -- "$sum" "$1.bridgeplay-staged"
+}
+
+# Writes the sha256s after $1 to the note $1, one per line. Written aside and renamed over, so
+# a link another user puts at the note's name is replaced, never written through, and a note
+# another user wrote is still updated. A folder at that name fails it.
+rockstar_note() {
+  note=$1
+  shift
+  if rm -f "$note.$$" && (umask 022; set -C; printf '%s\n' "$@" > "$note.$$") \
+    && { [ ! -L "$note" ] || rm -f "$note"; } && [ ! -d "$note" ] && mv -f "$note.$$" "$note"; then
+    return 0
+  fi
+  rm -f "$note.$$" 2>/dev/null || true
+  return 1
 }
 
 # Opens fd $1 on the lock file $2, created readable by every macOS user sharing the folder:
@@ -1053,27 +1066,26 @@ rockstar_shim_folders() {
             moved=1
             graphics_log "rockstar-shim: moved the $name in $dir to $name.bridgeplay-orig"
           fi
+          # DXVK's dxgi is noted before it is staged, along with the copy of ours it replaces,
+          # so a launch killed at any point leaves every dxgi.dll of ours known as ours.
+          old=""
+          if [ "$name" = dxgi.dll ]; then
+            sum=$(/usr/bin/shasum -a 256 "$src" 2>/dev/null | cut -d ' ' -f 1)
+            [ "$is_shim" = 0 ] || old=$(/usr/bin/shasum -a 256 "$target" 2>/dev/null | cut -d ' ' -f 1)
+            if [ -z "$sum" ] || ! rockstar_note "$target.bridgeplay-staged" "$sum" ${old:+"$old"} 2>> "$log"; then
+              graphics_log "rockstar-shim: could not note the dxgi.dll to stage in $dir, left as it was"
+              [ "$moved" = 0 ] || rockstar_put_back "$saved" "$target" || true
+              continue
+            fi
+          fi
           if ! stage_backend_file "$src" "$target"; then
             graphics_log "rockstar-shim: could not stage $name into $dir"
             [ "$moved" = 0 ] || rockstar_put_back "$saved" "$target" || true
           elif [ "$dir" != "$social_club" ]; then
             # Other macOS users' launches read it too.
             chmod a+r "$target" 2>/dev/null || true
-            # Written aside and renamed over, so a link another user puts at the note's name is
-            # replaced, never written through, and a note another user wrote is still updated.
-            note="$target.bridgeplay-staged"
-            if [ "$name" = dxgi.dll ] && ! {
-              sum=$(/usr/bin/shasum -a 256 "$target" | cut -d ' ' -f 1) && [ -n "$sum" ] \
-                && rm -f "$note.$$" && (umask 022; set -C; printf '%s\n' "$sum" > "$note.$$") \
-                && { [ ! -L "$note" ] || rm -f "$note"; } && [ ! -d "$note" ] \
-                && mv -f "$note.$$" "$note"
-            } 2>> "$log"; then
-              rm -f "$note.$$" 2>/dev/null || true
-              # Unnoted, it could not be told from the player's own later, so it comes out.
-              graphics_log "rockstar-shim: could not note the dxgi.dll staged in $dir, taken out again"
-              rm -f "$target" 2>> "$log" && { { [ ! -e "$saved" ] && [ ! -L "$saved" ]; } \
-                || rockstar_put_back "$saved" "$target"; } || true
-            fi
+            # The copy it replaced is gone.
+            [ -z "$old" ] || rockstar_note "$target.bridgeplay-staged" "$sum" 2>> "$log" || true
           fi
           continue
         fi
