@@ -10,7 +10,7 @@
 # resolved automatically is dylib/version.h: Bridgeplay's lines are kept and
 # NOTPROTON_VERSION takes upstream's value. Any other conflict aborts that merge and
 # leaves the tree untouched. After a merge on main, scripts/bump-version.sh patch is committed;
-# on dev (BRIDGEPLAY_BETA_BRANCH, default dev), where betas are built, nothing is bumped.
+# on develop (BRIDGEPLAY_BETA_BRANCH, default develop), where betas are built, nothing is bumped.
 
 set -eu
 
@@ -88,11 +88,11 @@ for entry in $pending; do
 	echo "==> kept Bridgeplay's version.h, NotProton $theirs"
 done
 
-# On dev nothing is bumped: the committed version stays X.Y.Z there, and the stable that
+# On develop nothing is bumped: the committed version stays X.Y.Z there, and the stable that
 # ships the beta takes the bump. On main (a security or crash hotfix from upstream) an upstream
 # merge is a patch: versions move slowly, see docs/RELEASING.md.
 branch=$(git symbolic-ref -q --short HEAD || true)
-if [ "$branch" = "${BRIDGEPLAY_BETA_BRANCH:-dev}" ]; then
+if [ "$branch" = "${BRIDGEPLAY_BETA_BRANCH:-develop}" ]; then
 	echo "==> on $branch: no version bump committed; the stable that ships this beta gets it"
 elif [ "$(product_of <dylib/version.h)" = "$ours_before" ]; then
 	scripts/bump-version.sh patch

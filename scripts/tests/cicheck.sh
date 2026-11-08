@@ -222,27 +222,32 @@ jobs_file() { # jobs_file <id> <scope> <build> <checks> <gate>
 	printf 'change scope%s%s\nfull app build%s%s\nsource checks%s%s\napp gate%s%s\n' \
 		"$tab" "$2" "$tab" "$3" "$tab" "$4" "$tab" "$5" >"$FAKE_DIR/jobs.$1"
 }
+runs_file() { # runs_file <sha> <id>...: push runs on main, newest first
+	sha=$1
+	shift
+	for id in "$@"; do printf '%s\tpush\tmain\n' "$id"; done >"$FAKE_DIR/runs.$sha"
+}
 reset_fake() { rm -f "$FAKE_DIR"/runs.* "$FAKE_DIR"/jobs.* "$FAKE_DIR/calls" "$FAKE_DIR/list-fails"; }
 passed_run() { PATH="$work/bin:$PATH" sh "$root/scripts/ci-run-passed.sh" owner/repo abc123; }
 
 reset_fake
 jobs_file 20 success success success success
-printf '20\n' >"$FAKE_DIR/runs.abc123"
+runs_file abc123 20
 yes "run: both heavy jobs succeeded" passed_run
 if grep -q 'run list -R owner/repo -w app --commit abc123 --status success' "$FAKE_DIR/calls"; then ok; else bad "run: wrong gh run list query: $(cat "$FAKE_DIR/calls")"; fi
 
 reset_fake
 jobs_file 30 success skipped skipped success
-printf '30\n' >"$FAKE_DIR/runs.abc123"
+runs_file abc123 30
 no "run: docs-only run, gate green but nothing built" passed_run
 
 jobs_file 20 success success success success
-printf '30\n20\n' >"$FAKE_DIR/runs.abc123"
+runs_file abc123 30 20
 yes "run: newest is docs-only, an older full run counts" passed_run
 
 reset_fake
 jobs_file 20 success success failure failure
-printf '20\n' >"$FAKE_DIR/runs.abc123"
+runs_file abc123 20
 no "run: checks failed" passed_run
 jobs_file 20 success skipped success success
 no "run: build skipped" passed_run
@@ -257,10 +262,41 @@ no "run: job list unreadable" passed_run
 reset_fake
 no "run: no run for the commit" passed_run
 jobs_file 20 success success success success
-printf '20\n' >"$FAKE_DIR/runs.abc123"
+runs_file abc123 20
 : >"$FAKE_DIR/list-fails"
 no "run: gh run list fails" passed_run
 no "run: wrong arguments" sh "$root/scripts/ci-run-passed.sh" owner/repo
+
+# Which runs count: a push on main, develop, dev or release/*, nothing else (review R10).
+one_run() { # one_run <event> <branch>: a single run with both heavy jobs green
+	reset_fake
+	jobs_file 40 success success success success
+	printf '40\t%s\t%s\n' "$1" "$2" >"$FAKE_DIR/runs.abc123"
+}
+for b in main develop dev release/0.7.70 release/0.7/rc1; do
+	one_run push "$b"
+	yes "run: push on $b counts" passed_run
+done
+one_run pull_request main
+no "run: pull request run with the right job names is ignored" passed_run
+one_run pull_request develop
+no "run: pull request run from a branch named develop is ignored" passed_run
+one_run workflow_dispatch main
+no "run: manual run on main is ignored" passed_run
+one_run workflow_dispatch release/0.7.70
+no "run: manual run on a release branch is ignored" passed_run
+for b in feat/x main2 developer devx releases/1 release/ xrelease/1 ''; do
+	one_run push "$b"
+	no "run: push on '$b' is ignored" passed_run
+done
+reset_fake
+jobs_file 40 success success success success
+jobs_file 41 success success success success
+printf '41\tpull_request\tmain\n40\tpush\tdevelop\n' >"$FAKE_DIR/runs.abc123"
+yes "run: an ignored run is skipped for a counting one behind it" passed_run
+if grep -q 'run view 41' "$FAKE_DIR/calls"; then bad "run: the ignored run's jobs were read"; else ok; fi
+if grep -q -- '--event push' "$FAKE_DIR/calls"; then ok; else bad "run: the query is not limited to push runs"; fi
+no "run: gh missing" env PATH="/nonexistent" /bin/sh "$root/scripts/ci-run-passed.sh" owner/repo abc123
 
 # ci_passed, the release's walk back over the last commits. Its helpers are the repo's own
 # scripts, copied beside a scratch history: c1 code, c2 docs, c3 the version bump.
@@ -295,34 +331,70 @@ else
 	jobs_file 11 success success success success
 	jobs_file 22 success skipped skipped success
 	make_history docs README.md
-	printf '11\n' >"$FAKE_DIR/runs.$c1"
-	printf '22\n' >"$FAKE_DIR/runs.$c2"
+	runs_file "$c1" 11
+	runs_file "$c2" 22
 	eq "ci_passed: the docs-only run is passed over for the full run behind it" "$c1" "$(walk)"
 
 	reset_fake
 	jobs_file 22 success skipped skipped success
 	jobs_file 11 success skipped skipped success
-	printf '11\n' >"$FAKE_DIR/runs.$c1"
-	printf '22\n' >"$FAKE_DIR/runs.$c2"
+	runs_file "$c1" 11
+	runs_file "$c2" 22
 	no "ci_passed: only docs-only runs, so the checks run locally" walk
 
 	reset_fake
 	jobs_file 33 success success success success
-	printf '33\n' >"$FAKE_DIR/runs.$c3"
+	runs_file "$c3" 33
 	eq "ci_passed: a full run on the bump commit itself" "$c3" "$(walk)"
 
 	reset_fake
 	make_history code app/a.c
 	jobs_file 11 success success success success
-	printf '11\n' >"$FAKE_DIR/runs.$c1"
+	runs_file "$c1" 11
 	no "ci_passed: code changed after the full run" walk
 
 	reset_fake
 	make_history docs README.md
 	jobs_file 11 success success success success
-	printf '11\n' >"$FAKE_DIR/runs.$c1"
+	runs_file "$c1" 11
 	rm "$repo/.github/docs-only-paths"
 	no "ci_passed: no docs list means can't tell, not same" walk
+
+	# R10: HEAD is a merge commit and only its second parent, a fork's PR head, has a green run.
+	merge_history() {
+		new_repo
+		repo=$work/r
+		printf 'scripts/\n.github/\n' >"$repo/.git/info/exclude"
+		mkdir -p "$repo/scripts" "$repo/.github"
+		cp "$root"/scripts/ci-code-paths.sh "$root"/scripts/ci-run-passed.sh "$repo/scripts/"
+		cp "$root/.github/docs-only-paths" "$repo/.github/"
+		git checkout -q -b fork-pr
+		commit "pr code" app/a.c
+		pr_head=$(git rev-parse HEAD)
+		git checkout -q main
+		gitq merge -q --no-ff -m merge fork-pr
+		merge_head=$(git rev-parse HEAD)
+	}
+	reset_fake
+	merge_history
+	jobs_file 50 success success success success
+	printf '50\tpull_request\tmain\n' >"$FAKE_DIR/runs.$pr_head"
+	no "ci_passed: a merge whose second parent has a green pull request run runs the checks" walk
+	printf '50\tpush\tfeat/x\n' >"$FAKE_DIR/runs.$pr_head"
+	no "ci_passed: a merge whose second parent has a green push run on a feature branch runs the checks" walk
+	printf '50\tpush\tdevelop\n' >"$FAKE_DIR/runs.$pr_head"
+	eq "ci_passed: the same run as a push on develop is reused" "$pr_head" "$(walk)"
+	printf '50\tworkflow_dispatch\tmain\n' >"$FAKE_DIR/runs.$merge_head"
+	rm "$FAKE_DIR/runs.$pr_head"
+	no "ci_passed: a manual run on the merge commit runs the checks" walk
+
+	# no gh: reuse is skipped and the checks run
+	make_history docs README.md
+	jobs_file 11 success success success success
+	runs_file "$c1" 11
+	# shellcheck disable=SC2123 # the walk must not find any gh, stub or real
+	no_gh_walk() { (PATH=/usr/bin:/bin && ci_passed); }
+	no "ci_passed: skipped without gh" no_gh_walk
 fi
 cd "$root" || exit 1
 
@@ -336,8 +408,8 @@ job() { awk -v j="  $1:" '$0 == j { p = 1; next } p && /^  [a-z_-]+:$/ { exit } 
 has() { printf '%s\n' "$2" | grep -Fxq -- "$1"; }
 
 no "app.yml: no path filters" grep -Eq '^[[:space:]]*paths(-ignore)?:' "$app"
-eq "app.yml: push branches" "    branches: [main, dev]" "$(grep -E '^    branches:' "$app")"
-eq "lint.yml: push branches" "    branches: [main, dev]" "$(grep -E '^    branches:' "$lint")"
+eq "app.yml: push branches" "    branches: [main, develop, dev, 'release/**']" "$(grep -E '^    branches:' "$app")"
+eq "lint.yml: push branches" "    branches: [main, develop, dev, 'release/**']" "$(grep -E '^    branches:' "$lint")"
 yes "app.yml: runs on every pull request" grep -Fxq '  pull_request:' "$app"
 no "app.yml: pull requests not limited to a branch" awk '/^  pull_request:/ { p = 1; next } p && /^    branches/ { f = 1 } p && /^  [a-z_]+:/ { p = 0 } END { exit !f }' "$app"
 yes "lint.yml: runs on every pull request" grep -Fxq '  pull_request:' "$lint"

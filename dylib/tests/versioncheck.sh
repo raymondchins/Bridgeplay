@@ -348,22 +348,22 @@ expect_eq "main build" 45 "$(version_in BRIDGEPLAY_BUILD)"
 expect_eq "main commits the bump" "chore(release): bump Bridgeplay to 0.7.3 after upstream merge" \
 	"$(git_in "$wk" log -1 --format=%s)"
 
-# On dev it merges and commits no version change.
-sync_fixture ondev
+# On develop it merges and commits no version change.
+sync_fixture ondevelop
 echo more >"$up/file.txt"
 git_in "$up" commit -q -am "upstream change"
-git_in "$wk" checkout -q -B dev
-expect_ok "sync on dev" sync_upstream x=1
-expect_eq "dev version" 0.7.2 "$(version_in BRIDGEPLAY_VERSION)"
-expect_eq "dev build" 44 "$(version_in BRIDGEPLAY_BUILD)"
-expect_eq "dev merged upstream" more "$(cat "$wk/file.txt")"
+git_in "$wk" checkout -q -B develop
+expect_ok "sync on develop" sync_upstream x=1
+expect_eq "develop version" 0.7.2 "$(version_in BRIDGEPLAY_VERSION)"
+expect_eq "develop build" 44 "$(version_in BRIDGEPLAY_BUILD)"
+expect_eq "develop merged upstream" more "$(cat "$wk/file.txt")"
 case $(git_in "$wk" log --format=%s) in
-	*chore\(release\)*) fail "a version bump was committed on dev" ;;
+	*chore\(release\)*) fail "a version bump was committed on develop" ;;
 	*) pass ;;
 esac
-expect_eq "dev tree is clean" "" "$(git_in "$wk" status --porcelain --untracked-files=no)"
+expect_eq "develop tree is clean" "" "$(git_in "$wk" status --porcelain --untracked-files=no)"
 
-# The dev branch name can be changed; any other branch bumps as on main.
+# The beta branch name can be changed; any other branch bumps as on main, dev included.
 sync_fixture named
 echo more >"$up/file.txt"
 git_in "$up" commit -q -am "upstream change"
@@ -376,9 +376,15 @@ git_in "$up" commit -q -am "upstream change"
 git_in "$wk" checkout -q -B feature
 expect_ok "sync on another branch" sync_upstream x=1
 expect_eq "other branch version" 0.7.3 "$(version_in BRIDGEPLAY_VERSION)"
+sync_fixture olddev
+echo more >"$up/file.txt"
+git_in "$up" commit -q -am "upstream change"
+git_in "$wk" checkout -q -B dev
+expect_ok "sync on dev, no longer special" sync_upstream x=1
+expect_eq "dev version bumps like any branch" 0.7.3 "$(version_in BRIDGEPLAY_VERSION)"
 
 # A version.h conflict is still resolved: Bridgeplay's lines stay, NotProton takes upstream's.
-for branch in main dev; do
+for branch in main develop; do
 	sync_fixture "conflict-$branch"
 	sed 's/^#define NOTPROTON_VERSION ".*"$/#define NOTPROTON_VERSION "1.3.0"/' "$up/dylib/version.h" >"$up/version.h.new"
 	cat "$up/version.h.new" >"$up/dylib/version.h"
@@ -393,7 +399,7 @@ for branch in main dev; do
 	expect_eq "$branch upstream version" 1.3.0 "$(version_in NOTPROTON_VERSION)"
 done
 expect_eq "conflict on main bumps the patch" 0.7.3 "$(define "$work/conflict-main/dylib/version.h" BRIDGEPLAY_VERSION)"
-expect_eq "conflict on dev keeps the version" 0.7.2 "$(define "$work/conflict-dev/dylib/version.h" BRIDGEPLAY_VERSION)"
+expect_eq "conflict on develop keeps the version" 0.7.2 "$(define "$work/conflict-develop/dylib/version.h" BRIDGEPLAY_VERSION)"
 
 if [ "$failures" -ne 0 ]; then
 	echo "==> versioncheck: $failures of $checks checks failed" >&2

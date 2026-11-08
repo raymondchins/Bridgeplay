@@ -4,7 +4,7 @@
 #   BRIDGEPLAY_BETA=N BRIDGEPLAY_BETA_BUILD=B [BRIDGEPLAY_BETA_PLANNED=X.Y.Z] make app
 #   scripts/stamp-beta.sh check | print | apply Info.plist
 #
-# dylib/version.h always holds the plain X.Y.Z, on main and on dev. A beta build is named
+# dylib/version.h always holds the plain X.Y.Z, on main and on develop. A beta build is named
 # after the release it leads to: label X.Y.Z-beta.N with X.Y.Z the planned release, which
 # defaults to the next patch of the committed version; name a milestone minor to override it.
 # It must be above the committed version. The build number B is "the highest build ever

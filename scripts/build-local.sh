@@ -246,11 +246,12 @@ if [ "$run_checks" -eq 1 ] && [ -n "$fingerprint" ] && [ "${BRIDGEPLAY_FORCE_CHE
 	checks_reused=1
 fi
 
-# The app workflow runs the same make ci-checks on every push to main and dev, so a release
-# whose sources (version.h and docs aside) match a commit that workflow passed skips them
-# too: push, let CI pass, bump, release. Needs gh; without it, or with no passing run, the
-# checks run here. A docs-only run is green with its build and checks skipped, so a run
-# counts only when both jobs ran and succeeded (scripts/ci-run-passed.sh).
+# The app workflow runs the same make ci-checks on every push to main, develop, dev and
+# release/*, so a release whose sources (version.h and docs aside) match a commit that
+# workflow passed skips them too: push, let CI pass, bump, release. Needs gh; without it, or
+# with no passing run, the checks run here. A docs-only run is green with its build and
+# checks skipped, so a run counts only when both jobs ran and succeeded, and only a push
+# run does: pull request and manual runs are ignored (scripts/ci-run-passed.sh).
 ci_slug=${BRIDGEPLAY_CI_REPO:-raymondchins/Bridgeplay}
 ci_passed() {
 	command -v gh >/dev/null 2>&1 || return 1
