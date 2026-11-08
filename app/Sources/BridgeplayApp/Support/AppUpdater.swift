@@ -16,6 +16,11 @@ final class AppUpdater {
     // An update downloaded and waiting for quit, or kept to resume, and the beta preference.
     private(set) var pending: PendingUpdate?
     private(set) var betaEnrolled = BetaUpdates.enrolled(.standard)
+    // The hidden switch, the one-time "back on stable" notice, and a Check for Updates that
+    // found no stable release for a build leaving the beta.
+    private(set) var betaUIShown = BetaUpdatesUI.shown(.standard)
+    private(set) var backOnStable = BetaCatchUp.take(running: .current, defaults: .standard)
+    private(set) var leavingNothingFound = false
 
     @ObservationIgnored private let controller: SPUStandardUpdaterController
     // Sparkle holds its delegates weakly.
@@ -24,6 +29,7 @@ final class AppUpdater {
     // Sparkle's own install-and-relaunch for an update waiting for quit.
     @ObservationIgnored private var installNow: (() -> Void)?
     @ObservationIgnored private var preferenceWatch: DefaultsWatch?
+    @ObservationIgnored private var uiWatch: DefaultsWatch?
 
     init() {
         #if DEBUG
@@ -40,6 +46,14 @@ final class AppUpdater {
         finder.report = { [weak self] in self?.flow.apply($0) }
         finder.installerReady = { [weak self] in self?.installNow = $0 }
         finder.pendingChanged = { [weak self] in self?.pending = $0 }
+        finder.checked = { [weak self] found, byUser, state in
+            guard let self else { return }
+            if found || state != .leaving {
+                leavingNothingFound = false
+            } else if byUser {
+                leavingNothingFound = true
+            }
+        }
         whatsNew = LatestRelease.takeWhatsNew(
             build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
         // Async because Sparkle changes this mid-way through closing a session.
@@ -56,6 +70,18 @@ final class AppUpdater {
                 MainActor.assumeIsolated { self?.betaPreferenceChanged() }
             }
         }
+        uiWatch = DefaultsWatch(key: BetaUpdatesUI.shownKey) { [weak self] in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.betaUIShown = BetaUpdatesUI.shown(.standard) }
+            }
+        }
+    }
+
+    var running: RunningBuild { finder.routing.running }
+    var state: UpdaterState { .of(enrolled: betaEnrolled, running: running.channel) }
+
+    func dismissBackOnStable() {
+        backOnStable = nil
     }
 
     // After quit or relaunch: the pending update if there is one (it installs whatever the
@@ -74,6 +100,7 @@ final class AppUpdater {
         let enrolled = BetaUpdates.enrolled(.standard)
         guard enrolled != betaEnrolled else { return }
         betaEnrolled = enrolled
+        leavingNothingFound = false
         AppLog.note("update: beta updates \(enrolled ? "on" : "off")")
         let action = finder.routing.preferenceChanged(enrolled: enrolled,
                                                       sessionInProgress: controller.updater.sessionInProgress)
@@ -150,10 +177,14 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
     var report: ((UpdateEvent) -> Void)?
     var installerReady: ((@escaping () -> Void) -> Void)?
     var pendingChanged: ((PendingUpdate?) -> Void)?
+    // Found or not, whether the user asked, and the state the check ran in.
+    var checked: ((Bool, Bool, UpdaterState) -> Void)?
+    private var userCheck = false
     var routing = UpdateRouting(running: .current, settings: .read(.standard))
 
     func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
         routing.startCheck(settings: .read(.standard))
+        userCheck = updateCheck == .updates
         report?(.cycleStarted(byUser: updateCheck == .updates))
     }
 
@@ -181,6 +212,7 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
                              state: routing.state)
         UpdateLog.note(routing.found(FeedItem(item), feedURL: updater.feedURL?.absoluteString))
         pendingChanged?(routing.pending)
+        checked?(true, userCheck, routing.state)
         report?(.found(version: item.displayVersionString))
     }
 
@@ -189,6 +221,7 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
             .flatMap { SPUNoUpdateFoundReason(rawValue: $0.int32Value) }
         UpdateLog.note(routing.notFound(reason: Self.describe(reason), feedURL: updater.feedURL?.absoluteString))
         pendingChanged?(routing.pending)
+        checked?(false, userCheck, routing.state)
     }
 
     func updater(_ updater: SPUUpdater, willDownloadUpdate item: SUAppcastItem, with request: NSMutableURLRequest) {

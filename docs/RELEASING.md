@@ -193,6 +193,11 @@ writes one `update check:` line to `bridgeplay.log` and the app log. For testing
 `BetaFeedURLOverride` and `StableFeedURLOverride` replace the feeds in any build and are named in
 that line; enclosure signatures are still required.
 
+The switch is hidden in this phase. `defaults write com.bridgeplay.Bridgeplay BetaUpdatesUI -bool
+true` shows **Get beta updates** in the Status page's Updates section; it writes `BetaUpdates`
+only after the user confirms. Without the key, that section appears only while the app is in the
+`beta` or `leaving` state, or once after a build that left the beta lands on stable.
+
 ## Steps
 
 0. Push the changes first and wait for the `app` workflow to pass on them

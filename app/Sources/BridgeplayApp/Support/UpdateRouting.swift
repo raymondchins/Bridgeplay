@@ -41,7 +41,11 @@ enum BetaUpdates {
 
     // Only a real boolean counts: a string, a number or garbage is off.
     static func enrolled(_ defaults: UserDefaults) -> Bool {
-        guard let value = defaults.object(forKey: enrolledKey) as AnyObject?,
+        flag(defaults, key: enrolledKey)
+    }
+
+    static func flag(_ defaults: UserDefaults, key: String) -> Bool {
+        guard let value = defaults.object(forKey: key) as AnyObject?,
               CFGetTypeID(value) == CFBooleanGetTypeID() else { return false }
         return (value as? Bool) ?? false
     }
