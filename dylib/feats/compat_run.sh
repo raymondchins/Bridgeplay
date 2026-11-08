@@ -1065,6 +1065,7 @@ rockstar_shim_folders() {
             if [ "$name" = dxgi.dll ] && ! {
               sum=$(/usr/bin/shasum -a 256 "$target" | cut -d ' ' -f 1) && [ -n "$sum" ] \
                 && rm -f "$note.$$" && (umask 022; set -C; printf '%s\n' "$sum" > "$note.$$") \
+                && { [ ! -L "$note" ] || rm -f "$note"; } && [ ! -d "$note" ] \
                 && mv -f "$note.$$" "$note"
             } 2>> "$log"; then
               rm -f "$note.$$" 2>/dev/null || true

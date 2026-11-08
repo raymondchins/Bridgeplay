@@ -1173,6 +1173,17 @@ is "then it is back for good, with no note" "old dxvk|no|no" \
 	"$(LC_ALL=C grep -q newer "$win64/dxgi.dll" 2>/dev/null && echo new || echo old) dxvk|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)|$([ -e "$win64/dxgi.dll.bridgeplay-staged" ] && echo yes || echo no)"
 is "and is still there" "yes" "$([ -f "$win64/dxgi.dll" ] && echo yes || echo no)"
 
+# A folder at the note's name: nothing is staged and the player's dxgi.dll stays in place.
+rockstar_case
+win64="$case_dir/game/Gameface/Binaries/Win64"
+mkdir -p "$win64/dxgi.dll.bridgeplay-staged"
+printf 'user dxgi' > "$win64/dxgi.dll"
+user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
+rockstar_launch waitforexitandrun "$win64/SanAndreas.exe"
+is "a folder at the note's name stages nothing and leaves the player's dxgi.dll" "user dxgi|no" \
+	"$(cat "$win64/dxgi.dll" 2>/dev/null)|$([ -e "$win64/dxgi.dll.bridgeplay-orig" ] && echo yes || echo no)"
+is "and the folder is left empty" "" "$(ls "$win64/dxgi.dll.bridgeplay-staged")"
+
 # A dxgi.dll the user put over the staged one is theirs.
 rockstar_case
 win64="$case_dir/game/Gameface/Binaries/Win64"
