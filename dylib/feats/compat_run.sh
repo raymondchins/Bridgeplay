@@ -916,6 +916,15 @@ rockstar_shim_copy() {
   cmp -s "$1" "$2" || LC_ALL=C grep -qaF 'rockstar-shim: ' "$2"
 }
 
+# DXVK's dxgi carries no such prefix, so a dxgi.dll a launch staged is known by the sha256 it
+# noted beside it, also after an engine update changed dxgx.dll or on an engine without it.
+rockstar_dxgi_copy() {
+  rockstar_shim_copy "$shim/dxgx.dll" "$1" && return 0
+  [ -f "$1.bridgeplay-staged" ] && [ ! -L "$1.bridgeplay-staged" ] || return 1
+  [ "$(sed -n 1p "$1.bridgeplay-staged" 2>/dev/null)" \
+    = "$(/usr/bin/shasum -a 256 "$1" 2>/dev/null | cut -d ' ' -f 1)" ]
+}
+
 # Opens fd $1 on the lock file $2, created readable by every macOS user sharing the folder:
 # read-write when it can be (some network volumes lock only a writable fd), else read-only.
 # The exclusive create never makes a file through a link another user puts there, and a
@@ -942,9 +951,9 @@ rockstar_shim_in_use() {
   return 1
 }
 
-# Stages, removes or restores version.dll in Social Club and the game folder (and Unreal's exe
-# folder inside it, under the game folder's lock and in-use marks, where DXVK's dxgi goes too
-# as dxgi.dll when $dxgi_wanted is 1). The first lock
+# Stages, removes or restores version.dll in Social Club and the game folder, and DXVK's dxgi
+# as dxgi.dll in Unreal's exe folder inside it when $dxgi_wanted is 1 (under the game folder's
+# lock and in-use marks). The first lock
 # is per macOS user. Several users can share the game folder, so it also gets a lock of its
 # own, taken only when the folder has something of the shim's in it. A volume that cannot
 # hold that lock falls back to the per-user one. Exits 3 when another launch held it.
@@ -964,7 +973,7 @@ rockstar_shim_folders() {
       || [ -e "$win64/version.dll.bridgeplay-orig" ] || [ -L "$win64/version.dll.bridgeplay-orig" ] \
       || rockstar_shim_copy "$shim/version.dll" "$win64/version.dll" \
       || [ -e "$win64/dxgi.dll.bridgeplay-orig" ] || [ -L "$win64/dxgi.dll.bridgeplay-orig" ] \
-      || rockstar_shim_copy "$shim/dxgx.dll" "$win64/dxgi.dll"; then
+      || rockstar_dxgi_copy "$win64/dxgi.dll"; then
       rc=1
       if rockstar_shim_lock_fd 7 "$lock"; then rc=0; /usr/bin/lockf -s -t 30 7 || rc=$?; fi
       if [ "$rc" = 0 ]; then
@@ -990,11 +999,22 @@ rockstar_shim_folders() {
           [ "$dir" = "$win64" ] || continue
           src=$shim/dxgx.dll
           want=$dxgi_wanted
+        elif [ "$dir" = "$win64" ]; then
+          # The shim acts only in SocialClubHelper.exe and GTA5.exe, so the exe folder never
+          # gets it: a mod loader's version.dll there keeps loading. One an earlier build
+          # staged comes out.
+          want=0
         fi
         target="$dir/$name"
         saved="$dir/$name.bridgeplay-orig"
         is_shim=0
-        ! rockstar_shim_copy "$src" "$target" || is_shim=1
+        if [ "$name" = dxgi.dll ]; then
+          ! rockstar_dxgi_copy "$target" || is_shim=1
+          # The note names a copy that is no longer there.
+          [ "$is_shim" = 1 ] || rm -f "$target.bridgeplay-staged" 2>/dev/null || true
+        else
+          ! rockstar_shim_copy "$src" "$target" || is_shim=1
+        fi
         # A launch of an older build killed between claiming the backup name and the move
         # left it empty, with the game's own file still in place. One still claiming it now
         # made it moments ago.
@@ -1026,6 +1046,11 @@ rockstar_shim_folders() {
           elif [ "$dir" != "$social_club" ]; then
             # Other macOS users' launches read it too.
             chmod a+r "$target" 2>/dev/null || true
+            if [ "$name" = dxgi.dll ] \
+              && ! { /usr/bin/shasum -a 256 "$target" | cut -d ' ' -f 1 > "$target.bridgeplay-staged"; } 2>> "$log"; then
+              graphics_log "rockstar-shim: could not note the dxgi.dll staged in $dir"
+            fi
+            chmod a+r "$target.bridgeplay-staged" 2>/dev/null || true
           fi
           continue
         fi
@@ -1038,6 +1063,7 @@ rockstar_shim_folders() {
         fi
         if [ "$is_shim" = 1 ]; then
           rm -f "$target" 2>> "$log" && graphics_log "rockstar-shim: removed $name from $dir"
+          rm -f "$target.bridgeplay-staged" 2>/dev/null || true
         fi
         if [ -e "$saved" ] || [ -L "$saved" ]; then
           if [ -e "$target" ] || [ -L "$target" ]; then
@@ -1056,7 +1082,7 @@ rockstar_shim_folders() {
 # Rockstar Games Launcher and GTA V Legacy (ROCKSTAR_SHIM=1, rockstar-shim/): a version.dll
 # next to SocialClubHelper.exe makes the launcher's CEF windows draw on winemac, and the one
 # next to the game hands GTA5.exe DXVK's dxgi on the dxvk backend. Unreal's exe folder
-# (SanAndreas.exe) also gets DXVK's dxgi as dxgi.dll, as the game imports it statically. A
+# (SanAndreas.exe) gets only DXVK's dxgi as dxgi.dll, as the game imports it statically. A
 # version.dll or dxgi.dll of the game's own (a mod loader) is moved to <name>.bridgeplay-orig
 # first. Without the key, or on an engine without the shim, the staged copy is removed and
 # that file put back, unless another launch is using the folder.
@@ -1103,7 +1129,7 @@ stage_rockstar_shim() {
   [ -z "${STEAM_COMPAT_INSTALL_PATH:-}" ] || win64="$STEAM_COMPAT_INSTALL_PATH/Gameface/Binaries/Win64"
   [ "$folders" = 3 ] || rockstar_shim_copy "$shim/version.dll" "${STEAM_COMPAT_INSTALL_PATH:-}/version.dll" \
     || { [ -n "$win64" ] && rockstar_shim_copy "$shim/version.dll" "$win64/version.dll"; } \
-    || { [ -n "$win64" ] && rockstar_shim_copy "$shim/dxgx.dll" "$win64/dxgi.dll"; } || exec 5>&-
+    || { [ -n "$win64" ] && rockstar_dxgi_copy "$win64/dxgi.dll"; } || exec 5>&-
   gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}version=n,b"
   # dxgx.dll is DXVK's dxgi under a name the backend's dxgi=b does not cover.
   if [ "$backend" = dxvk ] && [ -f "$shim/dxgx.dll" ]; then

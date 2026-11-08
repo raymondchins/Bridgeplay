@@ -3,10 +3,10 @@
 `version.dll` for the Rockstar Games Launcher, GTA V Legacy and GTA San Andreas DE, staged by the
 run script when a game's conf says `ROCKSTAR_SHIM=1` (`gamefixes/271590.conf`, `gamefixes/1547000.conf`). It goes next to
 `SocialClubHelper.exe` (`C:\Program Files\Rockstar Games\Social Club`) and next to the game's
-exe (for San Andreas, `Gameface/Binaries/Win64`), never into `system32`, and the run script adds `version=n,b`. Every export forwards to
+exe, never into `system32`, and the run script adds `version=n,b`. Every export forwards to
 kernelbase/kernel32. `DllMain` acts in two processes (SocialClubHelper.exe, GTA5.exe) and nowhere else.
 
-A `version.dll` (and in San Andreas's folder a `dxgi.dll`) already in any of these folders is moved to `<name>.bridgeplay-orig` and put back
+A `version.dll` (and in San Andreas's exe folder a `dxgi.dll`) already in any of these folders is moved to `<name>.bridgeplay-orig` and put back
 when the key is off or the engine has no shim. Several macOS users can share a game folder, so
 it gets `.bridgeplay-rockstar-shim.lock`, and each launch that stages the shim holds an
 `.inuse` file there until its launch ends; while one is held, the shim stays. The run script knows a staged copy, from this
@@ -60,8 +60,10 @@ the shim's `DllMain` runs and the substitution above would come too late (the ga
 `0xc0000005`, reported by a tester). Instead the run script copies `dxgx.dll` to
 `Gameface/Binaries/Win64/dxgi.dll` beside the exe and adds `dxgi=n,b`, so the import resolves to DXVK's
 dxgi. A `dxgi.dll` the folder already had is moved to `dxgi.dll.bridgeplay-orig` and put back, with the same lock and
-in-use marks as `version.dll`. Only a copy identical to the shipped `dxgx.dll` counts as ours, so
-after an engine update that changes it the old copy is set aside as the user's.
+in-use marks as `version.dll`. The staged copy's sha256 goes in `dxgi.dll.bridgeplay-staged`, so
+it is still known as ours after an engine update changes `dxgx.dll` or on an engine without the
+shim, and comes out. That folder gets no `version.dll`: `DllMain` does nothing in
+`SanAndreas.exe`, and a mod loader's `version.dll` there keeps loading.
 
 ## Build
 
