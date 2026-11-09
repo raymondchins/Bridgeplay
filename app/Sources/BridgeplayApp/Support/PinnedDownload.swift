@@ -71,7 +71,10 @@ enum PinnedDownload {
         var refusals: [String] = []
         var kinds: Set<Refusal> = []
         hosts: for base in bases {
-            let host = base.host() ?? base.absoluteString
+            var host = base.host() ?? base.absoluteString
+            var request = URLRequest(url: base.appending(path: file))
+            // Used once: a busy github.com release link is asked for through the API.
+            var lookup = githubReleaseLookup(base)
             var busy = 0
             while true {
                 report(.fetching(host: host))
@@ -86,8 +89,17 @@ enum PinnedDownload {
                             let relay = ProgressRelay(host: host, report: report)
                             defer { relay.finish() }
                             do {
-                                if let resumeData { return try await session.download(resumeFrom: resumeData, delegate: relay) }
-                                return try await session.download(from: base.appending(path: file), delegate: relay)
+                                if let resumeData {
+                                    let (body, response) = try await session.download(resumeFrom: resumeData, delegate: relay)
+                                    guard let http = response as? HTTPURLResponse, ![200, 206].contains(http.statusCode) else {
+                                        return (body, response)
+                                    }
+                                    // GitHub's signed link lasts an hour: once it has expired, start
+                                    // again from the request that hands out a new one.
+                                    try? FileManager.default.removeItem(at: body)
+                                    AppLog.note("\(file) from \(host) answered \(http.statusCode) to a resume, starting again")
+                                }
+                                return try await session.download(for: request, delegate: relay)
                             } catch let error as URLError where attempt < 4 && error.downloadTaskResumeData != nil {
                                 resumeData = error.downloadTaskResumeData
                                 AppLog.note("\(file) from \(host) interrupted (\(error.localizedDescription)), resuming")
@@ -109,7 +121,8 @@ enum PinnedDownload {
                 if let http = response as? HTTPURLResponse, ![200, 206].contains(http.statusCode) {
                     // #2727: github.com answers a passing 504 now and then, and the engine has
                     // only that one host. Ask it again before giving up on it.
-                    if busy < 2, http.statusCode == 408 || http.statusCode == 429 || (500...599).contains(http.statusCode) {
+                    let isBusy = http.statusCode == 408 || http.statusCode == 429 || (500...599).contains(http.statusCode)
+                    if busy < 2, isBusy {
                         busy += 1
                         AppLog.note("\(file) from \(host) answered \(http.statusCode), asking again")
                         try await Task.sleep(for: backoff * busy)
@@ -117,6 +130,16 @@ enum PinnedDownload {
                     }
                     refusals.append("\(host) answered \(http.statusCode)")
                     kinds.insert(.answered)
+                    // #3059: github.com's download route can stay down for hours while the API
+                    // serves the same asset. The pin still decides what is kept.
+                    if isBusy, let tags = lookup {
+                        lookup = nil
+                        AppLog.note("\(file) from \(host) answered \(http.statusCode), trying api.github.com")
+                        if let asset = await githubAsset(file, lookup: tags, session: session) {
+                            (request, host, busy) = (asset, "api.github.com", 0)
+                            continue
+                        }
+                    }
                     continue hosts
                 }
 
@@ -146,6 +169,44 @@ enum PinnedDownload {
 
         AppLog.note("\(file) refused by all \(bases.count) hosts: \(refusals.joined(separator: ". "))")
         throw StepFailure(step: step, detail: reason(kinds, from: source))
+    }
+
+    /// The API lookup for a github.com/<owner>/<repo>/releases/download/<tag> base, nil for any other.
+    static func githubReleaseLookup(_ base: URL) -> URL? {
+        let parts = base.pathComponents
+        guard base.scheme == "https", base.host() == "github.com", parts.count == 6,
+              parts[3] == "releases", parts[4] == "download" else { return nil }
+        return URL(string: "https://api.github.com/repos")!
+            .appending(components: parts[1], parts[2], "releases", "tags", parts[5])
+    }
+
+    // The asset's API URL, asked for as bytes. Nil when the lookup is refused (a 403 when the
+    // 60 an hour unauthenticated limit is spent) or the release has no such file.
+    private static func githubAsset(_ file: String, lookup: URL, session: URLSession) async -> URLRequest? {
+        struct Release: Decodable {
+            struct Asset: Decodable { let name: String; let url: URL }
+            let assets: [Asset]
+        }
+        var ask = URLRequest(url: lookup)
+        ask.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        do {
+            let (data, response) = try await session.data(for: ask)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard status == 200 else {
+                AppLog.note("api.github.com answered \(status) to \(lookup.path())")
+                return nil
+            }
+            guard let asset = try JSONDecoder().decode(Release.self, from: data).assets.first(where: { $0.name == file }) else {
+                AppLog.note("api.github.com lists no \(file) at \(lookup.path())")
+                return nil
+            }
+            var request = URLRequest(url: asset.url)
+            request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
+            return request
+        } catch {
+            AppLog.note("api.github.com lookup of \(file) failed: \(error.localizedDescription)")
+            return nil
+        }
     }
 
     /// Returns once macOS reports a usable network, or after `limit`.

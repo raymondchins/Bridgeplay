@@ -431,4 +431,127 @@ struct PinnedDownloadTests {
         #expect((try? result.get()) == nil)
         #expect(asked == 1)
     }
+
+    // github.com/<key>/<mode>/releases/download/v1/ answers 504 for good (#3059), as does
+    // mirror.invalid with the same path; the API route serves the file unless <mode> says not.
+    private final class GitHub: URLProtocol, @unchecked Sendable {
+        static let body = Data("the real package".utf8)
+        private static let lock = NSLock()
+        nonisolated(unsafe) private static var seen: [String: [String]] = [:]
+        static func asked(_ key: String) -> [String] { lock.withLock { seen[key] ?? [] } }
+
+        override class func canInit(with request: URLRequest) -> Bool {
+            ["github.com", "mirror.invalid", "api.github.com", "assets.invalid"].contains(request.url?.host() ?? "")
+        }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {
+            let url = request.url!, host = url.host()!, path = url.pathComponents
+            let (key, mode) = host == "api.github.com" ? (path[2], path[3]) : (path[1], path[2])
+            let accept = request.value(forHTTPHeaderField: "Accept") ?? ""
+            let what: String, status: Int, body: Data
+            switch host {
+            case "api.github.com" where path[5] == "tags":
+                what = "lookup"
+                status = ["lookup403": 403, "lookup404": 404][mode] ?? 200
+                let name = mode == "noasset" ? "other.tar" : "package.tar"
+                body = Data("""
+                    {"assets": [{"name": "\(name).sha256", "url": "https://api.github.com/repos/\(key)/\(mode)/releases/assets/2"},
+                                {"name": "\(name)", "url": "https://api.github.com/repos/\(key)/\(mode)/releases/assets/1"}]}
+                    """.utf8)
+            case "api.github.com" where accept == "application/octet-stream":
+                what = "asset \(path[6])"
+                guard mode != "assetdown" else { (status, body) = (504, Data()); break }
+                let blob = URL(string: "https://assets.invalid/\(key)/\(mode)/\(path[6])")!
+                Self.lock.withLock { Self.seen[key, default: []].append(what) }
+                client?.urlProtocol(
+                    self, wasRedirectedTo: URLRequest(url: blob),
+                    redirectResponse: HTTPURLResponse(url: url, statusCode: 302, httpVersion: nil, headerFields: ["Location": blob.absoluteString])!)
+                return
+            case "assets.invalid":
+                (what, status, body) = ("blob \(path[3])", 200, Self.body)
+            default:
+                (what, status, body) = (host, 504, Data("<h1>504 Gateway Time-out</h1>".utf8))
+            }
+            Self.lock.withLock { Self.seen[key, default: []].append(what) }
+            let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: body)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        override func stopLoading() {}
+    }
+
+    private func github(_ mode: String, host: String = "github.com", then next: [URL] = [])
+        async throws -> (Result<Data, StepFailure>, asked: [String])
+    {
+        let work = try scratchDirectory("pinned")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let key = UUID().uuidString
+        do {
+            let got = try await PinnedDownload.obtain(
+                file: "package.tar", sha256: Digest.sha256(of: GitHub.body),
+                bases: [URL(string: "https://\(host)/\(key)/\(mode)/releases/download/v1")!] + next,
+                into: work.appending(path: "downloads"), step: "test", from: "GitHub",
+                session: PinnedDownload.session(deadline: 30, protocols: [GitHub.self]), backoff: .zero)
+            return (.success(try Data(contentsOf: got)), GitHub.asked(key))
+        } catch let failure as StepFailure {
+            return (.failure(failure), GitHub.asked(key))
+        }
+    }
+
+    @Test("A github.com download that stays down is fetched through api.github.com (#3059)")
+    func githubDownTriesTheAPI() async throws {
+        let (result, asked) = try await github("up")
+        #expect(try result.get() == GitHub.body)
+        #expect(asked == ["github.com", "github.com", "github.com", "lookup", "asset 1", "blob 1"])
+    }
+
+    @Test("A host that is not github.com never goes to api.github.com")
+    func otherHostSkipsTheAPI() async throws {
+        let (result, asked) = try await github("up", host: "mirror.invalid")
+        #expect((try? result.get()) == nil)
+        #expect(asked == ["mirror.invalid", "mirror.invalid", "mirror.invalid"])
+    }
+
+    @Test("An API lookup that is refused falls through to the next host",
+          arguments: ["lookup403", "lookup404", "noasset"])
+    func refusedLookupFallsThrough(mode: String) async throws {
+        let work = try scratchDirectory("pinned")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let honest = try host(work, named: "package.tar", serving: "the real package")
+
+        let (result, asked) = try await github(mode, then: [honest])
+        #expect(try result.get() == GitHub.body)
+        #expect(asked == ["github.com", "github.com", "github.com", "lookup"])
+    }
+
+    @Test("With no host left, a refused API lookup keeps the usual refusal")
+    func refusedLookupKeepsTheRefusal() async throws {
+        let (result, asked) = try await github("lookup403")
+        guard case .failure(let failure) = result else { Issue.record("downloaded with the API refusing"); return }
+        #expect(failure.detail.contains("could not download the files it needs from GitHub"))
+        #expect(asked.count == 4)
+    }
+
+    @Test("An API asset route that is down too is asked again, then given up on")
+    func apiDownIsGivenUpOn() async throws {
+        let (result, asked) = try await github("assetdown")
+        #expect((try? result.get()) == nil)
+        #expect(asked == ["github.com", "github.com", "github.com", "lookup", "asset 1", "asset 1", "asset 1"])
+    }
+
+    @Test("Only github.com release download links have an API lookup")
+    func releaseLookupURL() {
+        let lookup = PinnedDownload.githubReleaseLookup(
+            URL(string: "https://github.com/dappermint/winecx-gptk/releases/download/runtime-v4.7.3")!)
+        #expect(lookup?.absoluteString == "https://api.github.com/repos/dappermint/winecx-gptk/releases/tags/runtime-v4.7.3")
+        for other in [
+            "https://mirror.invalid/dappermint/winecx-gptk/releases/download/runtime-v4.7.3",
+            "http://github.com/dappermint/winecx-gptk/releases/download/runtime-v4.7.3",
+            "https://github.com/dappermint/winecx-gptk/archive/refs/tags/v1.tar.gz",
+            "https://github.com/dappermint/winecx-gptk/releases/download/a/b",
+        ] {
+            #expect(PinnedDownload.githubReleaseLookup(URL(string: other)!) == nil, "\(other)")
+        }
+    }
 }
