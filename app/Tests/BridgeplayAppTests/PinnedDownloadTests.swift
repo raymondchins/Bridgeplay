@@ -467,10 +467,8 @@ struct PinnedDownloadTests {
                     self, wasRedirectedTo: URLRequest(url: blob),
                     redirectResponse: HTTPURLResponse(url: url, statusCode: 302, httpVersion: nil, headerFields: ["Location": blob.absoluteString])!)
                 return
-            case "api.github.com":
-                (what, status, body) = ("asset metadata", 200, Data("{}".utf8))
             case "assets.invalid":
-                (what, status, body) = ("blob \(path[3])", 200, path[3] == "1" ? Self.body : Data("a checksum".utf8))
+                (what, status, body) = ("blob \(path[3])", 200, Self.body)
             default:
                 (what, status, body) = (host, 504, Data("<h1>504 Gateway Time-out</h1>".utf8))
             }

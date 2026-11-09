@@ -73,7 +73,8 @@ enum PinnedDownload {
         hosts: for base in bases {
             var host = base.host() ?? base.absoluteString
             var request = URLRequest(url: base.appending(path: file))
-            var viaAPI = false
+            // Used once: a busy github.com release link is asked for through the API.
+            var lookup = githubReleaseLookup(base)
             var busy = 0
             while true {
                 report(.fetching(host: host))
@@ -89,13 +90,13 @@ enum PinnedDownload {
                             defer { relay.finish() }
                             do {
                                 if let resumeData {
-                                    let resumed = try await session.download(resumeFrom: resumeData, delegate: relay)
-                                    guard let http = resumed.1 as? HTTPURLResponse, ![200, 206].contains(http.statusCode) else {
-                                        return resumed
+                                    let (body, response) = try await session.download(resumeFrom: resumeData, delegate: relay)
+                                    guard let http = response as? HTTPURLResponse, ![200, 206].contains(http.statusCode) else {
+                                        return (body, response)
                                     }
                                     // GitHub's signed link lasts an hour: once it has expired, start
                                     // again from the request that hands out a new one.
-                                    try? FileManager.default.removeItem(at: resumed.0)
+                                    try? FileManager.default.removeItem(at: body)
                                     AppLog.note("\(file) from \(host) answered \(http.statusCode) to a resume, starting again")
                                 }
                                 return try await session.download(for: request, delegate: relay)
@@ -131,10 +132,11 @@ enum PinnedDownload {
                     kinds.insert(.answered)
                     // #3059: github.com's download route can stay down for hours while the API
                     // serves the same asset. The pin still decides what is kept.
-                    if isBusy, !viaAPI, let lookup = githubReleaseLookup(base) {
+                    if isBusy, let tags = lookup {
+                        lookup = nil
                         AppLog.note("\(file) from \(host) answered \(http.statusCode), trying api.github.com")
-                        if let asset = await githubAsset(file, lookup: lookup, session: session) {
-                            (request, host, viaAPI, busy) = (asset, "api.github.com", true, 0)
+                        if let asset = await githubAsset(file, lookup: tags, session: session) {
+                            (request, host, busy) = (asset, "api.github.com", 0)
                             continue
                         }
                     }
