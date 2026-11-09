@@ -397,6 +397,19 @@
     "fork_commit": null
   },
   {
+    "appid": 1374490,
+    "name": "RuneScape: Dragonwilds",
+    "api": "D3D11+D3D12",
+    "anticheat": "none known",
+    "status": "silver",
+    "backend": "d3dmetal",
+    "engine": "winecx-11.17",
+    "notes": "DXMT crashed at startup before 0.7.63 (fixed by #2954); use D3DMetal.",
+    "last_tested": "2026-11-03",
+    "fork_commit": null,
+    "tested_on": "M5 Pro · macOS 26.7.2"
+  },
+  {
     "appid": 526870,
     "name": "Satisfactory",
     "api": "D3D12+Vulkan",
