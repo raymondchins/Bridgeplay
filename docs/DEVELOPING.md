@@ -12,7 +12,8 @@ and where new code goes: [ARCHITECTURE.md](ARCHITECTURE.md). How to send a chang
 | Build the app, the dylib and the Wine bridge; run the C and Swift tests | An Apple Silicon Mac, macOS 26 or later, Xcode 27 and Homebrew. Packages and caches: [BUILD-LOCAL.md](BUILD-LOCAL.md) |
 | Try a change in Steam, run games | The above, plus Steam and Apple's Game Porting Toolkit (the app's Setup Assistant gets both) |
 | Package the native installer locally | The Mac above: `make native-installer` builds an ad hoc `out/Bridgeplay-Setup.zip`, with no Wine, GPTK or keys |
-| Package `Bridgeplay-Installer.zip` or publish a release | The maintainer's Mac: engine cache, GPTK, the Sparkle key, the Developer ID and the notary profile. See [RELEASING.md](RELEASING.md) |
+| Package `Bridgeplay-Installer.zip` | A Mac with the engine cache and GPTK set up by the app: `scripts/package-installer.sh` ([installer/README.md](../installer/README.md)) |
+| Publish a release | The maintainer's Mac: the above, plus the Sparkle key, the Developer ID and the notary profile. See [RELEASING.md](RELEASING.md) |
 
 ## Build
 

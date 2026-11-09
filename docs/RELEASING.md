@@ -14,7 +14,12 @@ Every release is a GitHub release of `raymondchins/Bridgeplay`, tag `vX.Y.Z`, ma
 prerelease, tag `installer`, with a `Bridgeplay-Installer.zip.sig` beside it. `release-local.sh`
 rebuilds, signs and uploads it only when its fingerprint changes. The fingerprint covers the
 path and content of every regular file it ships, not symlinks: a change to the GPTK's
-symlinks alone needs the installer uploaded by hand.
+symlinks alone needs the installer uploaded by hand. Upload the zip together with a new
+`.sig`, or the installers reject it: `scripts/package-installer.sh`, then
+`app/.build/artifacts/sparkle/Sparkle/bin/sign_update out/Bridgeplay-Installer.zip` and write
+its `edSignature` and `length` values, space-separated on one line, to
+`Bridgeplay-Installer.zip.sig`. Replace the zip on the `installer` release first, then the
+`.sig`.
 
 ## Version scheme
 
