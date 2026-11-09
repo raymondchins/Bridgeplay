@@ -26,7 +26,9 @@ scripts/build-local.sh --checks   # build, then `make ci-checks` (CI_CHECKS, Swi
 ```
 
 `--checks` skips the checks when these sources already passed, locally or in a passing `app`
-run on GitHub; `BRIDGEPLAY_FORCE_CHECKS=1` runs them anyway.
+run on GitHub; `BRIDGEPLAY_FORCE_CHECKS=1` runs them anyway. A local pass is recorded even
+when a check skipped for a missing tool (`node` for `panel-behavior`), so after installing
+the tool, run with `BRIDGEPLAY_FORCE_CHECKS=1` once.
 
 `JOBS=n` overrides the parallelism (default: `hw.ncpu`). Every phase also writes its
 output to `build/logs/<phase>.log`.

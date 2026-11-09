@@ -11,7 +11,8 @@ and where new code goes: [ARCHITECTURE.md](ARCHITECTURE.md). How to send a chang
 | Lint the shell scripts and the run script | Any OS with shellcheck 0.11.0: `make scriptcheck runcheck` |
 | Build the app, the dylib and the Wine bridge; run the C and Swift tests | An Apple Silicon Mac, macOS 26 or later, Xcode 27 and Homebrew. Packages and caches: [BUILD-LOCAL.md](BUILD-LOCAL.md) |
 | Try a change in Steam, run games | The above, plus Steam and Apple's Game Porting Toolkit (the app's Setup Assistant gets both) |
-| Package the installer or publish a release | The maintainer's Mac: engine cache, GPTK, the Sparkle key, the Developer ID and the notary profile. See [RELEASING.md](RELEASING.md) |
+| Package the native installer locally | The Mac above: `make native-installer` builds an ad hoc `out/Bridgeplay-Setup.zip`, with no Wine, GPTK or keys |
+| Package `Bridgeplay-Installer.zip` or publish a release | The maintainer's Mac: engine cache, GPTK, the Sparkle key, the Developer ID and the notary profile. See [RELEASING.md](RELEASING.md) |
 
 ## Build
 
@@ -41,7 +42,8 @@ print the whole shell environment, secrets included, when they fail to launch.
 A built app is not a dry run: once idle after launch, it re-applies its Steam patch when
 Steam carries an older one, and updates installed engines whose pins changed
 (`PostUpdateRefresh`). To try the Setup Assistant without
-changing anything, use the debug build:
+changing anything, build the debug app (`swift build --package-path app --product BridgeplayApp`;
+the full build makes only the release one) and run
 `app/.build/debug/BridgeplayApp --setup-preview [--fresh] [--step N]`. If it stops with
 `Library not loaded: @rpath/Sparkle.framework`, start it with
 `DYLD_FRAMEWORK_PATH=app/.build/out/Products/Debug`.

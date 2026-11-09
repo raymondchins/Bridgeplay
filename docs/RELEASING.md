@@ -12,7 +12,9 @@ Every release is a GitHub release of `raymondchins/Bridgeplay`, tag `vX.Y.Z`, ma
 
 `Bridgeplay-Installer.zip` (GPTK, DXMT, DXVK and the default configs, no app) lives on its own
 prerelease, tag `installer`, with a `Bridgeplay-Installer.zip.sig` beside it. `release-local.sh`
-rebuilds, signs and uploads it only when its fingerprint (every file it ships) changes.
+rebuilds, signs and uploads it only when its fingerprint changes. The fingerprint covers the
+path and content of every regular file it ships, not symlinks: a change to the GPTK's
+symlinks alone needs the installer uploaded by hand.
 
 ## Version scheme
 
@@ -93,15 +95,18 @@ its version check stops it. `make versioncheck` covers the stamp, the bump and t
 3. Optionally rehearse: `scripts/release-local.sh --dry-run` takes an app already built
    (`build/Bridgeplay.app`, else `out/Bridgeplay.app`) and writes the zip, appcast, an unsigned
    DMG and an ad hoc native installer to `out/release/`, without publishing or reading the
-   keychain. When the installer fingerprint changed it also packages the installer zip, which
-   needs this Mac's engine cache and GPTK.
+   keychain. Like the release, it computes the installer fingerprint, which needs this Mac's
+   engine cache and GPTK, and packages the installer zip only when the fingerprint changed.
 4. Release: `scripts/release-local.sh` (notes default to the commit subjects since the
    previous `vX.Y.Z` release; pass a string to override). It builds with
    `scripts/build-local.sh --checks`, signs the app with the Developer ID and notarizes it (see
    Signing), signs the zip with the EdDSA key in the login keychain, writes the appcast
    (`minimumSystemVersion` 26.0), builds the notarized DMG and native installer, and publishes
    all four on `vX.Y.Z` as Latest. It then uploads a new `Bridgeplay-Installer.zip` to the
-   `installer` release if its fingerprint changed.
+   `installer` release if its fingerprint changed. That fingerprint checks this Mac's engine
+   cache and GPTK even when the installer is unchanged, so set both up before releasing: if
+   the check fails after the app release is published, the installer is not updated, and a
+   rerun refuses the existing release.
 
 Any other release in the repository (a DXMT build, say) must be created with
 `--latest=false`, or the feed URL stops serving `appcast.xml` until the next app release.

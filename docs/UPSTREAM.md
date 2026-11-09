@@ -1,7 +1,6 @@
 # Upstream README (NotProton-WineHQ), kept for history
 
-Kept as written, so the engine details below are out of date: the current ones are in
-[WINECX.md](WINECX.md) and the developer guide is [DEVELOPING.md](DEVELOPING.md).
+The current developer guide is [DEVELOPING.md](DEVELOPING.md).
 
 > **This is a fork of [NotProton](https://github.com/NotProtonNot/NotProton).**
 >
@@ -24,7 +23,7 @@ Kept as written, so the engine details below are out of date: the current ones a
 > with this fork [here](https://github.com/raymondchins/Bridgeplay/issues), not upstream.
 >
 > Modified by Leon Seemann, 2026. Like upstream, this fork is licensed under the GPLv3; see
-> [NOTICE](../NOTICE) for details.
+> [NOTICE](NOTICE) for details.
 
 ---
 
@@ -79,6 +78,8 @@ against. Differences from CrossOver to be aware of:
 To support another WineHQ build, run `ntdll-patch/resolve.py` against its Wine tree, build the
 payloads with `ntdll-patch/build.sh` / `build32.sh`, and add the hashes to `SupportedRunners`,
 `NtdllPatcher.byBuild` and `FreeEngine`.
+
+- Any new or bumped engine needs a 32-bit game smoke test: launch a 32-bit game from Steam on it and check that it reaches Steam. `make detourcheck` only proves each detour reads the register its pin names.
 
 Please read NOTICE for license information.
 
