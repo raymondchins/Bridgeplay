@@ -157,8 +157,8 @@ the top of its release body), so this and every later feed leave it out.
 
 A rerun on a HEAD that is already published as a beta checks that release against its ledger and
 this run's options, uploads nothing, and only exposes it; anything different stops, and no
-published asset is overwritten. A beta whose upload doesn't match is deleted, so the next run
-starts clean. The beta mode takes the same lock as the stable mode. `make betacheck` runs all of
+published asset is overwritten. A beta whose upload doesn't match, or whose upload broke off and
+left a draft, is deleted, so the next run starts clean. The beta mode takes the same lock as the stable mode. `make betacheck` runs all of
 this through a scripted history with a local repository, a stub `gh`, a throwaway key and
 Sparkle's own tools.
 
@@ -237,8 +237,9 @@ only after the user confirms. Without the key, that section appears only while t
    The release is created without Latest; once the uploaded digests match the local files it is
    marked Latest, the one step that offers it to installed apps. If a run stops between the two,
    run it again: it checks the release against its ledger and the signatures, marks it Latest and
-   uploads nothing. A release whose uploads don't match is deleted (it was never Latest), so the
-   next run starts clean. The release body ends with the ledger (see Build numbers).
+   uploads nothing. A release whose uploads don't match, or whose upload broke off and left a
+   draft, is deleted (it was never Latest), so the next run starts clean. The release body ends
+   with the ledger (see Build numbers).
    It then uploads a new `Bridgeplay-Installer.zip` to the `installer` release if its fingerprint
    changed. That fingerprint checks this Mac's engine cache and GPTK even when the installer is
    unchanged, so set both up before releasing: if the check fails after the release is marked

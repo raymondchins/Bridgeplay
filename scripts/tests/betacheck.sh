@@ -23,7 +23,7 @@ fi
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/np-betacheck.XXXXXX")
 trap 'rm -rf "$work"' EXIT
-unset BRIDGEPLAY_LEDGER_REMOTE_URL SPARKLE_KEY_FILE GH_STUB_FAIL GH_STUB_FAIL_LATEST GH_STUB_CORRUPT \
+unset BRIDGEPLAY_LEDGER_REMOTE_URL SPARKLE_KEY_FILE GH_STUB_FAIL GH_STUB_FAIL_LATEST GH_STUB_CORRUPT GH_STUB_BREAK_CREATE \
 	GH_STUB_FAIL_UPLOAD BRIDGEPLAY_SIGN_IDENTITY BRIDGEPLAY_NOTARY_PROFILE CX_ROOT BRIDGEPLAY_BETA \
 	BRIDGEPLAY_BETA_BUILD BRIDGEPLAY_BETA_PLANNED BRIDGEPLAY_HIGHEST_BUILD BETACHECK_RACE
 
@@ -204,6 +204,7 @@ cat >"$stub/bin/gh" <<'EOF'
 # gh stub. Releases live in $GH_STUB/<owner>_<repo>.json in the API's shape, newest first, with
 # "latest" marking the Latest one; assets in $GH_STUB/assets/<id>. Every call goes to $GH_STUB/log.
 # GH_STUB_FAIL=1: no network. GH_STUB_CORRUPT=NAME: that asset is stored damaged on upload.
+# GH_STUB_BREAK_CREATE=NAME: release create breaks off before uploading that asset, leaving a draft.
 # GH_STUB_FAIL_UPLOAD=NAME: uploading that asset to an existing release fails.
 set -eu
 printf '%s\n' "$*" >>"$GH_STUB/log"
@@ -310,6 +311,14 @@ case "$cmd $sub" in
 		has "$first" && die "a release with tag $first already exists"
 		assets='[]'
 		for f in $(printf '%s' "$pos" | sed 1d); do
+			if [ "$(basename "$f")" = "${GH_STUB_BREAK_CREATE:-}" ]; then
+			jq --arg t "$first" --arg title "$title" --arg body "$notes" --arg target "$target" --argjson pre "$prerelease" \
+				--argjson assets "$assets" \
+				'[{tag_name: $t, name: $title, body: $body, draft: true, prerelease: $pre, latest: false,
+				   target_commitish: $target, assets: $assets}] + .' "$st" >"$st.new"
+			save
+			die "HTTP 502: Bad Gateway (upload $(basename "$f"))"
+			fi
 			assets=$(printf '%s' "$assets" | jq --argjson a "$(store "$f")" '. + [$a]')
 		done
 		if [ -n "$target" ] && [ -n "${GH_STUB_REMOTE:-}" ]; then
@@ -891,6 +900,18 @@ expect_has "Latest is not a stable: said" "the Latest release 'installer' is not
 feed_is "Latest is not a stable: the feed" "0.7.67-beta.1:beta:$((h + 3))
 0.7.66:stable:$((h + 1))" "$fx/out/release/beta-feed/appcast.xml"
 cp "$work/saved.json" "$rel"
+
+# --- an upload that breaks off inside gh release create leaves no draft ----------------------
+
+change src/feature8.c feature8 "feat: an eighth"
+push develop
+: >"$log"
+expect_code "an upload that breaks off" 1 with GH_STUB_BREAK_CREATE=Bridgeplay.zip --beta "- feat: an eighth"
+expect_has "the draft is deleted" "deleted the draft it left (it was never public), run again" "$out"
+expect_eq "no draft is left" 0 "$(jq 'map(select(.draft)) | length' "$rel")"
+expect_eq "the feed was not touched after the break" "" "$(grep 'beta-feed' "$log" | grep -v -e '^release view' -e '^release download' || true)"
+expect_code "after the break, a clean run" 0 release --beta "- feat: an eighth"
+expect_eq "after the break, the beta is published" false "$(jq -r 'map(select(.tag_name == "v0.7.67-beta.2"))[0].draft' "$rel")"
 
 # --- the lock is the stable mode's ----------------------------------------------------------
 

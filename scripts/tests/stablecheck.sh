@@ -22,7 +22,7 @@ fi
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/np-stablecheck.XXXXXX")
 trap 'rm -rf "$work"' EXIT
-unset BRIDGEPLAY_LEDGER_REMOTE_URL SPARKLE_KEY_FILE GH_STUB_FAIL GH_STUB_FAIL_LATEST GH_STUB_CORRUPT \
+unset BRIDGEPLAY_LEDGER_REMOTE_URL SPARKLE_KEY_FILE GH_STUB_FAIL GH_STUB_FAIL_LATEST GH_STUB_CORRUPT GH_STUB_BREAK_CREATE \
 	BRIDGEPLAY_SIGN_IDENTITY BRIDGEPLAY_NOTARY_PROFILE CX_ROOT
 
 checks=0
@@ -276,7 +276,8 @@ cat >"$stub/bin/gh" <<'EOF'
 # gh stub. Releases live in $GH_STUB/<owner>_<repo>.json in the API's shape, newest first, with
 # "latest" marking the Latest one; assets in $GH_STUB/assets/<id>. Every call goes to $GH_STUB/log.
 # GH_STUB_FAIL=1: no network. GH_STUB_FAIL_LATEST=1: marking a release Latest fails.
-# GH_STUB_CORRUPT=NAME: that asset is stored damaged on upload.
+# GH_STUB_CORRUPT=NAME: that asset is stored damaged on upload. GH_STUB_BREAK_CREATE=NAME: release
+# create breaks off before uploading that asset, leaving a draft, as gh does.
 set -eu
 printf '%s\n' "$*" >>"$GH_STUB/log"
 die() { echo "gh stub: $*" >&2; exit 1; }
@@ -348,6 +349,14 @@ case "$cmd $sub" in
 		[ "$(jq --arg t "$first" 'map(select(.tag_name == $t)) | length' "$st")" = 0 ] || die "a release with tag $first already exists"
 		assets='[]'
 		for f in $(printf '%s' "$pos" | sed 1d); do
+			if [ "$(basename "$f")" = "${GH_STUB_BREAK_CREATE:-}" ]; then
+			jq --arg t "$first" --arg title "$title" --arg body "$notes" --arg target "$target" --argjson pre "$prerelease" \
+				--argjson assets "$assets" \
+				'[{tag_name: $t, name: $title, body: $body, draft: true, prerelease: $pre, latest: false,
+				   target_commitish: $target, assets: $assets}] + .' "$st" >"$st.new"
+			save
+			die "HTTP 502: Bad Gateway (upload $(basename "$f"))"
+			fi
 			n=$(($(cat "$GH_STUB/next-id" 2>/dev/null || echo 100) + 1))
 			echo "$n" >"$GH_STUB/next-id"
 			cp "$f" "$GH_STUB/assets/$n"
@@ -564,6 +573,15 @@ git_in "$origin" tag -d build/81 >/dev/null
 
 # --- publication: create without Latest, check the digests, expose; a crash in between ----
 
+# An upload that breaks off inside gh release create: the draft it left is deleted.
+: >"$stub/log"
+expect_code "an upload that breaks off" 1 run_env GH_STUB_BREAK_CREATE=Bridgeplay-Setup.zip
+expect_has "the break is shown" "HTTP 502: Bad Gateway (upload Bridgeplay-Setup.zip)" "$out"
+expect_has "the draft is deleted" "deleted the draft it left (it was never public), run again" "$out"
+expect_eq "no release is left" 0 "$(jq 'map(select(.tag_name == "v0.7.64")) | length' "$rel")"
+expect_eq "Latest did not move after the break" v0.7.63 "$(jq -r 'map(select(.latest))[0].tag_name' "$rel")"
+expect_eq "nothing was exposed" 0 "$(grep -c '^release edit' "$stub/log" || true)"
+
 # A damaged upload is caught before Latest; the release is deleted so a rerun starts clean.
 : >"$stub/log"
 expect_code "a damaged upload" 1 run_env GH_STUB_CORRUPT=Bridgeplay.dmg
@@ -769,6 +787,15 @@ expect_has "the holder is named" "another release (pid $holder) holds" "$out"
 wait "$holder"
 expect_code "a stale lock is taken over" 0 sh -c "cd '$fx' && . '$repo/scripts/release-lib.sh' && release_lock && release_unlock"
 expect_has "taking over says so" "from a release that is gone (pid $holder)" "$out"
+# A lock its holder has made but not yet written its pid into is held, not stale.
+mkdir "$lockdir"
+expect_code "a lock being taken" 1 release --dry-run
+expect_has "a lock being taken: said" "another release is taking" "$out"
+expect_eq "a lock being taken: left alone" "" "$(ls -A "$lockdir")"
+# One left that way for over a minute was abandoned, and is taken over.
+touch -t 202001010000 "$lockdir"
+expect_code "an abandoned lock is taken over" 0 sh -c "cd '$fx' && . '$repo/scripts/release-lib.sh' && release_lock && release_unlock"
+expect_has "an abandoned lock: said" "from a release that is gone (pid unknown)" "$out"
 
 if [ "$failures" -ne 0 ]; then
 	echo "==> stablecheck: $failures of $checks checks failed" >&2

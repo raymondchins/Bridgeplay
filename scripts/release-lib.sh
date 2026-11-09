@@ -46,6 +46,12 @@ release_lock() {
 			echo "==> another release (pid $_pid) holds $_lock; wait for it to finish" >&2
 			return 1
 		fi
+		# No pid yet: its holder may be between the mkdir and writing it. Only a lock that has
+		# stayed without one for a minute is taken as abandoned.
+		if [ -z "$_pid" ] && [ -z "$(find "$_lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+			echo "==> another release is taking $_lock; wait for it to finish" >&2
+			return 1
+		fi
 		echo "==> taking over $_lock from a release that is gone (pid ${_pid:-unknown})" >&2
 		rm -rf "$_lock"
 		mkdir "$_lock" 2>/dev/null || { echo "==> another release took $_lock just now" >&2; return 1; }

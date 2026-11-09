@@ -140,6 +140,17 @@ run() {
 	fi
 }
 
+# create_release ARGS...: gh release create for $tag. An upload that breaks off inside it leaves
+# a draft; that draft was never public, so it is deleted and a rerun starts clean.
+create_release() {
+	run gh release create "$tag" "$@" && return 0
+	_draft=$(gh release view "$tag" -R "$slug" --json isDraft -q .isDraft 2>/dev/null || true)
+	[ "$_draft" = true ] || die "creating $tag failed (above)"
+	gh release delete "$tag" -R "$slug" -y >/dev/null 2>&1 \
+		|| die "creating $tag failed (above) and left a draft; delete it on GitHub (it was never public), then run again"
+	die "creating $tag failed (above); deleted the draft it left (it was never public), run again"
+}
+
 remote=""
 remote_url=""
 release_remote || die "no git remote points at github.com/$slug; git remote add bridgeplay https://github.com/$slug.git"
@@ -813,7 +824,7 @@ beta_publish() {
 
 	# A prerelease, never Latest, carrying the zip only (F0.4). It is offered to no one until the
 	# beta feed lists it.
-	run gh release create "$tag" "$zip" -R "$slug" --target "$head" --title "Bridgeplay $version" \
+	create_release "$zip" -R "$slug" --target "$head" --title "Bridgeplay $version" \
 		--notes "$body" --prerelease --latest=false
 	extra=""
 	if [ "$dry_run" -eq 1 ]; then
@@ -1012,7 +1023,7 @@ printf '%s\n' "$ledger" | sed 's/^/    /'
 # Created without Latest, so no installed app sees it until its uploads are checked; marking it
 # Latest is the one step that exposes it. A run that stops in between resumes at that step.
 assets="Bridgeplay.zip appcast.xml Bridgeplay-Setup.zip Bridgeplay.dmg"
-run gh release create "$tag" "$out/bridgeplay/Bridgeplay.zip" "$out/bridgeplay/appcast.xml" \
+create_release "$out/bridgeplay/Bridgeplay.zip" "$out/bridgeplay/appcast.xml" \
     "$out/bridgeplay/Bridgeplay-Setup.zip" "$out/bridgeplay/Bridgeplay.dmg" \
 	-R "$slug" --target "$head" --title "$title" --notes "$body" --latest=false
 if [ "$dry_run" -eq 1 ]; then
