@@ -22,7 +22,7 @@ tree's own `ntdll.so` and `win32u.so` can stand in for the runtime's at link tim
 `@rpath/` install names and exports matter); built this way the result matches the previous
 pin in every section, all imports and every load command except the minimum version.
 
-Then update `macDriver` in `FreeEngine.swift` with its sha256.
+Then put its sha256 in `macDriver` in `FreeEngine.swift` and in `docs/WINECX.md`, and update its line in `SignedPin.swift` (the new sha256 and its hash without the signature, see `docs/WINECX.md`, Shipped binaries).
 
 ## WineCX: `winecx-d3dmetal-retina.patch`
 
@@ -67,8 +67,8 @@ To rebuild `app/Sources/BridgeplayApp/Resources/winemac-winecx-11.15.so` from wi
 
 Built this way without the patch, the result matches the runtime's `winemac.so` in every
 section (`__text`, `__cstring`, `__const`, `__data`, objc) and in its 2147 symbols; only
-`__LINKEDIT` and the SDK's framework versions differ. Then update `macDriver` in
-`FreeEngineWinecx.swift` with the sha256.
+`__LINKEDIT` and the SDK's framework versions differ. Then put its sha256 in `macDriver`
+in `FreeEngineWinecx.swift` and in `docs/WINECX.md`, and update its line in `SignedPin.swift` (the new sha256 and its hash without the signature, see `docs/WINECX.md`, Shipped binaries).
 
 ### 11.17: `winecx-11.17-d3dmetal-retina.patch`
 

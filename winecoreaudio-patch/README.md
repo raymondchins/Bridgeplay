@@ -16,4 +16,4 @@ Build in the tree configured as in `winemac-patch/README.md`
 toolchain defaults to its SDK (27.0) and the driver does not load on macOS 26; `make mincheck`
 catches that. Then sign ad hoc under the runtime's identifier:
 `codesign -f -s - -i winecoreaudio-5555494448b257546f33317180481a4e0075393b winecoreaudio.so`.
-Pin: `FreeEngineWinecx.v1117.audio`.
+Pins: `FreeEngineWinecx.v1117.audio`, `docs/WINECX.md`, and its line in `SignedPin.swift` (the new sha256 and its hash without the signature, see `docs/WINECX.md`, Shipped binaries).

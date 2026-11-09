@@ -1,7 +1,8 @@
 # Local build
 
 `scripts/build-local.sh` builds the full app on an Apple Silicon Mac with the same make
-targets, in the same order, as `.github/workflows/app.yml`.
+targets, in the same order, as `.github/workflows/app.yml` (CI also packages the native
+installer with `make native-installer`).
 
 ## Prerequisites
 
@@ -9,9 +10,9 @@ targets, in the same order, as `.github/workflows/app.yml`.
   exports `DEVELOPER_DIR` for its own process, so the Command Line Tools can stay the
   active developer dir and you don't need `xcode-select`. To use a different Xcode, set
   `DEVELOPER_DIR` yourself.
-- Homebrew: `brew install cmake mingw-w64 bison flex fontforge gpatch` (bison must be
-  Homebrew's, at `/opt/homebrew/opt/bison/bin`). `shellcheck` and `node` are optional; without
-  them the lint and panel checks skip.
+- Homebrew at `/opt/homebrew`: `brew install cmake mingw-w64 bison flex fontforge gpatch`
+  (bison must be Homebrew's, at `/opt/homebrew/opt/bison/bin`). Optional: `shellcheck` for
+  `make scriptcheck runcheck`, and `node` for `panel-behavior`, which skips without it.
 - Font tools: the script installs afdko and fonttools into `scratch/fontvenv`, at the versions
   in `FONT_TOOLS` in app.yml. A direct `make fonts` needs those tools on `PATH`.
 - Network on the first run: Dobby, Wine 11.15 (gitlab.winehq.org), the Proton tarball,
@@ -21,8 +22,13 @@ targets, in the same order, as `.github/workflows/app.yml`.
 
 ```sh
 scripts/build-local.sh            # build only
-scripts/build-local.sh --checks   # build, then `make ci-checks` (the list CI runs) and the Swift tests
+scripts/build-local.sh --checks   # build, then `make ci-checks` (CI_CHECKS, Swift tests included)
 ```
+
+`--checks` skips the checks when these sources already passed, locally or in a passing `app`
+run on GitHub; `BRIDGEPLAY_FORCE_CHECKS=1` runs them anyway. A local pass is recorded even
+when a check skipped for a missing tool (`node` for `panel-behavior`), so after installing
+the tool, run with `BRIDGEPLAY_FORCE_CHECKS=1` once.
 
 `JOBS=n` overrides the parallelism (default: `hw.ncpu`). Every phase also writes its
 output to `build/logs/<phase>.log`.
@@ -87,8 +93,8 @@ disk. All of these paths are gitignored:
 `register-components.diff` changes, the script prints a warning. To rebuild fresh the way
 CI would, run `rm -rf scratch/wine scratch/wine-build-dual scratch/wine-build-arm64 scratch/.wine-key`.
 
-The bridge phase is skipped when `scratch/.bridge-key` (written after each bridge build)
-matches `scripts/bridge-key.sh`, a hash of `bridge/`, `lsteamclient/` and `steam-shim/`, the
+The bridge phase is skipped when its five outputs exist and `scratch/.bridge-key` (written
+after each bridge build) matches `scripts/bridge-key.sh`, a hash of `bridge/`, `lsteamclient/` and `steam-shim/`, the
 same sources CI keys its bridge cache on.
 
 ### A new worktree
@@ -98,13 +104,13 @@ so they can't be copied, and two checkouts building in one shared tree would ove
 other's bridge. Seed the worktree instead, then build:
 
 ```sh
-scripts/worktree-seed.sh      # from the main worktree; or pass another checkout
+scripts/worktree-seed.sh      # run in the new worktree; seeds from the main one, or pass another checkout
 scripts/build-local.sh
 ```
 
 The seed clones (APFS `cp -c`: instant, no extra disk) Dobby, the fonts and their stamp, the
 Proton tarball and, when both checkouts have the same bridge sources, the five bridge outputs.
-The font venv is linked. Measured on the M5 Max: the seed takes 1–2s and the first build 45s,
+The font venv is linked when its tools match `FONT_TOOLS`. Measured on the M5 Max: the seed takes 1–2s and the first build 45s,
 instead of about 15m. When the bridge sources differ, the Wine source is cloned instead and the
 bridge is built in the worktree without the 8m30s clone: 3m21s, 4m05s for the whole build.
 `app/.build` is not seeded: SwiftPM records absolute paths, and a cold app build is 35s.

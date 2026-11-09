@@ -27,7 +27,7 @@ in the stage:
 |---|---|
 | `Install.command`, `BACA DULU.txt`, `README.txt`, `config/` | this folder |
 | `config/gamefixes-default/` | `gamefixes/*.conf` at the repository root, the same files the app ships |
-| `LICENSE`, `LICENSE.*`, `NOTICE` | repository root (includes `LICENSE.jsoncpp`, `LICENSE.cjson`, `LICENSE.wine`) |
+| `LICENSE`, `LICENSE.*`, `NOTICE` | repository root (every `LICENSE.*` there) |
 | `LICENSE.dxmt`, `LICENSE.dxmt-old`, `COPYING.LIB.dxmt`, `LICENSE.dxvk` | `licenses/`: DXMT at 3Shain/dxmt `e94c312f5c054263acf261cfa109edf13e757587`, DXVK-macOS at Gcenx/DXVK-macOS `8f1e28deed3ad30802f7e1bdff428ec14e6e7817` (tag `v1.10.3-20230507-repack`) |
 | `gptk/` | `~/Library/Application Support/bridgeplay/gptk` (`redist/lib` of Apple's Game Porting Toolkit DMG), without Bridgeplay's own `SOURCE.txt` note |
 | `GPTK-License.rtf` | `gptk/License.rtf` from the same DMG |

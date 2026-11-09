@@ -1,6 +1,7 @@
 # Apple Game Porting Toolkit: how Bridgeplay meets its license
 
-The installer ships Apple's Game Porting Toolkit redistributables (`external/`, with
+The installer zip (`Bridgeplay-Installer.zip`, which the native installer and the app's Setup
+Assistant also download) ships Apple's Game Porting Toolkit redistributables (`external/`, with
 `D3DMetal.framework` and `libd3dshared.dylib`, and `wine/`, from the toolkit's `/redist/lib`
 directory). They are Apple software under
 Apple's license, shipped as `GPTK-License.rtf`; they are not in this repository. This page

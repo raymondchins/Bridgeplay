@@ -6,7 +6,7 @@
 is the GeForce 8 era `31.0.13.4052` (340.52). Games behind the NVIDIA identity D3DMetal is
 given read it through d3d9; Deadlock (Source 2) warns of an old driver and turns off
 asynchronous shader creation. Without the variable, or with a malformed value, nothing changes.
-The same version is reported by `win32u-patch` and `nvapi-shim`; keep the three in step.
+`win32u-patch` (as `35.0.15.9541`) and `nvapi-shim` report the same driver, 595.41; keep the three in step.
 
 Build: against winecx `e0aa380` (runtime 4.7.3), in a tree configured as in
 `winemac-patch/README.md`, with the tree's own rule

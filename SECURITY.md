@@ -30,11 +30,13 @@ user is a hardening request, not a vulnerability, but it is still welcome as an 
 - Steam is re-signed to load Bridgeplay, with a local "NotProton Local Signing" keychain identity or ad hoc,
   and loses Valve's hardened runtime.
 - `notproton.dylib` loads for every macOS user of a shared `/Applications/Steam.app`.
-- Setup removes quarantine in three places, each after a check. Bridgeplay.app must carry the
-  maintainer's signature and Steam.app Valve's. The Wine engine must match its pinned hashes first. In a
-  CrossOver clone only the Wine loader and `ntdll.dll` are pinned; the rest of the clone isn't checked
-  file by file. macOS refuses to load a quarantined Wine file once Bridgeplay has patched it and signed
-  it ad hoc. Setup also resets Steam's Accessibility, PostEvent and ListenEvent approvals
+- Setup removes quarantine from the Wine engines, each after a check: a free engine must match its
+  pinned hashes first; in a CrossOver clone only the Wine loader and `ntdll.dll` are pinned, and the rest
+  of the clone isn't checked file by file. macOS refuses to load a quarantined Wine file once Bridgeplay
+  has patched it and signed it ad hoc. The older `Install.command` installer also removes quarantine from
+  Bridgeplay.app and Steam.app. It checks a Steam.app it downloaded against Valve's signature and a
+  Bridgeplay.app it downloaded against the maintainer's, but a Bridgeplay.app bundled beside it in an
+  older installer zip is copied without a signature check. Setup also resets Steam's Accessibility, PostEvent and ListenEvent approvals
   (`tccutil`), re-signs Wine loaders ad hoc where needed, and sets Steam's default compatibility tool
   (`config.vdf`).
 - Optional "Block Steam client updates" (`BootStrapperInhibitUpdateOnLaunch` in `steam.cfg`) also blocks

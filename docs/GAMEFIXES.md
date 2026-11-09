@@ -34,16 +34,18 @@ Bridgeplay's own variables are spelled `BRIDGEPLAY_*` (`BRIDGEPLAY_RETINA=1`). T
 
 One `KEY=VALUE` per line. Blank lines and lines starting with `#` are ignored, and so is
 whitespace around a line. There are no inline comments: everything after the first `=`
-is the value. The files are never run as shell code. A line is rejected, and the rejection
-logged, when:
+is the value. The files are never run as shell code. A file over 64 KiB is ignored. A line
+is rejected, and the rejection logged, when:
 
-- the key is not on the list below
+- the key is not on the list below (`RETINA`, `STDOUT_NULL`, `VSYNC`, `HIDE_WINE_EXPORTS`,
+  `FRAMEGEN` and the `FRAMEGEN_*` keys also accept their `BRIDGEPLAY_` name, such as
+  `BRIDGEPLAY_RETINA=1`; `BACKEND` does not)
 - the value contains a backtick, `$(`, a quote or a control character, or is over 1024 characters
 
 | Key | Values | Effect |
 | --- | --- | --- |
 | `BACKEND` | `dxmt`, `dxvk`, `wined3d`, `d3dmetal` | Graphics backend, see below |
-| `ROSETTA_ADVERTISE_AVX` | `1` makes Rosetta report AVX/AVX2 to the game (needed by AVX-only titles) |
+| `ROSETTA_ADVERTISE_AVX` | `0`, `1` | `1` makes Rosetta report AVX/AVX2 to the game (needed by AVX-only titles) |
 | `ARGS` | space-separated arguments of `A-Za-z0-9_+./:=,-` | Added to the game's command line after the launch options' own arguments. Ignored for installers and other helpers |
 | `DLLOVERRIDES` | Wine syntax, e.g. `dinput8=n,b;xinput1_3=n` | Added to `WINEDLLOVERRIDES` after the backend's entries and before the launch options' |
 | `MSYNC` | `0`, `1` | `1` turns msync on when the engine supports it; `0` turns it off |
@@ -53,11 +55,12 @@ logged, when:
 | `FRAMEGEN_UI` | `0`, `1` | Same as `BRIDGEPLAY_FRAMEGEN_UI`, Protect UI: keeps static HUD and menus sharp. On when unset |
 | `FRAMEGEN_FALLBACK` | `0`, `1` | Same as `BRIDGEPLAY_FRAMEGEN_FALLBACK`, Fast-motion fallback: skips generated frames that would smear. On when unset |
 | `FRAMEGEN_ENGINE` | `own`, `metalfx` | Same as `BRIDGEPLAY_FRAMEGEN_ENGINE`: the built-in optical flow (`own`, the default) or MetalFX frame interpolation |
-| `NVAPI` | `0`, `1` | `1` turns on Apple's `nvapi64` and `nvngx` (DLSS on MetalFX) on an engine with a linked Game Porting Toolkit, for `d3dmetal` only, and makes D3DMetal report an NVIDIA GeForce RTX 4090 (`D3DM_VENDOR_ID=0x10de`, `D3DM_DEVICE_ID=0x2684`, `D3DM_DEVICE_DESCRIPTION`; a `D3DM_*` from a conf or the launch options wins) and a driver version of 32.0.15.9541 (`NOTPROTON_DRIVER_VERSION`), since games offer DLSS only on an NVIDIA adapter. Without the key, the run script treats it as `0`. Bridgeplay's `gamefixes-default/default.conf` sets `NVAPI=1`, so it is on for every game unless a later conf says `NVAPI=0`. It has no launch-option spelling. An nvapi that answers sends some games down NVIDIA-only paths, which is the reason to turn it off |
+| `NVAPI` | `0`, `1` | `1` turns on Apple's `nvapi64` and `nvngx` (DLSS on MetalFX) on an engine with a linked Game Porting Toolkit, for `d3dmetal` only. On WineCX 11.17, Bridgeplay's `nvapi-shim` goes in front of Apple's nvapi to report a newer driver, and `NOTPROTON_NGX_SIGNER` lets Streamline accept Apple's `nvngx` (`ngx-signer-patch/`); 11.15 ships neither, so Streamline games there can still lack DLSS. It also makes D3DMetal report an NVIDIA GeForce RTX 4090 (`D3DM_VENDOR_ID=0x10de`, `D3DM_DEVICE_ID=0x2684`, `D3DM_DEVICE_DESCRIPTION`; a `D3DM_*` from a conf or the launch options wins) and a driver version of 32.0.15.9541 (`NOTPROTON_DRIVER_VERSION`), since games offer DLSS only on an NVIDIA adapter. Without the key, the run script treats it as `0`. Bridgeplay's `gamefixes-default/default.conf` sets `NVAPI=1`, so it is on for every game unless a later conf says `NVAPI=0`. It has no launch-option spelling. An nvapi that answers sends some games down NVIDIA-only paths, which is the reason to turn it off |
 | `DLSS_FG` | `0`, `1` | With `NVAPI=1` on `d3dmetal`, `1` sets `CX_ACTIVE_GRAPHICS_BACKEND=d3dmetal` so WineCX reports hardware GPU scheduling, which DLSS frame generation requires. Experimental and off by default (`gamefixes-default/default.conf` leaves it out): [frankea/Whisky#231](https://github.com/frankea/Whisky/pull/231) saw MetalFX frame interpolation on an M5 with D3DMetal 4.0b2 hang WindowServer |
 | `STDOUT_NULL` | `0`, `1` | `1` starts the game without a stdout handle, as Steam on Windows does. Source 2 treats any stdout as a console build (`Plat_IsConsoleApplication`) and then skips NGX, so Deadlock offers no DLSS |
 | `VSYNC` | `0`, `1` | `1` makes the game's Metal layer wait for the display even when the game turns vsync off, like forcing vsync in the NVIDIA control panel. For games that lock vsync off with frame generation on (Resident Evil Requiem) and tear above the refresh rate |
 | `HIDE_WINE_EXPORTS` | `0`, `1` | `1` makes `GetProcAddress` fail for ntdll's `wine_*` exports on the WineCX 11.17 engine (`hide-wine-exports-patch/`), like Wine Staging's `HideWineExports`. For games that turn features off under Wine: The Witcher 3 5.0 skips NVIDIA Streamline, so no DLSS |
+| `STEAMDECK` | `0`, `1` | Exported as `SteamDeck` (mixed case, which a conf key can't spell). Mortal Kombat 1 reads controllers only with `1` (`gamefixes/1971870.conf`) |
 | `ROCKSTAR_SHIM` | `0`, `1` | `1` stages `rockstar-shim/`'s `version.dll` next to `SocialClubHelper.exe` (`C:\Program Files\Rockstar Games\Social Club`) and in the game folder (next to GTA5.exe) at the game launch, and adds `version=n,b`. It makes the Rockstar Games Launcher's CEF windows draw on winemac and, on `dxvk`, gives GTA5.exe DXVK's dxgi instead of D3DMetal's (`NOTPROTON_ROCKSTAR_DXGI`) and stages that dxgi as `dxgi.dll` in `Gameface/Binaries/Win64` with `dxgi=n,b` (SanAndreas.exe imports it statically). A `version.dll` or `dxgi.dll` already where one is staged is moved to `<name>.bridgeplay-orig` first; a `version.dll` in `Gameface/Binaries/Win64` (a mod loader) is never staged over and keeps loading. Without the key, or on an engine without the shim, staged copies are removed and that file is put back, except in a game folder another launch (another macOS user's too) is still using. WineCX 11.17 only; `gamefixes/271590.conf` (GTA V Legacy) and `gamefixes/1547000.conf` (GTA San Andreas DE) set it. Details in `rockstar-shim/README.md` |
 | `DXMT_*`, `DXVK_*`, `MVK_*`, `VKD3D_*`, `D3DM_*`, `STAGING_*` | any | Exported as is |
 | `MTL_HUD_ENABLED`, `WINEDEBUG`, `WINE_LARGE_ADDRESS_AWARE`, `WINE_CPU_TOPOLOGY` | any | Exported as is |
@@ -82,11 +85,13 @@ The backend is picked in this order:
    Any case is accepted. `d3dmetal`, `dxmt` and `dxvk` map to themselves, and `wined3d`,
    `opengl` and `wine` map to `wined3d`. Other values are logged and ignored
 3. `BACKEND=` in a conf file
-4. Auto-detect. If the game's `.exe` imports `d3d12.dll` in its PE import table, the game
+4. For anything but the game launch itself (an installer or other helper), the backend the
+   game last ran with
+5. Auto-detect. If the game's `.exe` imports `d3d12.dll` in its PE import table, the game
    gets `wined3d`. Otherwise it gets `dxmt`. Delay-loaded and `LoadLibrary` imports do not
    count, and neither does a file that does not parse as a PE. On an engine with D3DMetal
    every game gets `d3dmetal`
-5. `dxmt`, or `d3dmetal` on an engine with D3DMetal
+6. `dxmt`, or `d3dmetal` on an engine with D3DMetal
 
 A backend the engine lacks falls back: `dxvk` → `dxmt` → `wined3d`, and `d3dmetal` → `dxmt`.
 

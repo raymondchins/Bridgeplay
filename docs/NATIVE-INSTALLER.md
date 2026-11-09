@@ -76,9 +76,10 @@ make app-tests
 make scriptcheck runcheck native-installercheck
 ```
 
-`scripts/test-native-installer.sh` runs an additional standalone smoke suite against the
-production core sources without depending on the full app test bundle. It uses generated
-signing keys and temporary app roots, leaving installed apps and game data alone.
+`make native-installercheck` runs `scripts/test-native-installer.sh`, a standalone smoke suite
+against the production core sources that doesn't need the app test bundle, and
+`scripts/test-installer-cleanup.sh`. They use generated signing keys and temporary app roots,
+leaving installed apps and game data alone.
 
 For visual review, the executable supports deterministic, non-mutating preview states:
 
@@ -94,10 +95,12 @@ States are `review`, `update`, `download`, `paused`, `components`, `install`, `s
 `current`, and `error`.
 Preview screenshots establish appearance; they do not establish install/update success.
 
-Before public rollout, exercise a fresh install, older/current/newer app, real component
-setup, offline/retry, rejected signatures, low disk/permission failures, concurrent
-install/update, interrupted replacement, multiple macOS users, external/case-sensitive
-volumes, supported OS versions, all locales, keyboard/VoiceOver, and cleanup enabled/disabled.
-Record the actual packaged size and separate local ad hoc verification from maintainer-signed
-release validation. The contributor writes the PR description personally per CONTRIBUTING.md;
-release publishing and keys remain with the maintainer.
+A change to the installer's flow is worth trying by hand on: a fresh install, an older,
+current and newer app, real component setup, offline and retry, rejected signatures, low disk
+and permission failures, concurrent install and update, an interrupted replacement, all
+locales, keyboard and VoiceOver, and cleanup on and off. Say in the PR which ones ran, and
+whether the build was ad hoc or Developer ID signed.
+
+Known gaps: the lock serializes installers, but the guard against a running updater is best
+effort, so a Sparkle updater launched at the same moment can still race it. Several macOS
+users and external, non-APFS or case-sensitive volumes have little runtime coverage.

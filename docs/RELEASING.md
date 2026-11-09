@@ -1,22 +1,27 @@
 # Releasing Bridgeplay
 
-Every release is a GitHub release of `raymondchins/Bridgeplay` carrying `Bridgeplay.zip`
-(the Sparkle update), `appcast.xml`, `Bridgeplay.dmg` (the download bridgeplay.dev links to:
-the app in a disk image with an Applications link, built by `scripts/package-dmg.sh` after
-the appcast so Sparkle never indexes it) and the small native installer,
-`Bridgeplay-Setup.zip`. All three are notarized, so macOS only asks once whether to open
-them. The native installer also downloads the `installer`
-release's `Bridgeplay-Installer.zip` for GPTK, the engine and the configs, checked against
-the `Bridgeplay-Installer.zip.sig` that `release-local.sh` signs and uploads beside it. The one-click `Bridgeplay-Installer.zip` lives on its own prerelease, tag
-`installer`. It carries no app: `Install.command`
-downloads the Latest release's `Bridgeplay.zip` when it runs, so `release-local.sh` uploads
-the installer again only when its fingerprint (every file it ships) changes, which is when
-the engines, GPTK, the configs or the installer itself change. A release whose sources
-already passed `make ci-checks`, here or in the `app` workflow on GitHub (only the version
-bump differs), skips them;
-`BRIDGEPLAY_FORCE_CHECKS=1` runs them anyway. Installed apps read
-`https://github.com/raymondchins/Bridgeplay/releases/latest/download/appcast.xml`
-(`SUFeedURL`), so whatever release is marked **Latest** is the update feed.
+Every release is a GitHub release of `raymondchins/Bridgeplay`, tag `vX.Y.Z`, marked
+**Latest**, with four assets:
+
+| Asset | What it is |
+|---|---|
+| `Bridgeplay.zip` | The app, notarized; the Sparkle update |
+| `appcast.xml` | The Sparkle feed. Installed apps read `https://github.com/raymondchins/Bridgeplay/releases/latest/download/appcast.xml` (`SUFeedURL`), so whatever release is **Latest** is the update feed |
+| `Bridgeplay.dmg` | The download bridgeplay.dev links to: the app in a disk image with an Applications link (`scripts/package-dmg.sh`), notarized. Built after the appcast so Sparkle never indexes it |
+| `Bridgeplay-Setup.zip` | The native installer ([NATIVE-INSTALLER.md](NATIVE-INSTALLER.md)), notarized |
+
+`Bridgeplay-Installer.zip` (GPTK, DXMT, DXVK and the default configs, no app) lives on its own
+prerelease, tag `installer`, with a `Bridgeplay-Installer.zip.sig` beside it. `release-local.sh`
+rebuilds, signs and uploads it only when its fingerprint changes. The fingerprint covers the
+path and content of every regular file it ships, not symlinks: a change to the GPTK's
+symlinks alone needs the installer uploaded by hand. Upload the zip together with a new
+`.sig`, or the installers reject it: `scripts/package-installer.sh`, then
+`app/.build/artifacts/sparkle/Sparkle/bin/sign_update out/Bridgeplay-Installer.zip` and write
+its `edSignature` and `length` values, space-separated on one line, to
+`Bridgeplay-Installer.zip.sig`. Replace the zip on the `installer` release first, then the
+`.sig`, each the way `swap_asset` in `release-local.sh` does: upload it as `next-<name>`,
+delete the old asset, then rename the new one to `<name>`. Don't use `--clobber`: it deletes
+the old asset first, and installers got 404s for the minutes the upload took (#166).
 
 ## Version scheme
 
@@ -28,18 +33,9 @@ bump differs), skips them;
 | `BRIDGEPLAY_BUILD` | +1 on every release; Sparkle orders updates by it | `CFBundleVersion` | `sparkle:version` |
 | `NOTPROTON_VERSION` | the upstream release this is based on, exactly as upstream ships it | `NotProtonVersion`, About ("based on NotProton 1.2.0") | release notes |
 
-The build number continues the old counter, so the first Bridgeplay release orders after
-every NotProton-WineHQ build:
-
-| Old release | Old `CFBundleVersion` | New |
-|---|---|---|
-| `1.1.9-winehq.1-ray.31` (last shipped) | `1.1.9.31` | — |
-| `1.2.0-winehq.1-ray.32` (never released) | `1.2.0.32` | Bridgeplay `2.0.0`, build `32` |
-| next fix | — | `2.0.1`, build `33` |
-| next upstream merge | — | `2.1.0`, build `34` |
-
-Sparkle compares `32` with `1.1.9.31` part by part, so `32 > 1` makes it newer. The app
-compares the build recorded in Steam numerically (`DeploymentContent`), so since 0.7.0 that
+The build number continues NotProton-WineHQ's counter (its last `CFBundleVersion` was
+`1.1.9.31`; Bridgeplay started at build 32). Sparkle compares versions part by part, so `32`
+sorts after `1.1.9.31`. The app compares the build recorded in Steam numerically (`DeploymentContent`), so since 0.7.0 that
 record holds `4.0.<build>` (`AppVersion.deployKey`), not the semver: it sorts past every
 older record (`1.2.0-…`, `3.5.0`), and an older app that another macOS user still runs sees
 a newer install and leaves it alone. `VersioningTests` guards both.
@@ -89,10 +85,10 @@ its version check stops it. `make versioncheck` covers the stamp, the bump and t
 ## Steps
 
 0. Push the changes first and wait for the `app` workflow to pass on them
-   (`gh run watch -R raymondchins/Bridgeplay`, about 10 minutes, free on this public repo).
-   The release then reuses that result instead of running the checks again here. A docs-only run
-   (the gate green, build and checks skipped) does not count; the release falls back to an older run
-   of the same sources or runs the checks here.
+   (`gh run watch -R raymondchins/Bridgeplay`). The release reuses that result instead of
+   running the checks again; `BRIDGEPLAY_FORCE_CHECKS=1` runs them anyway. A docs-only run (the
+   gate green, build and checks skipped) does not count, so the release falls back to an older
+   run of the same sources or runs the checks here.
 1. Bump and commit:
    ```sh
    scripts/bump-version.sh patch        # or minor / major, or set X.Y.Z
@@ -100,21 +96,24 @@ its version check stops it. `make versioncheck` covers the stamp, the bump and t
    ```
    `set X.Y.Z` takes any version above the committed one, such as `0.7.31` after `0.7.3` for a
    small follow-up. The numbers compare as integers, so `0.7.31` sorts above `0.7.4`: after it,
-   go on with `0.7.32` (or `patch`) or a minor. Updates still order by the build, which goes up by one.
-   `scripts/sync-upstream.sh` already bumps the patch after an upstream merge on `main`; on `dev` it
-   commits no bump, see Betas.
+   go on with `0.7.32` (or `patch`) or a minor. `scripts/sync-upstream.sh` already bumps the
+   patch after an upstream merge on `main`; on `dev` it commits no bump (see Betas).
 2. Push to `main` of `raymondchins/Bridgeplay` (the script refuses anything else).
-3. Optionally rehearse: `scripts/release-local.sh --dry-run` writes the zip, appcast and
-   an ad hoc native installer ZIP to
-   `out/release/` from an app already built with `make app`, without publishing or reading
-   the keychain.
+3. Optionally rehearse: `scripts/release-local.sh --dry-run` takes an app already built
+   (`build/Bridgeplay.app`, else `out/Bridgeplay.app`) and writes the zip, appcast, an unsigned
+   DMG and an ad hoc native installer to `out/release/`, without publishing or reading the
+   keychain. Like the release, it computes the installer fingerprint, which needs this Mac's
+   engine cache and GPTK, and packages the installer zip only when the fingerprint changed.
 4. Release: `scripts/release-local.sh` (notes default to the commit subjects since the
    previous `vX.Y.Z` release; pass a string to override). It builds with
-   `scripts/build-local.sh --checks`, signs the app with the maintainer's Developer ID and
-   notarizes it (see Signing), signs the zip with the EdDSA key in the login keychain, writes an appcast with `minimumSystemVersion` 26.0, packages the installer from the
-   same app (`scripts/package-installer.sh`). It also builds the native installer ZIP with the same
-   Developer ID, notarized, and attaches it beside the product ZIP and appcast on `vX.Y.Z` Latest.
-   The existing bundled installer ZIP remains on the separate `installer` tag.
+   `scripts/build-local.sh --checks`, signs the app with the Developer ID and notarizes it (see
+   Signing), signs the zip with the EdDSA key in the login keychain, writes the appcast
+   (`minimumSystemVersion` 26.0), builds the notarized DMG and native installer, and publishes
+   all four on `vX.Y.Z` as Latest. It then uploads a new `Bridgeplay-Installer.zip` to the
+   `installer` release if its fingerprint changed. That fingerprint checks this Mac's engine
+   cache and GPTK even when the installer is unchanged, so set both up before releasing: if
+   the check fails after the app release is published, the installer is not updated, and a
+   rerun refuses the existing release.
 
 Any other release in the repository (a DXMT build, say) must be created with
 `--latest=false`, or the feed URL stops serving `appcast.xml` until the next app release.
@@ -190,9 +189,9 @@ Signing`, `LocalSigning.swift`) or Bridgeplay itself. Signing them with the rele
 keeps their requirement stable all the same, should one of them ever hold a permission of
 its own. Signing does not change what loads where: the processes these load into (Steam,
 re-signed locally, and the Wine loaders) have no library validation, so they take a library
-from any signer. The committed Wine and SDL binaries in `Resources/` keep their own signatures,
-since their sha256 is pinned (`FreeEngineWinecx.swift`). `np-native` and
-`libnp_gamepad.dylib` are not in the app and stay ad hoc.
+from any signer. The committed Wine and SDL binaries in `Resources/` are re-signed too; their
+pins still match through `SignedPin.swift`. `np-native` and `libnp_gamepad.dylib` are not in
+the app and stay ad hoc.
 
 To check a build:
 
@@ -309,7 +308,7 @@ feed, matched by bundle identifier.
 | `~/Library/Application Support/notproton` | `~/Library/Application Support/bridgeplay` |
 | `~/Library/Caches/notproton` | `~/Library/Caches/bridgeplay` |
 | `~/.notproton` (np-native, libnp_gamepad.dylib) | `~/.bridgeplay` |
-| Steam tools `notproton-winecx-11.17`, `notproton-winehq`, … | `bridgeplay-winecx-11.17`, `bridgeplay-winehq`, … |
+| Steam tools `notproton-winecx-11.17`, `notproton-winehq`, … | `bridgeplay-proton-winecx-11.17`, `bridgeplay-proton-winehq`, … |
 | `notproton-run.log`, `notproton-wine.log`, `notproton.log` | `bridgeplay-run.log`, `bridgeplay-wine.log`, `bridgeplay.log` |
 | `NOTPROTON_*` in launch options and conf files | `BRIDGEPLAY_*` (the old spelling still works) |
 
@@ -319,7 +318,7 @@ Unchanged: `notproton.dylib`, `lib/notproton-backends`, the prefix markers in `c
 
 The app migrates on its first launch after the update, once Steam and every game are
 closed: it moves the folders and switches games mapped to a `notproton*` tool to its
-`bridgeplay*` name. What it replaces is backed up under
+`bridgeplay-proton*` name. What it replaces is backed up under
 `~/Library/Application Support/bridgeplay/backups/migration-3.0.0/`. Nothing is needed in the
 release steps; `scripts/release-local.sh` and `scripts/package-installer.sh` fall back to the
 `notproton` folders on a Mac that has not migrated yet.

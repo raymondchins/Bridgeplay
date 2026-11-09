@@ -9,15 +9,14 @@ Two releases are pinned side by side (`FreeEngineWinecx.releases`):
 
 | Build | Runtime | winecx | Wine | Tool | Bundle |
 |---|---|---|---|---|---|
-| `winecx-11.17` (current) | 4.7.3 | `e0aa380` | 11.17 | `bridgeplay-winecx-11.17` | `WineCX 11.17.app` |
-| `winecx-11.15` | 4.5.125 | `5b45f45` | 11.15 | `bridgeplay-winecx` | `WineCX 11.15.app` |
+| `winecx-11.17` (current) | 4.7.3 | `e0aa380` | 11.17 | `bridgeplay-proton-winecx-11.17` | `WineCX 11.17.app` |
+| `winecx-11.15` | 4.5.125 | `5b45f45` | 11.15 | `bridgeplay-proton-winecx` | `WineCX 11.15.app` |
 
-The WineCX row installs the current one. Each release is its own runner build with its own
-pins, ntdll detours and Steam tool. `bridgeplay-winecx` stays on 11.15: every existing prefix's
-build record (`notproton-build`) names `winecx-11.15`, and `refuse_other_build` in
-`compat_run.sh` refuses a prefix claimed by another build, so moving the default tool would
-stop every WineCX game until its prefix is rebuilt. 11.17 is picked per game as "WineCX 11.17"
-(`bridgeplay-winecx-11.17`), on a rebuilt prefix.
+The WineCX row installs the current one, and setup makes its tool Steam's default
+compatibility tool. Each release is its own runner build with its own pins, ntdll detours and
+Steam tool. A prefix set up by the other build of the same CPU arch runs as is
+(`note_other_build` in `compat_run.sh`); only a prefix of another arch must be rebuilt
+(`refuse_foreign_prefix`).
 
 4.7.3 over 4.5.125: msync fixes (wake one waiter, skip wake syscalls nobody waits on, sleep
 instead of spinning while a wait registers, unregister on contention), kernelbase
@@ -32,13 +31,14 @@ Compared with the WineHQ 11.15 engine it adds:
 - **D3DMetal support** through CrossOver's hooks (winemac `macdrv_functions`, the
   `libd3dshared` non-native code regions in ntdll, and the d3dkmt answers). This only works
   with Apple's Game Porting Toolkit: the one-click installer ships its redistributables
-  under Apple's non-commercial license ([GPTK-LICENSE.md](GPTK-LICENSE.md)). The app links
-  that copy or one you install yourself, and never downloads it.
+  under Apple's non-commercial license ([GPTK-LICENSE.md](GPTK-LICENSE.md)), and the Setup
+  Assistant's Download fetches the same zip. The app links that copy or one you install
+  yourself.
 - **DXMT master and DXVK-macOS 1.10.3** as backends a game opts into. DXMT is the same
   `e94c312` build as the WineHQ engine ([DXMT.md](DXMT.md)), not the archive's 0.80. The
   builtin Direct3D is Wine's own, or D3DMetal once a Game Porting Toolkit is linked.
 
-In Bridgeplay the current build is `winecx-11.17`, tool `bridgeplay-winecx-11.17`, shown as
+In Bridgeplay the current build is `winecx-11.17`, tool `bridgeplay-proton-winecx-11.17`, shown as
 "WineCX 11.17 (msync, D3DMetal)". Like the WineHQ engine it needs no CrossOver license. The licence check
 treats it as free only because the loader hash matches the pinned one, so a CrossOver install
 can never pass as it.
@@ -102,8 +102,18 @@ lib/wine/x86_64-windows/winebus.sys               11.17 only: map-key fix, repla
 lib/wine/x86_64-windows/ws2_32.dll                11.17 only: own host name without loopback, replacing the archive's (Own host name)
 lib/wine/x86_64-windows/kernel{32,base}.dll       11.17 only: GetProcAddress can hide ntdll's wine_* exports, replacing the archive's (Hidden Wine exports)
 lib/wine/{x86_64,i386}-windows/d3dx11_4{2,3}.dll  11.17 only: D3DX11CreateThreadPump stub, replacing the archive's (D3DX11 thread pump)
+lib/wine/x86_64-windows/{crypt32,wintrust}.dll    11.17 only: NGX signer (ngx-signer-patch/)
+lib/wine/x86_64-unix/win32u.so                    11.17 only: NVIDIA driver version (win32u-patch/)
+lib/wine/x86_64-windows/wined3d.dll               11.17 only: driver version (wined3d-patch/)
+lib/wine/x86_64-unix/winecoreaudio.so             11.17 only: render buffer (winecoreaudio-patch/)
+lib/notproton-backends/nvapi-shim/x86_64-windows/nvapi64.dll       11.17 only (nvapi-shim/)
+lib/notproton-backends/rockstar-shim/x86_64-windows/{version,dxgx}.dll   11.17 only (rockstar-shim/)
+lib/notproton-backends/d3d12-stub/x86_64-windows/d3d12.dll         11.17 only (d3d12-stub/)
 lib/libSDL2-2.0.0.dylib                           SDL 2.32.10, x86_64, for winebus.so (Controllers)
 ```
+
+The 11.17-only files are pinned in `FreeEngineWinecx.v1117`; [Shipped binaries](#shipped-binaries)
+lists each with its source.
 
 DXMT comes from `dxmt-e94c312.tar.gz` (the WineHQ engine's pin, shared download cache).
 `winemetal.so` and both `winemetal.dll` files are replaced together, since they share one unix-call
@@ -259,6 +269,7 @@ lib/wine/x86_64-unix/{d3d10,d3d11,d3d12,dxgi}.so      -> <gptk>/wine/x86_64-unix
                                                          when the GPTK has no unix folder)
 lib/wine/x86_64-{windows,unix}/nvapi64.{dll,so}       -> <gptk>, when the GPTK has it
 lib/wine/x86_64-{windows,unix}/nvapi.{dll,so}         -> <gptk>/…/nvapi64.*, the internal name Wine finds Apple's nvapi64 by
+lib/wine/x86_64-{windows,unix}/d3d12core.{dll,so}     -> <gptk>, when the GPTK has it (4.0 beta 3 on); Wine's own goes to wine-stock
 lib/external/{D3DMetal.framework,libd3dshared.dylib}  -> <gptk>/external/
 lib/notproton-backends/wine-stock/x86_64-windows/{d3d10,d3d11,d3d12,dxgi}.dll  Wine's originals
 lib/notproton-backends/d3dmetal.enabled
@@ -283,7 +294,7 @@ found, and Rescan unlinks.
 
 Linking happens when the engine is installed (before the runner is cloned from it, so the
 runner carries the same links) and when you press **Rescan**, which relinks or unlinks both
-the engine and `runners/crossover-winecx-11.15`. It refuses while a game is running. The
+the engine and the runner of every WineCX release. It refuses while a game is running. The
 32-bit side is untouched: D3DMetal has no i386 half.
 
 `d3dmetal.enabled` is a `key=value` file: `source=` (the GPTK `lib` folder), `version=`
@@ -323,7 +334,7 @@ which keeps it in `Contents/Resources/wine/lib`), then `~/Applications/Game Port
 
 A copy counts only when `external/libd3dshared.dylib`, `external/D3DMetal.framework` and
 `wine/x86_64-windows/{d3d10,d3d11,d3d12,dxgi}.dll` are all present and each forwarder carries
-the `Wine builtin DLL` marker. GPTK 4.0 beta 2 also has `wine/x86_64-unix/<name>.so` (links
+the `Wine builtin DLL` marker. GPTK 4.0 also has `wine/x86_64-unix/<name>.so` (links
 to `../../external/libd3dshared.dylib`), `nvapi64` and `nvngx-on-metalfx`, `License.rtf` and
 `SOURCE.txt`; the unix halves and nvapi64 are linked when present. Bridgeplay only reads the
 folder.
@@ -334,8 +345,7 @@ folder.
   does not choose `dxmt` or `dxvk` runs D3DMetal, and Wine's `wined3d` is not reachable on
   that engine (use the WineHQ engine for it). A `dxmt`/`dxvk` game still gets Apple's
   `d3d10`/`d3d12` builtins. `wineboot --update` copies `lib/wine` builtins into a prefix, so
-  Apple's forwarders can end up in a prefix's `system32`, as they do under Whisky. No game was
-  launched in this work.
+  Apple's forwarders can end up in a prefix's `system32`, as they do under Whisky.
 - **Upstream maturity.** The runtimes are CI builds from one maintainer, tagged automatically.
   The `runtime-v4.5.1xx` tags carry only a version table. The 11.15 notes
   ([v4.5.0](https://github.com/dappermint/winecx-gptk/releases/tag/v4.5.0),
@@ -352,13 +362,13 @@ folder.
 - **The CrossOver user profile.** A prefix built by another engine keeps its profile under
   `users/<name>`, while CrossOver-lineage Wine uses `users/crossover`
   ([frankea notes](https://github.com/frankea/Whisky/releases/tag/v4.5.105-beta.1)).
-  Bridgeplay prefixes are tied to one build, so this only matters if a prefix is moved
-  between engines.
-- **Bridge compatibility is inferred, not run.** `ntdll.so` exports a superset of stock
+  This matters when a prefix moves between engines: a prefix from another build of the same
+  arch runs as is.
+- **Bridge compatibility.** `ntdll.so` exports a superset of stock
   11.15's (299 → 302 symbols), so `lsteamclient.so` resolves. The PE `ntdll.dll` exports were
   not compared, because no stock 11.15 `ntdll.dll` was built locally. `RunnerPatcher` replaces
   winecx's own `lsteamclient` with the bridge's. The bridge has no wineserver-protocol
-  component. No game was launched in this work.
+  component.
 - **DXVK.** The archive's DXVK has no `dxgi.dll` for either arch. A 32-bit game on DXVK paired
   with Wine's dxgi can fail with "Adapter is not a DXVK adapter" (winecx-gptk `build.yml`
   comment).
@@ -385,7 +395,7 @@ python3 resolve.py ../Libraries/Wine          # self-tests against PINNED
 python3 apply.py <ntdll.dll> <out> <detour bin>   # patched hashes
 ```
 
-- Any new or bumped engine needs a 32-bit game smoke test: launch a 32-bit game from Steam on it and check that it reaches Steam. `make detourcheck` only proves each detour reads the register its pin names.
+A new or bumped engine also needs the 32-bit smoke test in [ntdll-patch/AGENTS.md](../ntdll-patch/AGENTS.md).
 
 4.7.3 (`winecx-11.17`): both detours fit in `.text` padding. The detour payloads and
 every other shipped file are in [Shipped binaries](#shipped-binaries).
