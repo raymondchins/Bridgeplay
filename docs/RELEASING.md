@@ -19,7 +19,9 @@ symlinks alone needs the installer uploaded by hand. Upload the zip together wit
 `app/.build/artifacts/sparkle/Sparkle/bin/sign_update out/Bridgeplay-Installer.zip` and write
 its `edSignature` and `length` values, space-separated on one line, to
 `Bridgeplay-Installer.zip.sig`. Replace the zip on the `installer` release first, then the
-`.sig`.
+`.sig`, each the way `swap_asset` in `release-local.sh` does: upload it as `next-<name>`,
+delete the old asset, then rename the new one to `<name>`. Don't use `--clobber`: it deletes
+the old asset first, and installers got 404s for the minutes the upload took (#166).
 
 ## Version scheme
 
