@@ -8,19 +8,20 @@ each folder is, which process it ends up in, and where new code belongs.
 
 | Folder | Runs in | How it gets there |
 |---|---|---|
-| `app/` | The Bridgeplay app (SwiftUI, Sparkle updates); also a CLI (`--install-into-steam`, `--setup-winecx`, `--remove-everything`) | `installer/Install.command` copies it to `/Applications` |
+| `app/` | The Bridgeplay app (SwiftUI, Sparkle updates); also a CLI (`--install-into-steam`, `--setup-winecx`, `--remove-everything`, `--rebuild-prefix`, …) and the native installer | The user drags it from `Bridgeplay.dmg` to `/Applications`, or `Bridgeplay Installer.app` puts it there |
 | `dylib/` (`notproton.dylib`: hooks, signature resolver, Steam web UI patches, compat tool registration, the run script `feats/compat_run.sh`) | The Steam client (`steam_osx`) and Steam Helper | The app copies it into `Steam.app/Contents/MacOS`, sets `DYLD_INSERT_LIBRARIES` in Steam's Info.plist and re-signs Steam |
 | `signatures/macos.arm64/` | Data the dylib reads to find Steam functions | Copied to Application Support; the highest-numbered file wins |
 | `lsteamclient/`, `steam-shim/` | Wine: the steamclient bridge and the Windows `steam.exe` | Built against the Wine tree in `bridge/`, shipped in the app payload, put into runners |
 | `ntdll-patch/` | Detours patched into the engine's `ntdll.dll` | Prebuilt `detour*.bin` in the app's Resources, applied by `NtdllPatcher.swift` |
 | `win32u-patch/`, `winemac-patch/`, `winebus-patch/`, `winecoreaudio-patch/`, `wined3d-patch/`, `ws2_32-patch/`, `ngx-signer-patch/`, `d3dx11-patch/`, `hide-wine-exports-patch/` | Replacement Wine files inside the engine | Rebuilt binaries are committed in the app's Resources and copied over the engine at setup |
-| `nvapi-shim/` | Windows `nvapi64.dll` in the game (reports an NVIDIA driver so games offer DLSS) | Prebuilt in the app's Resources |
+| `nvapi-shim/` | Windows `nvapi64.dll` in the game, in front of Apple's nvapi: reports a newer NVIDIA driver so games offer DLSS | Prebuilt in the app's Resources |
+| `rockstar-shim/` | Windows `version.dll` for the Rockstar Games Launcher and GTA (`ROCKSTAR_SHIM=1`, see its README) | Prebuilt in the app's Resources |
 | `d3d12-stub/` | Windows `d3d12.dll` in the game under DXMT on a D3DMetal engine (creates no device, so games fall back to D3D11) | Prebuilt in the app's Resources |
 | `overlay-shim/` | Mac dylib in the game process (HDR, Metal 4, frame generation) | `DYLD_INSERT_LIBRARIES` from the run script, or loaded by lsteamclient |
 | `native-launch/` (`np-native`), `native-shim/` (`libnp_gamepad.dylib`) | Native Mac games | A Steam launch option re-execs the game with the shim inserted |
 | `helpers/` | Small CLIs the dylib and run script call (`iconmaker`, `appinfo`) | Application Support |
 | `gamefixes/` | Per-game defaults read by the run script | Bundled in the app payload and the installer |
-| `installer/` | `Install.command` and its config | Zipped by `scripts/package-installer.sh` |
+| `installer/` | `Bridgeplay-Installer.zip`: GPTK, DXMT, DXVK and default configs, plus the older `Install.command` | Zipped by `scripts/package-installer.sh` |
 | `bridge/`, `scripts/`, `fonts/`, `compat/`, `vendor/` | Build tooling, the Proton font build, the compatibility table, vendored code | Build time only |
 
 ## How it fits together
@@ -46,7 +47,8 @@ each folder is, which process it ends up in, and where new code belongs.
 
 ## Naming
 
-Runtime identifiers kept their NotProton names (`notproton.dylib`, `NOTPROTON_*` variables,
-`com.notproton.*` signing identifiers, the `NotProtonVersion` plist key); renaming them
-would need another migration. Everything on disk uses `bridgeplay` since 3.0.0; see
-[RELEASING.md](RELEASING.md#the-300-rename).
+Runtime identifiers kept their NotProton names: `notproton.dylib`, `NOTPROTON_*` variables,
+the launcher bundle ids `com.notproton.launcher.<appid>`, the `NotProtonVersion` plist key and
+the prefix markers (`notproton-build`, `notproton-backend`). Renaming them would need another
+migration. Paths, logs, Steam tools and signing identifiers use `bridgeplay` since the 3.0.0
+rename ([RELEASING.md](RELEASING.md#the-300-rename)).

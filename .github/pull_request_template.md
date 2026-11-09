@@ -13,6 +13,10 @@
 - Engine (WineCX 11.17, DXMT, DXVK…):
 - Games tried:
 
+## Not tested
+
+<!-- What you couldn't check, and why. -->
+
 ## Shipped files
 
 - [ ] No prebuilt binary, signature database or gamefix changed

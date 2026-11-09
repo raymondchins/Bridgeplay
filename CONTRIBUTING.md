@@ -13,24 +13,25 @@ by NotProtonNot.
 2. **Read [docs/DEVELOPING.md](docs/DEVELOPING.md)** for what machine you need, how to build,
    how to try a change in Steam, and the checks. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
    says where new code goes.
-3. **Write the PR description yourself.** Translation is fine; plain human text is easier to
-   review than generated text. Fill in the template: checks run, macOS, Steam build, engine.
-4. **Keep comments short and useful.** Comment where the code is hard to follow, not where it
+3. **Think through the hard parts.** Code that runs inside Steam, the run script, lsteamclient,
+   Wine patches and game saves interact in subtle ways. Consider several Steam accounts,
+   Steam libraries (external drives too), macOS users sharing one Steam.app, and
+   case-sensitive or non-APFS volumes. Never risk a game's saves or prefix.
+4. **Run the checks** your change touches (`make ci-checks` runs the `app` workflow's;
+   `make scriptcheck runcheck` also works on Linux).
+5. **Fill in the PR template:** what and why, the checks you ran, macOS, Steam build and
+   engine, and what you didn't test.
+6. **Keep comments short and useful.** Comment where the code is hard to follow, not where it
    is obvious.
-5. **Think through the hard parts.** Code that runs inside Steam, the run script, lsteamclient,
-   Wine patches and game saves interact in subtle ways. Consider multiple Steam accounts,
-   libraries, macOS users and file systems.
-6. **Run the checks** your change touches before opening the PR (`make ci-checks` runs them
-   all; `make scriptcheck runcheck` also works on Linux).
 
 ## Process
 
 - Pull requests go into `main`. Commits follow Conventional Commits (`feat(scope):`,
   `fix(scope):`, `docs:`).
-- The maintainer reviews every PR. CI runs on PRs while the workflows are enabled; until then,
-  say in the PR which checks you ran.
-- Releases are made by the maintainer only (they need the Sparkle signing key); see
+- CI (the `app` and `lint` workflows) runs on every PR. The maintainer reviews every PR.
+- Releases are made by the maintainer only (they need the signing keys); see
   [docs/RELEASING.md](docs/RELEASING.md).
+- Changes that belong upstream are better sent to [NotProton](https://github.com/NotProtonNot/NotProton).
 - Security problems are reported privately; see [SECURITY.md](SECURITY.md).
 
 ## Licensing
@@ -46,10 +47,11 @@ exceptions:
 | `steam-shim/` | BSD-3-Clause (port of Proton's steam_helper), see `LICENSE.steam-shim` |
 | `*-patch/` Wine patches and the Wine files built from them | LGPL-2.1-or-later, like Wine |
 | `fonts/` | Each font's own license; the build files under `LICENSE.fonts` |
+| `app/Sources/BridgeplayUI/Resources/Fonts/` | OFL-1.1 (`OFL-*.txt` there) |
+| `app/Sources/BridgeplayApp/Resources/libSDL2-2.0.0.dylib` | zlib (SDL) |
 | `vendor/cJSON.*`, `steam-shim/jsoncpp.cpp`, `steam-shim/json/` | MIT (cJSON), public domain / MIT (JsonCpp) |
+| `installer/licenses/` | The license texts of DXMT and DXVK, shipped beside them |
 | `compat/reported.json` | CC BY-NC-SA 3.0 (adapted from AppleGamingWiki), see [NOTICE](NOTICE) |
-
-Changes that belong upstream are better sent to [NotProton](https://github.com/NotProtonNot/NotProton).
 
 ## Credit
 

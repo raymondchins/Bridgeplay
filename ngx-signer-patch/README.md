@@ -28,4 +28,4 @@ Verified 2026-10-12: RE Requiem lists NVIDIA DLSS; 007 First Light logs
 Build in a tree configured as in `winemac-patch/README.md` (with
 `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer` so the x86_64 clang runs):
 `make dlls/crypt32/x86_64-windows/crypt32.dll dlls/wintrust/x86_64-windows/wintrust.dll`, then
-`x86_64-w64-mingw32-strip --strip-debug`. Pins: `FreeEngineWinecx.v1117.signer`.
+`x86_64-w64-mingw32-strip --strip-debug`. Pins: `FreeEngineWinecx.v1117.nvidia` and `docs/WINECX.md`.
