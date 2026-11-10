@@ -24,6 +24,7 @@ static int quit_enabled;
 static void (*next_send_event)(id, SEL, id);
 static int sidebar_send_event(id event); // sidebar.m
 static int sidebar_wanted(void);         // sidebar.m
+static void cursor_install(void);        // cursor.m
 
 static int quit_is_command_q(id event)
 {
@@ -62,6 +63,10 @@ static void quit_install(void)
 		return;
 	}
 
+	// The quick settings hold the game's cursor calls while they are open; counting its hides
+	// starts now, before the game is up
+	if (sidebar_wanted())
+		cursor_install();
 	Class app_class = object_getClass(app);
 	int hooked = interpose(app_class, "sendEvent:", (IMP)hook_send_event, (IMP *)&next_send_event);
 	shim_log("overlay_shim quitkey: Command-Q quits %s, quick settings %s, on %s\n",
