@@ -119,7 +119,9 @@ function agrees(t, v, env, what) {
   t.ok(v.overlay.props.selectedOption === level,
        `${what}: overlay shows "${v.overlay.props.selectedOption}", the shim shows ${level}`);
   // As overlay-shim reads it on the panel's 60 Hz: display and half from the display, a
-  // number held to 15..60, anything else no limit; the switch turns it off and keeps it
+  // number held to 15..60, anything else no limit; the switch turns it off and keeps it.
+  // 10 to 14 still read (as 15) because launch options from earlier releases carry them; only
+  // the in-game sidebar's route requires 15 or more, since it never writes less.
   const raw = (env.BRIDGEPLAY_FPS_LIMIT || '').toLowerCase();
   const set = raw === 'display' ? 60 : raw === 'half' ? 30 :
     /^\d+$/.test(raw) && +raw >= 10 && +raw <= 360 ? Math.min(60, Math.max(15, +raw)) : 0;
