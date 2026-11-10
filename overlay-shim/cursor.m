@@ -53,6 +53,9 @@ static _Atomic int ch_associated = 1; // as the game last asked
 static os_unfair_lock ch_lock = OS_UNFAIR_LOCK_INIT;
 static CGPoint ch_game_at; // where the game has the cursor while taken, under ch_lock
 static int ch_game_warped;
+// Set on the thread giving the cursor back while it holds ch_lock: Wine's event tap warps
+// through the interposed call then, which must not take the lock again
+static __thread int ch_restoring;
 
 // A move the game makes while taken: noted, not done
 static int ch_hold_warp(CGPoint point)
@@ -168,6 +171,8 @@ static BOOL ch_tap_warp(id handler, SEL sel, CGPoint *to, const CGPoint *from)
 // calls here, Wine's driver loaded later included. The shim's own calls reach Quartz.
 static CGError ch_warp(CGPoint point)
 {
+	if (ch_restoring)
+		return ch_real_warp(point);
 	os_unfair_lock_lock(&ch_lock);
 	CGError err = kCGErrorSuccess;
 	if (!atomic_load(&ch_taken)) {
@@ -182,6 +187,8 @@ static CGError ch_warp(CGPoint point)
 
 static CGError ch_associate(boolean_t connected)
 {
+	if (ch_restoring)
+		return ch_real_associate(connected);
 	os_unfair_lock_lock(&ch_lock);
 	CGError err = atomic_load(&ch_taken) ? kCGErrorSuccess : ch_real_associate(connected);
 	if (err == kCGErrorSuccess)
@@ -265,8 +272,8 @@ static void cursor_take(void)
 		return;
 	cursor_install();
 	Class cursor = objc_getClass("NSCursor");
-	CGPoint at = ch_real_location();
 	os_unfair_lock_lock(&ch_lock);
+	CGPoint at = ch_real_location();
 	ch_game_at = at;
 	ch_game_warped = 0;
 	atomic_store(&ch_taken, 1);
@@ -331,23 +338,21 @@ static void cursor_give_back(void)
 	if (!held || tap == nil || ch_next_tap_warp == NULL || ![tap respondsToSelector:clipping] ||
 	    !((BOOL (*)(id, SEL))objc_msgSend)(tap, clipping))
 		tap = nil;
-	if (held && tap == nil) {
-		ch_real_warp(at);
-		// Also after a warp, which holds the mouse still for a moment unless it is connected
-		// again (Wine's setCursorPosition: does the same)
-		ch_real_associate(connected);
-	}
 	atomic_store(&ch_taken, 0);
-	os_unfair_lock_unlock(&ch_lock);
-	if (tap != nil) {
+	if (held && tap != nil) {
 		// Wine's clipping event tap takes each warp out of the next event's deltas, so this one goes
-		// through it, with the cursor's real place now that the game's calls reach Quartz again
+		// through it, reading the cursor's real place now that it is no longer held
+		ch_restoring = 1;
 		ch_next_tap_warp(tap, sel_registerName("warpCursorTo:from:"), &at, NULL);
-		os_unfair_lock_lock(&ch_lock);
-		connected = atomic_load(&ch_associated);
-		ch_real_associate(connected);
-		os_unfair_lock_unlock(&ch_lock);
+		ch_restoring = 0;
+	} else if (held) {
+		ch_real_warp(at);
 	}
+	// Also after a warp, which holds the mouse still for a moment unless it is connected again
+	// (Wine's setCursorPosition: does the same)
+	if (held)
+		ch_real_associate(connected);
+	os_unfair_lock_unlock(&ch_lock);
 	shim_log("overlay_shim cursor: given back, hidden=%d connected=%d clipped=%d%s\n", ch_hides, connected, clipped,
 	         held ? ", back where the game holds it" : "");
 	ch_n_confined = 0;
