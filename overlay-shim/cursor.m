@@ -142,9 +142,13 @@ static CGPoint ch_flipped(id controller, SEL sel, CGPoint point)
 	return at;
 }
 
+// Wine's clipping event tap handler, as last seen: Wine makes one and keeps it, so it is not retained
+static _Atomic(id) ch_tap_handler;
+
 // Wine's clipping event tap moves the cursor itself and rewrites each event's place
 static CGEventRef ch_tap(id handler, SEL sel, CGEventTapProxy proxy, CGEventType type, CGEventRef event)
 {
+	atomic_store(&ch_tap_handler, handler);
 	if (atomic_load(&ch_taken) && type != kCGEventTapDisabledByTimeout && type != kCGEventTapDisabledByUserInput)
 		return event;
 	return ch_next_tap(handler, sel, proxy, type, event);
@@ -154,6 +158,7 @@ static CGEventRef ch_tap(id handler, SEL sel, CGEventTapProxy proxy, CGEventType
 // it takes out of the next event's deltas: a move that is not made must leave no record
 static BOOL ch_tap_warp(id handler, SEL sel, CGPoint *to, const CGPoint *from)
 {
+	atomic_store(&ch_tap_handler, handler);
 	if (to != NULL && ch_hold_warp(*to))
 		return YES;
 	return ch_next_tap_warp(handler, sel, to, from);
@@ -294,12 +299,6 @@ static void cursor_give_back(void)
 	if (!atomic_load(&ch_taken))
 		return;
 	Class cursor = objc_getClass("NSCursor");
-	os_unfair_lock_lock(&ch_lock);
-	atomic_store(&ch_taken, 0);
-	CGPoint at = ch_game_at;
-	int warped = ch_game_warped;
-	os_unfair_lock_unlock(&ch_lock);
-	int connected = atomic_load(&ch_associated);
 
 	// Hidden first, so the cursor is not seen jumping back
 	if (ch_next_hide != NULL)
@@ -315,19 +314,40 @@ static void cursor_give_back(void)
 	int clipped = 0;
 	for (int i = 0; i < ch_n_confined; i++)
 		clipped |= !CGRectIsEmpty(ch_confined[i].rect);
-	// Where the game holds the cursor or last put it; a cursor it leaves free stays where it is
-	int held = ch_hides > 0 || !connected || clipped || warped;
-	if (held) {
-		ch_real_warp(at);
-		// Also after a warp, which holds the mouse still for a moment unless it is connected
-		// again (Wine's setCursorPosition: does the same)
-		ch_real_associate(connected);
-	}
 	if (ch_next_confine != NULL)
 		for (int i = 0; i < ch_n_confined; i++)
 			ch_next_confine(ch_confined[i].window, sel_registerName("setMouseConfinementRect:"), ch_confined[i].rect);
 	for (int i = 0; i < ch_n_confined; i++)
 		[ch_confined[i].window release];
+
+	// Back where the game holds the cursor or last put it; a cursor it leaves free stays where it is.
+	// Under the lock, so a Quartz call from another thread comes wholly before or after.
+	os_unfair_lock_lock(&ch_lock);
+	CGPoint at = ch_game_at;
+	int connected = atomic_load(&ch_associated);
+	int held = ch_hides > 0 || !connected || clipped || ch_game_warped;
+	id tap = atomic_load(&ch_tap_handler);
+	SEL clipping = sel_registerName("clippingCursor");
+	if (!held || tap == nil || ch_next_tap_warp == NULL || ![tap respondsToSelector:clipping] ||
+	    !((BOOL (*)(id, SEL))objc_msgSend)(tap, clipping))
+		tap = nil;
+	if (held && tap == nil) {
+		ch_real_warp(at);
+		// Also after a warp, which holds the mouse still for a moment unless it is connected
+		// again (Wine's setCursorPosition: does the same)
+		ch_real_associate(connected);
+	}
+	atomic_store(&ch_taken, 0);
+	os_unfair_lock_unlock(&ch_lock);
+	if (tap != nil) {
+		// Wine's clipping event tap takes each warp out of the next event's deltas, so this one goes
+		// through it, with the cursor's real place now that the game's calls reach Quartz again
+		ch_next_tap_warp(tap, sel_registerName("warpCursorTo:from:"), &at, NULL);
+		os_unfair_lock_lock(&ch_lock);
+		connected = atomic_load(&ch_associated);
+		ch_real_associate(connected);
+		os_unfair_lock_unlock(&ch_lock);
+	}
 	shim_log("overlay_shim cursor: given back, hidden=%d connected=%d clipped=%d%s\n", ch_hides, connected, clipped,
 	         held ? ", back where the game holds it" : "");
 	ch_n_confined = 0;

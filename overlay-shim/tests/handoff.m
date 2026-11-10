@@ -110,18 +110,23 @@ __attribute__((visibility("default"))) id NSApp;
 @end
 
 static int tapped, tap_warps;
+static BOOL tap_clipping;
 @interface WineEventTapClipCursorHandler : NSObject
 - (CGEventRef)eventTapWithProxy:(CGEventTapProxy)proxy type:(CGEventType)type event:(CGEventRef)event;
 - (BOOL)warpCursorTo:(CGPoint *)to from:(const CGPoint *)from;
+- (BOOL)clippingCursor;
 @end
 @implementation WineEventTapClipCursorHandler
 // Wine records each warp here and takes it out of the next event's deltas
 - (BOOL)warpCursorTo:(CGPoint *)to from:(const CGPoint *)from
 {
-	(void)to;
 	(void)from;
 	tap_warps++;
-	return YES;
+	return CGWarpMouseCursorPosition(*to) == kCGErrorSuccess;
+}
+- (BOOL)clippingCursor
+{
+	return tap_clipping;
 }
 - (CGEventRef)eventTapWithProxy:(CGEventTapProxy)proxy type:(CGEventType)type event:(CGEventRef)event
 {
@@ -333,6 +338,22 @@ static int child(const char *path, const char *mode)
 	      "a game that let go got its grab back: hides %d, connected %d", hides, connected);
 	CHECK(cursor_at.x == 580 && cursor_at.y == 120, "a free cursor was moved to %.0f,%.0f on closing", cursor_at.x,
 	      cursor_at.y);
+
+	// With Wine's clipping event tap on (UseConfinementCursorClipping=n), the move back goes
+	// through the tap, which keeps a record of it for the next event's deltas
+	tap_clipping = YES;
+	CGAssociateMouseAndMouseCursorPosition(false);
+	CHECK(send(event(10, KEY_P, CMD | OPT)), "Option-Command-P did not open the quick settings over the event tap");
+	CHECK(connected, "the event tap's disconnected mouse stayed disconnected under the quick settings");
+	CGWarpMouseCursorPosition(CGPointMake(400, 300));
+	cursor_at = CGPointMake(600, 100);
+	int warps_before = tap_warps;
+	CHECK(send(event(10, KEY_ESCAPE, 0)), "Escape did not close the quick settings over the event tap");
+	CHECK(tap_warps == warps_before + 1, "the move back did not go through Wine's event tap (%d warps)",
+	      tap_warps - warps_before);
+	CHECK(cursor_at.x == 400 && cursor_at.y == 300 && !connected,
+	      "closing over the event tap left the cursor at %.0f,%.0f, connected %d", cursor_at.x, cursor_at.y, connected);
+	tap_clipping = NO;
 
 	printf("%-8s hidden, clipped, disconnected and recentred cursor freed under the quick settings and given back\n",
 	       mode);

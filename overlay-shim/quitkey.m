@@ -52,6 +52,10 @@ static void hook_send_event(id app, SEL selector, id event)
 
 static void quit_install(void)
 {
+	// The quick settings hold the game's cursor calls while they are open; counting its hides
+	// starts as soon as AppKit is in, before the game has a window
+	if (sidebar_wanted())
+		cursor_install();
 	id *app_slot = (id *)dlsym(RTLD_DEFAULT, "NSApp");
 	id app = app_slot != NULL ? *app_slot : nil;
 
@@ -63,10 +67,6 @@ static void quit_install(void)
 		return;
 	}
 
-	// The quick settings hold the game's cursor calls while they are open; counting its hides
-	// starts now, before the game is up
-	if (sidebar_wanted())
-		cursor_install();
 	Class app_class = object_getClass(app);
 	int hooked = interpose(app_class, "sendEvent:", (IMP)hook_send_event, (IMP *)&next_send_event);
 	shim_log("overlay_shim quitkey: Command-Q quits %s, quick settings %s, on %s\n",
