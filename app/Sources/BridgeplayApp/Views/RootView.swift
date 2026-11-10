@@ -167,7 +167,7 @@ struct RootView: View {
     private var credits: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("A fork of [NotProton](https://github.com/NotProtonNot/NotProton), running on [CodeWeavers](https://www.codeweavers.com)' open-source Wine and Apple's Game Porting Toolkit.")
-            Text("If CrossOver works for you, [buy it](https://www.codeweavers.com/crossover) to support Wine.")
+            Text("If CrossOver works for you,\n[buy it](https://www.codeweavers.com/crossover) to support Wine.")
         }
         .font(BP.sans(11))
         .lineSpacing(2)

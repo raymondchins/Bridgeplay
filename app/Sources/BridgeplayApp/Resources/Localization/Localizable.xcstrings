@@ -7828,24 +7828,24 @@
         }
       }
     },
-    "If CrossOver works for you, [buy it](https://www.codeweavers.com/crossover) to support Wine." : {
+    "If CrossOver works for you,\n[buy it](https://www.codeweavers.com/crossover) to support Wine." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se CrossOver fa al caso tuo, [acquistalo](https://www.codeweavers.com/crossover) per sostenere Wine."
+            "value" : "Se CrossOver fa al caso tuo,\n[acquistalo](https://www.codeweavers.com/crossover) per sostenere Wine."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Если CrossOver вам подходит, [купите его](https://www.codeweavers.com/crossover), чтобы поддержать Wine."
+            "value" : "Если CrossOver вам подходит,\n[купите его](https://www.codeweavers.com/crossover), чтобы поддержать Wine."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "如果 CrossOver 适合你，[购买它](https://www.codeweavers.com/crossover)来支持 Wine。"
+            "value" : "如果 CrossOver 适合你，\n[购买它](https://www.codeweavers.com/crossover)来支持 Wine。"
           }
         }
       }
