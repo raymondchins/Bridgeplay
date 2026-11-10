@@ -185,7 +185,13 @@ struct BulkReportSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
             let list = reports.bulk ?? []
             if reports.bulkLoading {
-                ProgressView().frame(maxWidth: .infinity, minHeight: 120)
+                VStack(spacing: 0) {
+                    ForEach(0..<3, id: \.self) { row in SkeletonRow(titleWidth: [140, 180, 120][row]) }
+                }
+                .shimmer()
+                .frame(maxWidth: .infinity, minHeight: 120)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Checking"))
             } else if list.isEmpty {
                 Text("Nothing left to report.")
                     .foregroundStyle(BP.fg3)

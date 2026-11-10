@@ -12,6 +12,10 @@ struct GuideView: View {
 
     private var game: String { entries.count > 1 ? entries[1].name : "Deadlock" }
 
+    private var toolbarSpacer: some View {
+        Color.clear.frame(width: 1, height: 28).accessibilityHidden(true)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
@@ -26,6 +30,16 @@ struct GuideView: View {
             .frame(maxWidth: .infinity)
         }
         .navigationTitle("Guide")
+        // macOS draws a shorter title bar for a page with no toolbar items; an invisible one
+        // keeps Guide's the same height as every other page's.
+        .toolbar {
+            if #available(macOS 26.0, *) {
+                ToolbarItem(placement: .primaryAction) { toolbarSpacer }
+                    .sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .primaryAction) { toolbarSpacer }
+            }
+        }
         .task {
             let local = await Task.detached(priority: .utility) { LibraryEntry.local(limit: 6) }.value
             if local.count >= 3 { entries = local }

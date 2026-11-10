@@ -107,7 +107,7 @@ struct StatusRow: View {
             }
             if let toggle {
                 Toggle(title, isOn: toggle)
-                    .toggleStyle(.switch)
+                    .toggleStyle(.brandSwitch)
                     .labelsHidden()
             }
             if let secondaryAction {
@@ -172,9 +172,6 @@ struct StatusRow: View {
 struct StatusView: View {
     @Environment(SystemStatus.self) private var status
     // Two of the Game Defaults (GameDefaults), read when the page opens; the switches write them straight away.
-    @State private var metalHUD = GameDefaults.isOn(.metalHUD)
-    @State private var highResolution = GameDefaults.isOn(.highResolution)
-    @State private var gameDefaultsError: String?
 
     private static let updateBlockPrompt =
         String(localized: "Steam client updates may break Bridgeplay. If you don't want to wait for Bridgeplay to be updated to be compatible with future Steam versions at the cost of not getting updates to the Steam client, you can stop the Steam client from updating itself. You also miss Steam's security fixes.")
@@ -184,8 +181,7 @@ struct StatusView: View {
             if let snapshot = status.snapshot {
                 statusForm(snapshot)
             } else {
-                ProgressView("Checking")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                SkeletonPage(label: String(localized: "Checking"))
             }
         }
         .navigationTitle("Status")
@@ -370,8 +366,6 @@ struct StatusView: View {
                 Text("Engines")
             }
 
-            gameDefaultsSection
-
             componentsSection(snapshot.payload)
 
             dangerSection
@@ -443,37 +437,6 @@ struct StatusView: View {
                 }
             )
         }
-    }
-
-    private var gameDefaultsSection: some View {
-        Section {
-            StatusRow(title: String(localized: "Metal HUD"),
-                      value: String(localized: "Shows frame rate and GPU details in a corner while you play."),
-                      toggle: gameDefault(.metalHUD, $metalHUD))
-            StatusRow(title: String(localized: "High Resolution"),
-                      value: String(localized: "Sharper on Retina displays, but games run slower."),
-                      toggle: gameDefault(.highResolution, $highResolution))
-            if let gameDefaultsError {
-                StatusRow(title: String(localized: "Something went wrong"), value: gameDefaultsError, tone: .bad,
-                          menu: ErrorReport.actions(gameDefaultsError, in: "Game settings"))
-            }
-        } header: {
-            Text("For Every Game")
-        } footer: {
-            Text("A game's own settings in Steam Properties › Bridgeplay win over these. Game Defaults has the rest.")
-        }
-    }
-
-    private func gameDefault(_ setting: GameDefaults.Setting, _ value: Binding<Bool>) -> Binding<Bool> {
-        Binding(get: { value.wrappedValue }, set: { on in
-            value.wrappedValue = on
-            do {
-                try GameDefaults.set(setting, to: on)
-                gameDefaultsError = nil
-            } catch {
-                gameDefaultsError = String(localized: "Bridgeplay could not save this setting. \(error.localizedDescription)")
-            }
-        })
     }
 
     private var dangerSection: some View {

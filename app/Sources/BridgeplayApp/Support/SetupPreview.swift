@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import BridgeplayUI
 import SwiftUI
 
 // Debug builds only: `.build/debug/BridgeplayApp --setup-preview [--fresh]` opens the Setup
@@ -13,8 +14,14 @@ struct SetupPreviewApp: App {
 
     @State private var status = SystemStatus()
     @State private var prefixes = PrefixesModel()
-    @State private var pane: Pane = .status
+    // --pane gameDefaults opens the main window on that page.
+    @State private var pane: Pane = {
+        let arguments = CommandLine.arguments
+        guard let index = arguments.firstIndex(of: "--pane"), index + 1 < arguments.count else { return .status }
+        return Pane(rawValue: arguments[index + 1]) ?? .status
+    }()
     private static let mainFirst = CommandLine.arguments.contains("--main")
+        && !CommandLine.arguments.contains("--skeleton")
     private let preview: SetupAssistant.Preview =
         CommandLine.arguments.contains("--fresh") ? .fresh : .thisMac
     // --step 4 opens on Set Up; numbers match the wizard's "Step N of 5".
@@ -29,6 +36,7 @@ struct SetupPreviewApp: App {
     init() {
         NSApplication.shared.setActivationPolicy(.regular)
         DispatchQueue.main.async { NSApp.activate() }
+        WindowMirror.startIfAsked()
     }
 
     var body: some Scene {
@@ -38,7 +46,21 @@ struct SetupPreviewApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
-        .defaultLaunchBehavior(Self.mainFirst ? .suppressed : .presented)
+        .defaultLaunchBehavior(Self.mainFirst || CommandLine.arguments.contains("--skeleton") ? .suppressed : .presented)
+        .restorationBehavior(.disabled)
+
+        // --skeleton shows the loading placeholders alone, for design review.
+        Window("Bridgeplay Loading", id: "skeleton-preview") {
+            HStack(spacing: 0) {
+                SkeletonPage(label: "Checking").frame(width: 520)
+                Rectangle().fill(BP.line).frame(width: 1)
+                SkeletonTable(label: "Looking for prefixes")
+            }
+            .background(BP.bg)
+            .preferredColorScheme(.dark)
+        }
+        .defaultSize(width: 1100, height: 760)
+        .defaultLaunchBehavior(CommandLine.arguments.contains("--skeleton") ? .presented : .suppressed)
         .restorationBehavior(.disabled)
 
         Window("Bridgeplay", id: "main-preview") {
@@ -46,6 +68,15 @@ struct SetupPreviewApp: App {
                 .environment(status)
                 .environment(prefixes)
                 .frame(minWidth: 800, minHeight: 600)
+                // --cycle-panes switches page every 1.5 s, for profiling page changes
+                .task {
+                    guard CommandLine.arguments.contains("--cycle-panes") else { return }
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(1.5))
+                        let all = Pane.allCases
+                        pane = all[((all.firstIndex(of: pane) ?? 0) + 1) % all.count]
+                    }
+                }
         }
         .defaultSize(width: 900, height: 760)
         .defaultLaunchBehavior(Self.mainFirst ? .presented : .suppressed)
@@ -54,6 +85,39 @@ struct SetupPreviewApp: App {
             CommandGroup(replacing: .appInfo) {
                 Button("About Bridgeplay") { AboutPanel.show() }
             }
+        }
+    }
+}
+
+// --mirror <file.png> writes the key window's pixels to that file every second, so a browser
+// page can show the preview without Screen Recording permission (the app draws its own window).
+private enum WindowMirror {
+    static func startIfAsked() {
+        let arguments = CommandLine.arguments
+        guard let index = arguments.firstIndex(of: "--mirror"), index + 1 < arguments.count else { return }
+        let out = URL(fileURLWithPath: arguments[index + 1])
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            MainActor.assumeIsolated { write(to: out) }
+        }
+    }
+
+    @MainActor private static func write(to out: URL) {
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.frame.height > 300 }) else { return }
+        // A process may read its own windows' pixels without Screen Recording permission.
+        // The SDK marks CGWindowListCreateImage unavailable; CoreGraphics still exports it.
+        typealias Create = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else { return }
+        let create = unsafeBitCast(symbol, to: Create.self)
+        let options = CGWindowImageOption([.boundsIgnoreFraming, .bestResolution]).rawValue
+        guard let image = create(.null, CGWindowListOption.optionIncludingWindow.rawValue,
+                                 UInt32(window.windowNumber), options)?.takeRetainedValue() else { return }
+        // Encoding takes ~20 ms; keep it off the main thread so clicks never wait on it.
+        DispatchQueue.global(qos: .utility).async {
+            let rep = NSBitmapImageRep(cgImage: image)
+            guard let png = rep.representation(using: .png, properties: [:]) else { return }
+            let temp = out.appendingPathExtension("tmp")
+            try? png.write(to: temp)
+            _ = try? FileManager.default.replaceItemAt(out, withItemAt: temp)
         }
     }
 }
