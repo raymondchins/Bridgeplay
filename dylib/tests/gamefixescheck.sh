@@ -795,7 +795,7 @@ for spec in '-:none' '0:none' 'off:none' '1:shim' '2:shim' '3:shim' 'adaptive:sh
 	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
 	is "NOTPROTON_FRAMEGEN=${fg#-} without the Steam overlay: $want" "$want" "$got_dyld"
 done
-for spec in '0:none' 'off:none' 'fps:shim' 'summary:shim' 'detailed:shim'; do
+for spec in '0:none' 'off:none' 'OFF:none' 'false:none' 'No:none' 'fps:shim' 'summary:shim' 'detailed:shim'; do
 	po=${spec%%:*} want=${spec#*:}
 	env -i PATH="$PATH" NOTPROTON_PERF_OVERLAY="$po" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
 	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")

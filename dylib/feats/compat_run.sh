@@ -3448,6 +3448,8 @@ export WINELOADER="$WINELOADER"
 wine_log="$loader_root/bridgeplay-wine.log"
 exec > "\$wine_log" 2>&1
 shim="$np_support/overlay-shim.dylib"
+# Off as np-native's is_off reads it: unset, 0, off, false or no, in any case
+wants() { case "\$1" in ''|0|[Oo][Ff][Ff]|[Ff][Aa][Ll][Ss][Ee]|[Nn][Oo]) return 1 ;; esac; }
 if [ -n "\$STEAM_DYLD_INSERT_LIBRARIES" ]; then
   if [ -f "\$shim" ]; then
     export DYLD_INSERT_LIBRARIES="\$shim:\$STEAM_DYLD_INSERT_LIBRARIES"
@@ -3455,10 +3457,8 @@ if [ -n "\$STEAM_DYLD_INSERT_LIBRARIES" ]; then
   else
     export DYLD_INSERT_LIBRARIES="\$STEAM_DYLD_INSERT_LIBRARIES"
   fi
-elif [ -f "\$shim" ] && { { [ "\${NOTPROTON_FRAMEGEN:-0}" != 0 ] && [ "\$NOTPROTON_FRAMEGEN" != off ]; } ||
-  { [ "\${NOTPROTON_PERF_OVERLAY:-0}" != 0 ] && [ "\$NOTPROTON_PERF_OVERLAY" != off ]; } ||
-  { [ "\${NOTPROTON_FPS_LIMIT:-0}" != 0 ] && [ "\$NOTPROTON_FPS_LIMIT" != off ] && [ "\${NOTPROTON_FPS_LIMIT_OFF:-0}" != 1 ]; } ||
-  { [ "\${NOTPROTON_SCALING_FILTER:-0}" != 0 ] && [ "\$NOTPROTON_SCALING_FILTER" != off ]; }; }; then
+elif [ -f "\$shim" ] && { wants "\$NOTPROTON_FRAMEGEN" || wants "\$NOTPROTON_PERF_OVERLAY" ||
+  { wants "\$NOTPROTON_FPS_LIMIT" && [ "\$NOTPROTON_FPS_LIMIT_OFF" != 1 ]; } || wants "\$NOTPROTON_SCALING_FILTER"; }; then
   # Frame generation, the performance overlay, the frame rate limit and the scaling filter
   # live in the shim, so it loads without the Steam overlay too.
   export DYLD_INSERT_LIBRARIES="\$shim"
