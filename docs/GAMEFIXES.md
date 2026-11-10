@@ -190,7 +190,12 @@ frame limit under it: that switch applies the limit, and while it is off the sli
 and keeps its value. The scaling filter is a row of named choices. Up and Down pick a
 setting, Left and Right change it (the limit by 1 FPS), Return or Space flips the switch, a click
 or a drag along a slider sets it, and Option-Command-P, Escape or a click outside close them.
-While they are open the game gets no key presses, clicks or drags; releases still reach it.
+While they are open the game gets no key presses, clicks, drags, scrolls or mouse movement (raw
+input included); releases still reach it. The cursor is theirs then: the arrow, shown and free to
+move, also in a game that hides it, clips it to its window or keeps pulling it back to the middle
+for mouse look, and the game's own reading of the cursor stays where it left it. Closing them gives
+the game its cursor back as it last asked for it: hidden, clipped or held, and back where the game
+put it.
 
 Each change is also written to `quick-settings/<appid>.conf` in the support folder. Steam's page
 collects it within a couple of seconds and saves it to the game's launch options with the same

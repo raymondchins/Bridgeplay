@@ -19,6 +19,7 @@
 #import <objc/runtime.h>
 #import <sys/mman.h>
 #import <stdarg.h>
+#import <stdatomic.h>
 #import <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -125,9 +126,13 @@ static const void *overlay_text_begin;
 static const void *overlay_text_end;
 static const struct mach_header *overlay_header;
 
+static _Atomic int cursor_rebinding;
+static void rebind_cursor(const struct mach_header *header, intptr_t slide);
+
 static void image_added(const struct mach_header *header, intptr_t slide)
 {
-	(void)slide;
+	if (atomic_load(&cursor_rebinding))
+		rebind_cursor(header, slide);
 
 	if (overlay_text_end != NULL)
 		return;
@@ -287,6 +292,7 @@ static int stage_claimed(Class seen, Class *held, const char *stage)
 #include "perfhud.m"
 #include "framelimit.m"
 #include "scalefilter.m"
+#include "cursor.m"
 #include "sidebar.m"
 
 static void encoder_mark(id encoder, NSUInteger format, id<MTLCommandBuffer> buffer)
@@ -1090,10 +1096,32 @@ static void report_renderer_chain(void)
 	hook_layer_drawable(layer);
 }
 
+// Loaded by hand, the shim gets none of its interposes from dyld; the cursor's (cursor.m) go in
+// by rebinding every other image, now and as images load
+static void rebind_cursor(const struct mach_header *header, intptr_t slide)
+{
+	Dl_info self;
+	if (dladdr((const void *)rebind_cursor, &self) == 0 || header == self.dli_fbase)
+		return;
+	rebind_image(header, slide, (const struct interpose_pair *)cursor_interposes,
+	             sizeof(cursor_interposes) / sizeof(cursor_interposes[0]));
+}
+
+static void rebind_cursor_everywhere(void)
+{
+	if (!sidebar_wanted() || atomic_exchange(&cursor_rebinding, 1))
+		return;
+	uint32_t images = _dyld_image_count();
+	for (uint32_t i = 0; i < images; i++)
+		rebind_cursor(_dyld_get_image_header(i), _dyld_get_image_vmaddr_slide(i));
+	shim_log("overlay_shim rebind_cursor_everywhere: %u images\n", images);
+}
+
 // FEX specific stuff
 __attribute__((visibility("default"))) void np_overlay_shim_install(void)
 {
 	ensure_device_hooks(MTLCreateSystemDefaultDevice());
+	rebind_cursor_everywhere();
 	apply_overlay_interposes();
 	kick_renderer_metal_hooks();
 	report_renderer_chain();

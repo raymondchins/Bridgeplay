@@ -24,6 +24,7 @@ static int quit_enabled;
 static void (*next_send_event)(id, SEL, id);
 static int sidebar_send_event(id event); // sidebar.m
 static int sidebar_wanted(void);         // sidebar.m
+static void cursor_install(void);        // cursor.m
 
 static int quit_is_command_q(id event)
 {
@@ -51,6 +52,10 @@ static void hook_send_event(id app, SEL selector, id event)
 
 static void quit_install(void)
 {
+	// The quick settings hold the game's cursor calls while they are open; counting its hides
+	// starts as soon as AppKit is in, before the game has a window
+	if (sidebar_wanted())
+		cursor_install();
 	id *app_slot = (id *)dlsym(RTLD_DEFAULT, "NSApp");
 	id app = app_slot != NULL ? *app_slot : nil;
 

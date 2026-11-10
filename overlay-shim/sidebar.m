@@ -5,8 +5,11 @@
 // Option-Command-P shows it on the right edge of the game's window; Option-Command-P or
 // Escape hides it, and so does a click outside it. Up and Down pick a setting, Left and
 // Right (or Return) change it, and a click or a drag along a slider picks a stop. While it shows,
-// the game gets no key presses, clicks or drags; releases still pass, so nothing it saw pressed
-// stays held. The game keeps drawing behind it.
+// the game gets no key presses, clicks, drags, scrolls or mouse movement, so neither its window
+// messages nor its raw input see them; releases still pass, so nothing it saw pressed stays held.
+// The cursor is the sidebar's then: shown, free and the arrow, whatever the game hid, clipped or
+// recentred, and the game gets it back as it left it on closing (cursor.m). The game keeps
+// drawing behind it.
 //
 // A change takes effect on the game's next frame and is written to
 // <support>/quick-settings/<appid>.conf. Steam's page collects it through the
@@ -788,6 +791,7 @@ static void sb_close(void)
 	if (!sb_open)
 		return;
 	sb_open = 0;
+	cursor_give_back();
 	sb_drag_row = -1;
 	sb_hover_row = sb_hover_k = -1;
 	fg_ca_begin();
@@ -811,6 +815,7 @@ static void sb_show(void)
 		return;
 	sb_host = [host retain];
 	sb_open = 1;
+	cursor_take();
 	sb_status[0] = '\0';
 	ph_read_screen(sb_host);
 	if (sb_hint != nil) {
@@ -1074,6 +1079,8 @@ static int sidebar_send_event(id event)
 		sb_hover(event);
 		return 1;
 	case 3: case 7: case 22: case 25: case 27: // other presses, drags, scrolls
+		return 1;
+	case 17: // cursor updates: AppKit would set the game window's cursor over the sidebar's arrow
 		return 1;
 	case 12: { // modifiers: a press stays out of the game; anything that releases a key reaches
 		// it, so nothing stays held there, even with another modifier still pressed
