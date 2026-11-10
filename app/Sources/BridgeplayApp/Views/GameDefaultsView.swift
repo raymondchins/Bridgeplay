@@ -15,6 +15,8 @@ struct GameDefaultsView: View {
     @State private var failure: String?
     @State private var confirmsReset = false
     @State private var clearing: GameDefaults.Override?
+    // The frame rate limit while its slider is dragged; written when the drag ends
+    @State private var limitDraft: Double?
 
     private var hasD3DMetal: Bool { status.snapshot?.gptkSource != nil }
 
@@ -36,7 +38,8 @@ struct GameDefaultsView: View {
                 toggleRow(.highResolution)
                 overlayRow
                 toggleRow(.vsync)
-                choiceRow(.frameLimit)
+                frameLimitRow
+                toggleRow(.frameLimitOff)
                 choiceRow(.scalingFilter)
             } header: {
                 Text("Display")
@@ -132,7 +135,72 @@ struct GameDefaultsView: View {
 
     private func toggleRow(_ setting: GameDefaults.Setting) -> some View {
         StatusRow(title: Self.title(setting), value: caption(setting), menu: resetActions(setting),
-                  toggle: Binding(get: { resolved(setting).value == "1" }, set: { save(setting, $0 ? "1" : "0") }))
+                  toggle: Binding(get: { isOn(setting) }, set: { on in
+                      if setting == .frameLimitOff { setLimitOff(on) } else { save(setting, on ? "1" : "0") }
+                  }))
+    }
+
+    private func isOn(_ setting: GameDefaults.Setting) -> Bool {
+        setting == .frameLimitOff ? limitOff : resolved(setting).value == "1"
+    }
+
+    // MARK: Frame rate limit
+    //
+    // As on Steam Deck: a slider in whole frames per second from 15 to the fastest display's
+    // rate, and Disable Frame Limit under it, which turns the limit off without losing the
+    // slider's value and dims the slider. overlay-shim holds the limit to the display a game is on.
+
+    private var maxFPS: Int {
+        min(360, max(GameDefaults.minFrameLimit, NSScreen.screens.map(\.maximumFramesPerSecond).max() ?? 60))
+    }
+
+    private var limitValue: Int {
+        GameDefaults.frameLimitValue(resolved(.frameLimit).value, maxFPS: maxFPS) ?? maxFPS
+    }
+
+    private var limitOff: Bool {
+        GameDefaults.frameLimitIsOff(limit: resolved(.frameLimit).value, off: resolved(.frameLimitOff).value)
+    }
+
+    private var frameLimitRow: some View {
+        let shown = Int(limitDraft ?? Double(limitValue))
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 0) {
+                label(.frameLimit)
+                Spacer(minLength: 12)
+                Text(verbatim: "\(shown) FPS")
+                    .monospacedDigit()
+                    .foregroundStyle(limitOff ? .tertiary : .secondary)
+            }
+            Slider(value: Binding(get: { limitDraft ?? Double(limitValue) }, set: { limitDraft = $0.rounded() }),
+                   in: Double(GameDefaults.minFrameLimit)...Double(maxFPS), step: 1) {
+                Text(Self.title(.frameLimit))
+            } minimumValueLabel: {
+                Text(verbatim: "\(GameDefaults.minFrameLimit)")
+            } maximumValueLabel: {
+                Text(verbatim: "\(maxFPS)")
+            } onEditingChanged: { editing in
+                guard !editing, let draft = limitDraft else { return }
+                limitDraft = nil
+                save(.frameLimit, String(Int(draft)))
+            }
+            .labelsHidden()
+            .disabled(limitOff)
+            .padding(.leading, StatusMetrics.textInset)
+        }
+        .contextMenu {
+            ForEach(resetActions(.frameLimit), id: \.label) { action in
+                Button(action.label, action: action.perform)
+            }
+        }
+    }
+
+    // Off keeps the value; on with no value set takes the slider's, the display's rate.
+    private func setLimitOff(_ off: Bool) {
+        if !off, GameDefaults.frameLimitValue(resolved(.frameLimit).value, maxFPS: maxFPS) == nil {
+            save(.frameLimit, String(limitValue))
+        }
+        save(.frameLimitOff, off ? "1" : "0")
     }
 
     private func label(_ setting: GameDefaults.Setting) -> some View {
@@ -221,7 +289,7 @@ struct GameDefaultsView: View {
     }
 
     // The page's options, plus a valid value the conf sets that the page does not list
-    // (FPS_LIMIT=45 written by hand), so the picker shows what games actually get.
+    // (FRAMEGEN=1 written by hand), so the picker shows what games actually get.
     private func choices(_ setting: GameDefaults.Setting) -> [String] {
         let options = Self.options(setting)
         guard let current = resolved(setting).value, !options.contains(current) else { return options }
@@ -329,6 +397,7 @@ struct GameDefaultsView: View {
         case .msync: "MSync"
         case .vsync: String(localized: "Force VSync")
         case .frameLimit: String(localized: "Frame Rate Limit")
+        case .frameLimitOff: String(localized: "Disable Frame Limit")
         case .scalingFilter: String(localized: "Scaling Filter")
         case .frameGen: String(localized: "Frame Generation")
         case .frameGenQuality: String(localized: "Quality")
@@ -360,7 +429,8 @@ struct GameDefaultsView: View {
         case .advertiseAVX: String(localized: "Many games quit without it.")
         case .msync: String(localized: "Automatic follows the engine.")
         case .vsync: String(localized: "Waits for the display even when a game turns VSync off.")
-        case .frameLimit: String(localized: "Paces games to the display they are on, which also waits for the display. The display's refresh rate is not changed.")
+        case .frameLimit: String(localized: "Holds games to this many frames per second, from 15 up to the display's refresh rate, and waits for the display they are on. The display's refresh rate is not changed.")
+        case .frameLimitOff: String(localized: "No limit, and the slider keeps its value for when you switch it back on.")
         case .scalingFilter: String(localized: "How a game's frames are scaled up to the screen when it draws fewer pixels, as with High Resolution off. Automatic keeps what Wine does there, sharp pixels; Linear smooths them.")
         case .frameGen, .frameGenQuality, .frameGenEngine: ""
         case .frameGenUI: String(localized: "Keeps static HUD and menus sharp.")
@@ -397,10 +467,6 @@ struct GameDefaultsView: View {
         case (.scalingFilter, "integer"): String(localized: "Integer")
         case (.scalingFilter, "linear"): String(localized: "Linear")
         case (.scalingFilter, _): String(localized: "Automatic")
-        case (.frameLimit, "display"): String(localized: "Match Display Refresh")
-        case (.frameLimit, "half"): String(localized: "Half Display Refresh")
-        case (.frameLimit, "0"): String(localized: "Off")
-        case (.frameLimit, _): "\(option) FPS"
         default: option
         }
     }

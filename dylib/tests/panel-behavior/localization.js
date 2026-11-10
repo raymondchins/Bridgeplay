@@ -30,16 +30,17 @@ for (const form of Object.keys(FORMS)) {
       assert(nodes.some(n => n.props.label === t('Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)',
         '缩放过滤（当游戏绘制的像素少于屏幕时生效，例如关闭高分辨率时）',
         'Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)')));
-      assert.deepEqual(dropdowns[3].props.rgOptions.map(o => o.label), [
+      assert.deepEqual(dropdowns[2].props.rgOptions.map(o => o.label), [
         t('Automatic (Wine keeps pixels sharp with High Resolution off)', '自动（关闭高分辨率时 Wine 保持像素锐利）',
           'Automatico (con Alta risoluzione disattivata Wine mantiene i pixel nitidi)'),
         t('Linear (smooth)', '线性（平滑）', 'Lineare (morbido)'),
         t('Nearest (sharp pixels at any scale)', '最近邻（任何比例都保持锐利像素）', 'Nearest (pixel nitidi a qualsiasi scala)'),
         t('Integer (sharp at exact 2x or 3x, smooth otherwise)', '整数（正好 2 倍或 3 倍时锐利，其他比例平滑）',
           'Intero (nitido a 2x o 3x esatti, morbido altrimenti)')]);
-      assert.deepEqual(dropdowns[2].props.rgOptions.map(o => o.label), [t('Off', '关闭', 'Disattivato'),
-        t('Match display refresh', '匹配显示器刷新率', 'Uguale alla frequenza del display'),
-        t('Half display refresh', '显示器刷新率的一半', 'Metà della frequenza del display'), '60 FPS', '40 FPS', '30 FPS']);
+      // The limit is a slider in FPS, which needs no words, and its switch, which does
+      assert(nodes.some(n => n.type === 'Slider' && n.props.valueSuffix === ' FPS'));
+      assert(nodes.some(n => n.type === 'Toggle' &&
+        n.props.label === t('Disable frame limit', '停用帧率限制', 'Disattiva limite di fotogrammi')));
       assert.deepEqual(dropdowns[1].props.rgOptions.map(o => o.label), [t('Off', '关闭', 'Disattivato'), 'FPS',
         t('Summary (FPS, frame time, CPU, GPU, memory, battery)', '摘要（FPS、帧时间、CPU、GPU、内存、电池）',
           'Riepilogo (FPS, tempo per fotogramma, CPU, GPU, memoria, batteria)'),

@@ -114,7 +114,9 @@ for (const form of Object.keys(FORMS)) {
                      'nice -n 5 CX_GRAPHICS_BACKEND=dxmt %command%']) {
     written.length = 0;
     const ns = nodes(odd);
-    t.ok(ns.every(x => !x.props.disabled && x.props.role !== 'status'), `edits ${JSON.stringify(odd)}`);
+    // The limit slider is disabled while its switch turns the limit off, which says nothing about the line
+    t.ok(ns.every(x => (!x.props.disabled || x.props.npKey === 'BRIDGEPLAY_FPS_LIMIT') && x.props.role !== 'status'),
+         `edits ${JSON.stringify(odd)}`);
     hud(odd).props.onChange(true);
     t.ok(written.length === 1 && hud(last()).props.checked, `turns the HUD on in ${JSON.stringify(odd)}`);
     t.ok((last().match(/%command%/gi) || []).length === Math.max(1, (odd.match(/%command%/gi) || []).length),

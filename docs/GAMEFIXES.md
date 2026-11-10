@@ -38,7 +38,7 @@ is the value. The files are never run as shell code. A file over 64 KiB is ignor
 is rejected, and the rejection logged, when:
 
 - the key is not on the list below (`RETINA`, `STDOUT_NULL`, `VSYNC`, `HIDE_WINE_EXPORTS`,
-  `FRAMEGEN`, the `FRAMEGEN_*` keys, `PERF_OVERLAY`, `FPS_LIMIT` and `SCALING_FILTER` also
+  `FRAMEGEN`, the `FRAMEGEN_*` keys, `PERF_OVERLAY`, `FPS_LIMIT`, `FPS_LIMIT_OFF` and `SCALING_FILTER` also
   accept their `BRIDGEPLAY_` name, such as `BRIDGEPLAY_RETINA=1`; `BACKEND` does not)
 - the value contains a backtick, `$(`, a quote or a control character, or is over 1024 characters
 
@@ -55,7 +55,8 @@ is rejected, and the rejection logged, when:
 | `FRAMEGEN_UI` | `0`, `1` | Same as `BRIDGEPLAY_FRAMEGEN_UI`, Protect UI: keeps static HUD and menus sharp. On when unset |
 | `FRAMEGEN_FALLBACK` | `0`, `1` | Same as `BRIDGEPLAY_FRAMEGEN_FALLBACK`, Fast-motion fallback: skips generated frames that would smear. On when unset |
 | `FRAMEGEN_ENGINE` | `own`, `metalfx` | Same as `BRIDGEPLAY_FRAMEGEN_ENGINE`: the built-in optical flow (`own`, the default) or MetalFX frame interpolation |
-| `FPS_LIMIT` | `0`, `display`, `half`, `10` to `360` | Same as `BRIDGEPLAY_FPS_LIMIT`: overlay-shim holds the game to the display's refresh rate (`display`), half of it (`half`) or that many frames per second, and turns display sync on as `VSYNC=1` does, so frames land on refreshes. It never changes the display's refresh rate. A number at or above the display's rate is display sync alone. Frame generation adds its frames on top. Off (`0`) by default. Works on the game's Metal layer (D3DMetal, DXMT, DXVK through MoltenVK, native Metal games), not on OpenGL |
+| `FPS_LIMIT` | `15` to `360`; also read: `0`, `display`, `half`, `10` to `14` | Same as `BRIDGEPLAY_FPS_LIMIT`: overlay-shim holds the game to that many frames per second, never below 15 nor above the refresh rate of the display the game is on, and turns display sync on as `VSYNC=1` does, so frames land on refreshes. It never changes the display's refresh rate. A number at or above the display's rate is display sync alone. Frame generation adds its frames on top. The settings write whole numbers from a slider; values from earlier releases still work: `display` is the display's rate, `half` half of it, `10` to `14` count as 15, and `0` is no limit. No limit by default. Works on the game's Metal layer (D3DMetal, DXMT, DXVK through MoltenVK, native Metal games), not on OpenGL |
+| `FPS_LIMIT_OFF` | `0`, `1` | Same as `BRIDGEPLAY_FPS_LIMIT_OFF`, Disable frame limit: `1` turns the limit off and keeps `FPS_LIMIT`, so switching it back on (`0`) restores the same value, as on Steam Deck |
 | `SCALING_FILTER` | `0`, `linear`, `nearest`, `integer` | Same as `BRIDGEPLAY_SCALING_FILTER`: the filter Core Animation scales the game's frames up to the screen with, when the game draws fewer pixels than the screen (High Resolution off, the default, draws half a Retina display's pixels; a game set below its window's resolution). `0` (the default) leaves it as it is: Wine's Mac driver uses nearest while High Resolution is off, so Windows games are pixel-doubled, and native games get macOS's linear. `linear` smooths, `nearest` keeps every pixel sharp at any scale. `integer` is nearest at an exact whole-number scale and linear otherwise. It runs after the game and after DXMT's MetalFX upscaling, and changes nothing when the frame already matches the screen. Metal layers only (D3DMetal, DXMT, DXVK through MoltenVK, native Metal games), not OpenGL |
 | `PERF_OVERLAY` | `0`, `fps`, `summary`, `detailed` | Same as `BRIDGEPLAY_PERF_OVERLAY`: Bridgeplay's performance overlay, drawn by overlay-shim in the top-left corner. `fps` is the frame rate alone, `summary` one row with frame time, CPU, GPU, memory and battery, `detailed` a panel with a frame-time graph. Off (`0`) by default. It sits on the game's Metal layer (D3DMetal, DXMT, DXVK through MoltenVK, native Metal games), not on OpenGL. `MTL_HUD_ENABLED=1` shows Apple's Metal HUD instead of it |
 | `NVAPI` | `0`, `1` | `1` turns on Apple's `nvapi64` and `nvngx` (DLSS on MetalFX) on an engine with a linked Game Porting Toolkit, for `d3dmetal` only. On WineCX 11.17, Bridgeplay's `nvapi-shim` goes in front of Apple's nvapi to report a newer driver, and `NOTPROTON_NGX_SIGNER` lets Streamline accept Apple's `nvngx` (`ngx-signer-patch/`); 11.15 ships neither, so Streamline games there can still lack DLSS. It also makes D3DMetal report an NVIDIA GeForce RTX 4090 (`D3DM_VENDOR_ID=0x10de`, `D3DM_DEVICE_ID=0x2684`, `D3DM_DEVICE_DESCRIPTION`; a `D3DM_*` from a conf or the launch options wins) and a driver version of 32.0.15.9541 (`NOTPROTON_DRIVER_VERSION`), since games offer DLSS only on an NVIDIA adapter. Without the key, the run script treats it as `0`. Bridgeplay's `gamefixes-default/default.conf` sets `NVAPI=1`, so it is on for every game unless a later conf says `NVAPI=0`. It has no launch-option spelling. An nvapi that answers sends some games down NVIDIA-only paths, which is the reason to turn it off |
@@ -183,17 +184,19 @@ While a game runs with overlay-shim loaded (a Steam game with the Steam overlay 
 sets `PERF_OVERLAY`, `FPS_LIMIT`, `SCALING_FILTER` or `FRAMEGEN`), Option-Command-P opens
 Bridgeplay's quick settings on the right edge of the game's window. They change the performance
 overlay level, the frame rate limit and the scaling filter at once, and show the battery and
-power the Mac reports. The overlay level and the frame rate limit are stepped sliders. The
-limit's stops run 30, 40, 60, Half, Display, Off; with Half or Display chosen, the row shows the
-rate it gives on the current display. The scaling filter is a row of named choices. Up and Down
-pick a setting, Left and Right change it, a click or a drag along a slider picks a stop, and
-Option-Command-P, Escape or a click outside close it. While it is open the game gets no key
-presses, clicks or drags; releases still reach it.
+power the Mac reports. The overlay level is a stepped slider. The frame rate limit is a slider in
+whole frames per second from 15 to the refresh rate of the display the game is on, with Disable
+frame limit under it: that switch turns the limit off, dims the slider and keeps its value for
+when it is switched on again. The scaling filter is a row of named choices. Up and Down pick a
+setting, Left and Right change it (the limit by 1 FPS), Return or Space flips the switch, a click
+or a drag along a slider sets it, and Option-Command-P, Escape or a click outside close them.
+While they are open the game gets no key presses, clicks or drags; releases still reach it.
 
 Each change is also written to `quick-settings/<appid>.conf` in the support folder. Steam's page
 collects it within a couple of seconds and saves it to the game's launch options with the same
-logic as the Bridgeplay tab in Steam Properties, so the next launch uses it. With Steam's page
-not running, the file waits for the next time it is. The Metal HUD, when a game starts with it,
+logic as the Bridgeplay tab in Steam Properties, so the next launch uses it. A change Steam cannot
+place yet is tried again for about a minute. One left from an earlier Steam session, which may
+have been another Steam account's, is dropped. The Metal HUD, when a game starts with it,
 stays the only overlay and the overlay row is locked. Controllers cannot open or move through
 the quick settings. `BRIDGEPLAY_QUICK_SETTINGS=0` in the launch options turns them off.
 
@@ -208,7 +211,7 @@ with variable names as they are (`BRIDGEPLAY_FRAMEGEN=2`, `NP_PAD_MODE=hid`, `MT
 
 The Bridgeplay tab in Steam Properties for such a game shows the performance overlay
 (`BRIDGEPLAY_PERF_OVERLAY`, or `MTL_HUD_ENABLED=1` for the Metal HUD), the frame rate limit
-(`BRIDGEPLAY_FPS_LIMIT`), the scaling filter (`BRIDGEPLAY_SCALING_FILTER`), Frame Generation and the controller
+(`BRIDGEPLAY_FPS_LIMIT` and `BRIDGEPLAY_FPS_LIMIT_OFF`), the scaling filter (`BRIDGEPLAY_SCALING_FILTER`), Frame Generation and the controller
 layer (`NP_PAD_MODE`: `hid`, `gc` or `off`). It writes the launch options as
 `<home>/.bridgeplay/np-native VAR=VALUE ... %command% <game args>`, and rewrites the older
 `/usr/bin/arch -arm64 -x86_64 -e VAR=VALUE ... %command%` form into that one, dropping its

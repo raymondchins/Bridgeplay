@@ -5,8 +5,9 @@
 // <support>/quick-settings/<appid>.conf as KEY=VALUE lines. The Steam page polls the
 // NotProton.TakeQuickSettings route, which hands it these as JSON and removes the files;
 // the page then writes them through the Bridgeplay panel's own launch-option logic, the
-// same path a pick in Steam Properties › Bridgeplay takes. Only the three settings the
-// sidebar offers, with the values its menus offer, get through.
+// same path a pick in Steam Properties › Bridgeplay takes. Only the settings the sidebar
+// offers, with the values it can set, get through: the frame rate limit as a whole number
+// from 15 to 360 and its off switch as 0 or 1.
 #include "quicksettings.h"
 
 #include <dirent.h>
@@ -17,7 +18,7 @@
 #include <unistd.h>
 
 static const char *const qs_overlay[] = { "0", "fps", "summary", "detailed", NULL };
-static const char *const qs_limit[] = { "0", "display", "half", "60", "40", "30", NULL };
+static const char *const qs_limit_off[] = { "0", "1", NULL };
 static const char *const qs_filter[] = { "0", "linear", "nearest", "integer", NULL };
 
 static const struct {
@@ -25,11 +26,24 @@ static const struct {
     const char *const *values;
 } qs_keys[] = {
     { "BRIDGEPLAY_PERF_OVERLAY", qs_overlay },
-    { "BRIDGEPLAY_FPS_LIMIT", qs_limit },
+    { "BRIDGEPLAY_FPS_LIMIT_OFF", qs_limit_off },
     { "BRIDGEPLAY_SCALING_FILTER", qs_filter },
 };
 
+// The frame rate limit slider's whole numbers, 15 to 360, written without a leading zero.
+static int qs_limit(const char *value) {
+    size_t n = strlen(value);
+    if (n < 2 || n > 3 || value[0] == '0') return 0;
+    int v = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (value[i] < '0' || value[i] > '9') return 0;
+        v = v * 10 + (value[i] - '0');
+    }
+    return v >= 15 && v <= 360;
+}
+
 int np_quick_settings_allowed(const char *key, const char *value) {
+    if (strcmp(key, "BRIDGEPLAY_FPS_LIMIT") == 0) return qs_limit(value);
     for (size_t i = 0; i < sizeof(qs_keys) / sizeof(qs_keys[0]); i++) {
         if (strcmp(key, qs_keys[i].key) != 0) continue;
         for (const char *const *v = qs_keys[i].values; *v; v++)

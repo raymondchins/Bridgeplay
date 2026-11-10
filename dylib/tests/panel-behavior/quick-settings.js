@@ -25,14 +25,26 @@ for (const form of Object.keys(FORMS)) {
        r.includes('BRIDGEPLAY_SCALING_FILTER=linear') && r.includes('WINEDEBUG=-all') && r.endsWith('%command% -novid'),
        `all three land and the rest of the line stays (${r})`);
 
-  r = run('BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_PERF_OVERLAY=detailed %command%', { BRIDGEPLAY_FPS_LIMIT: '0' });
-  t.ok(r === 'BRIDGEPLAY_PERF_OVERLAY=detailed %command%', `Off from the game drops the limit only (${r})`);
+  r = run('BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_PERF_OVERLAY=detailed %command%', { BRIDGEPLAY_FPS_LIMIT_OFF: '1' });
+  t.ok(/BRIDGEPLAY_FPS_LIMIT_OFF=1/.test(r) && r.includes('BRIDGEPLAY_FPS_LIMIT=30') &&
+       r.includes('BRIDGEPLAY_PERF_OVERLAY=detailed'), `Disable frame limit from the game keeps the value (${r})`);
+
+  r = run('BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_FPS_LIMIT_OFF=1 %command%', { BRIDGEPLAY_FPS_LIMIT: '47', BRIDGEPLAY_FPS_LIMIT_OFF: '0' });
+  t.ok(r === 'BRIDGEPLAY_FPS_LIMIT=47 %command%' && written.length === 1,
+       `a new value and the switch back on land together, the value first (${r})`);
+
+  r = run('', { BRIDGEPLAY_FPS_LIMIT: '47', BRIDGEPLAY_FPS_LIMIT_OFF: '1' });
+  t.ok(/BRIDGEPLAY_FPS_LIMIT=47/.test(r) && /BRIDGEPLAY_FPS_LIMIT_OFF=1/.test(r),
+       `a value set and then switched off in the game keeps both (${r})`);
 
   r = run('BRIDGEPLAY_PERF_OVERLAY=fps %command%', { BRIDGEPLAY_PERF_OVERLAY: 'fps' });
   t.ok(written.length === 0 && r === 'BRIDGEPLAY_PERF_OVERLAY=fps %command%', 'an unchanged value writes nothing');
 
-  r = run('', { BRIDGEPLAY_FPS_LIMIT: '45', BRIDGEPLAY_PERF_OVERLAY: 'hud', MTL_HUD_ENABLED: '1', PATH: '/x' });
-  t.ok(written.length === 0 && r === '', `values and keys the menus do not offer are ignored (${r})`);
+  r = run('', { BRIDGEPLAY_FPS_LIMIT: 'half', BRIDGEPLAY_PERF_OVERLAY: 'hud', MTL_HUD_ENABLED: '1', PATH: '/x',
+                BRIDGEPLAY_FPS_LIMIT_OFF: 'yes' });
+  t.ok(written.length === 0 && r === '', `values and keys the sidebar does not set are ignored (${r})`);
+  r = run('', { BRIDGEPLAY_FPS_LIMIT: '14' });
+  t.ok(written.length === 0, `a limit under 15 is ignored (${r})`);
 
   r = run('MTL_HUD_ENABLED=1 %command%', { BRIDGEPLAY_PERF_OVERLAY: 'summary' });
   t.ok(r === 'BRIDGEPLAY_PERF_OVERLAY=summary %command%', `a level replaces the Metal HUD, as the menu does (${r})`);
@@ -40,8 +52,8 @@ for (const form of Object.keys(FORMS)) {
   globalThis.MSCXFx = { g: { BRIDGEPLAY_FPS_LIMIT: '30' }, a: {}, e: {}, d: {} };
   r = run('BRIDGEPLAY_FPS_LIMIT=60 %command%', { BRIDGEPLAY_FPS_LIMIT: '30' });
   t.ok(r === '', `a pick matching Game Defaults drops the override (${JSON.stringify(r)})`);
-  r = run('', { BRIDGEPLAY_FPS_LIMIT: '0' });
-  t.ok(r === 'BRIDGEPLAY_FPS_LIMIT=0 %command%', `Off over a Game Defaults limit writes 0 (${r})`);
+  r = run('', { BRIDGEPLAY_FPS_LIMIT_OFF: '1' });
+  t.ok(r === 'BRIDGEPLAY_FPS_LIMIT_OFF=1 %command%', `Disable frame limit over a Game Defaults limit writes the switch (${r})`);
   delete globalThis.MSCXFx;
 
   globalThis.MSCXFx = { g: {}, a: {}, e: {}, d: {}, ng: {}, na: {}, h: '/Users/me' };

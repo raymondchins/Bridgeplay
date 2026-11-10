@@ -207,6 +207,51 @@ static int child(const char *path, const char *mode, const char *home)
 	CHECK([[NSString stringWithContentsOfFile:victim encoding:NSUTF8StringEncoding error:nil] isEqualToString:@"SAVE"],
 	      "saving wrote through a link at its temporary name");
 
+	// Disable frame limit keeps the value and lets the game go; switched back on, it holds again
+	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "45"), "a limit of 45 was refused");
+	CHECK(set("BRIDGEPLAY_FPS_LIMIT_OFF", "1"), "the switch was refused");
+	CHECK(!set("BRIDGEPLAY_FPS_LIMIT_OFF", "2"), "the switch took 2");
+	int lmode = -1, lwaits = -1, lsync = -1;
+	double lcap = -2;
+	limit(&lmode, &lcap, &lwaits, &lsync);
+	CHECK(lmode == 3 && lcap == -1 && lsync == 0 && !layer.displaySyncEnabled,
+	      "switched off: mode %d cap %.1f sync %d layer %d", lmode, lcap, lsync, layer.displaySyncEnabled);
+	double free_fps = present_for(layer, 1.0);
+	CHECK(free_fps > 55, "a limit switched off held the game to %.1f fps", free_fps);
+	CHECK(set("BRIDGEPLAY_FPS_LIMIT_OFF", "0"), "switching the limit back on was refused");
+	limit(&lmode, &lcap, &lwaits, &lsync);
+	CHECK(lmode == 3 && lcap == 45 && layer.displaySyncEnabled, "switched on: mode %d cap %.1f", lmode, lcap);
+	double held = present_for(layer, 2.0);
+	CHECK(held > 42 && held < 47, "the kept 45 held the game to %.1f fps", held);
+	file = saved(home);
+	CHECK([file containsString:@"BRIDGEPLAY_FPS_LIMIT=45\n"] && [file containsString:@"BRIDGEPLAY_FPS_LIMIT_OFF=0\n"],
+	      "the saved changes read %s", file.UTF8String);
+
+	// The keys: the limit moves one frame per second at a time, and the switch flips on Return
+	// and Space. The modifier check above left the focus on the last row.
+	CHECK(send(event(10, 35, CMD | OPT)), "Option-Command-P did not open the sidebar again");
+	send(event(12, 55, 0));
+	send(event(10, 125, 0)); // to the overlay
+	send(event(10, 125, 0)); // to the frame rate limit
+	send(event(10, 124, 0));
+	send(event(10, 124, 0));
+	limit(&lmode, &lcap, &lwaits, &lsync);
+	CHECK(lmode == 3 && lcap == 47, "two Right presses took 45 to %.1f, not 47", lcap);
+	send(event(10, 125, 0)); // to Disable frame limit
+	send(event(10, 36, 0));
+	limit(&lmode, &lcap, &lwaits, &lsync);
+	CHECK(lcap == -1, "Return on Disable frame limit left a cap of %.1f", lcap);
+	send(event(10, 126, 0)); // back up to the limit
+	send(event(10, 124, 0));
+	limit(&lmode, &lcap, &lwaits, &lsync);
+	CHECK(lcap == -1 && [saved(home) containsString:@"BRIDGEPLAY_FPS_LIMIT=47\n"],
+	      "Right on a switched-off limit moved it (cap %.1f, %s)", lcap, saved(home).UTF8String);
+	send(event(10, 125, 0)); // to Disable frame limit
+	send(event(10, 49, 0));
+	limit(&lmode, &lcap, &lwaits, &lsync);
+	CHECK(lcap == 47, "Space switched the limit back on at %.1f, not the kept 47", lcap);
+	send(event(10, 53, 0));
+
 	// A link in place of the folder is not written through either
 	NSString *elsewhere = [NSString stringWithFormat:@"%s/elsewhere", home];
 	[[NSFileManager defaultManager] removeItemAtPath:dir error:nil];

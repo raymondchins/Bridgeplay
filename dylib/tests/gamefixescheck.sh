@@ -126,7 +126,7 @@ launch() {
 			compose_dll_overrides
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
-				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE NOTPROTON_PERF_OVERLAY NOTPROTON_FPS_LIMIT NOTPROTON_SCALING_FILTER CX_GRAPHICS_BACKEND \
+				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE NOTPROTON_PERF_OVERLAY NOTPROTON_FPS_LIMIT NOTPROTON_FPS_LIMIT_OFF NOTPROTON_SCALING_FILTER CX_GRAPHICS_BACKEND \
 				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS NOTPROTON_ROCKSTAR_DXGI CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
@@ -727,6 +727,31 @@ for bad in 5 9 361 400 1000 max 30fps -30; do
 	has "FPS_LIMIT=$bad is refused" "rejected FPS_LIMIT: not 0, display, half or 10 to 360" "$case_dir/log"
 	is "a refused FPS_LIMIT=$bad leaves no limit" "<unset>" "$(got NOTPROTON_FPS_LIMIT)"
 done
+echo "== FPS_LIMIT_OFF"
+for value in 0 1; do
+	new_case
+	full_engine
+	user_conf "FPS_LIMIT=45
+FPS_LIMIT_OFF=$value"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	is "FPS_LIMIT_OFF=$value maps to NOTPROTON_FPS_LIMIT_OFF" "$value" "$(got NOTPROTON_FPS_LIMIT_OFF)"
+	is "and FPS_LIMIT=45 is kept beside it" "45" "$(got NOTPROTON_FPS_LIMIT)"
+done
+new_case
+full_engine
+printf 'FPS_LIMIT=40\nBRIDGEPLAY_FPS_LIMIT_OFF=1\n' > "$case_dir/support/gamefixes/default.conf"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "Game Defaults can switch the limit off, BRIDGEPLAY_ name and all" "1" "$(got NOTPROTON_FPS_LIMIT_OFF)"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_FPS_LIMIT_OFF=0
+is "a launch option switches it back on over the confs" "0" "$(got NOTPROTON_FPS_LIMIT_OFF)"
+for bad in 2 yes on -1; do
+	new_case
+	full_engine
+	user_conf "FPS_LIMIT_OFF=$bad"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	has "FPS_LIMIT_OFF=$bad is refused" "rejected FPS_LIMIT_OFF: not 0 or 1" "$case_dir/log"
+	is "a refused FPS_LIMIT_OFF=$bad sets nothing" "<unset>" "$(got NOTPROTON_FPS_LIMIT_OFF)"
+done
 
 echo "== PERF_OVERLAY"
 for level in 0 fps summary detailed; do
@@ -784,6 +809,13 @@ for spec in '0:none' 'off:none' 'display:shim' 'half:shim' '30:shim'; do
 	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
 	is "NOTPROTON_FPS_LIMIT=$fl without the Steam overlay: $want" "$want" "$got_dyld"
 done
+for spec in '1:none' '0:shim'; do
+	off=${spec%%:*} want=${spec#*:}
+	env -i PATH="$PATH" NOTPROTON_FPS_LIMIT=45 NOTPROTON_FPS_LIMIT_OFF="$off" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
+	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
+	is "a limit of 45 with NOTPROTON_FPS_LIMIT_OFF=$off without the Steam overlay: $want" "$want" "$got_dyld"
+done
 for spec in '0:none' 'off:none' 'linear:shim' 'nearest:shim' 'integer:shim'; do
 	sfv=${spec%%:*} want=${spec#*:}
 	env -i PATH="$PATH" NOTPROTON_SCALING_FILTER="$sfv" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
@@ -797,9 +829,9 @@ set --
 out=$(env -i PATH="$PATH" forward="$forward" VKD3D_CONFIG=dxr MVK_CONFIG_LOG_LEVEL=1 \
 	STAGING_SHARED_MEMORY=1 WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 CX_FWD_COMPAT_GL_CTX=1 \
 	DXVK_HUD=fps NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 \
-	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_FPS_LIMIT=30 NOTPROTON_SCALING_FILTER=nearest NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | LC_ALL=C sort | tr '\n' ' ')
+	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_FPS_LIMIT=30 NOTPROTON_FPS_LIMIT_OFF=1 NOTPROTON_SCALING_FILTER=nearest NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | LC_ALL=C sort | tr '\n' ' ')
 is "VKD3D_, MVK_, STAGING_, WINE_ topology and CX_FWD_COMPAT_GL_CTX variables are forwarded" \
-	"CX_FWD_COMPAT_GL_CTX=1 DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FPS_LIMIT=30 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_SCALING_FILTER=nearest STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
+	"CX_FWD_COMPAT_GL_CTX=1 DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FPS_LIMIT=30 NOTPROTON_FPS_LIMIT_OFF=1 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_SCALING_FILTER=nearest STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
 
 echo "== the wineserver directory self-heal"
 heal=$(sed -n '/^heal_wine_tmp() {$/,/^}$/p' "$SRC")

@@ -19,8 +19,9 @@ for (const form of Object.keys(FORMS)) {
        'a shortcut renders the panel before a tool name reaches the page');
 
   let r = nodes('');
-  t.ok(toggles(r).length === 6 && sections(r).length === 7, 'automatic shows six toggles in seven sections');
-  t.ok(r.filter(x => x.type === 'Dropdown').length === 6, 'six dropdowns');
+  t.ok(toggles(r).length === 7 && sections(r).length === 7, 'automatic shows seven toggles in seven sections');
+  t.ok(r.filter(x => x.type === 'Dropdown').length === 5 && r.filter(x => x.type === 'Slider').length === 1,
+       'five dropdowns and the limit slider');
   t.ok(!('label' in r.find(x => x.type === 'Dropdown').props), 'the backend dropdown carries no label column');
 
   r = nodes('CX_GRAPHICS_BACKEND=dxmt');
@@ -78,7 +79,7 @@ for (const form of Object.keys(FORMS)) {
   const root = P({ details: details('') });
   t.ok(root.props.className === 'MSCXPanel', 'the panel root carries its own class');
   const classes = nodes('').filter(x => x.type === 'Toggle').map(x => x.props.className);
-  t.ok(classes.length === 6 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
+  t.ok(classes.length === 7 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
 
   // Performance Overlay: Bridgeplay's own levels and the Metal HUD in one menu, off by default.
   const po = o => overlay(nodes(o));
@@ -128,46 +129,82 @@ for (const form of Object.keys(FORMS)) {
   globalThis.MSCXFx = { g: {}, a: { 287700: { BRIDGEPLAY_PERF_OVERLAY: 'summary' } }, e: {}, d: {} };
   t.ok(po('').props.selectedOption === 'summary', "the game's own conf level shows");
   delete globalThis.MSCXFx;
-  // Frame Rate Limit: off by default, display-relative or a number, written only when it differs.
+  // Frame Rate Limit: a slider from 15 to the fastest display's rate and a switch that turns it
+  // off and keeps its value, as on Steam Deck. Off, with the slider at the top, by default.
   const fl = o => limit(nodes(o));
-  const FLL = 'Off:0,Match display refresh:display,Half display refresh:half,60 FPS:60,40 FPS:40,30 FPS:30';
-  t.ok(fl('').props.rgOptions.map(x => x.label + ':' + x.data).join(',') === FLL, 'the limits name themselves');
   t.ok(nodes('').some(x => x.type === 'Section' && typeof x.props.label === 'string' &&
        x.props.label.startsWith('Frame Rate Limit (') && x.props.label.includes('refresh rate stays')),
        'the limit says it does not change the refresh rate');
-  t.ok(fl('').props.selectedOption === '0', 'no limit by default');
-  t.ok(fl('BRIDGEPLAY_FPS_LIMIT=30').props.selectedOption === '30', 'a number reads from its argument');
-  t.ok(fl('BRIDGEPLAY_FPS_LIMIT=Half').props.selectedOption === 'half', 'half reads in any case');
-  t.ok(fl('NOTPROTON_FPS_LIMIT=display').props.selectedOption === 'display', 'the pre-3.0 spelling reads too');
-  t.ok(fl('BRIDGEPLAY_FPS_LIMIT=5').props.selectedOption === '0', 'a number the shim refuses reads as off');
-  const odd = fl('BRIDGEPLAY_FPS_LIMIT=45');
-  t.ok(odd.props.selectedOption === '45' && odd.props.rgOptions.some(o => o.data === '45' && o.label === '45 FPS'),
-       'a number set by hand shows as its own entry');
-  written.length = 0;
-  fl('').props.onChange({ data: '30' });
-  t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT=30 %command%', `picking a limit writes it (${last()})`);
-  written.length = 0;
-  fl('WINEDEBUG=-all BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_PERF_OVERLAY=summary').props.onChange({ data: '0' });
-  t.ok(last().trim() === 'WINEDEBUG=-all BRIDGEPLAY_PERF_OVERLAY=summary %command%',
-       `Off drops only the limit (${last()})`);
-  written.length = 0;
-  fl('BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_FRAMEGEN=2').props.onChange({ data: 'half' });
-  t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT=half BRIDGEPLAY_FRAMEGEN=2 %command%',
-       `changing the limit keeps frame generation (${last()})`);
-  globalThis.MSCXFx = { g: { BRIDGEPLAY_FPS_LIMIT: 'half' }, a: {}, e: {}, d: {} };
-  t.ok(fl('').props.selectedOption === 'half', 'the Game Defaults limit shows');
-  written.length = 0;
-  fl('').props.onChange({ data: '0' });
-  t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT=0 %command%', `Off over a default limit writes 0 (${last()})`);
-  written.length = 0;
-  fl('BRIDGEPLAY_FPS_LIMIT=30').props.onChange({ data: 'half' });
-  t.ok(last() === '', `the default limit drops the override (${JSON.stringify(last())})`);
-  globalThis.MSCXFx = { g: {}, a: { 287700: { BRIDGEPLAY_FPS_LIMIT: '40' } }, e: {}, d: {} };
-  t.ok(fl('').props.selectedOption === '40', "the game's own conf limit shows");
+  let L = fl('');
+  t.ok(L.value.type === 'Slider' && L.value.props.min === 15 && L.value.props.max === 60 &&
+       L.value.props.showValue === true && L.value.props.valueSuffix === ' FPS', "Steam's own slider, 15 to 60 FPS");
+  t.ok(L.sw.type === 'Toggle' && L.sw.props.label === 'Disable frame limit' && L.sw.props.className === 'MSCXRow',
+       'the switch is a row of its own');
+  t.ok(L.off && L.dimmed && L.v === 60, 'no limit by default: switched off, the slider dimmed at the display rate');
+  L = fl('BRIDGEPLAY_FPS_LIMIT=30');
+  t.ok(!L.off && !L.dimmed && L.v === 30, 'a number reads from its argument and switches the limit on');
+  t.ok(fl('BRIDGEPLAY_FPS_LIMIT=Half').v === 30 && !fl('BRIDGEPLAY_FPS_LIMIT=Half').off,
+       'half from an earlier release shows as half the display rate');
+  t.ok(fl('NOTPROTON_FPS_LIMIT=display').v === 60, 'display, in the pre-3.0 spelling too, shows as the display rate');
+  t.ok(fl('BRIDGEPLAY_FPS_LIMIT=12').v === 15, 'a limit under 15 from an earlier release shows as 15');
+  t.ok(fl('BRIDGEPLAY_FPS_LIMIT=90').v === 60, 'a limit over the display rate shows clamped to it');
+  t.ok(fl('BRIDGEPLAY_FPS_LIMIT=5').off && fl('BRIDGEPLAY_FPS_LIMIT=0').off, 'a refused number or 0 reads as no limit');
+  L = fl('BRIDGEPLAY_FPS_LIMIT=45 BRIDGEPLAY_FPS_LIMIT_OFF=1');
+  t.ok(L.off && L.dimmed && L.v === 45, 'switched off, the slider keeps 45, dimmed');
+  globalThis.MSCXFx = { g: {}, a: {}, e: {}, d: {}, fm: 120 };
+  L = fl('BRIDGEPLAY_FPS_LIMIT=90');
+  t.ok(L.value.props.max === 120 && L.v === 90, 'on a 120 Hz display the slider runs to 120 and 90 holds');
   delete globalThis.MSCXFx;
   written.length = 0;
-  nodes('WINEDEBUG=-all BRIDGEPLAY_FPS_LIMIT=30').find(x => x.type === 'button').props.onClick();
-  t.ok(last().trim() === 'WINEDEBUG=-all %command%', `Use Bridgeplay defaults drops the limit (${last()})`);
+  fl('BRIDGEPLAY_FPS_LIMIT=30').slide(42);
+  t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT=42 %command%', `the slider writes its whole number (${last()})`);
+  written.length = 0;
+  fl('BRIDGEPLAY_FPS_LIMIT=30').slide(41.6);
+  t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT=42 %command%', `a value between steps rounds (${last()})`);
+  written.length = 0;
+  fl('').slide(42);
+  fl('BRIDGEPLAY_FPS_LIMIT=45 BRIDGEPLAY_FPS_LIMIT_OFF=1').slide(30);
+  t.ok(written.length === 0, 'a dimmed slider writes nothing');
+  written.length = 0;
+  fl('WINEDEBUG=-all BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_PERF_OVERLAY=summary').toggle(true);
+  t.ok(/BRIDGEPLAY_FPS_LIMIT_OFF=1/.test(last()) && /BRIDGEPLAY_FPS_LIMIT=30 /.test(last()) &&
+       last().includes('WINEDEBUG=-all') && last().includes('BRIDGEPLAY_PERF_OVERLAY=summary'),
+       `Disable frame limit keeps the value and the rest of the line (${last()})`);
+  written.length = 0;
+  fl('BRIDGEPLAY_FPS_LIMIT=45 BRIDGEPLAY_FPS_LIMIT_OFF=1').toggle(false);
+  t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT=45 %command%', `switching it back on keeps 45 (${last()})`);
+  written.length = 0;
+  fl('').toggle(false);
+  t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT=60 %command%', `switching on with no value takes the slider's (${last()})`);
+  globalThis.MSCXFx = { g: { BRIDGEPLAY_FPS_LIMIT: '40' }, a: {}, e: {}, d: {} };
+  L = fl('');
+  t.ok(!L.off && L.v === 40, 'the Game Defaults limit shows');
+  written.length = 0;
+  L.toggle(true);
+  t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT_OFF=1 %command%', `switching a default limit off writes the switch (${last()})`);
+  written.length = 0;
+  fl('BRIDGEPLAY_FPS_LIMIT=30').slide(40);
+  t.ok(last() === '', `the default limit drops the override (${JSON.stringify(last())})`);
+  globalThis.MSCXFx = { g: { BRIDGEPLAY_FPS_LIMIT: '40', BRIDGEPLAY_FPS_LIMIT_OFF: '1' }, a: {}, e: {}, d: {} };
+  L = fl('');
+  t.ok(L.off && L.v === 40, 'a limit switched off in Game Defaults shows off at its value');
+  written.length = 0;
+  L.toggle(false);
+  t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT_OFF=0 %command%', `switching it on for this game writes 0 (${last()})`);
+  globalThis.MSCXFx = { g: {}, a: { 287700: { BRIDGEPLAY_FPS_LIMIT: '40' } }, e: {}, d: {} };
+  t.ok(fl('').v === 40, "the game's own conf limit shows");
+  delete globalThis.MSCXFx;
+  written.length = 0;
+  nodes('WINEDEBUG=-all BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_FPS_LIMIT_OFF=1').find(x => x.type === 'button').props.onClick();
+  t.ok(last().trim() === 'WINEDEBUG=-all %command%', `Use Bridgeplay defaults drops the limit and its switch (${last()})`);
+  {
+    // Without Steam's slider, a menu in steps of 5 stands in, with the value it reads
+    const { render } = panel(emit, form, undefined, { slider: false });
+    const M = limit(walk(render({ details: details('BRIDGEPLAY_FPS_LIMIT=42 %command%') })));
+    t.ok(M.value.type === 'Dropdown' && M.v === 42 &&
+         M.value.props.rgOptions.map(o => o.data).join(',') === '15,20,25,30,35,40,42,45,50,55,60',
+         `a menu stands in for a missing slider (${M.value.props.rgOptions.map(o => o.data)})`);
+  }
 
   // Scaling Filter: linear unless set, nearest or integer written only when they differ.
   const sf = o => filter(nodes(o));
@@ -378,11 +415,12 @@ for (const form of Object.keys(FORMS)) {
   let n = nnodes('');
   t.ok(P({ details: mac('') }) !== null && P({ details: mac('') }).props.className === 'MSCXPanel',
        'a mac build with nothing pinned renders the native panel');
-  t.ok(toggles(n).length === 0 && sections(n).join(',') === 'Performance,Frame,Scaling,Frame,Controllers',
+  t.ok(toggles(n).join(',') === 'Disable frame limit' && sections(n).join(',') === 'Performance,Frame,Scaling,Frame,Controllers',
        `the native panel has the overlay, the limit, the filter, frame generation and controllers only (${toggles(n)} / ${sections(n)})`);
-  t.ok(n.filter(x => x.type === 'Dropdown').map(x => x === overlay(n) ? 'overlay' : x === limit(n) ? 'limit' :
-        x === filter(n) ? 'filter' : x.props.label).join(',') === 'overlay,limit,filter,Mode,Controller layer',
-       'native dropdowns: the overlay, the limit, the filter, the mode and the controller layer');
+  t.ok(n.filter(x => x.type === 'Dropdown').map(x => x === overlay(n) ? 'overlay' :
+        x === filter(n) ? 'filter' : x.props.label).join(',') === 'overlay,filter,Mode,Controller layer' &&
+       limit(n).value.type === 'Slider',
+       'native dropdowns: the overlay, the filter, the mode and the controller layer; the limit is a slider');
   written.length = 0;
   filter(nnodes('-novid')).props.onChange({ data: 'nearest' });
   t.ok(last() === NAT + ' BRIDGEPLAY_SCALING_FILTER=nearest %command% -novid',
@@ -390,8 +428,11 @@ for (const form of Object.keys(FORMS)) {
   t.ok(filter(nnodes('')).props.rgOptions[0].label === 'Automatic (as the game sets it)',
        'a native game is not told about Wine');
   written.length = 0;
-  limit(nnodes('-novid')).props.onChange({ data: '30' });
-  t.ok(last() === NAT + ' BRIDGEPLAY_FPS_LIMIT=30 %command% -novid', `a native game gets the limit under np-native (${last()})`);
+  limit(nnodes('-novid')).toggle(false);
+  t.ok(last() === NAT + ' BRIDGEPLAY_FPS_LIMIT=60 %command% -novid', `a native game gets the limit under np-native (${last()})`);
+  written.length = 0;
+  limit(nnodes(NAT + ' BRIDGEPLAY_FPS_LIMIT=60 %command% -novid')).slide(30);
+  t.ok(last() === NAT + ' BRIDGEPLAY_FPS_LIMIT=30 %command% -novid', `and its slider writes there too (${last()})`);
   written.length = 0;
   overlay(nnodes('-novid')).props.onChange({ data: 'summary' });
   t.ok(last() === NAT + ' BRIDGEPLAY_PERF_OVERLAY=summary %command% -novid',

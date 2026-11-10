@@ -2,6 +2,7 @@
 // as Bridgeplay, since on a Mac every setting on it is Bridgeplay's
 #include "webpatch.h"
 #include "nativeplatform.h"
+#include "displayrate.h"
 #include "../util/log.h"
 #include "../util/file.h"
 
@@ -366,6 +367,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "padding:0;margin:10px 0;background:none}" \
     ".MSCXPanel .MSCXDrop>*{width:100%;max-width:none;margin:0}" \
     ".MSCXNoBottomGap{margin-bottom:0}" \
+    ".MSCXPanel .MSCXDim{opacity:.45;pointer-events:none}" \
     ".MSCXBtns{display:flex;gap:8px}" \
     ".MSCXBtn{background:#3d4450;color:#fff;border:none;border-radius:2px;padding:6px 14px;" \
     "font-size:14px;cursor:pointer}.MSCXBtn:hover{background:#4c5361}" \
@@ -454,13 +456,31 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "onChange:v=>{const h=\"hud\"===v.data,p=h?\"0\":v.data;" \
     "s([[\"BRIDGEPLAY_PERF_OVERLAY\",pf(dv(\"BRIDGEPLAY_PERF_OVERLAY\"))===p?\"\":p]," \
     "[\"MTL_HUD_ENABLED\",(\"1\"===dv(\"MTL_HUD_ENABLED\"))===h?\"\":h?\"1\":\"0\"]])}})},\"pov\")," \
-    /* The frame rate limit overlay-shim applies: display, half its rate, or a number. A value \
-       set by hand that the menu does not list shows as its own entry. */ \
-    "fl=x=>{x=(x||\"\").toLowerCase();return/^(display|half)$/.test(x)?x:" \
-    "/^\\d+$/.test(x)&&+x>=10&&+x<=360?String(+x):\"0\"}," \
-    "FL=(l,O)=>{const c=fl(ev(\"BRIDGEPLAY_FPS_LIMIT\"));return(0," RT ".jsx)(" BARREL ".XY,{label:l," \
-    "children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:O.some(o=>o.data===c)?O:O.concat([{data:c,label:c+\" FPS\"}])," \
-    "selectedOption:c,onChange:v=>s([[\"BRIDGEPLAY_FPS_LIMIT\",fl(dv(\"BRIDGEPLAY_FPS_LIMIT\"))===v.data?\"\":v.data]])})},\"fpl\")}," \
+    /* The frame rate limit: a slider in whole frames per second from 15 to the fastest \
+       display's refresh rate (Fx.fm), and a switch that turns the limit off and keeps the \
+       slider's value (BRIDGEPLAY_FPS_LIMIT_OFF=1). overlay-shim clamps to the display the game \
+       is on. display and half from earlier releases show as the rate they give, 0 or no value \
+       as no limit. Steam's slider is found by the name its export carries, so a renamed export \
+       still works; without it, a menu in steps of 5 stands in. npKey and npSet are for \
+       MSCXApply, which sets the value even while the switch dims the slider. */ \
+    "fm=+Fx.fm>=15&&+Fx.fm<=360?+Fx.fm:60," \
+    "lf=x=>{x=(x||\"\").toLowerCase();return x===\"display\"?fm:x===\"half\"?Math.max(15,Math.round(fm/2)):" \
+    "/^\\d+$/.test(x)&&+x>=10&&+x<=360?Math.min(fm,Math.max(15,+x)):0}," \
+    "SL=globalThis.MSCXSliderField||(globalThis.MSCXSliderField=(()=>{try{return Object.values(" BARREL ")" \
+    ".find(f=>typeof f===\"function\"&&/\"SliderField\"/.test(String(f)))}catch(e){return null}})())," \
+    "FL=(l,dl)=>{const n=lf(ev(\"BRIDGEPLAY_FPS_LIMIT\")),off=!n||ev(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",v=n||fm," \
+    "set=x=>{x=Math.min(fm,Math.max(15,Math.round(+x)));if(!(x>=15))return;const b=dv(\"BRIDGEPLAY_FPS_LIMIT\");" \
+    "s([[\"BRIDGEPLAY_FPS_LIMIT\",/^\\d+$/.test(b)&&+b===x?\"\":String(x)]])}," \
+    "tog=d=>{const b=dv(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",ps=[[\"BRIDGEPLAY_FPS_LIMIT_OFF\",d?(b?\"\":\"1\"):(b?\"0\":\"\")]];" \
+    "d||n||ps.push([\"BRIDGEPLAY_FPS_LIMIT\",String(v)]);s(ps)}," \
+    "R=[];for(let x=15;x<fm;x+=5)R.push(x);R.push(fm);R.indexOf(v)<0&&R.push(v);" \
+    "return(0," RT ".jsxs)(" BARREL ".XY,{label:l,children:[(0," RT ".jsx)(\"div\",{className:off?\"MSCXDim\":\"\",children:" \
+    "SL?(0," RT ".jsx)(SL,{min:15,max:fm,value:v,showValue:!0,valueSuffix:\" FPS\",disabled:off," \
+    "npKey:\"BRIDGEPLAY_FPS_LIMIT\",npSet:set,onChange:x=>{off||set(x)}}):" \
+    "(0," RT ".jsx)(" BARREL ".m,{rgOptions:R.sort((a,b)=>a-b).map(x=>({data:x,label:x+\" FPS\"})),selectedOption:v," \
+    "disabled:off,npKey:\"BRIDGEPLAY_FPS_LIMIT\",npSet:set,onChange:o=>{off||set(o.data)}})})," \
+    "(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:dl,checked:off,npKey:\"BRIDGEPLAY_FPS_LIMIT_OFF\"," \
+    "onChange:tog})]},\"fpl\")}," \
     /* The filter Core Animation scales the game's frames to the screen with. 0 leaves it as \
        Wine (nearest with High Resolution off) or a native game (linear) sets it. */ \
     "sq=x=>{x=(x||\"\").toLowerCase();return/^(linear|nearest|integer)$/.test(x)?x:\"0\"}," \
@@ -498,15 +518,13 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "OV=[\"CX_GRAPHICS_BACKEND\",\"MTL_HUD_ENABLED\",\"D3DM_ENABLE_METALFX\",\"DXMT_ENABLE_NVEXT\"," \
     "\"ROSETTA_ADVERTISE_AVX\",\"WINEMSYNC\",\"BRIDGEPLAY_RETINA\",\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"DXMT_CONFIG\"," \
     "\"BRIDGEPLAY_FRAMEGEN\",\"BRIDGEPLAY_FRAMEGEN_QUALITY\",\"BRIDGEPLAY_FRAMEGEN_UI\",\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"," \
-    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\",\"BRIDGEPLAY_SCALING_FILTER\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
+    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\",\"BRIDGEPLAY_FPS_LIMIT_OFF\",\"BRIDGEPLAY_SCALING_FILTER\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
     "if(nat)return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
     "PO(\"Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)\",[{data:\"0\",label:\"Off\"},{data:\"fps\",label:\"FPS\"}," \
     "{data:\"summary\",label:\"Summary (FPS, frame time, CPU, GPU, memory, battery)\"}," \
     "{data:\"detailed\",label:\"Detailed (adds a frame-time graph)\"},{data:\"hud\",label:\"Apple Metal HUD\"}])," \
-    "FL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\",[{data:\"0\",label:\"Off\"}," \
-    "{data:\"display\",label:\"Match display refresh\"},{data:\"half\",label:\"Half display refresh\"}," \
-    "{data:\"60\",label:\"60 FPS\"},{data:\"40\",label:\"40 FPS\"},{data:\"30\",label:\"30 FPS\"}])," \
+    "FL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\",\"Disable frame limit\")," \
     "SQ(\"Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)\",[" \
     "{data:\"0\",label:\"Automatic (as the game sets it)\"},{data:\"linear\",label:\"Linear (smooth)\"}," \
     "{data:\"nearest\",label:\"Nearest (sharp pixels at any scale)\"}," \
@@ -539,11 +557,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "\"Dettagliato (aggiunge il grafico dei tempi per fotogramma)\")}," \
     "{data:\"hud\",label:npL(\"Apple Metal HUD\",\"Apple Metal 性能监视器\",\"Metal HUD di Apple\")}])," \
     "FL(npL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\"," \
-    "\"帧率限制（与显示器同步，不会更改其刷新率）\",\"Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)\"),[" \
-    "{data:\"0\",label:npL(\"Off\",\"关闭\",\"Disattivato\")}," \
-    "{data:\"display\",label:npL(\"Match display refresh\",\"匹配显示器刷新率\",\"Uguale alla frequenza del display\")}," \
-    "{data:\"half\",label:npL(\"Half display refresh\",\"显示器刷新率的一半\",\"Metà della frequenza del display\")}," \
-    "{data:\"60\",label:\"60 FPS\"},{data:\"40\",label:\"40 FPS\"},{data:\"30\",label:\"30 FPS\"}])," \
+    "\"帧率限制（与显示器同步，不会更改其刷新率）\",\"Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)\")," \
+    "npL(\"Disable frame limit\",\"停用帧率限制\",\"Disattiva limite di fotogrammi\"))," \
     "SQ(npL(\"Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)\"," \
     "\"缩放过滤（当游戏绘制的像素少于屏幕时生效，例如关闭高分辨率时）\"," \
     "\"Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)\"),[" \
@@ -584,17 +599,21 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 // keys, the same native or Wine form, nothing written when it matches the game's confs.
 #define NP_CX_APPLY \
     "(t,ch)=>{let o=t.strLaunchOptions||\"\";const o0=o," \
-    "K={BRIDGEPLAY_PERF_OVERLAY:\"hud\",BRIDGEPLAY_FPS_LIMIT:\"half\",BRIDGEPLAY_SCALING_FILTER:\"integer\"}," \
-    /* The sidebar's values only, as the route allows: never the Metal HUD, never a hand-set number. */ \
-    "V={BRIDGEPLAY_PERF_OVERLAY:[\"0\",\"fps\",\"summary\",\"detailed\"]," \
-    "BRIDGEPLAY_FPS_LIMIT:[\"0\",\"display\",\"half\",\"60\",\"40\",\"30\"]," \
+    /* The sidebar's values only, as the route allows: never the Metal HUD, never display or \
+       half. A menu is found by an option only it has, the frame limit's slider and switch by \
+       the npKey they carry. The limit goes before its switch, so a value set while the switch \
+       turns the limit off is kept. */ \
+    "K={BRIDGEPLAY_PERF_OVERLAY:\"hud\",BRIDGEPLAY_SCALING_FILTER:\"integer\"}," \
+    "V={BRIDGEPLAY_PERF_OVERLAY:[\"0\",\"fps\",\"summary\",\"detailed\"],BRIDGEPLAY_FPS_LIMIT_OFF:[\"0\",\"1\"]," \
     "BRIDGEPLAY_SCALING_FILTER:[\"0\",\"linear\",\"nearest\",\"integer\"]}," \
-    "menu=(n,m)=>{let f=null;const w=x=>{if(f||!x||typeof x!==\"object\")return;if(Array.isArray(x))return x.forEach(w);" \
-    "const p=x.props;if(!p)return;if(Array.isArray(p.rgOptions)&&p.rgOptions.some(z=>z.data===m))f=p;else w(p.children)};" \
-    "w(n);return f};" \
-    "Object.keys(ch||{}).forEach(k=>{if(!(k in K))return;" \
-    "const d=menu(MSCXOpts({details:Object.assign({},t,{strLaunchOptions:o}),write:(a,r)=>{o=r}}),K[k]);" \
-    "if(d&&V[k].indexOf(ch[k])>=0)d.onChange({data:ch[k]})});" \
+    "ok=(k,x)=>k===\"BRIDGEPLAY_FPS_LIMIT\"?/^\\d+$/.test(x)&&+x>=15&&+x<=360:(V[k]||[]).indexOf(x)>=0," \
+    "find=(n,f)=>{let r=null;const w=x=>{if(r||!x||typeof x!==\"object\")return;if(Array.isArray(x))return x.forEach(w);" \
+    "const p=x.props;if(!p)return;if(f(p))r=p;else w(p.children)};w(n);return r};" \
+    "[\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\",\"BRIDGEPLAY_FPS_LIMIT_OFF\",\"BRIDGEPLAY_SCALING_FILTER\"]" \
+    ".forEach(k=>{if(!ch||!(k in ch)||!ok(k,ch[k]))return;" \
+    "const d=find(MSCXOpts({details:Object.assign({},t,{strLaunchOptions:o}),write:(a,r)=>{o=r}})," \
+    "p=>k in K?Array.isArray(p.rgOptions)&&p.rgOptions.some(z=>z.data===K[k]):p.npKey===k);if(!d)return;" \
+    "k===\"BRIDGEPLAY_FPS_LIMIT\"?d.npSet(+ch[k]):k===\"BRIDGEPLAY_FPS_LIMIT_OFF\"?d.onChange(ch[k]===\"1\"):d.onChange({data:ch[k]})});" \
     "if(o!==o0)SteamClient.Apps.SetAppLaunchOptions(t.unAppID,o);return o}"
 
 // One poll's changes, by appid. The route has already removed their files, so an app Steam
@@ -942,7 +961,7 @@ int np_webpatch_should_patch(const char *path) {
 static const char *const fx_bridgeplay_keys[] = {
     "BRIDGEPLAY_RETINA", "BRIDGEPLAY_FRAMEGEN", "BRIDGEPLAY_FRAMEGEN_QUALITY",
     "BRIDGEPLAY_FRAMEGEN_UI", "BRIDGEPLAY_FRAMEGEN_FALLBACK", "BRIDGEPLAY_FRAMEGEN_ENGINE",
-    "BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_FPS_LIMIT", "BRIDGEPLAY_SCALING_FILTER",
+    "BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_FPS_LIMIT", "BRIDGEPLAY_FPS_LIMIT_OFF", "BRIDGEPLAY_SCALING_FILTER",
 };
 
 // The BRIDGEPLAY_ name whose suffix follows prefix in key ("" for the run script's short
@@ -978,6 +997,7 @@ static const char *fx_native_key(const char *key) {
     if (strncmp(key, "BRIDGEPLAY_FRAMEGEN", 19) != 0 && strncmp(key, "NOTPROTON_FRAMEGEN", 18) != 0 &&
         strcmp(key, "BRIDGEPLAY_PERF_OVERLAY") != 0 && strcmp(key, "NOTPROTON_PERF_OVERLAY") != 0 &&
         strcmp(key, "BRIDGEPLAY_FPS_LIMIT") != 0 && strcmp(key, "NOTPROTON_FPS_LIMIT") != 0 &&
+        strcmp(key, "BRIDGEPLAY_FPS_LIMIT_OFF") != 0 && strcmp(key, "NOTPROTON_FPS_LIMIT_OFF") != 0 &&
         strcmp(key, "BRIDGEPLAY_SCALING_FILTER") != 0 && strcmp(key, "NOTPROTON_SCALING_FILTER") != 0)
         return NULL;
     const char *bp = fx_bridgeplay_key(key, "BRIDGEPLAY_");
@@ -1235,7 +1255,8 @@ static int fx_build(char *buf, size_t cap) {
     if (n < 0 || (size_t)n >= cap - len) return 0;
     len += (size_t)n;
     if (!fx_json_str(buf, cap, &len, home)) return 0;
-    n = snprintf(buf + len, cap - len, "};");
+    // The frame rate limit slider's top: the fastest display's refresh rate now.
+    n = snprintf(buf + len, cap - len, ",\"fm\":%d};", np_display_max_hz());
     if (n < 0 || (size_t)n >= cap - len) return 0;
     return 1;
 }

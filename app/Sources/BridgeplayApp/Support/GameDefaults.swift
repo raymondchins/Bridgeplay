@@ -13,6 +13,8 @@ enum GameDefaults {
         case toggle
         // The values the page offers, in its order.
         case choice([String])
+        // Whole frames per second on a slider, 15 up to the display's rate (frameLimit).
+        case frameRate
         case dllOverrides
     }
 
@@ -33,6 +35,8 @@ enum GameDefaults {
         case msync
         case vsync
         case frameLimit
+        // Disable Frame Limit: off without losing frameLimit's value, as on Steam Deck.
+        case frameLimitOff
         case scalingFilter
         case frameGen
         case frameGenQuality
@@ -57,6 +61,7 @@ enum GameDefaults {
             case .msync: ["MSYNC"]
             case .vsync: ["VSYNC", "BRIDGEPLAY_VSYNC"]
             case .frameLimit: ["FPS_LIMIT", "BRIDGEPLAY_FPS_LIMIT"]
+            case .frameLimitOff: ["FPS_LIMIT_OFF", "BRIDGEPLAY_FPS_LIMIT_OFF"]
             case .scalingFilter: ["SCALING_FILTER", "BRIDGEPLAY_SCALING_FILTER"]
             case .frameGen: ["FRAMEGEN", "BRIDGEPLAY_FRAMEGEN"]
             case .frameGenQuality: ["FRAMEGEN_QUALITY", "BRIDGEPLAY_FRAMEGEN_QUALITY"]
@@ -77,7 +82,7 @@ enum GameDefaults {
             case .msync: ["WINEMSYNC"]
             case .nvapi, .dlssFrameGen, .dllOverrides: []
             case .highResolution, .vsync, .frameGen, .frameGenQuality, .frameGenUI, .frameGenFallback, .frameGenEngine,
-                 .perfOverlay, .frameLimit, .scalingFilter:
+                 .perfOverlay, .frameLimit, .frameLimitOff, .scalingFilter:
                 ["BRIDGEPLAY_\(keys[0])", "NOTPROTON_\(keys[0])"]
             }
         }
@@ -90,7 +95,7 @@ enum GameDefaults {
             case .frameGenQuality: .choice(["performance", "balanced", "quality"])
             case .frameGenEngine: .choice(["own", "metalfx"])
             case .perfOverlay: .choice(["0", "fps", "summary", "detailed"])
-            case .frameLimit: .choice(["0", "display", "half", "60", "40", "30"])
+            case .frameLimit: .frameRate
             case .scalingFilter: .choice(["0", "linear", "nearest", "integer"])
             case .dllOverrides: .dllOverrides
             default: .toggle
@@ -276,6 +281,27 @@ enum GameDefaults {
         guard let first = value.first, first != "0", value.count <= 3, value.allSatisfy({ ("0"..."9").contains($0) }),
               let number = Int(value) else { return false }
         return (10...360).contains(number)
+    }
+
+    // The lowest frame rate limit the slider and overlay-shim offer.
+    static let minFrameLimit = 15
+
+    // Where the frame rate limit slider sits for a FPS_LIMIT value, as overlay-shim reads it on
+    // a display whose top rate is maxFPS: a number held to 15...maxFPS, display at the top and
+    // half at half of it. nil means no limit is set (unset, 0 or a value the run script refuses).
+    static func frameLimitValue(_ value: String?, maxFPS: Int) -> Int? {
+        guard let value, validFrameLimit(value) else { return nil }
+        switch value {
+        case "0": return nil
+        case "display": return maxFPS
+        case "half": return max(minFrameLimit, (maxFPS + 1) / 2)
+        default: return min(maxFPS, max(minFrameLimit, Int(value) ?? minFrameLimit))
+        }
+    }
+
+    // Disable Frame Limit shows on when the limit is switched off or none is set.
+    static func frameLimitIsOff(limit: String?, off: String?) -> Bool {
+        off == "1" || frameLimitValue(limit, maxFPS: 360) == nil
     }
 
     // name[,name...]=[n|b|n,b|b,n|d] entries joined by semicolons (valid_dll_overrides).

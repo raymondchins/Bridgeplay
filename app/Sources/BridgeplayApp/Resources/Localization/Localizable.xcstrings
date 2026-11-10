@@ -1706,6 +1706,28 @@
         }
       }
     },
+    "A slider in whole frames per second, from 15 up to your display's refresh rate, as on Steam Deck. The game waits for the display so frames land evenly: smoother pacing and less battery drain. On a game's own display a higher value counts as its refresh rate, and the display's own rate is never changed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un cursore in fotogrammi al secondo interi, da 15 fino alla frequenza del display, come su Steam Deck. Il gioco attende il display perché i fotogrammi arrivino regolari: ritmo più fluido e meno consumo di batteria. Sul display del gioco un valore più alto vale come la sua frequenza, e la frequenza del display non viene mai cambiata."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ползунок в целых кадрах в секунду, от 15 до частоты обновления дисплея, как на Steam Deck. Игра ждёт дисплей, чтобы кадры выводились равномерно: плавнее темп и меньше расход батареи. На дисплее игры более высокое значение считается его частотой обновления, а частота самого дисплея никогда не меняется."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以整数帧率调节的滑块，从 15 到显示器的刷新率，与 Steam Deck 相同。游戏会等待显示器，使帧均匀呈现：节奏更流畅，电池消耗更少。在游戏所在的显示器上，更高的数值按其刷新率计算，显示器本身的刷新率不会被更改。"
+          }
+        }
+      }
+    },
     "A star on GitHub helps other people find it." : {
       "localizations" : {
         "it" : {
@@ -6156,6 +6178,50 @@
         }
       }
     },
+    "Disable Frame Limit" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattiva limite di fotogrammi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отключить ограничение частоты кадров"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停用帧率限制"
+          }
+        }
+      }
+    },
+    "Disable frame limit" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattiva limite di fotogrammi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отключить ограничение частоты кадров"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停用帧率限制"
+          }
+        }
+      }
+    },
     "Disable hidraw" : {
       "localizations" : {
         "it" : {
@@ -7740,28 +7806,6 @@
         }
       }
     },
-    "Half Display Refresh" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Metà della frequenza del display"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Половина частоты дисплея"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显示器刷新率的一半"
-          }
-        }
-      }
-    },
     "Has issues" : {
       "localizations" : {
         "it" : {
@@ -7828,24 +7872,24 @@
         }
       }
     },
-    "Holds the game to your display's refresh rate, half of it, or 60, 40 or 30 FPS, and waits for the display so frames land evenly. Smoother pacing and less battery drain. The display's own refresh rate is not changed. Off by default." : {
+    "Holds games to this many frames per second, from 15 up to the display's refresh rate, and waits for the display they are on. The display's refresh rate is not changed." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Limita il gioco alla frequenza del display, alla sua metà, oppure a 60, 40 o 30 FPS, e attende il display perché i fotogrammi arrivino regolari. Ritmo più fluido e meno consumo di batteria. La frequenza del display non cambia. Disattivato per impostazione predefinita."
+            "value" : "Limita i giochi a questo numero di fotogrammi al secondo, da 15 fino alla frequenza del display, e attende il display su cui si trovano. La frequenza del display non cambia."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ограничивает игру частотой обновления дисплея, её половиной или 60, 40 либо 30 FPS и ждёт дисплей, чтобы кадры выводились равномерно. Плавнее темп и меньше расход батареи. Частота обновления самого дисплея не меняется. По умолчанию выключено."
+            "value" : "Ограничивает игры этим числом кадров в секунду, от 15 до частоты обновления дисплея, и ждёт дисплей, на котором они идут. Частота обновления дисплея не меняется."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将游戏限制在显示器的刷新率、其一半，或 60、40、30 FPS，并等待显示器刷新，让帧均匀呈现。帧节奏更平稳，耗电更少。显示器本身的刷新率不会改变。默认关闭。"
+            "value" : "将游戏限制为此帧率，从 15 到显示器的刷新率，并等待游戏所在的显示器。不会更改显示器的刷新率。"
           }
         }
       }
@@ -9390,28 +9434,6 @@
         }
       }
     },
-    "Match Display Refresh" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uguale alla frequenza del display"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Как частота дисплея"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "匹配显示器刷新率"
-          }
-        }
-      }
-    },
     "Metal HUD" : {
       "localizations" : {
         "it" : {
@@ -9852,6 +9874,28 @@
         }
       }
     },
+    "No limit, and the slider keeps its value for when you switch it back on." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun limite, e il cursore mantiene il suo valore per quando lo riattivi."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без ограничения, а ползунок сохраняет значение на случай, если вы снова его включите."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不限制帧率，滑块会保留其数值，以便你重新开启时使用。"
+          }
+        }
+      }
+    },
     "No longer installed" : {
       "localizations" : {
         "it" : {
@@ -10156,6 +10200,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开启"
+          }
+        }
+      }
+    },
+    "On by default, so there is no limit. Switch it off to use the slider; switching it on again keeps the slider's value." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attivo per impostazione predefinita, quindi senza limite. Disattivalo per usare il cursore; riattivandolo, il cursore mantiene il suo valore."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "По умолчанию включено, то есть ограничения нет. Выключите его, чтобы использовать ползунок; при повторном включении значение ползунка сохраняется."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认开启，即不限制帧率。关闭它即可使用滑块；再次开启时会保留滑块的数值。"
           }
         }
       }
@@ -10618,28 +10684,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自有 conf"
-          }
-        }
-      }
-    },
-    "Paces games to the display they are on, which also waits for the display. The display's refresh rate is not changed." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronizza i giochi con il display su cui si trovano, attendendo il display. La frequenza di aggiornamento del display non cambia."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Синхронизирует игры с дисплеем, на котором они идут, и ждёт этот дисплей. Частота обновления дисплея не меняется."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "让游戏与所在的显示器同步，并等待显示器刷新。显示器的刷新率不会改变。"
           }
         }
       }

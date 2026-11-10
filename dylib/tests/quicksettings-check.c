@@ -47,10 +47,15 @@ int main(void) {
     np_quick_settings_take(dir, 0, json, sizeof json, NULL);
     is("so a second poll finds nothing", "{}", json);
 
-    put(dir, "42.conf", "BRIDGEPLAY_FPS_LIMIT=45\nBRIDGEPLAY_SCALING_FILTER=fsr\nPATH=/evil\n"
-        "DYLD_INSERT_LIBRARIES=/x\nBRIDGEPLAY_SCALING_FILTER=integer\nnot a line\n");
+    put(dir, "42.conf", "BRIDGEPLAY_FPS_LIMIT=half\nBRIDGEPLAY_SCALING_FILTER=fsr\nPATH=/evil\n"
+        "DYLD_INSERT_LIBRARIES=/x\nBRIDGEPLAY_SCALING_FILTER=integer\nnot a line\nBRIDGEPLAY_FPS_LIMIT_OFF=yes\n");
     np_quick_settings_take(dir, 0, json, sizeof json, NULL);
-    is("only menu values of the three keys pass", "{\"42\":{\"BRIDGEPLAY_SCALING_FILTER\":\"integer\"}}", json);
+    is("only the sidebar's values of its keys pass", "{\"42\":{\"BRIDGEPLAY_SCALING_FILTER\":\"integer\"}}", json);
+
+    put(dir, "46.conf", "BRIDGEPLAY_FPS_LIMIT=47\nBRIDGEPLAY_FPS_LIMIT_OFF=1\n");
+    np_quick_settings_take(dir, 0, json, sizeof json, NULL);
+    is("a slider value and the off switch pass",
+       "{\"46\":{\"BRIDGEPLAY_FPS_LIMIT\":\"47\",\"BRIDGEPLAY_FPS_LIMIT_OFF\":\"1\"}}", json);
 
     put(dir, "43.conf", "BRIDGEPLAY_FPS_LIMIT=5\n");
     np_quick_settings_take(dir, 0, json, sizeof json, NULL);
@@ -87,6 +92,13 @@ int main(void) {
     is("and nothing is counted stale", "0", stale == 0 ? "0" : "other");
 
     is("allowed: overlay off", "1", np_quick_settings_allowed("BRIDGEPLAY_PERF_OVERLAY", "0") ? "1" : "0");
+    const char *limits[][2] = { { "15", "1" }, { "60", "1" }, { "360", "1" }, { "14", "0" }, { "361", "0" },
+                                { "045", "0" }, { "0", "0" }, { "display", "0" }, { "4a", "0" }, { "", "0" } };
+    for (size_t i = 0; i < sizeof limits / sizeof limits[0]; i++) {
+        char what[64];
+        snprintf(what, sizeof what, "the limit %s: %s", limits[i][0], limits[i][1][0] == '1' ? "allowed" : "refused");
+        is(what, limits[i][1], np_quick_settings_allowed("BRIDGEPLAY_FPS_LIMIT", limits[i][0]) ? "1" : "0");
+    }
     is("refused: the Metal HUD is not a sidebar choice", "0",
        np_quick_settings_allowed("BRIDGEPLAY_PERF_OVERLAY", "hud") ? "1" : "0");
     is("refused: MTL_HUD_ENABLED", "0", np_quick_settings_allowed("MTL_HUD_ENABLED", "1") ? "1" : "0");

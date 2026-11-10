@@ -102,8 +102,10 @@ struct GuideView: View {
             }
 
             SteamBlock(title: String(localized: "Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)")) {
-                SteamRow(.dropdown(nil, String(localized: "Off")),
-                         note: String(localized: "Holds the game to your display's refresh rate, half of it, or 60, 40 or 30 FPS, and waits for the display so frames land evenly. Smoother pacing and less battery drain. The display's own refresh rate is not changed. Off by default."))
+                SteamRow(.slider("60 FPS", 1, true),
+                         note: String(localized: "A slider in whole frames per second, from 15 up to your display's refresh rate, as on Steam Deck. The game waits for the display so frames land evenly: smoother pacing and less battery drain. On a game's own display a higher value counts as its refresh rate, and the display's own rate is never changed."))
+                SteamRow(.toggle(String(localized: "Disable frame limit"), true),
+                         note: String(localized: "On by default, so there is no limit. Switch it off to use the slider; switching it on again keeps the slider's value."))
             }
 
             SteamBlock(title: String(localized: "Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)")) {
@@ -412,6 +414,8 @@ private struct SteamRow: View {
         case toggle(String, Bool)
         case dropdown(String?, String)
         case check(String, Bool)
+        // Steam's slider: its value, where it sits on the track (0 to 1), and whether it is dimmed
+        case slider(String, Double, Bool)
     }
 
     let control: Control
@@ -470,6 +474,21 @@ private struct SteamRow: View {
                 Spacer()
             }
             .padding(.horizontal, 10).frame(height: 38).background(Steam.row)
+        case .slider(let value, let at, let dimmed):
+            VStack(alignment: .leading, spacing: 6) {
+                GeometryReader { box in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Steam.control).frame(height: 6)
+                        Capsule().fill(Steam.blue).frame(width: box.size.width * at, height: 6)
+                        Circle().fill(.white).frame(width: 16, height: 16)
+                            .offset(x: box.size.width * at - 8)
+                    }
+                    .frame(height: 16)
+                }
+                .frame(height: 16)
+                Text(verbatim: value).font(Steam.font(12, .regular)).foregroundStyle(Steam.dim)
+            }
+            .opacity(dimmed ? 0.45 : 1)
         }
     }
 

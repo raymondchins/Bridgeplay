@@ -18,7 +18,8 @@ const TOGGLES = {
 const ON_UNLESS_0 = { ROSETTA_ADVERTISE_AVX: true };
 const PANEL_KEYS = ['CX_GRAPHICS_BACKEND', 'MTL_HUD_ENABLED', 'D3DM_ENABLE_METALFX', 'DXMT_ENABLE_NVEXT',
   'DXMT_METALFX_SPATIAL_SWAPCHAIN', 'DXMT_CONFIG', 'ROSETTA_ADVERTISE_AVX', 'WINEMSYNC', 'BRIDGEPLAY_RETINA',
-  'BRIDGEPLAY_RAW_CONTROLLERS', 'BRIDGEPLAY_DISABLE_HIDRAW', 'BRIDGEPLAY_PERF_OVERLAY', 'BRIDGEPLAY_FPS_LIMIT', 'BRIDGEPLAY_SCALING_FILTER'];
+  'BRIDGEPLAY_RAW_CONTROLLERS', 'BRIDGEPLAY_DISABLE_HIDRAW', 'BRIDGEPLAY_PERF_OVERLAY', 'BRIDGEPLAY_FPS_LIMIT', 'BRIDGEPLAY_FPS_LIMIT_OFF',
+  'BRIDGEPLAY_SCALING_FILTER'];
 const OTHER_KEYS = ['WINEDEBUG', 'DXVK_HUD', 'FOO'];
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'np-shell-'));
@@ -117,11 +118,14 @@ function agrees(t, v, env, what) {
     /^(fps|summary|detailed)$/.test(env.BRIDGEPLAY_PERF_OVERLAY || '') ? env.BRIDGEPLAY_PERF_OVERLAY : '0';
   t.ok(v.overlay.props.selectedOption === level,
        `${what}: overlay shows "${v.overlay.props.selectedOption}", the shim shows ${level}`);
-  const cap = /^(display|half)$/i.test(env.BRIDGEPLAY_FPS_LIMIT || '') ? env.BRIDGEPLAY_FPS_LIMIT.toLowerCase() :
-    /^\d+$/.test(env.BRIDGEPLAY_FPS_LIMIT || '') && +env.BRIDGEPLAY_FPS_LIMIT >= 10 && +env.BRIDGEPLAY_FPS_LIMIT <= 360
-      ? String(+env.BRIDGEPLAY_FPS_LIMIT) : '0';
-  t.ok(v.limit.props.selectedOption === cap,
-       `${what}: limit shows "${v.limit.props.selectedOption}", the shim limits to ${cap}`);
+  // As overlay-shim reads it on the panel's 60 Hz: display and half from the display, a
+  // number held to 15..60, anything else no limit; the switch turns it off and keeps it
+  const raw = (env.BRIDGEPLAY_FPS_LIMIT || '').toLowerCase();
+  const set = raw === 'display' ? 60 : raw === 'half' ? 30 :
+    /^\d+$/.test(raw) && +raw >= 10 && +raw <= 360 ? Math.min(60, Math.max(15, +raw)) : 0;
+  const capped = set && env.BRIDGEPLAY_FPS_LIMIT_OFF !== '1';
+  t.ok(v.limit.v === (set || 60) && v.limit.off === !capped,
+       `${what}: limit shows ${v.limit.v}${v.limit.off ? ' off' : ''}, the shim limits to ${capped ? set : 'nothing'}`);
   const sfw = /^(linear|nearest|integer)$/i.test(env.BRIDGEPLAY_SCALING_FILTER || '') ? env.BRIDGEPLAY_SCALING_FILTER.toLowerCase() : '0';
   t.ok(v.filter.props.selectedOption === sfw,
        `${what}: filter shows "${v.filter.props.selectedOption}", the shim uses ${sfw}`);
@@ -140,10 +144,12 @@ const ACTIONS = [
     want: (v0, v1) => v1.filter.props.selectedOption === 'nearest' },
   { name: 'filter automatic', run: v => v.filter.props.onChange({ data: '0' }),
     want: (v0, v1) => v1.filter.props.selectedOption === '0' },
-  { name: 'limit 30', run: v => v.limit.props.onChange({ data: '30' }),
-    want: (v0, v1) => v1.limit.props.selectedOption === '30' },
-  { name: 'limit off', run: v => v.limit.props.onChange({ data: '0' }),
-    want: (v0, v1) => v1.limit.props.selectedOption === '0' },
+  { name: 'limit 30', run: v => v.limit.slide(30),
+    want: (v0, v1) => v0.limit.off ? v1.limit.v === v0.limit.v && v1.limit.off : v1.limit.v === 30 },
+  { name: 'limit switched off', run: v => v.limit.toggle(true),
+    want: (v0, v1) => v1.limit.off && v1.limit.v === v0.limit.v },
+  { name: 'limit switched on', run: v => v.limit.toggle(false),
+    want: (v0, v1) => !v1.limit.off && v1.limit.v === v0.limit.v },
   { name: 'MSync', run: v => v.toggles.WINEMSYNC.props.onChange(!v.toggles.WINEMSYNC.props.checked),
     want: (v0, v1) => v1.toggles.WINEMSYNC.props.checked === !v0.toggles.WINEMSYNC.props.checked },
   { name: 'AVX2', run: v => v.toggles.ROSETTA_ADVERTISE_AVX.props.onChange(!v.toggles.ROSETTA_ADVERTISE_AVX.props.checked),

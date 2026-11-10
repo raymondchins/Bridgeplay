@@ -10,6 +10,11 @@
 int np_log_level = 0;
 FILE *np_log_file = NULL;
 
+// No displays here: the panel gets the 60 a Mac without a reading gets.
+int np_display_max_hz(void) {
+    return 60;
+}
+
 char *np_nativeplatform_javascript(void) {
     return NULL;
 }

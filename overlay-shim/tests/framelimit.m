@@ -14,7 +14,8 @@
 // Frame rate limit: inert without NOTPROTON_FPS_LIMIT; a fixed limit holds a game that
 // could go far faster to that rate and turns display sync on; the overlay counts the
 // frames the game actually made; a display-relative limit without a known display only
-// syncs; a value out of range is refused.
+// syncs; a value out of range is refused; NOTPROTON_FPS_LIMIT_OFF=1 keeps the value and
+// limits nothing; a value from before the 15 fps floor holds at 15.
 
 typedef void (*limit_probe_fn)(int *, double *, int *, int *);
 typedef void (*hud_probe_fn)(int *, int *, int *, double *, int *, int *);
@@ -79,6 +80,22 @@ static int child(const char *path, const char *mode)
 		return 0;
 	}
 
+	if (strcmp(mode, "switched-off") == 0) {
+		CHECK(limit == 3 && cap == -1, "a limit switched off has mode %d cap %.1f, not the kept 30 and no cap", limit,
+		      cap);
+		CHECK(waits == 0 && vsync == 0 && !layer.displaySyncEnabled, "a limit switched off still paced the game");
+		CHECK(fps > 90, "a limit switched off held the game to %.1f fps", fps);
+		printf("%-10s 30 kept, switched off: %.0f fps flat out, the game's VSync left alone\n", mode, fps);
+		return 0;
+	}
+
+	if (strcmp(mode, "floor") == 0) {
+		CHECK(limit == 3 && cap == 15, "a limit of 10 has mode %d cap %.1f, not 15", limit, cap);
+		CHECK(fps > 13 && fps < 16, "a limit of 10 let the game run at %.1f fps, not 15", fps);
+		printf("%-10s 10 from an earlier release holds at %.1f fps, the 15 floor\n", mode, fps);
+		return 0;
+	}
+
 	if (strcmp(mode, "display") == 0) {
 		// No window and no AppKit, so no display rate: only display sync applies
 		CHECK(limit == 1 && cap == 0, "display limit %d cap %.1f without a display", limit, cap);
@@ -92,14 +109,15 @@ static int child(const char *path, const char *mode)
 	CHECK(vsync == 1 && layer.displaySyncEnabled, "the limit did not turn display sync on");
 	CHECK(waits > 30, "the game waited only %d times", waits);
 	CHECK(fps > 27 && fps < 31, "a 30 fps limit let the game run at %.1f fps", fps);
-	// The overlay counts what was made, read while its last window still had frames in it
-	CHECK(level == 2 && hud_fps > 20 && hud_fps <= 31, "the overlay measured %.1f fps under a 30 limit", hud_fps);
+	// The overlay counts what was made, read while its last window still had frames in it; a
+	// window's edges can catch one frame more than 30 a second
+	CHECK(level == 2 && hud_fps > 20 && hud_fps <= 32.5, "the overlay measured %.1f fps under a 30 limit", hud_fps);
 	printf("%-10s %.1f fps flat out under 30, overlay %.1f fps, %d waits, display sync on\n", mode, fps,
 	       hud_fps, waits);
 	return 0;
 }
 
-static int spawn_child(const char *self, const char *mode, const char *limit)
+static int spawn_child(const char *self, const char *mode, const char *limit, int off)
 {
 	char **parent = *_NSGetEnviron();
 	int n = 0;
@@ -109,6 +127,7 @@ static int spawn_child(const char *self, const char *mode, const char *limit)
 	int k = 0;
 	for (int i = 0; i < n; i++)
 		if (strncmp(parent[i], "NOTPROTON_FPS_LIMIT=", 20) != 0 &&
+		    strncmp(parent[i], "NOTPROTON_FPS_LIMIT_OFF=", 24) != 0 &&
 		    strncmp(parent[i], "NOTPROTON_PERF_OVERLAY=", 23) != 0 &&
 		    strncmp(parent[i], "NOTPROTON_VSYNC=", 16) != 0 && strncmp(parent[i], "MTL_HUD_ENABLED=", 16) != 0)
 			env[k++] = parent[i];
@@ -120,6 +139,8 @@ static int spawn_child(const char *self, const char *mode, const char *limit)
 		snprintf(limit_var, sizeof(limit_var), "NOTPROTON_FPS_LIMIT=%s", limit);
 		env[k++] = limit_var;
 	}
+	if (off)
+		env[k++] = "NOTPROTON_FPS_LIMIT_OFF=1";
 	env[k] = NULL;
 
 	pid_t pid;
@@ -144,11 +165,15 @@ int main(int argc, char **argv)
 		return child(path, mode);
 
 	int rc;
-	if ((rc = spawn_child(argv[0], "off", NULL)) != 0)
+	if ((rc = spawn_child(argv[0], "off", NULL, 0)) != 0)
 		return rc;
-	if ((rc = spawn_child(argv[0], "refused", "5")) != 0)
+	if ((rc = spawn_child(argv[0], "refused", "5", 0)) != 0)
 		return rc;
-	if ((rc = spawn_child(argv[0], "display", "display")) != 0)
+	if ((rc = spawn_child(argv[0], "display", "display", 0)) != 0)
 		return rc;
-	return spawn_child(argv[0], "fixed", "30");
+	if ((rc = spawn_child(argv[0], "switched-off", "30", 1)) != 0)
+		return rc;
+	if ((rc = spawn_child(argv[0], "floor", "10", 0)) != 0)
+		return rc;
+	return spawn_child(argv[0], "fixed", "30", 0);
 }

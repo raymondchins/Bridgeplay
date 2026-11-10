@@ -15,7 +15,12 @@ const expand = (s, caps) => s.replace(/[\u0001-\u0008\u0013-\u0016]/g, c => {
 
 const mk = (type, props) => ({ type, props });
 const react = { jsx: mk, jsxs: mk, Fragment: 'Fragment' };
-const barrel = { XY: 'Section', m: 'Dropdown', Yh: 'Toggle' };
+// Steam's SliderField, which the panel finds by the name its export's source carries rather
+// than by the export's letters
+function SliderField(props) { return { type: 'Slider', props }; }
+SliderField.toString = () => 'Dt=>{const lr=(0,f.Zt)("SliderField",v);return(0,a.jsx)(lr,{...Dt})}';
+const barrel = { XY: 'Section', m: 'Dropdown', Yh: 'Toggle', Kc: SliderField };
+const barrelWithoutSlider = { XY: 'Section', m: 'Dropdown', Yh: 'Toggle' };
 
 // The two shapes take the payload in different forms and bind different names, which
 // is the whole of the difference between them.
@@ -28,7 +33,7 @@ const FORMS = {
 // stand-in global falls through to the real one, so a test's globalThis.MSCXFx still reaches the panel.
 function panel(emit, form, globals = Object.assign(Object.create(globalThis),
                                                    { document: { documentElement: { lang: 'en' } } }),
-               { fallback = 'bridgeplay-proton', fexTools = [], names = ['R0', 'B0'] } = {}) {
+               { fallback = 'bridgeplay-proton', fexTools = [], names = ['R0', 'B0'], slider = true } = {}) {
   const raw = execFileSync(emit, [form, fallback, ...fexTools], { encoding: 'utf8' }).trim();
   const f = FORMS[form];
   const body = expand(raw, { [f.react]: names[0], [f.barrel]: names[1] });
@@ -42,7 +47,8 @@ function panel(emit, form, globals = Object.assign(Object.create(globalThis),
     ' MSCXTake: typeof MSCXTake === "function" ? MSCXTake : null,' +
     ' MSCXPick: typeof MSCXPick === "function" ? MSCXPick : null,' +
     ' MSCXToolQuery: typeof MSCXToolQuery === "function" ? MSCXToolQuery : null };');
-  const { MSCXOpts, MSCXApply, MSCXTake, MSCXPick, MSCXToolQuery } = build(react, barrel, SteamClient, globals);
+  const { MSCXOpts, MSCXApply, MSCXTake, MSCXPick, MSCXToolQuery } =
+    build(react, slider ? barrel : barrelWithoutSlider, SteamClient, globals);
   return { render: MSCXOpts, apply: MSCXApply, take: MSCXTake, pick: MSCXPick, toolQuery: MSCXToolQuery, written,
            globals };
 }
@@ -92,8 +98,24 @@ function hud(nodes) {
   } };
 }
 
-// The Frame Rate Limit menu.
-const limit = nodes => nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === 'half'));
+// The Frame Rate Limit: Steam's slider (or the menu standing in for it) and the Disable frame
+// limit switch, with what they show: the value, whether the switch is on, and whether the
+// slider is dimmed.
+function limit(nodes) {
+  const value = nodes.find(n => n.props && n.props.npKey === 'BRIDGEPLAY_FPS_LIMIT');
+  const sw = nodes.find(n => n.props && n.props.npKey === 'BRIDGEPLAY_FPS_LIMIT_OFF');
+  if (!value || !sw) return undefined;
+  const wrap = nodes.find(n => n.type === 'div' && n.props.children &&
+                               n.props.children.props && n.props.children.props.npKey === 'BRIDGEPLAY_FPS_LIMIT');
+  return {
+    value, sw,
+    v: value.type === 'Slider' ? value.props.value : value.props.selectedOption,
+    off: sw.props.checked,
+    dimmed: !!wrap && wrap.props.className === 'MSCXDim',
+    slide: x => value.type === 'Slider' ? value.props.onChange(x) : value.props.onChange({ data: x }),
+    toggle: on => sw.props.onChange(on),
+  };
+}
 
 // The Scaling Filter menu.
 const filter = nodes => nodes.find(n => n.type === 'Dropdown' && n.props.rgOptions.some(o => o.data === 'integer'));

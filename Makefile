@@ -63,6 +63,7 @@ SRCS := \
 	dylib/feats/usershortcuts.c \
 	dylib/feats/webpatch.c \
 	dylib/feats/nativeplatform.c \
+	dylib/feats/displayrate.c \
 	dylib/feats/input_access.c \
 	vendor/cJSON.c
 

@@ -15,6 +15,11 @@ FILE *np_log_file;
 
 static const char *g_platform_js;
 
+// No displays here: the panel gets the 60 a Mac without a reading gets.
+int np_display_max_hz(void) {
+    return 60;
+}
+
 char *np_nativeplatform_javascript(void) {
     return g_platform_js ? strdup(g_platform_js) : NULL;
 }

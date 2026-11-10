@@ -21,22 +21,29 @@
 #import <fcntl.h>
 #import <sys/stat.h>
 
-enum { sb_overlay, sb_limit, sb_filter, sb_rows };
+// The frame rate limit is a value and a switch, as on Steam Deck: the slider sets frames per
+// second from 15 to the display's rate, and Disable frame limit turns it off without losing
+// the slider's place.
+enum { sb_overlay, sb_limit, sb_limit_off, sb_filter, sb_rows };
 
 static const char *const sb_keys[sb_rows] = { "BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_FPS_LIMIT",
-	                                      "BRIDGEPLAY_SCALING_FILTER" };
-static const char *const sb_titles[sb_rows] = { "Performance overlay", "Frame rate limit", "Scaling filter" };
-static const char *const sb_values[sb_rows][6] = {
+	                                      "BRIDGEPLAY_FPS_LIMIT_OFF", "BRIDGEPLAY_SCALING_FILTER" };
+static const char *const sb_titles[sb_rows] = { "Performance overlay", "Frame rate limit", "Disable frame limit",
+	                                        "Scaling filter" };
+// The stepped and named choices; the limit's value is a number and its switch 0 or 1
+static const char *const sb_values[sb_rows][4] = {
 	{ "0", "fps", "summary", "detailed" },
-	{ "0", "display", "half", "60", "40", "30" },
+	{ NULL },
+	{ "0", "1" },
 	{ "0", "linear", "nearest", "integer" },
 };
-static const char *const sb_labels[sb_rows][6] = {
+static const char *const sb_labels[sb_rows][4] = {
 	{ "Off", "FPS", "Summary", "Detailed" },
-	{ "Off", "Display", "Half", "60", "40", "30" },
+	{ NULL },
+	{ NULL },
 	{ "Auto", "Linear", "Nearest", "Integer" },
 };
-static const int sb_counts[sb_rows] = { 4, 6, 4 };
+static const int sb_counts[sb_rows] = { 4, 0, 2, 4 };
 
 #define sb_key_p 35
 #define sb_key_return 36
@@ -172,16 +179,11 @@ static int sb_index(int row)
 	switch (row) {
 	case sb_overlay:
 		return ph_hud_locked ? -1 : atomic_load(&ph_level);
-	case sb_limit: {
-		int mode = atomic_load(&fl_mode), fps = atomic_load(&fl_fixed_fps);
-		if (mode == fl_off)
-			return 0;
-		if (mode == fl_display)
-			return 1;
-		if (mode == fl_half)
-			return 2;
-		return fps == 60 ? 3 : fps == 40 ? 4 : fps == 30 ? 5 : -1;
-	}
+	case sb_limit:
+		return -1;
+	case sb_limit_off:
+		// On with no value set too: there is no limit until one is switched on
+		return atomic_load(&fl_disabled) || atomic_load(&fl_mode) == fl_off;
 	default:
 		return atomic_load(&sf_mode);
 	}
@@ -264,6 +266,8 @@ static int sb_apply(const char *key, const char *value)
 				ok = perfhud_set_level(i);
 	} else if (strcmp(key, sb_keys[sb_limit]) == 0) {
 		ok = framelimit_set(value, host);
+	} else if (strcmp(key, sb_keys[sb_limit_off]) == 0) {
+		ok = framelimit_set_off(value, host);
 	} else if (strcmp(key, sb_keys[sb_filter]) == 0) {
 		ok = scalefilter_set(value, host);
 	}
@@ -278,12 +282,12 @@ static CGColorRef sb_gray(double alpha);
 
 // MARK: Drawing
 //
-// Two control kinds, chosen by what the choices are. The overlay level and the frame rate limit are
-// ordered steps, so each is a stepped slider whose position means something: more detail to the
-// right; fixed rates, then Half and Display, then Off (no limit) at the end. The scaling filters
-// are not an order, so they stay a selector that shows every name. Text is placed by centring its
-// capitals on the line it belongs to (ph_centred), so labels and values of different sizes share
-// one optical centre.
+// Control kinds chosen by what the choices are. The overlay level is ordered steps, so it is a
+// stepped slider whose position means something: more detail to the right. The frame rate limit
+// is a number, so a continuous slider in whole frames per second, with a switch under it that
+// turns it off and dims it. The scaling filters are not an order, so they stay a selector that
+// shows every name. Text is placed by centring its capitals on the line it belongs to
+// (ph_centred), so labels and values of different sizes share one optical centre.
 
 // Layout, in points from the panel's top-left
 #define sb_pad 22.0
@@ -291,7 +295,6 @@ static CGColorRef sb_gray(double alpha);
 #define sb_power_mid 76.0    // battery line
 #define sb_power_bar 92.0    // battery gauge
 #define sb_rows_top 128.0
-#define sb_row_h 96.0
 #define sb_row_lead 10.0     // a row's band (focus tint, clicks) starts this far above its top
 #define sb_tint_inset 10.0   // the focus tint's inset from the panel's sides
 #define sb_title_mid 12.0    // a row's title line, from the row's top
@@ -304,6 +307,20 @@ static CGColorRef sb_gray(double alpha);
 #define sb_note_mid 72.0     // the selector's measured note
 #define sb_thumb_r 8.0
 #define sb_inset 9.0         // stops start this far in, so the end thumbs stay inside
+#define sb_switch_w 32.0
+#define sb_switch_h 18.0
+
+// Each row's height; the switch is one line, under the slider it belongs to. Together they fit
+// a 480 pt-tall window.
+static const double sb_row_heights[sb_rows] = { 88, 80, 44, 88 };
+
+static double sb_row_top(int row)
+{
+	double top = sb_rows_top;
+	for (int i = 0; i < row; i++)
+		top += sb_row_heights[i];
+	return top;
+}
 
 struct sb_fonts {
 	CTFontRef title, row, value, stop, stop_on, seg, seg_on, small;
@@ -367,18 +384,11 @@ static double sb_text_right(CGContextRef ctx, double h, double right, double mid
 	return tw;
 }
 
-// Each control's stops, left to right, as indexes into its choices. The limit runs from the
-// fixed rates up, then the two tied to the display, then Off (no limit) at the end.
-static const int sb_stop_order[sb_rows][6] = {
-	{ 0, 1, 2, 3 },
-	{ 5, 4, 3, 2, 1, 0 }, // 30, 40, 60, Half, Display, Off
-	{ 0, 1, 2, 3 },
-};
-
+// A stepped control's stops, left to right, as indexes into its choices
 static int sb_stops(int row, int pick[6])
 {
 	for (int k = 0; k < sb_counts[row]; k++)
-		pick[k] = sb_stop_order[row][k];
+		pick[k] = k;
 	return sb_counts[row];
 }
 
@@ -405,16 +415,83 @@ static void sb_readout(int row, char *out, size_t cap)
 	if (row == sb_overlay && ph_hud_locked) {
 		snprintf(out, cap, "Metal HUD");
 	} else if (row == sb_limit) {
-		int sel = sb_index(row);
-		const char *v = sel < 0 ? NULL : sb_values[row][sel];
-		if (v == NULL)
-			snprintf(out, cap, "%d FPS, set in Steam", atomic_load(&fl_fixed_fps));
-		// Half and Display name no rate, so say what they give on this display
-		else if (strcmp(v, "display") == 0 && atomic_load(&ph_refresh_hz) > 0)
-			snprintf(out, cap, "%d FPS", atomic_load(&ph_refresh_hz));
-		else if (strcmp(v, "half") == 0 && atomic_load(&ph_refresh_hz) > 0)
-			snprintf(out, cap, "%g FPS", atomic_load(&ph_refresh_hz) / 2.0);
+		snprintf(out, cap, "%d FPS", framelimit_value());
 	}
+}
+
+// The limit slider's x for a value, and the value under an x, in whole frames per second
+static double sb_limit_x(double w, int v)
+{
+	double x0 = sb_pad + sb_inset, x1 = w - sb_pad - sb_inset;
+	int top = framelimit_max();
+	return top > fl_min_fps ? x0 + (x1 - x0) * (v - fl_min_fps) / (top - fl_min_fps) : x1;
+}
+
+static int sb_limit_at(double w, double x)
+{
+	double x0 = sb_pad + sb_inset, x1 = w - sb_pad - sb_inset;
+	int top = framelimit_max();
+	double t = x1 > x0 ? (x - x0) / (x1 - x0) : 1;
+	int v = (int)lround(fl_min_fps + t * (top - fl_min_fps));
+	return v < fl_min_fps ? fl_min_fps : v > top ? top : v;
+}
+
+// The thumb, with a soft offset shadow so it sits on the track
+static void sb_draw_thumb(CGContextRef ctx, double h, double x, double cy, int disabled)
+{
+	CGContextSaveGState(ctx);
+	CGColorRef shadow = sb_gray(0.55);
+	CGContextSetShadowWithColor(ctx, CGSizeMake(0, -1), 3, shadow);
+	CGColorRelease(shadow);
+	if (disabled)
+		CGContextSetRGBFillColor(ctx, PH_RGB(0x6E6E73, 1));
+	else
+		CGContextSetRGBFillColor(ctx, PH_RGB(0xF5F5F7, 1));
+	CGContextFillEllipseInRect(ctx, sb_rect(h, x - sb_thumb_r, cy - sb_thumb_r, 2 * sb_thumb_r, 2 * sb_thumb_r));
+	CGContextRestoreGState(ctx);
+}
+
+// The frame rate limit: the track filled with the brand gradient up to the value, as the
+// stepped slider is, and the two ends named under it. Switched off, it dims and the fill goes
+// grey, so the value it keeps still shows.
+static void sb_draw_range(CGContextRef ctx, double w, double h, double top, int disabled)
+{
+	int v = framelimit_value(), maxv = framelimit_max();
+	double cy = top + sb_track_mid, x0 = sb_pad + sb_inset, x1 = w - sb_pad - sb_inset, xp = sb_limit_x(w, v);
+	sb_fill_round(ctx, sb_rect(h, x0 - 2, cy - 2, x1 - x0 + 4, 4), 2, PH_RGB(0x2C2C30, 1));
+	CGRect fill = sb_rect(h, x0 - 2, cy - 2, xp - x0 + 4, 4);
+	if (disabled) {
+		sb_fill_round(ctx, fill, 2, PH_RGB(0x48484E, 1));
+	} else {
+		CGContextSaveGState(ctx);
+		CGPathRef path = CGPathCreateWithRoundedRect(fill, 2, 2, NULL);
+		CGContextAddPath(ctx, path);
+		CGContextClip(ctx);
+		ph_gradient(ctx, CGPointMake(x0, 0), CGPointMake(x1, 0));
+		CGContextRestoreGState(ctx);
+		CGPathRelease(path);
+	}
+	sb_draw_thumb(ctx, h, xp, cy, disabled);
+	char lo[8], hi[8];
+	snprintf(lo, sizeof(lo), "%d", fl_min_fps);
+	snprintf(hi, sizeof(hi), "%d", maxv);
+	double mid = top + sb_stops_mid;
+	ph_text(ctx, h, sb_pad, ph_centred(mid, sb_f.stop), lo, sb_f.stop, ph_style.fg3, 0);
+	sb_text_right(ctx, h, w - sb_pad, mid, hi, sb_f.stop, ph_style.fg3);
+}
+
+// A switch at the row's right, in the app's switch blue when on
+static void sb_draw_switch(CGContextRef ctx, double w, double h, double mid, int on)
+{
+	double x = w - sb_pad - sb_switch_w, y = mid - sb_switch_h / 2;
+	CGRect track = sb_rect(h, x, y, sb_switch_w, sb_switch_h);
+	if (on)
+		sb_fill_round(ctx, track, sb_switch_h / 2, PH_RGB(0x4FB3FF, 1));
+	else
+		sb_fill_round(ctx, track, sb_switch_h / 2, PH_RGB(0x3A3A3F, 1));
+	double r = sb_switch_h / 2 - 2, kx = on ? x + sb_switch_w - 2 - 2 * r : x + 2;
+	CGContextSetRGBFillColor(ctx, PH_RGB(0xF5F5F7, 1));
+	CGContextFillEllipseInRect(ctx, sb_rect(h, kx, y + 2, 2 * r, 2 * r));
 }
 
 static void sb_draw_slider(CGContextRef ctx, double w, double h, double top, int row, int disabled)
@@ -448,20 +525,8 @@ static void sb_draw_slider(CGContextRef ctx, double w, double h, double top, int
 			CGContextSetRGBFillColor(ctx, PH_RGB(0x5A5A60, 1));
 		CGContextFillEllipseInRect(ctx, sb_rect(h, sx - 2, cy - 2, 4, 4));
 	}
-	// The thumb, with a soft offset shadow so it sits on the track
-	if (pos >= 0) {
-		double tx = sb_stop_x(w, pos, n);
-		CGContextSaveGState(ctx);
-		CGColorRef shadow = sb_gray(0.55);
-		CGContextSetShadowWithColor(ctx, CGSizeMake(0, -1), 3, shadow);
-		CGColorRelease(shadow);
-		if (disabled)
-			CGContextSetRGBFillColor(ctx, PH_RGB(0x6E6E73, 1));
-		else
-			CGContextSetRGBFillColor(ctx, PH_RGB(0xF5F5F7, 1));
-		CGContextFillEllipseInRect(ctx, sb_rect(h, tx - sb_thumb_r, cy - sb_thumb_r, 2 * sb_thumb_r, 2 * sb_thumb_r));
-		CGContextRestoreGState(ctx);
-	}
+	if (pos >= 0)
+		sb_draw_thumb(ctx, h, sb_stop_x(w, pos, n), cy, disabled);
 	// Every stop named under it, centred on its notch
 	double mid = top + sb_stops_mid;
 	for (int k = 0; k < n; k++) {
@@ -517,12 +582,13 @@ static void sb_draw_selector(CGContextRef ctx, double w, double h, double top, i
 
 static void sb_draw_row(CGContextRef ctx, double w, double h, int row)
 {
-	double top = sb_rows_top + row * sb_row_h;
-	int focused = row == sb_row, disabled = row == sb_overlay && ph_hud_locked;
+	double top = sb_row_top(row);
+	int focused = row == sb_row;
+	int disabled = (row == sb_overlay && ph_hud_locked) || (row == sb_limit && sb_index(sb_limit_off) == 1);
 	// Focus: one tint behind the whole row, the same for every kind of control
 	if (focused)
-		sb_fill_round(ctx, sb_rect(h, sb_tint_inset, top - sb_row_lead, w - 2 * sb_tint_inset, sb_row_h), 10,
-		              1, 1, 1, 0.05);
+		sb_fill_round(ctx, sb_rect(h, sb_tint_inset, top - sb_row_lead, w - 2 * sb_tint_inset, sb_row_heights[row]),
+		              10, 1, 1, 1, 0.05);
 	char readout[48];
 	sb_readout(row, readout, sizeof(readout));
 	double mid = top + sb_title_mid;
@@ -532,6 +598,10 @@ static void sb_draw_row(CGContextRef ctx, double w, double h, int row)
 		sb_text_right(ctx, h, w - sb_pad, mid, readout, sb_f.value, disabled ? ph_style.fg3 : ph_style.fg2);
 	if (row == sb_filter) {
 		sb_draw_selector(ctx, w, h, top, row);
+	} else if (row == sb_limit) {
+		sb_draw_range(ctx, w, h, top, disabled);
+	} else if (row == sb_limit_off) {
+		sb_draw_switch(ctx, w, h, mid, sb_index(row) == 1);
 	} else if (disabled) {
 		// The Metal HUD is the game's only overlay: say where it is changed instead of a slider
 		// that cannot move
@@ -596,7 +666,7 @@ static void sb_draw(CGContextRef ctx, double w, double h)
 		sb_draw_row(ctx, w, h, row);
 
 	// Right under the settings, where the eye is after a change
-	double foot = sb_rows_top - sb_row_lead + sb_rows * sb_row_h + 8;
+	double foot = sb_row_top(sb_rows) - sb_row_lead + 8;
 	sb_hairline(ctx, h, sb_pad, foot, w - 2 * sb_pad);
 	ph_text(ctx, h, sb_pad, ph_centred(foot + 22, sb_f.small),
 	        sb_status[0] ? sb_status : "Changes apply now and are saved for this game.", sb_f.small,
@@ -762,12 +832,52 @@ static void sb_show(void)
 	         sb_appid[0] ? sb_appid : "unknown");
 }
 
-// Left and Right move along the control as drawn; Return and Space go to the next stop and
-// wrap.
+// The limit at v frames per second, from the slider: not while it is switched off
+static void sb_set_limit(int v)
+{
+	if (sb_index(sb_limit_off) == 1)
+		return;
+	int top = framelimit_max();
+	v = v < fl_min_fps ? fl_min_fps : v > top ? top : v;
+	if (atomic_load(&fl_mode) == fl_fixed && v == framelimit_value())
+		return;
+	char value[8];
+	snprintf(value, sizeof(value), "%d", v);
+	sb_apply(sb_keys[sb_limit], value);
+}
+
+// Disable frame limit: off keeps the value; on with no value yet takes the slider's, the
+// display's rate
+static void sb_toggle_limit(void)
+{
+	if (sb_index(sb_limit_off) == 0) {
+		sb_apply(sb_keys[sb_limit_off], "1");
+		return;
+	}
+	if (atomic_load(&fl_mode) == fl_off) {
+		char value[8];
+		snprintf(value, sizeof(value), "%d", framelimit_value());
+		sb_apply(sb_keys[sb_limit], value);
+	}
+	if (atomic_load(&fl_disabled))
+		sb_apply(sb_keys[sb_limit_off], "0");
+}
+
+// Left and Right move along the control as drawn, the limit by one frame per second; Return
+// and Space go to the next stop and wrap. On the switch, each of them flips it.
 static void sb_step(int row, int delta)
 {
 	if (row == sb_overlay && ph_hud_locked)
 		return;
+	if (row == sb_limit) {
+		if (delta != 0)
+			sb_set_limit(framelimit_value() + delta);
+		return;
+	}
+	if (row == sb_limit_off) {
+		sb_toggle_limit();
+		return;
+	}
 	int pick[6], n = sb_stops(row, pick), at = sb_position(row, pick, n);
 	int next = at < 0 ? (delta > 0 ? 0 : n - 1) : at + delta;
 	if (delta == 0)
@@ -816,15 +926,20 @@ static int sb_point(id event, double *x, double *y)
 }
 
 // The row under a point in the panel (-1 outside the rows), and the selector choice or slider
-// stop it is on (-1 when on neither)
+// stop it is on (-1 when on neither; 0 on the limit's track or anywhere on its switch's row)
 static int sb_hit(double x, double y, int *row_out)
 {
-	int row = (int)floor((y - sb_rows_top + sb_row_lead) / sb_row_h);
+	int row = -1;
+	for (int i = 0; i < sb_rows; i++)
+		if (y >= sb_row_top(i) - sb_row_lead && y < sb_row_top(i + 1) - sb_row_lead)
+			row = i;
 	*row_out = -1;
-	if (x < 0 || x > sb_width || row < 0 || row >= sb_rows)
+	if (x < 0 || x > sb_width || row < 0)
 		return -1;
 	*row_out = row;
-	double top = sb_rows_top + row * sb_row_h;
+	double top = sb_row_top(row);
+	if (row == sb_limit_off)
+		return 0;
 	if (row == sb_filter) {
 		double seg_top = top + sb_seg_top;
 		if (y < seg_top || y > seg_top + sb_seg_h || x < sb_pad + 3)
@@ -834,7 +949,7 @@ static int sb_hit(double x, double y, int *row_out)
 	}
 	if (y < top + sb_track_mid - sb_hit_above || y > top + sb_track_mid + sb_hit_below)
 		return -1;
-	return sb_nearest_stop(row, x);
+	return row == sb_limit ? 0 : sb_nearest_stop(row, x);
 }
 
 static void sb_click(id event)
@@ -853,6 +968,12 @@ static void sb_click(id event)
 	if (row == sb_filter) {
 		if (k >= 0 && k != sb_index(row))
 			sb_apply(sb_keys[row], sb_values[row][k]);
+	} else if (row == sb_limit_off) {
+		sb_toggle_limit();
+	} else if (row == sb_limit && k >= 0) {
+		// A press on the track sets the value under it and starts a drag
+		sb_set_limit(sb_limit_at(sb_width, x));
+		sb_drag_row = row;
 	} else if (k >= 0) {
 		// A press on the track or its labels picks the nearest stop and starts a drag
 		sb_pick_stop(row, x);
@@ -868,7 +989,7 @@ static void sb_hover(id event)
 	int row = -1, k = -1;
 	if (sb_point(event, &x, &y))
 		k = sb_hit(x, y, &row);
-	if (row == sb_overlay && ph_hud_locked)
+	if ((row == sb_overlay && ph_hud_locked) || row == sb_limit || row == sb_limit_off)
 		k = -1;
 	if (k < 0)
 		row = -1;
@@ -926,7 +1047,10 @@ static int sidebar_send_event(id event)
 	case 6: { // left mouse dragged: a slider follows the pointer from stop to stop
 		double x, y;
 		if (sb_drag_row >= 0 && sb_point(event, &x, &y)) {
-			sb_pick_stop(sb_drag_row, x);
+			if (sb_drag_row == sb_limit)
+				sb_set_limit(sb_limit_at(sb_width, x));
+			else
+				sb_pick_stop(sb_drag_row, x);
 			sb_redraw();
 		}
 		sb_hover(event);
