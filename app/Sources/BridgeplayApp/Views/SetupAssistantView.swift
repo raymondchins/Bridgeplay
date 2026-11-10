@@ -642,9 +642,8 @@ private struct WizardRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             if let toggle = row.toggle {
                 Toggle(row.title, isOn: toggle)
-                    .toggleStyle(.switch)
+                    .toggleStyle(.brandSwitch)
                     .labelsHidden()
-                    .tint(BP.blue)
             }
             if row.secondaryAction != nil || row.action != nil {
                 HStack(spacing: 8) {

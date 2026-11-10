@@ -122,14 +122,15 @@ final class PrefixesModel {
         }
         kept.sort { ($0.taken ?? .distantPast) > ($1.taken ?? .distantPast) }
         backups = kept
+        // The lists are ready; sizes walk every file of every prefix, so they fill in row by
+        // row ("Calculating…") instead of holding the whole page back.
+        hasLoaded = true
 
         for prefix in found {
             let measured = await Task.detached { PrefixStore.usage(of: prefix) }.value
             guard run == loadGeneration else { return }
             usage[prefix.id] = measured
         }
-
-        hasLoaded = true
     }
 
     func open(_ tool: WineTool, for prefix: WinePrefix) {

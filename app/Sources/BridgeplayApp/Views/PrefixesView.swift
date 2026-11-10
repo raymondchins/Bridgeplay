@@ -13,8 +13,7 @@ struct PrefixesView: View {
     var body: some View {
         Group {
             if !model.hasLoaded {
-                ProgressView("Looking for prefixes")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                SkeletonTable(label: String(localized: "Looking for prefixes"))
             } else if model.prefixes.isEmpty {
                 ContentUnavailableView(
                     String(localized: "No Prefixes"),

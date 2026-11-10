@@ -38,6 +38,8 @@ struct RootView: View {
     @Environment(SystemStatus.self) private var status
     @Environment(PrefixesModel.self) private var prefixes
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // Ambient motion stops while the window is in the background
+    @Environment(\.appearsActive) private var appearsActive
 
     var body: some View {
         VStack(spacing: 0) {
@@ -56,17 +58,25 @@ struct RootView: View {
             UpdateNotice(busy: status.isBusy || prefixes.isBusy)
 
             NavigationSplitView {
-                List(selection: $pane) {
+                // Bridgeplay's own selection: near-white type on a hairline tile, not the
+                // system's accent fill or its grey inactive one.
+                // Plain buttons, not List rows: a table view takes the click first, which made
+                // a page change feel like it hadn't registered.
+                VStack(alignment: .leading, spacing: 4) {
                     ForEach(Pane.allCases) { item in
-                        Label(item.label, systemImage: item.symbol)
-                            .tag(item)
+                        SidebarItem(item: item, selected: pane == item) { pane = item }
                     }
+                    Spacer(minLength: 0)
                 }
-                .listStyle(.sidebar)
-                .listItemTint(.monochrome)
-                .scrollContentBackground(.hidden)
+                // 16 + the item's 10 puts the icons under the logo mark (leading 26)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .background(BP.bg)
                 .safeAreaInset(edge: .top, spacing: 0) {
+                    // The brand lockup: the mark on its tile, a gap of 20% of the tile, the
+                    // gradient wordmark. The tile is centred over the menu's 18 pt icon column
+                    // (SidebarItem: 16 inset + 10 padding).
                     HStack(spacing: 4.4) {
                         BridgeplayMark(size: 22)
                         Text(verbatim: "Bridgeplay")
@@ -74,7 +84,8 @@ struct RootView: View {
                             .foregroundStyle(BP.iridescent)
                         Spacer()
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.leading, 24)
+                    .padding(.trailing, 12)
                     .padding(.top, 6)
                     .padding(.bottom, 10)
                 }
@@ -87,12 +98,21 @@ struct RootView: View {
                             .foregroundStyle(BP.fg3)
                             .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 6)
+                            .padding(.horizontal, 2)
                     }
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
                 }
+                // A hairline between the sidebar and the page, full height under the toolbar too
+                .overlay(alignment: .trailing) {
+                    Rectangle()
+                        .fill(BP.line)
+                        .frame(width: 1)
+                        .ignoresSafeArea()
+                }
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
+                // The sidebar always shows; no button to hide it
+                .toolbar(removing: .sidebarToggle)
             } detail: {
                 Group {
                     switch pane {
@@ -145,22 +165,22 @@ struct RootView: View {
     }
 
     private var credits: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Credits")
-                .font(BP.sans(11, .semibold))
-                .foregroundStyle(BP.fg2)
+        VStack(alignment: .leading, spacing: 6) {
             Text("A fork of [NotProton](https://github.com/NotProtonNot/NotProton), running on [CodeWeavers](https://www.codeweavers.com)' open-source Wine and Apple's Game Porting Toolkit.")
-            Text("If CrossOver works for you, [buy it](https://www.codeweavers.com/crossover) to support Wine.")
+            Text("If CrossOver works for you,\n[buy it](https://www.codeweavers.com/crossover) to support Wine.")
         }
         .font(BP.sans(11))
+        .lineSpacing(2)
         .foregroundStyle(BP.fg3)
+        .tint(BP.fg)
+        // The card's full width, so the credit wraps at word groups instead of leaving one word
+        // ("Toolkit.", "it") on a line of its own
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 2)
     }
 
-    // The landing page's games marquee in miniature, under the hero line.
     private var libraryCard: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion || !appearsActive)) { context in
             let t = reduceMotion ? 1.2 : context.date.timeIntervalSinceReferenceDate
             ZStack(alignment: .bottomLeading) {
                 Aurora(t: t * 0.6, lean: 0.5)
@@ -195,7 +215,6 @@ private struct MigrationBanner: View {
                 Text(MigrationLaunch.shared.bannerMessage)
                     .font(BP.sans(12))
                     .foregroundStyle(BP.fg2)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
@@ -204,5 +223,36 @@ private struct MigrationBanner: View {
         .background(BP.raise)
         .overlay(alignment: .bottom) { Rectangle().fill(BP.line).frame(height: 1) }
         .accessibilityElement(children: .combine)
+    }
+}
+
+private struct SidebarItem: View {
+    let item: Pane
+    let selected: Bool
+    let select: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let tone = selected || hovered ? BP.fg : BP.fg3
+        Button(action: select) {
+            HStack(spacing: 9) {
+                Image(systemName: item.symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 18)
+                Text(item.label)
+                    .font(BP.sans(13, selected ? .semibold : .regular))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(tone)
+            .padding(.horizontal, 10)
+            .frame(height: 32)
+            // As the brand guidelines' navigation: selected on raise 2, hover on raise
+            .background(shape.fill(selected ? BP.raise2 : (hovered ? BP.raise : .clear)))
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

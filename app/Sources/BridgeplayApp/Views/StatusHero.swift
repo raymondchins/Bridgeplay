@@ -7,13 +7,17 @@ struct StatusHero: View {
     let snapshot: StatusSnapshot
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // Ambient motion stops while the window is in the background
+    @Environment(\.appearsActive) private var appearsActive
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
-            let t = reduceMotion ? 1.2 : context.date.timeIntervalSinceReferenceDate * 0.6
-            ZStack(alignment: .leading) {
+        ZStack(alignment: .leading) {
+            // Only the aurora redraws per frame; the grid and the text stay put
+            TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion || !appearsActive)) { context in
+                let t = reduceMotion ? 1.2 : context.date.timeIntervalSinceReferenceDate * 0.6
                 Aurora(t: t, lean: lean)
-                GridLines()
+            }
+            GridLines()
                 HStack(spacing: 18) {
                     BridgeplayMark(size: 52)
                         .shadow(color: BP.violet.opacity(0.45), radius: 18)
@@ -28,19 +32,13 @@ struct StatusHero: View {
                             .lineLimit(2)
                         HStack(spacing: 6) {
                             ForEach(chips, id: \.self) { chip in
-                                Text(chip)
-                                    .font(BP.sans(11, .semibold))
-                                    .foregroundStyle(BP.fg)
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 3)
-                                    .background(.white.opacity(0.1), in: Capsule())
+                                HeroChip(text: chip)
                             }
                         }
                     }
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 24)
-            }
         }
         .frame(height: 148)
         .clipShape(RoundedRectangle(cornerRadius: BP.radius, style: .continuous))
@@ -107,5 +105,20 @@ struct StatusHero: View {
         guard parts.count == 2 else { return build }
         let family = FreeEngine.family(ofBuild: build) ?? parts[0]
         return "\(family) \(parts[1])"
+    }
+}
+
+// A fact under a hero headline, as the brand guidelines draw a chip: Geist 11 semibold in
+// near-white on a white 10% capsule.
+struct HeroChip: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(BP.sans(11, .semibold))
+            .foregroundStyle(BP.fg)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 3)
+            .background(.white.opacity(0.1), in: Capsule())
     }
 }

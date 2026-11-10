@@ -17,6 +17,9 @@ struct GameDefaultsView: View {
     @State private var clearing: GameDefaults.Override?
     // The frame rate limit while its slider is dragged; written when the drag ends
     @State private var limitDraft: Double?
+    @State private var showsAdvanced = false
+    // Steam's small library icon per app id, for the per-game list
+    @State private var icons: [String: NSImage] = [:]
 
     private var hasD3DMetal: Bool { status.snapshot?.gptkSource != nil }
 
@@ -25,56 +28,53 @@ struct GameDefaultsView: View {
             Section {
                 choiceRow(.backend)
                 toggleRow(.metalFX)
-                toggleRow(.dlssFrameGen)
-                toggleRow(.nvapi)
-                choiceRow(.msync)
-                toggleRow(.advertiseAVX)
-            } header: {
-                Text("Graphics")
-            } footer: {
-                Text("Changes apply the next time a game starts. A game's own settings in Steam Properties › Bridgeplay win over these.")
-            }
-            Section {
                 toggleRow(.highResolution)
+            } header: {
+                header("Graphics")
+            } footer: {
+                footer("Changes apply the next time a game starts. Per-game settings in Steam win.")
+            }
+            Section {
                 overlayRow
-                toggleRow(.vsync)
                 frameLimitRow
-                toggleRow(.frameLimitOff)
-                choiceRow(.scalingFilter)
-            } header: {
-                Text("Display")
-            }
-            Section {
                 choiceRow(.frameGen)
-                if resolved(.frameGen).value != "0" {
+                if frameGenOn {
                     choiceRow(.frameGenQuality)
-                    toggleRow(.frameGenUI)
-                    toggleRow(.frameGenFallback)
-                    choiceRow(.frameGenEngine)
                 }
             } header: {
-                Text("Frame Generation")
-            } footer: {
-                Text("Experimental. Adds input lag.")
+                header("Performance")
             }
             Section {
-                dllRow
-                ForEach(Array(GameDefaults.problems(in: user).enumerated()), id: \.offset) { _, problem in
-                    StatusRow(title: Self.title(problem.setting),
-                              value: String(localized: "Ignored: \(problem.reason)"), tone: .warning)
+                DisclosureGroup(isExpanded: $showsAdvanced) {
+                    toggleRow(.vsync)
+                    choiceRow(.scalingFilter)
+                    if frameGenOn {
+                        toggleRow(.frameGenUI)
+                        toggleRow(.frameGenFallback)
+                        choiceRow(.frameGenEngine)
+                    }
+                    toggleRow(.dlssFrameGen)
+                    toggleRow(.nvapi)
+                    choiceRow(.msync)
+                    toggleRow(.advertiseAVX)
+                    dllRow
+                    ForEach(Array(GameDefaults.problems(in: user).enumerated()), id: \.offset) { _, problem in
+                        StatusRow(title: Self.title(problem.setting),
+                                  value: String(localized: "Ignored: \(problem.reason)"), tone: .warning)
+                    }
+                    row(String(localized: "Default Compatibility Tool"), "", changed: false, reset: {}) {
+                        Text(defaultTool ?? String(localized: "Not set"))
+                            .foregroundStyle(BP.fg2)
+                    }
+                } label: {
+                    Text("Advanced")
+                        .font(BP.sans(13, .semibold))
+                        .tracking(-0.1)
                 }
-            } header: {
-                Text("Advanced")
-            } footer: {
-                Text("Other lines in gamefixes/default.conf are kept as they are.")
             }
-            Section {
-                StatusRow(title: String(localized: "Default Compatibility Tool"),
-                          value: defaultTool ?? String(localized: "Not set"))
-            } footer: {
-                Text("Steam runs every game without a tool of its own with this one. Change it in the Setup Assistant while Steam is closed.")
+            if !overrides.isEmpty {
+                overridesSection
             }
-            overridesSection
             if let failure {
                 Section {
                     StatusRow(title: String(localized: "Something went wrong"), value: failure, tone: .bad,
@@ -83,6 +83,12 @@ struct GameDefaultsView: View {
             }
         }
         .formStyle(.grouped)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            DefaultsHero(customized: GameDefaults.resettingAll(in: user) != user, chips: heroChips)
+        }
+        // One readable column: on a wide window the controls stay near their labels.
+        .frame(maxWidth: 680, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Game Defaults")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -108,24 +114,34 @@ struct GameDefaultsView: View {
         .task { await load() }
     }
 
+    // What every game gets right now, in a few words: the backend and whatever is switched on.
+    private var heroChips: [String] {
+        var chips = [Self.optionLabel(resolved(.backend).value ?? "", for: .backend)]
+        if chips[0].isEmpty { chips[0] = hasD3DMetal ? "D3DMetal" : "DXMT" }
+        if resolved(.highResolution).value == "1" { chips.append(Self.title(.highResolution)) }
+        if overlayChoice != "0" { chips.append(Self.optionLabel(overlayChoice, for: .perfOverlay)) }
+        if !limitOff { chips.append("\(limitValue) FPS") }
+        if frameGenOn { chips.append(Self.title(.frameGen)) }
+        return chips
+    }
+
     // MARK: Rows
+    //
+    // Each row is a title, at most one short line under it, and its control. A setting you
+    // changed shows a small reset arrow; Bridgeplay's own defaults show nothing.
 
     private func resolved(_ setting: GameDefaults.Setting) -> GameDefaults.Resolved {
         GameDefaults.resolve(setting, user: user, shipped: shipped)
     }
 
+    private var frameGenOn: Bool { (resolved(.frameGen).value ?? "0") != "0" }
+
     private func caption(_ setting: GameDefaults.Setting) -> String {
-        var parts = [Self.summary(setting)]
-        switch resolved(setting).source {
-        case .user: parts.append(String(localized: "Set by you."))
-        case .bridgeplay: parts.append(String(localized: "Bridgeplay's default."))
-        case .engine: break
-        }
         let needsD3DMetal = setting.requirement == .d3dmetal || (setting == .backend && resolved(setting).value == "d3dmetal")
         if needsD3DMetal, !hasD3DMetal {
-            parts.append(String(localized: "Needs the Game Porting Toolkit. Without it, games use DXMT."))
+            return String(localized: "Needs the Game Porting Toolkit. Without it, games use DXMT.")
         }
-        return parts.filter { !$0.isEmpty }.joined(separator: " ")
+        return Self.summary(setting)
     }
 
     private func resetActions(_ setting: GameDefaults.Setting) -> [StatusAction] {
@@ -133,22 +149,43 @@ struct GameDefaultsView: View {
         return [StatusAction(label: String(localized: "Reset to Bridgeplay's Default")) { save(setting, nil) }]
     }
 
-    private func toggleRow(_ setting: GameDefaults.Setting) -> some View {
-        StatusRow(title: Self.title(setting), value: caption(setting), menu: resetActions(setting),
-                  toggle: Binding(get: { isOn(setting) }, set: { on in
-                      if setting == .frameLimitOff { setLimitOff(!on) } else { save(setting, on ? "1" : "0") }
-                  }))
+    private func row(_ title: String, _ caption: String, changed: Bool,
+                     reset: @escaping () -> Void, @ViewBuilder control: () -> some View) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            label(title, caption)
+            Spacer(minLength: 12)
+            if changed { resetButton(reset) }
+            control()
+        }
+        .contextMenu {
+            if changed {
+                Button(String(localized: "Reset to Bridgeplay's Default"), action: reset)
+            }
+        }
     }
 
-    // Enable Frame Limit shows on when the limit applies, the opposite of FPS_LIMIT_OFF.
-    private func isOn(_ setting: GameDefaults.Setting) -> Bool {
-        setting == .frameLimitOff ? !limitOff : resolved(setting).value == "1"
+    private func resetButton(_ reset: @escaping () -> Void) -> some View {
+        ResetButton(action: reset)
+    }
+
+    private func row(_ setting: GameDefaults.Setting, @ViewBuilder control: () -> some View) -> some View {
+        row(Self.title(setting), caption(setting), changed: resolved(setting).source == .user,
+            reset: { save(setting, nil) }, control: control)
+    }
+
+    private func toggleRow(_ setting: GameDefaults.Setting) -> some View {
+        row(setting) {
+            Toggle(Self.title(setting), isOn: Binding(get: { resolved(setting).value == "1" },
+                                                      set: { save(setting, $0 ? "1" : "0") }))
+                .toggleStyle(.brandSwitch)
+                .labelsHidden()
+        }
     }
 
     // MARK: Frame rate limit
     //
-    // A slider in whole frames per second from 15 to the fastest display's rate, and Enable
-    // Frame Limit under it, which applies it; switched off, the slider dims and keeps its value.
+    // One row: a switch that applies the limit, and under it, while on, a slider in whole
+    // frames per second from 15 to the fastest display's rate. Off keeps the slider's value.
     // overlay-shim holds the limit to the display a game is on.
 
     private var maxFPS: Int {
@@ -165,39 +202,42 @@ struct GameDefaultsView: View {
 
     private var frameLimitRow: some View {
         let shown = Int(limitDraft ?? Double(limitValue))
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 0) {
-                label(.frameLimit)
-                Spacer(minLength: 12)
-                Text(verbatim: "\(shown) FPS")
-                    .monospacedDigit()
-                    .foregroundStyle(limitOff ? .tertiary : .secondary)
+        let changed = resolved(.frameLimit).source == .user || resolved(.frameLimitOff).source == .user
+        return VStack(alignment: .leading, spacing: 8) {
+            row(Self.title(.frameLimit), "", changed: changed, reset: {
+                save(.frameLimit, nil)
+                save(.frameLimitOff, nil)
+            }) {
+                if !limitOff {
+                    Text(verbatim: "\(shown) FPS")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                Toggle(Self.title(.frameLimitOff), isOn: Binding(get: { !limitOff }, set: { setLimitOff(!$0) }))
+                    .toggleStyle(.brandSwitch)
+                    .labelsHidden()
             }
-            // Whole numbers come from rounding, not step:, which draws a tick for every one of them
-            Slider(value: Binding(get: { limitDraft ?? Double(limitValue) }, set: { limitDraft = $0.rounded() }),
-                   in: Double(GameDefaults.minFrameLimit)...Double(maxFPS)) {
-                Text(Self.title(.frameLimit))
-            } minimumValueLabel: {
-                Text(verbatim: "\(GameDefaults.minFrameLimit)")
-            } maximumValueLabel: {
-                Text(verbatim: "\(maxFPS)")
-            } onEditingChanged: { editing in
-                guard !editing, let draft = limitDraft else { return }
-                limitDraft = nil
-                save(.frameLimit, String(Int(draft)))
-            }
-            .labelsHidden()
-            .disabled(limitOff)
-            .padding(.leading, StatusMetrics.textInset)
-        }
-        .contextMenu {
-            ForEach(resetActions(.frameLimit), id: \.label) { action in
-                Button(action.label, action: action.perform)
+            if !limitOff {
+                HStack(spacing: 10) {
+                    Text(verbatim: "\(GameDefaults.minFrameLimit)")
+                    BrandSlider(value: Binding(get: { limitDraft ?? Double(limitValue) },
+                                               set: { limitDraft = $0.rounded() }),
+                                range: Double(GameDefaults.minFrameLimit)...Double(maxFPS),
+                                label: Self.title(.frameLimit)) {
+                        guard let draft = limitDraft else { return }
+                        limitDraft = nil
+                        save(.frameLimit, String(Int(draft)))
+                    }
+                    Text(verbatim: "\(maxFPS)")
+                }
+                .font(BP.sans(11))
+                .monospacedDigit()
+                .foregroundStyle(BP.fg3)
             }
         }
     }
 
-    // Off keeps the value; on with no value set takes the slider's, the display's rate.
+    // On with no value set takes the slider's, the display's rate.
     private func setLimitOff(_ off: Bool) {
         if !off, GameDefaults.frameLimitValue(resolved(.frameLimit).value, maxFPS: maxFPS) == nil {
             save(.frameLimit, String(limitValue))
@@ -205,19 +245,46 @@ struct GameDefaultsView: View {
         save(.frameLimitOff, off ? "1" : "0")
     }
 
-    private func label(_ setting: GameDefaults.Setting) -> some View {
-        label(Self.title(setting), caption(setting))
+    private func label(_ title: String, _ caption: String) -> some View {
+        HStack(alignment: .center, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(BP.sans(13, .semibold))
+                    .tracking(-0.1)
+                    .foregroundStyle(BP.fg)
+                if !caption.isEmpty {
+                    Text(caption)
+                        .font(BP.sans(12))
+                        .foregroundStyle(BP.fg2)
+                }
+            }
+        }
     }
 
-    private func label(_ title: String, _ caption: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(BP.sans(13, .semibold))
-                .tracking(-0.1)
-            Text(caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.leading, StatusMetrics.textInset)
+    private func header(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(BP.sans(12, .semibold))
+            .tracking(0.2)
+            .foregroundStyle(BP.fg2)
+    }
+
+    private func footer(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(BP.sans(11))
+            .foregroundStyle(BP.fg3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // A neutral menu: the value in near-white, not the accent.
+    private func menu<Content: View>(_ title: String, selection: Binding<String>,
+                                     @ViewBuilder content: () -> Content) -> some View {
+        Picker(title, selection: selection, content: content)
+            .labelsHidden()
+            .fixedSize()
+            .tint(BP.fg)
+            // The menu button draws ~10pt of empty bezel before its text; pull it in so the
+            // reset arrow sits as close to a menu as it does to a switch or a value.
+            .padding(.leading, -10)
     }
 
     // Bridgeplay's performance overlay and Apple's Metal HUD are one choice, as in Steam
@@ -226,34 +293,15 @@ struct GameDefaultsView: View {
         resolved(.metalHUD).value == "1" ? "hud" : (resolved(.perfOverlay).value ?? "0")
     }
 
-    private var overlayCaption: String {
-        let sources = [resolved(.perfOverlay).source, resolved(.metalHUD).source]
-        var parts = [Self.summary(.perfOverlay)]
-        if sources.contains(.user) {
-            parts.append(String(localized: "Set by you."))
-        } else if sources.contains(.bridgeplay) {
-            parts.append(String(localized: "Bridgeplay's default."))
-        }
-        return parts.joined(separator: " ")
-    }
-
     private var overlayRow: some View {
-        HStack(alignment: .center, spacing: 0) {
-            label(Self.title(.perfOverlay), overlayCaption)
-            Spacer(minLength: 12)
-            Picker(Self.title(.perfOverlay), selection: Binding(get: { overlayChoice }, set: saveOverlay)) {
+        let changed = resolved(.perfOverlay).source == .user || resolved(.metalHUD).source == .user
+        return row(Self.title(.perfOverlay), "", changed: changed, reset: {
+            save(.perfOverlay, nil)
+            save(.metalHUD, nil)
+        }) {
+            menu(Self.title(.perfOverlay), selection: Binding(get: { overlayChoice }, set: saveOverlay)) {
                 ForEach(Self.options(.perfOverlay) + ["hud"], id: \.self) { option in
                     Text(Self.optionLabel(option, for: .perfOverlay)).tag(option)
-                }
-            }
-            .labelsHidden()
-            .fixedSize()
-        }
-        .contextMenu {
-            if resolved(.perfOverlay).source == .user || resolved(.metalHUD).source == .user {
-                Button(String(localized: "Reset to Bridgeplay's Default")) {
-                    save(.perfOverlay, nil)
-                    save(.metalHUD, nil)
                 }
             }
         }
@@ -266,10 +314,8 @@ struct GameDefaultsView: View {
     }
 
     private func choiceRow(_ setting: GameDefaults.Setting) -> some View {
-        HStack(alignment: .center, spacing: 0) {
-            label(setting)
-            Spacer(minLength: 12)
-            Picker(Self.title(setting), selection: Binding(
+        row(setting) {
+            menu(Self.title(setting), selection: Binding(
                 get: { resolved(setting).value ?? "" },
                 set: { save(setting, $0.isEmpty ? nil : $0) }
             )) {
@@ -279,13 +325,6 @@ struct GameDefaultsView: View {
                 ForEach(choices(setting), id: \.self) { option in
                     Text(Self.optionLabel(option, for: setting)).tag(option)
                 }
-            }
-            .labelsHidden()
-            .fixedSize()
-        }
-        .contextMenu {
-            ForEach(resetActions(setting), id: \.label) { action in
-                Button(action.label, action: action.perform)
             }
         }
     }
@@ -299,12 +338,10 @@ struct GameDefaultsView: View {
     }
 
     private var dllRow: some View {
-        HStack(alignment: .center, spacing: 8) {
-            label(.dllOverrides)
-            Spacer(minLength: 12)
+        row(.dllOverrides) {
             TextField(Self.title(.dllOverrides), text: $dllDraft, prompt: Text(verbatim: "dinput8=n,b"))
                 .labelsHidden()
-                .frame(maxWidth: 220)
+                .frame(maxWidth: 200)
                 .onSubmit(saveDLLOverrides)
             Button("Apply", action: saveDLLOverrides)
                 .disabled(dllDraft == (resolved(.dllOverrides).value ?? ""))
@@ -313,22 +350,62 @@ struct GameDefaultsView: View {
 
     private var overridesSection: some View {
         Section {
-            if overrides.isEmpty {
-                StatusRow(title: String(localized: "None"), value: String(localized: "Every game uses these defaults."))
-            }
             ForEach(overrides) { item in
-                StatusRow(title: item.name ?? String(localized: "App \(item.appID)"),
-                          value: item.settings.map(Self.overrideTitle).joined(separator: ", "),
-                          trailing: Self.place(item.place),
-                          action: StatusAction(label: String(localized: "Open in Steam")) { Self.openInSteam(item.appID) },
-                          menu: item.place == .conf
-                              ? [StatusAction(label: String(localized: "Use Defaults…")) { clearing = item }] : [])
+                HStack(alignment: .center, spacing: 12) {
+                    gameIcon(item.appID)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name ?? String(localized: "App \(item.appID)"))
+                            .font(BP.sans(13, .semibold))
+                            .tracking(-0.1)
+                            .foregroundStyle(BP.fg)
+                        Text(item.settings.map(Self.overrideTitle).joined(separator: ", "))
+                            .font(BP.sans(12))
+                            .foregroundStyle(BP.fg2)
+                            .help(Self.place(item.place))
+                    }
+                    Spacer(minLength: 12)
+                    Button("Open in Steam") { Self.openInSteam(item.appID) }
+                        .controlSize(.small)
+                }
+                .contextMenu {
+                    if item.place == .conf {
+                        Button(String(localized: "Use Defaults…")) { clearing = item }
+                    }
+                }
             }
         } header: {
-            Text("Games with Their Own Settings")
+            header("Games with Their Own Settings")
         } footer: {
-            Text("A game with launch options goes back to these defaults with Use Bridgeplay defaults in its Steam Properties › Bridgeplay.")
+            footer("Games with launch options reset in their Steam Properties › Bridgeplay.")
         }
+    }
+
+    private func gameIcon(_ appID: String) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        return Group {
+            if let image = icons[appID] {
+                Image(nsImage: image).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
+            } else {
+                BP.raise2.overlay(Image(systemName: "gamecontroller").font(.system(size: 13)).foregroundStyle(BP.fg3))
+            }
+        }
+        .frame(width: 32, height: 32)
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(BP.line, lineWidth: 1))
+        .accessibilityHidden(true)
+    }
+
+    // Steam's small icon at appcache/librarycache/<appid>/<hash>.jpg, as the Guide's list reads it.
+    nonisolated private static func steamIcons(for ids: [String]) -> [String: NSImage] {
+        let fm = FileManager.default
+        let cache = SupportPaths.Steam.userData.appending(path: "appcache/librarycache")
+        var found: [String: NSImage] = [:]
+        for id in Set(ids) {
+            let file = ((try? fm.contentsOfDirectory(at: cache.appending(path: id), includingPropertiesForKeys: nil)) ?? [])
+                .first { $0.pathExtension.lowercased() == "jpg" }
+            if let file, let image = NSImage(contentsOf: file) { found[id] = image }
+        }
+        return found
     }
 
     // MARK: Actions
@@ -339,6 +416,8 @@ struct GameDefaultsView: View {
         dllDraft = resolved(.dllOverrides).value ?? ""
         defaultTool = SteamDefaultTool.current(in: GameDefaults.read(SteamDefaultTool.config))?.name
         overrides = await Task.detached(priority: .utility) { GameDefaults.overrides() }.value
+        let ids = overrides.map(\.appID)
+        icons = await Task.detached(priority: .utility) { Self.steamIcons(for: ids) }.value
     }
 
     private func save(_ setting: GameDefaults.Setting, _ value: String?) {
@@ -393,7 +472,7 @@ struct GameDefaultsView: View {
         case .metalHUD: String(localized: "Metal HUD")
         case .perfOverlay: String(localized: "Performance Overlay")
         case .nvapi: String(localized: "Report an NVIDIA GPU")
-        case .metalFX: String(localized: "DLSS through MetalFX")
+        case .metalFX: "DLSS"
         case .dlssFrameGen: String(localized: "DLSS Frame Generation")
         case .advertiseAVX: String(localized: "Advertise AVX2 to Rosetta")
         case .msync: "MSync"
@@ -405,7 +484,7 @@ struct GameDefaultsView: View {
         case .frameGenQuality: String(localized: "Quality")
         case .frameGenUI: String(localized: "Protect UI")
         case .frameGenFallback: String(localized: "Fast-Motion Fallback")
-        case .frameGenEngine: String(localized: "Engine")
+        case .frameGenEngine: String(localized: "Frame Generation Engine")
         case .dllOverrides: String(localized: "DLL Overrides")
         }
     }
@@ -414,30 +493,25 @@ struct GameDefaultsView: View {
     static func overrideTitle(_ setting: GameDefaults.Setting) -> String {
         switch setting {
         case .frameGenQuality: String(localized: "Frame Generation Quality")
-        case .frameGenEngine: String(localized: "Frame Generation Engine")
         default: title(setting)
         }
     }
 
     static func summary(_ setting: GameDefaults.Setting) -> String {
         switch setting {
-        case .backend: String(localized: "Automatic picks D3DMetal when the Game Porting Toolkit is linked, and DXMT otherwise.")
-        case .highResolution: String(localized: "Sharper on Retina displays, but games run slower.")
-        case .metalHUD: String(localized: "Shows frame rate and GPU details in a corner while you play.")
-        case .perfOverlay: String(localized: "Frame rate, frame time, CPU, GPU, memory and battery in the top-left corner while you play, or Apple's Metal HUD.")
-        case .nvapi: String(localized: "Lets games offer DLSS, served by MetalFX. Some games take NVIDIA-only paths with it.")
-        case .metalFX: String(localized: "Only takes effect when DLSS is switched on in the game.")
-        case .dlssFrameGen: String(localized: "Lets games offer DLSS frame generation. Experimental: it can freeze the Mac on some setups.")
-        case .advertiseAVX: String(localized: "Many games quit without it.")
-        case .msync: String(localized: "Automatic follows the engine.")
-        case .vsync: String(localized: "Waits for the display even when a game turns VSync off.")
-        case .frameLimit: String(localized: "Holds games to this many frames per second, from 15 up to the display's refresh rate, and waits for the display they are on. The display's refresh rate is not changed.")
-        case .frameLimitOff: String(localized: "Applies the limit above. Off, games run without one and the slider keeps its value.")
-        case .scalingFilter: String(localized: "How a game's frames are scaled up to the screen when it draws fewer pixels, as with High Resolution off. Automatic keeps what Wine does there, sharp pixels; Linear smooths them.")
-        case .frameGen, .frameGenQuality, .frameGenEngine: ""
-        case .frameGenUI: String(localized: "Keeps static HUD and menus sharp.")
-        case .frameGenFallback: String(localized: "Skips generated frames that would smear.")
-        case .dllOverrides: String(localized: "Wine syntax. A game's own conf replaces these; its launch options win per DLL.")
+        case .highResolution: String(localized: "Sharper, but slower.")
+        case .metalFX: String(localized: "Uses MetalFX when a game turns DLSS on.")
+        case .nvapi: String(localized: "Lets games offer DLSS. Some take NVIDIA-only paths.")
+        case .dlssFrameGen: String(localized: "Experimental. Can freeze some Macs.")
+        case .advertiseAVX: String(localized: "Many games need it.")
+        case .vsync: String(localized: "Even when a game turns it off.")
+        case .scalingFilter: String(localized: "How games scale up when High Resolution is off.")
+        case .frameGen: String(localized: "Experimental. Adds input lag.")
+        case .frameGenUI: String(localized: "Keeps HUD and menus sharp.")
+        case .frameGenFallback: String(localized: "Skips frames that would smear.")
+        case .dllOverrides: String(localized: "Wine syntax.")
+        case .backend, .metalHUD, .perfOverlay, .msync, .frameLimit, .frameLimitOff,
+             .frameGenQuality, .frameGenEngine: ""
         }
     }
 
@@ -463,7 +537,7 @@ struct GameDefaultsView: View {
         case (.perfOverlay, "fps"): "FPS"
         case (.perfOverlay, "summary"): String(localized: "Summary")
         case (.perfOverlay, "detailed"): String(localized: "Detailed")
-        case (.perfOverlay, "hud"): String(localized: "Apple Metal HUD")
+        case (.perfOverlay, "hud"): String(localized: "Metal HUD")
         case (.perfOverlay, _): String(localized: "Off")
         case (.scalingFilter, "nearest"): String(localized: "Nearest")
         case (.scalingFilter, "integer"): String(localized: "Integer")
@@ -478,5 +552,126 @@ struct GameDefaultsView: View {
         case .conf: String(localized: "Own conf")
         case .launchOptions(let account): String(localized: "Launch options, account \(account)")
         }
+    }
+}
+
+
+// The top of Game Defaults, in the Status page's frame: the aurora behind what every game
+// starts with, and the settings in force as chips.
+private struct DefaultsHero: View {
+    let customized: Bool
+    let chips: [String]
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // Ambient motion stops while the window is in the background
+    @Environment(\.appearsActive) private var appearsActive
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // Only the aurora redraws per frame; the grid and the text stay put
+            TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion || !appearsActive)) { context in
+                let t = reduceMotion ? 1.2 : context.date.timeIntervalSinceReferenceDate * 0.6
+                Aurora(t: t, lean: customized ? 0.65 : 0.35)
+            }
+            GridLines()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Your Game Defaults")
+                        .font(BP.sans(24, .semibold))
+                        .tracking(-0.7)
+                        .foregroundStyle(BP.fg)
+                    Text("Every game starts with these, unless it has its own settings in Steam.")
+                        .font(BP.sans(13))
+                        .foregroundStyle(BP.fg2)
+                        .lineLimit(2)
+                    HStack(spacing: 6) {
+                        ForEach(chips, id: \.self) { chip in
+                            HeroChip(text: chip)
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+        }
+        .frame(height: 148)
+        .clipShape(RoundedRectangle(cornerRadius: BP.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: BP.radius, style: .continuous).strokeBorder(BP.line, lineWidth: 1))
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
+        .padding(.bottom, 4)
+        .background(BP.bg)
+    }
+}
+
+// A changed setting's way back: a small arrow, quiet until the pointer is on it.
+private struct ResetButton: View {
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "arrow.counterclockwise")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(hovered ? BP.fg : BP.fg3)
+                .frame(width: 16, height: 16)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .onHover { hovered = $0 }
+        .help(String(localized: "Reset to Bridgeplay's Default"))
+    }
+}
+
+// A value along a range in the brand's progress style: a 4 pt raise-2 track, the gradient up
+// to the value and a white knob. Steps by one with the arrow keys; VoiceOver gets a slider.
+private struct BrandSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let label: String
+    let onCommit: () -> Void
+
+    @State private var dragging = false
+    private let knob: CGFloat = 16
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = max(proxy.size.width - knob, 1)
+            let fraction = (value - range.lowerBound) / max(range.upperBound - range.lowerBound, 1)
+            let x = CGFloat(min(max(fraction, 0), 1)) * width
+            ZStack(alignment: .leading) {
+                Capsule().fill(BP.raise2).frame(height: 4)
+                Capsule().fill(BP.iridescent).frame(width: x + knob / 2, height: 4)
+                Circle()
+                    .fill(.white)
+                    .frame(width: knob, height: knob)
+                    .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+                    .scaleEffect(dragging ? 1.1 : 1)
+                    .offset(x: x)
+            }
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { drag in
+                    dragging = true
+                    let f = min(max((drag.location.x - knob / 2) / width, 0), 1)
+                    value = range.lowerBound + Double(f) * (range.upperBound - range.lowerBound)
+                }
+                .onEnded { _ in
+                    dragging = false
+                    onCommit()
+                })
+            .animation(.easeOut(duration: 0.18), value: dragging)
+        }
+        .frame(height: 20)
+        .focusable()
+        .onKeyPress(.leftArrow) { step(-1) }
+        .onKeyPress(.rightArrow) { step(1) }
+        .accessibilityRepresentation {
+            Slider(value: $value, in: range) { Text(label) } onEditingChanged: { if !$0 { onCommit() } }
+        }
+    }
+
+    private func step(_ by: Double) -> KeyPress.Result {
+        value = min(max(value.rounded() + by, range.lowerBound), range.upperBound)
+        onCommit()
+        return .handled
     }
 }

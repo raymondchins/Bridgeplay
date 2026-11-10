@@ -8,8 +8,7 @@ struct BackupsView: View {
     var body: some View {
         Group {
             if !model.hasLoaded {
-                ProgressView("Looking for backups")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                SkeletonTable(label: String(localized: "Looking for backups"), columns: [0.45, 0.3, 0.25])
             } else if model.backups.isEmpty {
                 ContentUnavailableView(
                     String(localized: "No Backups"),
