@@ -1364,7 +1364,12 @@ static int fg_layer_create(CAMetalLayer *game, NSUInteger width, NSUInteger heig
 	layer.framebufferOnly = NO;
 	layer.maximumDrawableCount = 3;
 	layer.presentsWithTransaction = NO;
-	layer.displaySyncEnabled = game.displaySyncEnabled;
+	// Past the hook, which would take this copy of the game layer's (maybe forced) value for
+	// the game's own choice
+	if (next_set_display_sync != NULL)
+		next_set_display_sync(layer, @selector(setDisplaySyncEnabled:), game.displaySyncEnabled);
+	else
+		layer.displaySyncEnabled = game.displaySyncEnabled;
 	layer.opaque = YES;
 	layer.contentsGravity = game.contentsGravity;
 	layer.hidden = YES;

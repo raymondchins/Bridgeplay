@@ -24,12 +24,16 @@ static _Atomic int sf_mode;
 // nearest on the game layer, the default on framegen's covering layer) even after the game
 // has changed layers. Main thread.
 static char sf_original_key;
+static NSHashTable *sf_changed; // every layer given a filter, held weakly, for Automatic
 
 static void sf_remember(CALayer *layer)
 {
 	if (objc_getAssociatedObject(layer, &sf_original_key) != nil)
 		return;
 	objc_setAssociatedObject(layer, &sf_original_key, layer.magnificationFilter, OBJC_ASSOCIATION_COPY);
+	if (sf_changed == nil)
+		sf_changed = [[NSHashTable weakObjectsHashTable] retain];
+	[sf_changed addObject:layer];
 	shim_log("overlay_shim scalefilter: the layer came with %s magnification\n",
 	         layer.magnificationFilter.UTF8String);
 }
@@ -146,8 +150,8 @@ static int sf_parse(const char *value)
 	return -1;
 }
 
-// The quick settings' filter, applied to layer now. Automatic puts back the filter the layer
-// came with. Main thread.
+// The quick settings' filter, applied to layer now. Automatic puts back, on every layer it
+// changed, the filter that layer came with. Main thread.
 static int scalefilter_set(const char *value, CAMetalLayer *layer)
 {
 	int mode = sf_parse(value);
@@ -156,12 +160,13 @@ static int scalefilter_set(const char *value, CAMetalLayer *layer)
 	atomic_store(&sf_mode, mode);
 	if (layer != nil && mode != sf_default) {
 		sf_apply(layer);
-	} else if (layer != nil) {
+	} else if (mode == sf_default) {
+		// Every layer the filter touched, not only the current one: the game may go back to
+		// one it drew to before
 		fg_ca_begin();
-		sf_restore(layer);
-		for (CALayer *sub in layer.sublayers)
-			if ([sub isKindOfClass:[CAMetalLayer class]])
-				sf_restore(sub);
+		for (CALayer *changed in sf_changed.allObjects)
+			sf_restore(changed);
+		[sf_changed removeAllObjects];
 		fg_ca_end();
 	}
 	if (mode == sf_default)

@@ -155,22 +155,36 @@ static int child(const char *path, const char *mode, const char *home)
 	CHECK([layer.magnificationFilter isEqualToString:original], "a queued check left %s after Automatic, not %s",
 	      layer.magnificationFilter.UTF8String, original.UTF8String);
 
-	// Automatic gives each layer back its own filter, also after the game moved to a new layer
-	// that came with another filter than the first one did
+	// Automatic gives every layer it changed back its own filter, also after the game moved to
+	// a new layer that came with another filter, and the layer it left
 	CAMetalLayer *next = [CAMetalLayer layer];
 	next.device = device;
 	next.pixelFormat = MTLPixelFormatBGRA8Unorm;
 	next.bounds = CGRectMake(0, 0, 128, 72);
 	next.drawableSize = CGSizeMake(64, 36);
-	NSString *next_original = [next.magnificationFilter copy];
-	CHECK(set("BRIDGEPLAY_SCALING_FILTER", "nearest"), "Nearest was refused");
+	next.magnificationFilter = kCAFilterTrilinear;
+	CHECK(set("BRIDGEPLAY_SCALING_FILTER", "linear"), "Linear was refused");
+	CHECK([layer.magnificationFilter isEqualToString:kCAFilterLinear], "Linear was not applied to the game layer");
 	present_for(next, 1.1);
 	[[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.2]];
-	CHECK([next.magnificationFilter isEqualToString:kCAFilterNearest], "Nearest did not follow the game to its new layer");
+	CHECK([next.magnificationFilter isEqualToString:kCAFilterLinear], "Linear did not follow the game to its new layer");
 	CHECK(set("BRIDGEPLAY_SCALING_FILTER", "0"), "Automatic was refused after the layer changed");
-	CHECK([next.magnificationFilter isEqualToString:next_original], "Automatic gave the new layer %s, not its own %s",
-	      next.magnificationFilter.UTF8String, next_original.UTF8String);
-	present_for(layer, 0.1);
+	CHECK([next.magnificationFilter isEqualToString:kCAFilterTrilinear], "Automatic gave the new layer %s, not its own",
+	      next.magnificationFilter.UTF8String);
+	CHECK([layer.magnificationFilter isEqualToString:original], "Automatic left the earlier layer at %s, not %s",
+	      layer.magnificationFilter.UTF8String, original.UTF8String);
+	present_for(layer, 1.2); // the game layer is the current one again once next has gone quiet
+
+	// A Metal sublayer (framegen's covering layer) follows the limit's display sync both ways
+	CAMetalLayer *cover = [CAMetalLayer layer];
+	[layer addSublayer:cover];
+	cover.displaySyncEnabled = NO; // a new layer starts with it on
+	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "30"), "a 30 fps limit was refused again");
+	CHECK(cover.displaySyncEnabled, "the covering layer did not get display sync with the limit");
+	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "0"), "Off was refused again");
+	CHECK(!cover.displaySyncEnabled && !layer.displaySyncEnabled, "Off left display sync on (game %d, cover %d)",
+	      layer.displaySyncEnabled, cover.displaySyncEnabled);
+	[cover removeFromSuperlayer];
 
 	// While the sidebar shows, a modifier press stays out of the game; releases reach it
 	CHECK(send(event(10, 35, CMD | OPT)), "Option-Command-P did not open the sidebar");

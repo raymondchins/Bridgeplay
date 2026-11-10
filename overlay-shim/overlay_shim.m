@@ -485,14 +485,19 @@ static void hook_set_display_sync(id layer, SEL selector, BOOL enabled)
 	next_set_display_sync(layer, selector, effective);
 }
 
-// After the quick settings change the limit: the game's own choice again, or display sync.
+// After the quick settings change the limit: the game's own choice again, or display sync,
+// on the game layer and framegen's covering layer, which shows the frames while it is on.
 // Main thread.
 static void framelimit_sync_layer(id layer)
 {
 	if (next_set_display_sync == NULL || layer == nil)
 		return;
-	next_set_display_sync(layer, sel_registerName("setDisplaySyncEnabled:"),
-	                      atomic_load(&game_display_sync) || force_vsync || framelimit_active());
+	SEL selector = sel_registerName("setDisplaySyncEnabled:");
+	BOOL sync = atomic_load(&game_display_sync) || force_vsync || framelimit_active();
+	next_set_display_sync(layer, selector, sync);
+	for (CALayer *sub in ((CALayer *)layer).sublayers)
+		if ([sub isKindOfClass:[CAMetalLayer class]])
+			next_set_display_sync(sub, selector, sync);
 }
 
 static void hook_set_device(id layer, SEL selector, id device)
