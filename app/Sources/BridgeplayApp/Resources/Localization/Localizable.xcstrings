@@ -2396,6 +2396,12 @@
             "value" : "Metal HUD di Apple"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metal HUD от Apple"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2630,6 +2636,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Automatico (con Alta risoluzione disattivata Wine mantiene i pixel nitidi)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автоматически (при выключенном высоком разрешении Wine сохраняет пиксели чёткими)"
           }
         },
         "zh-Hans" : {
@@ -4079,6 +4091,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L'overlay di Bridgeplay nell'angolo in alto a sinistra mentre giochi. FPS mostra solo la frequenza dei fotogrammi, Riepilogo aggiunge in una riga tempo per fotogramma, CPU, GPU, memoria e batteria, e Dettagliato un pannello con il grafico dei tempi per fotogramma. Metal HUD di Apple mostra invece l'overlay di Apple. Disattivato per impostazione predefinita. Mentre un gioco è in esecuzione, Opzione-Comando-P apre le impostazioni rapide di Bridgeplay a destra del gioco: overlay, limite di fotogrammi e filtro di scala cambiano subito e vengono salvati per quel gioco. Usa i tasti freccia o fai clic, ed Esc per chiudere."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оверлей Bridgeplay в левом верхнем углу во время игры. FPS показывает только частоту кадров, «Сводка» добавляет в одну строку время кадра, CPU, GPU, память и батарею, а «Подробно» — панель с графиком времени кадра. «Metal HUD от Apple» показывает вместо него оверлей Apple. По умолчанию выключено. Пока игра запущена, Option-Command-P открывает быстрые настройки Bridgeplay справа от игры: оверлей, ограничение частоты кадров и фильтр масштабирования меняются сразу и сохраняются для этой игры. Используйте клавиши со стрелками или щелчок, а Esc — чтобы закрыть."
           }
         },
         "zh-Hans" : {
@@ -6102,6 +6120,12 @@
             "value" : "Dettagliato"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подробно"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7240,6 +7264,12 @@
             "value" : "Limite di fotogrammi"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ограничение частоты кадров"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7256,6 +7286,12 @@
             "value" : "Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ограничение частоты кадров (синхронизировано с дисплеем, его частота обновления не меняется)"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7270,6 +7306,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Frequenza dei fotogrammi, tempo per fotogramma, CPU, GPU, memoria e batteria nell'angolo in alto a sinistra mentre giochi, oppure il Metal HUD di Apple."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Частота кадров, время кадра, CPU, GPU, память и батарея в левом верхнем углу во время игры или Metal HUD от Apple."
           }
         },
         "zh-Hans" : {
@@ -7706,6 +7748,12 @@
             "value" : "Metà della frequenza del display"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Половина частоты дисплея"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7788,6 +7836,12 @@
             "value" : "Limita il gioco alla frequenza del display, alla sua metà, oppure a 60, 40 o 30 FPS, e attende il display perché i fotogrammi arrivino regolari. Ritmo più fluido e meno consumo di batteria. La frequenza del display non cambia. Disattivato per impostazione predefinita."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ограничивает игру частотой обновления дисплея, её половиной или 60, 40 либо 30 FPS и ждёт дисплей, чтобы кадры выводились равномерно. Плавнее темп и меньше расход батареи. Частота обновления самого дисплея не меняется. По умолчанию выключено."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7802,6 +7856,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Come i fotogrammi di un gioco vengono ingranditi sullo schermo quando disegna meno pixel, come con Alta risoluzione disattivata. Automatico mantiene ciò che fa Wine, pixel nitidi; Lineare li ammorbidisce."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как кадры игры растягиваются на экран, когда она рисует меньше пикселей, например при выключенном высоком разрешении. «Автоматически» оставляет то, что делает Wine, — чёткие пиксели; «Линейный» их сглаживает."
           }
         },
         "zh-Hans" : {
@@ -7884,6 +7944,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Come i fotogrammi del gioco vengono ingranditi sullo schermo. Automatico mantiene il comportamento attuale: con Alta risoluzione disattivata Wine raddoppia ogni pixel in modo nitido, e i giochi per Mac vengono ammorbiditi. Lineare ammorbidisce, Nearest mantiene ogni pixel nitido, adatto alla pixel art, e Intero è nitido solo a 2x o 3x esatti. L'upscaling MetalFX, se attivo, viene prima."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как кадры игры растягиваются на ваш экран. «Автоматически» оставляет всё как сейчас: при выключенном высоком разрешении Wine чётко удваивает каждый пиксель, а игры для Mac сглаживаются. «Линейный» сглаживает, «Ближайший» сохраняет каждый пиксель чётким, что подходит для пиксель-арта, а «Целочисленный» чёткий только при ровно 2x или 3x. Масштабирование MetalFX, если включено, выполняется первым."
           }
         },
         "zh-Hans" : {
@@ -8540,6 +8606,12 @@
             "value" : "Intero"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Целочисленный"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9062,6 +9134,12 @@
             "value" : "Lineare"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Линейный"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9320,6 +9398,12 @@
             "value" : "Uguale alla frequenza del display"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как частота дисплея"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9576,6 +9660,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nearest"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ближайший"
           }
         },
         "zh-Hans" : {
@@ -10125,7 +10215,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Только для нативных игр Mac, рядом с Metal HUD и генерацией кадров. Raw HID подходит для игр на Unity, SDL и Unreal, GameController использует фреймворк Apple, а «Выкл.» не трогает геймпады."
+            "value" : "Только для нативных игр Mac, рядом с оверлеем производительности и генерацией кадров. Raw HID подходит для игр на Unity, SDL и Unreal, GameController использует фреймворк Apple, а «Выкл.» не трогает геймпады."
           }
         },
         "zh-Hans" : {
@@ -10540,6 +10630,12 @@
             "value" : "Sincronizza i giochi con il display su cui si trovano, attendendo il display. La frequenza di aggiornamento del display non cambia."
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Синхронизирует игры с дисплеем, на котором они идут, и ждёт этот дисплей. Частота обновления дисплея не меняется."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10710,6 +10806,12 @@
             "value" : "Overlay delle prestazioni"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оверлей производительности"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10724,6 +10826,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Overlay delle prestazioni (in gioco, ⌥⌘P apre le impostazioni rapide di questi controlli)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оверлей производительности (в игре ⌥⌘P открывает быстрые настройки для этих параметров)"
           }
         },
         "zh-Hans" : {
@@ -12788,6 +12896,12 @@
             "value" : "Filtro di scala"
           }
         },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фильтр масштабирования"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12802,6 +12916,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фильтр масштабирования (когда игра рисует меньше пикселей, чем у экрана, например при выключенном высоком разрешении)"
           }
         },
         "zh-Hans" : {
@@ -14779,6 +14899,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Riepilogo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сводка"
           }
         },
         "zh-Hans" : {
