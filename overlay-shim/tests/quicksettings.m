@@ -112,7 +112,14 @@ static int child(const char *path, const char *mode, const char *home)
 	CHECK(before > 45, "the game ran at only %.1f fps before any limit", before);
 	CHECK(!layer.displaySyncEnabled, "VSync was forced before any limit");
 
+	// A pick still waiting from an earlier session is replaced, not carried into this one's
+	NSString *stale = [dir stringByAppendingString:@"/4242.conf"];
+	[@"BRIDGEPLAY_PERF_OVERLAY=detailed\n" writeToFile:stale atomically:NO encoding:NSUTF8StringEncoding error:nil];
+	[[NSFileManager defaultManager] setAttributes:@{ NSFileModificationDate : [NSDate dateWithTimeIntervalSinceNow:-3600] }
+	                                 ofItemAtPath:stale error:nil];
 	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "30"), "a 30 fps limit was refused");
+	CHECK([saved(home) isEqualToString:@"BRIDGEPLAY_FPS_LIMIT=30\n"], "the save carried over an earlier session's pick: %s",
+	      saved(home).UTF8String);
 	CHECK(layer.displaySyncEnabled, "the limit did not turn display sync on at once");
 	double capped = present_for(layer, 2.0);
 	CHECK(capped > 27 && capped < 31, "a limit set mid-run let the game run at %.1f fps", capped);
@@ -148,12 +155,31 @@ static int child(const char *path, const char *mode, const char *home)
 	CHECK([layer.magnificationFilter isEqualToString:original], "a queued check left %s after Automatic, not %s",
 	      layer.magnificationFilter.UTF8String, original.UTF8String);
 
+	// Automatic gives each layer back its own filter, also after the game moved to a new layer
+	// that came with another filter than the first one did
+	CAMetalLayer *next = [CAMetalLayer layer];
+	next.device = device;
+	next.pixelFormat = MTLPixelFormatBGRA8Unorm;
+	next.bounds = CGRectMake(0, 0, 128, 72);
+	next.drawableSize = CGSizeMake(64, 36);
+	NSString *next_original = [next.magnificationFilter copy];
+	CHECK(set("BRIDGEPLAY_SCALING_FILTER", "nearest"), "Nearest was refused");
+	present_for(next, 1.1);
+	[[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.2]];
+	CHECK([next.magnificationFilter isEqualToString:kCAFilterNearest], "Nearest did not follow the game to its new layer");
+	CHECK(set("BRIDGEPLAY_SCALING_FILTER", "0"), "Automatic was refused after the layer changed");
+	CHECK([next.magnificationFilter isEqualToString:next_original], "Automatic gave the new layer %s, not its own %s",
+	      next.magnificationFilter.UTF8String, next_original.UTF8String);
+	present_for(layer, 0.1);
+
 	// While the sidebar shows, a modifier press stays out of the game; releases reach it
 	CHECK(send(event(10, 35, CMD | OPT)), "Option-Command-P did not open the sidebar");
 	CHECK(send(event(12, 56, CMD | OPT | SHIFT)), "a Shift press reached the game under the sidebar");
-	CHECK(!send(event(12, 56, CMD | OPT)), "the Shift release did not reach the game");
-	CHECK(!send(event(12, 58, CMD)), "the Option release did not reach the game");
+	CHECK(!send(event(12, 58, CMD | SHIFT)), "the Option release, with Shift still held, did not reach the game");
+	CHECK(!send(event(12, 56, CMD)), "the Shift release did not reach the game");
 	CHECK(!send(event(12, 55, 0)), "the Command release did not reach the game");
+	CHECK(send(event(12, 59, 1UL << 18)), "a Control press reached the game under the sidebar");
+	CHECK(!send(event(12, 59, 0)), "the Control release did not reach the game");
 	CHECK(send(event(10, 126, 0)), "an arrow key reached the game under the sidebar");
 	CHECK(send(event(10, 53, 0)), "Escape did not close the sidebar");
 	CHECK(!send(event(12, 56, SHIFT)), "a Shift press did not reach the game once the sidebar closed");

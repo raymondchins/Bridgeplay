@@ -20,7 +20,28 @@ static const char *const sf_mode_names[] = { "default", "linear", "nearest", "in
 // Changed at run time by the quick settings sidebar
 static _Atomic int sf_mode;
 // The filter the game's layer came with, put back when the quick settings return to Automatic
-static NSString *sf_original; // main thread
+// Each layer keeps the filter it came with, so Automatic puts back that layer's own (Wine's
+// nearest on the game layer, the default on framegen's covering layer) even after the game
+// has changed layers. Main thread.
+static char sf_original_key;
+
+static void sf_remember(CALayer *layer)
+{
+	if (objc_getAssociatedObject(layer, &sf_original_key) != nil)
+		return;
+	objc_setAssociatedObject(layer, &sf_original_key, layer.magnificationFilter, OBJC_ASSOCIATION_COPY);
+	shim_log("overlay_shim scalefilter: the layer came with %s magnification\n",
+	         layer.magnificationFilter.UTF8String);
+}
+
+static void sf_restore(CALayer *layer)
+{
+	NSString *original = objc_getAssociatedObject(layer, &sf_original_key);
+	if (original == nil)
+		return;
+	layer.magnificationFilter = original;
+	objc_setAssociatedObject(layer, &sf_original_key, nil, OBJC_ASSOCIATION_COPY);
+}
 static os_unfair_lock sf_lock = OS_UNFAIR_LOCK_INIT;
 static id sf_layer; // compared only
 static double sf_checked;
@@ -47,17 +68,16 @@ static void sf_apply(CAMetalLayer *layer)
 	int nearest = mode == sf_nearest || (mode == sf_integer && whole);
 	NSString *filter = nearest ? kCAFilterNearest : kCAFilterLinear;
 
-	if (sf_original == nil) {
-		sf_original = [layer.magnificationFilter copy];
-		shim_log("overlay_shim scalefilter: the layer came with %s magnification\n",
-		         sf_original.UTF8String);
-	}
 	fg_ca_begin();
+	sf_remember(layer);
 	if (![layer.magnificationFilter isEqualToString:filter])
 		layer.magnificationFilter = filter;
 	for (CALayer *sub in layer.sublayers)
-		if ([sub isKindOfClass:[CAMetalLayer class]] && ![sub.magnificationFilter isEqualToString:filter])
-			sub.magnificationFilter = filter;
+		if ([sub isKindOfClass:[CAMetalLayer class]]) {
+			sf_remember(sub);
+			if (![sub.magnificationFilter isEqualToString:filter])
+				sub.magnificationFilter = filter;
+		}
 	fg_ca_end();
 
 	int scale = (int)lround(sx * 100);
@@ -136,12 +156,12 @@ static int scalefilter_set(const char *value, CAMetalLayer *layer)
 	atomic_store(&sf_mode, mode);
 	if (layer != nil && mode != sf_default) {
 		sf_apply(layer);
-	} else if (layer != nil && sf_original != nil) {
+	} else if (layer != nil) {
 		fg_ca_begin();
-		layer.magnificationFilter = sf_original;
+		sf_restore(layer);
 		for (CALayer *sub in layer.sublayers)
 			if ([sub isKindOfClass:[CAMetalLayer class]])
-				sub.magnificationFilter = sf_original;
+				sf_restore(sub);
 		fg_ca_end();
 	}
 	if (mode == sf_default)

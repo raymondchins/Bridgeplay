@@ -59,6 +59,7 @@ static NSUInteger sb_mods; // the modifiers held as the game last saw them, main
 
 static int sb_enabled;
 static char sb_appid[16];
+static time_t sb_started; // when this game started: an older pending file is another session's
 
 // The layer the game draws to, from its render thread
 static os_unfair_lock sb_lock = OS_UNFAIR_LOCK_INIT;
@@ -98,6 +99,7 @@ static int sb_digits(const char *v)
 static int sidebar_init(void)
 {
 	sb_enabled = sidebar_wanted();
+	sb_started = time(NULL);
 	const char *names[] = { "SteamAppId", "SteamGameId", "STEAM_COMPAT_APP_ID" };
 	for (size_t i = 0; i < sizeof(names) / sizeof(names[0]) && !sb_appid[0]; i++)
 		if (sb_digits(getenv(names[i])))
@@ -205,8 +207,15 @@ static int sb_save(const char *key, const char *value)
 	snprintf(path, sizeof(path), "%s/%s.conf", dir, sb_appid);
 	snprintf(tmp, sizeof(tmp), "%s.%d.tmp", path, getpid());
 
+	// Picks still waiting from this game carry over; a file from before it started belongs to
+	// an earlier session, maybe another Steam account's, and is replaced, not merged
 	char kept[sb_rows][16] = { { 0 } };
 	FILE *in = fopen(path, "r");
+	struct stat file;
+	if (in != NULL && (fstat(fileno(in), &file) != 0 || file.st_mtime < sb_started)) {
+		fclose(in);
+		in = NULL;
+	}
 	if (in != NULL) {
 		char line[128];
 		while (fgets(line, sizeof(line), in) != NULL) {
@@ -932,9 +941,10 @@ static int sidebar_send_event(id event)
 		return 1;
 	case 3: case 7: case 22: case 25: case 27: // other presses, drags, scrolls
 		return 1;
-	case 12: { // modifiers: a release reaches the game, so nothing stays held; a press does not
+	case 12: { // modifiers: a press stays out of the game; anything that releases a key reaches
+		// it, so nothing stays held there, even with another modifier still pressed
 		NSUInteger now = flags & sb_mod_keys;
-		if (now & ~sb_mods)
+		if ((now & ~sb_mods) && !(sb_mods & ~now))
 			return 1;
 		sb_mods = now;
 		return 0;
