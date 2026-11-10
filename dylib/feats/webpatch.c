@@ -459,7 +459,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     /* The frame rate limit: a slider in whole frames per second from 15 to the fastest \
        display's refresh rate (Fx.fm), and a switch that turns the limit off and keeps the \
        slider's value (BRIDGEPLAY_FPS_LIMIT_OFF=1). overlay-shim clamps to the display the game \
-       is on. display and half from earlier releases show as the rate they give, 0 or no value \
+       is on, so a value from the game, which knows that display, is kept up to 360 even when \
+       Fx.fm, read when Steam loaded this page, is lower. display and half from earlier releases show as the rate they give, 0 or no value \
        as no limit. Steam's slider is found by the name its export carries, so a renamed export \
        still works; without it, a menu in steps of 5 stands in. npKey and npSet are for \
        MSCXApply, which sets the value even while the switch dims the slider. */ \
@@ -469,16 +470,16 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "SL=globalThis.MSCXSliderField||(globalThis.MSCXSliderField=(()=>{try{return Object.values(" BARREL ")" \
     ".find(f=>typeof f===\"function\"&&/\"SliderField\"/.test(String(f)))}catch(e){return null}})())," \
     "FL=(l,dl)=>{const n=lf(ev(\"BRIDGEPLAY_FPS_LIMIT\")),off=!n||ev(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",v=n||fm," \
-    "set=x=>{x=Math.min(fm,Math.max(15,Math.round(+x)));if(!(x>=15))return;const b=dv(\"BRIDGEPLAY_FPS_LIMIT\");" \
+    "set=(x,top)=>{x=Math.min(top||fm,Math.max(15,Math.round(+x)));if(!(x>=15))return;const b=dv(\"BRIDGEPLAY_FPS_LIMIT\");" \
     "s([[\"BRIDGEPLAY_FPS_LIMIT\",/^\\d+$/.test(b)&&+b===x?\"\":String(x)]])}," \
     "tog=d=>{const b=dv(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",ps=[[\"BRIDGEPLAY_FPS_LIMIT_OFF\",d?(b?\"\":\"1\"):(b?\"0\":\"\")]];" \
     "d||n||ps.push([\"BRIDGEPLAY_FPS_LIMIT\",String(v)]);s(ps)}," \
     "R=[];for(let x=15;x<fm;x+=5)R.push(x);R.push(fm);R.indexOf(v)<0&&R.push(v);" \
     "return(0," RT ".jsxs)(" BARREL ".XY,{label:l,children:[(0," RT ".jsx)(\"div\",{className:off?\"MSCXDim\":\"\",children:" \
     "SL?(0," RT ".jsx)(SL,{min:15,max:fm,value:v,showValue:!0,valueSuffix:\" FPS\",disabled:off," \
-    "npKey:\"BRIDGEPLAY_FPS_LIMIT\",npSet:set,onChange:x=>{off||set(x)}}):" \
+    "npKey:\"BRIDGEPLAY_FPS_LIMIT\",npSet:x=>set(x,360),onChange:x=>{off||set(x)}}):" \
     "(0," RT ".jsx)(" BARREL ".m,{rgOptions:R.sort((a,b)=>a-b).map(x=>({data:x,label:x+\" FPS\"})),selectedOption:v," \
-    "disabled:off,npKey:\"BRIDGEPLAY_FPS_LIMIT\",npSet:set,onChange:o=>{off||set(o.data)}})})," \
+    "disabled:off,npKey:\"BRIDGEPLAY_FPS_LIMIT\",npSet:x=>set(x,360),onChange:o=>{off||set(o.data)}})})," \
     "(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:dl,checked:off,npKey:\"BRIDGEPLAY_FPS_LIMIT_OFF\"," \
     "onChange:tog})]},\"fpl\")}," \
     /* The filter Core Animation scales the game's frames to the screen with. 0 leaves it as \

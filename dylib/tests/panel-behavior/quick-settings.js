@@ -43,6 +43,9 @@ for (const form of Object.keys(FORMS)) {
   r = run('', { BRIDGEPLAY_FPS_LIMIT: 'half', BRIDGEPLAY_PERF_OVERLAY: 'hud', MTL_HUD_ENABLED: '1', PATH: '/x',
                 BRIDGEPLAY_FPS_LIMIT_OFF: 'yes' });
   t.ok(written.length === 0 && r === '', `values and keys the sidebar does not set are ignored (${r})`);
+  r = run('', { BRIDGEPLAY_FPS_LIMIT: '90' });
+  t.ok(r === 'BRIDGEPLAY_FPS_LIMIT=90 %command%',
+       `90 from a game on a faster display than the page knows is kept, not cut to its 60 (${r})`);
   r = run('', { BRIDGEPLAY_FPS_LIMIT: '14' });
   t.ok(written.length === 0, `a limit under 15 is ignored (${r})`);
 
