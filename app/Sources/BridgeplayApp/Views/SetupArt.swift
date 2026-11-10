@@ -79,6 +79,8 @@ struct Aurora: View {
             smoothsColors: true
         )
         .blur(radius: 20)
+        // The mesh and its blur in one offscreen Metal pass: measured 50% → 19% CPU on Status
+        .drawingGroup()
         .animation(.easeInOut(duration: 0.9), value: lean)
     }
 
