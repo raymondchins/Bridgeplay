@@ -207,7 +207,7 @@ static int child(const char *path, const char *mode, const char *home)
 	CHECK([[NSString stringWithContentsOfFile:victim encoding:NSUTF8StringEncoding error:nil] isEqualToString:@"SAVE"],
 	      "saving wrote through a link at its temporary name");
 
-	// Disable frame limit keeps the value and lets the game go; switched back on, it holds again
+	// Switched off, the limit keeps its value and lets the game go; switched back on, it holds again
 	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "45"), "a limit of 45 was refused");
 	CHECK(set("BRIDGEPLAY_FPS_LIMIT_OFF", "1"), "the switch was refused");
 	CHECK(!set("BRIDGEPLAY_FPS_LIMIT_OFF", "2"), "the switch took 2");
@@ -237,16 +237,16 @@ static int child(const char *path, const char *mode, const char *home)
 	send(event(10, 124, 0));
 	limit(&lmode, &lcap, &lwaits, &lsync);
 	CHECK(lmode == 3 && lcap == 47, "two Right presses took 45 to %.1f, not 47", lcap);
-	send(event(10, 125, 0)); // to Disable frame limit
+	send(event(10, 125, 0)); // to Enable frame limit
 	send(event(10, 36, 0));
 	limit(&lmode, &lcap, &lwaits, &lsync);
-	CHECK(lcap == -1, "Return on Disable frame limit left a cap of %.1f", lcap);
+	CHECK(lcap == -1, "Return on Enable frame limit left a cap of %.1f", lcap);
 	send(event(10, 126, 0)); // back up to the limit
 	send(event(10, 124, 0));
 	limit(&lmode, &lcap, &lwaits, &lsync);
 	CHECK(lcap == -1 && [saved(home) containsString:@"BRIDGEPLAY_FPS_LIMIT=47\n"],
 	      "Right on a switched-off limit moved it (cap %.1f, %s)", lcap, saved(home).UTF8String);
-	send(event(10, 125, 0)); // to Disable frame limit
+	send(event(10, 125, 0)); // to Enable frame limit
 	send(event(10, 49, 0));
 	limit(&lmode, &lcap, &lwaits, &lsync);
 	CHECK(lcap == 47, "Space switched the limit back on at %.1f, not the kept 47", lcap);

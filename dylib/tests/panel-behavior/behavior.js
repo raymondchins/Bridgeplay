@@ -138,7 +138,7 @@ for (const form of Object.keys(FORMS)) {
   let L = fl('');
   t.ok(L.value.type === 'Slider' && L.value.props.min === 15 && L.value.props.max === 60 &&
        L.value.props.showValue === true && L.value.props.valueSuffix === ' FPS', "Steam's own slider, 15 to 60 FPS");
-  t.ok(L.sw.type === 'Toggle' && L.sw.props.label === 'Disable frame limit' && L.sw.props.className === 'MSCXRow',
+  t.ok(L.sw.type === 'Toggle' && L.sw.props.label === 'Enable frame limit' && L.sw.props.className === 'MSCXRow',
        'the switch is a row of its own');
   t.ok(L.off && L.dimmed && L.v === 60, 'no limit by default: switched off, the slider dimmed at the display rate');
   L = fl('BRIDGEPLAY_FPS_LIMIT=30');
@@ -166,21 +166,21 @@ for (const form of Object.keys(FORMS)) {
   fl('BRIDGEPLAY_FPS_LIMIT=45 BRIDGEPLAY_FPS_LIMIT_OFF=1').slide(30);
   t.ok(written.length === 0, 'a dimmed slider writes nothing');
   written.length = 0;
-  fl('WINEDEBUG=-all BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_PERF_OVERLAY=summary').toggle(true);
+  fl('WINEDEBUG=-all BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_PERF_OVERLAY=summary').enable(false);
   t.ok(/BRIDGEPLAY_FPS_LIMIT_OFF=1/.test(last()) && /BRIDGEPLAY_FPS_LIMIT=30 /.test(last()) &&
        last().includes('WINEDEBUG=-all') && last().includes('BRIDGEPLAY_PERF_OVERLAY=summary'),
-       `Disable frame limit keeps the value and the rest of the line (${last()})`);
+       `switching the limit off keeps the value and the rest of the line (${last()})`);
   written.length = 0;
-  fl('BRIDGEPLAY_FPS_LIMIT=45 BRIDGEPLAY_FPS_LIMIT_OFF=1').toggle(false);
+  fl('BRIDGEPLAY_FPS_LIMIT=45 BRIDGEPLAY_FPS_LIMIT_OFF=1').enable(true);
   t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT=45 %command%', `switching it back on keeps 45 (${last()})`);
   written.length = 0;
-  fl('').toggle(false);
+  fl('').enable(true);
   t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT=60 %command%', `switching on with no value takes the slider's (${last()})`);
   globalThis.MSCXFx = { g: { BRIDGEPLAY_FPS_LIMIT: '40' }, a: {}, e: {}, d: {} };
   L = fl('');
   t.ok(!L.off && L.v === 40, 'the Game Defaults limit shows');
   written.length = 0;
-  L.toggle(true);
+  L.enable(false);
   t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT_OFF=1 %command%', `switching a default limit off writes the switch (${last()})`);
   written.length = 0;
   fl('BRIDGEPLAY_FPS_LIMIT=30').slide(40);
@@ -189,7 +189,7 @@ for (const form of Object.keys(FORMS)) {
   L = fl('');
   t.ok(L.off && L.v === 40, 'a limit switched off in Game Defaults shows off at its value');
   written.length = 0;
-  L.toggle(false);
+  L.enable(true);
   t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT_OFF=0 %command%', `switching it on for this game writes 0 (${last()})`);
   globalThis.MSCXFx = { g: {}, a: { 287700: { BRIDGEPLAY_FPS_LIMIT: '40' } }, e: {}, d: {} };
   t.ok(fl('').v === 40, "the game's own conf limit shows");
@@ -415,7 +415,7 @@ for (const form of Object.keys(FORMS)) {
   let n = nnodes('');
   t.ok(P({ details: mac('') }) !== null && P({ details: mac('') }).props.className === 'MSCXPanel',
        'a mac build with nothing pinned renders the native panel');
-  t.ok(toggles(n).join(',') === 'Disable frame limit' && sections(n).join(',') === 'Performance,Frame,Scaling,Frame,Controllers',
+  t.ok(toggles(n).join(',') === 'Enable frame limit' && sections(n).join(',') === 'Performance,Frame,Scaling,Frame,Controllers',
        `the native panel has the overlay, the limit, the filter, frame generation and controllers only (${toggles(n)} / ${sections(n)})`);
   t.ok(n.filter(x => x.type === 'Dropdown').map(x => x === overlay(n) ? 'overlay' :
         x === filter(n) ? 'filter' : x.props.label).join(',') === 'overlay,filter,Mode,Controller layer' &&
@@ -428,7 +428,7 @@ for (const form of Object.keys(FORMS)) {
   t.ok(filter(nnodes('')).props.rgOptions[0].label === 'Automatic (as the game sets it)',
        'a native game is not told about Wine');
   written.length = 0;
-  limit(nnodes('-novid')).toggle(false);
+  limit(nnodes('-novid')).enable(true);
   t.ok(last() === NAT + ' BRIDGEPLAY_FPS_LIMIT=60 %command% -novid', `a native game gets the limit under np-native (${last()})`);
   written.length = 0;
   limit(nnodes(NAT + ' BRIDGEPLAY_FPS_LIMIT=60 %command% -novid')).slide(30);

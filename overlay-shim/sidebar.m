@@ -21,14 +21,14 @@
 #import <fcntl.h>
 #import <sys/stat.h>
 
-// The frame rate limit is a value and a switch, as on Steam Deck: the slider sets frames per
-// second from 15 to the display's rate, and Disable frame limit turns it off without losing
-// the slider's place.
-enum { sb_overlay, sb_limit, sb_limit_off, sb_filter, sb_rows };
+// The frame rate limit is a value and a switch: the slider sets frames per second from 15 to
+// the display's rate, and Enable frame limit applies it; switched off, the slider keeps its place.
+// The switch is saved as BRIDGEPLAY_FPS_LIMIT_OFF, 1 when off.
+enum { sb_overlay, sb_limit, sb_limit_on, sb_filter, sb_rows };
 
 static const char *const sb_keys[sb_rows] = { "BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_FPS_LIMIT",
 	                                      "BRIDGEPLAY_FPS_LIMIT_OFF", "BRIDGEPLAY_SCALING_FILTER" };
-static const char *const sb_titles[sb_rows] = { "Performance overlay", "Frame rate limit", "Disable frame limit",
+static const char *const sb_titles[sb_rows] = { "Performance overlay", "Frame rate limit", "Enable frame limit",
 	                                        "Scaling filter" };
 // The stepped and named choices; the limit's value is a number and its switch 0 or 1
 static const char *const sb_values[sb_rows][4] = {
@@ -181,9 +181,9 @@ static int sb_index(int row)
 		return ph_hud_locked ? -1 : atomic_load(&ph_level);
 	case sb_limit:
 		return -1;
-	case sb_limit_off:
-		// On with no value set too: there is no limit until one is switched on
-		return atomic_load(&fl_disabled) || atomic_load(&fl_mode) == fl_off;
+	case sb_limit_on:
+		// Off with no value set too: there is no limit until one is switched on
+		return !atomic_load(&fl_disabled) && atomic_load(&fl_mode) != fl_off;
 	default:
 		return atomic_load(&sf_mode);
 	}
@@ -266,7 +266,7 @@ static int sb_apply(const char *key, const char *value)
 				ok = perfhud_set_level(i);
 	} else if (strcmp(key, sb_keys[sb_limit]) == 0) {
 		ok = framelimit_set(value, host);
-	} else if (strcmp(key, sb_keys[sb_limit_off]) == 0) {
+	} else if (strcmp(key, sb_keys[sb_limit_on]) == 0) {
 		ok = framelimit_set_off(value, host);
 	} else if (strcmp(key, sb_keys[sb_filter]) == 0) {
 		ok = scalefilter_set(value, host);
@@ -294,31 +294,36 @@ static CGColorRef sb_gray(double alpha);
 #define sb_head_mid 38.0     // title line
 #define sb_power_mid 76.0    // battery line
 #define sb_power_bar 92.0    // battery gauge
-#define sb_rows_top 128.0
-#define sb_row_lead 10.0     // a row's band (focus tint, clicks) starts this far above its top
+#define sb_rows_top 118.0    // the first row's card
 #define sb_tint_inset 10.0   // the focus tint's inset from the panel's sides
-#define sb_title_mid 12.0    // a row's title line, from the row's top
-#define sb_track_mid 42.0    // slider track centre
-#define sb_stops_mid 64.0    // slider stop labels
+// A row is a card (the focus tint, the click target) with sb_card_pad inside it on every side,
+// measured to the text's capitals, the same as the inset its text has from the card's sides
+// (sb_pad - sb_tint_inset). Offsets below are from the card's top.
+#define sb_card_pad 12.0
+#define sb_title_mid 17.0    // a row's title line
+#define sb_track_mid 40.0    // slider track centre
+#define sb_stops_mid 60.0    // slider stop and range labels
 #define sb_hit_above 18.0    // a press this far above the track to below its labels picks a stop
 #define sb_hit_below 32.0
-#define sb_seg_top 28.0      // selector
+#define sb_seg_top 32.0      // selector
 #define sb_seg_h 32.0
-#define sb_note_mid 72.0     // the selector's measured note
+#define sb_note_mid 76.0     // the selector's measured note
+#define sb_switch_mid 20.0   // a switch row's title and switch
 #define sb_thumb_r 8.0
 #define sb_inset 9.0         // stops start this far in, so the end thumbs stay inside
 #define sb_switch_w 32.0
 #define sb_switch_h 18.0
+#define sb_group_gap 6.0     // between settings; a switch stays with the slider it belongs to
 
-// Each row's height; the switch is one line, under the slider it belongs to. Together they fit
-// a 480 pt-tall window.
-static const double sb_row_heights[sb_rows] = { 88, 80, 44, 88 };
+// Each row's card height, and the gap after it. Together they fit a 480 pt-tall window.
+static const double sb_row_heights[sb_rows] = { 76, 76, 40, 92 };
+static const double sb_row_gaps[sb_rows] = { sb_group_gap, 0, sb_group_gap, 0 };
 
 static double sb_row_top(int row)
 {
 	double top = sb_rows_top;
 	for (int i = 0; i < row; i++)
-		top += sb_row_heights[i];
+		top += sb_row_heights[i] + sb_row_gaps[i];
 	return top;
 }
 
@@ -472,12 +477,13 @@ static void sb_draw_range(CGContextRef ctx, double w, double h, double top, int 
 		CGPathRelease(path);
 	}
 	sb_draw_thumb(ctx, h, xp, cy, disabled);
+	// The two ends named under them, where the thumb sits at 15 and at the display's rate
 	char lo[8], hi[8];
 	snprintf(lo, sizeof(lo), "%d", fl_min_fps);
 	snprintf(hi, sizeof(hi), "%d", maxv);
 	double mid = top + sb_stops_mid;
-	ph_text(ctx, h, sb_pad, ph_centred(mid, sb_f.stop), lo, sb_f.stop, ph_style.fg3, 0);
-	sb_text_right(ctx, h, w - sb_pad, mid, hi, sb_f.stop, ph_style.fg3);
+	ph_text(ctx, h, x0 - ph_width(lo, sb_f.stop, 0) / 2, ph_centred(mid, sb_f.stop), lo, sb_f.stop, ph_style.fg3, 0);
+	ph_text(ctx, h, x1 - ph_width(hi, sb_f.stop, 0) / 2, ph_centred(mid, sb_f.stop), hi, sb_f.stop, ph_style.fg3, 0);
 }
 
 // A switch at the row's right, in the app's switch blue when on
@@ -533,10 +539,11 @@ static void sb_draw_slider(CGContextRef ctx, double w, double h, double top, int
 		const char *label = sb_labels[row][pick[k]];
 		CTFontRef font = k == pos ? sb_f.stop_on : sb_f.stop;
 		double tw = ph_width(label, font, 0), lx = sb_stop_x(w, k, n) - tw / 2;
-		if (lx < sb_pad - 4)
-			lx = sb_pad - 4;
-		if (lx + tw > w - sb_pad + 4)
-			lx = w - sb_pad + 4 - tw;
+		// Inside the card's padding, as every other label is
+		if (lx < sb_pad)
+			lx = sb_pad;
+		if (lx + tw > w - sb_pad)
+			lx = w - sb_pad - tw;
 		CGColorRef color = disabled ? ph_style.fg3 : k == pos || k == hover ? ph_style.fg : ph_style.fg3;
 		ph_text(ctx, h, lx, ph_centred(mid, font), label, font, color, 0);
 	}
@@ -584,14 +591,14 @@ static void sb_draw_row(CGContextRef ctx, double w, double h, int row)
 {
 	double top = sb_row_top(row);
 	int focused = row == sb_row;
-	int disabled = (row == sb_overlay && ph_hud_locked) || (row == sb_limit && sb_index(sb_limit_off) == 1);
+	int disabled = (row == sb_overlay && ph_hud_locked) || (row == sb_limit && sb_index(sb_limit_on) == 0);
 	// Focus: one tint behind the whole row, the same for every kind of control
 	if (focused)
-		sb_fill_round(ctx, sb_rect(h, sb_tint_inset, top - sb_row_lead, w - 2 * sb_tint_inset, sb_row_heights[row]),
-		              10, 1, 1, 1, 0.05);
+		sb_fill_round(ctx, sb_rect(h, sb_tint_inset, top, w - 2 * sb_tint_inset, sb_row_heights[row]), 10,
+		              1, 1, 1, 0.05);
 	char readout[48];
 	sb_readout(row, readout, sizeof(readout));
-	double mid = top + sb_title_mid;
+	double mid = top + (row == sb_limit_on ? sb_switch_mid : sb_title_mid);
 	ph_text(ctx, h, sb_pad, ph_centred(mid, sb_f.row), sb_titles[row], sb_f.row, focused ? ph_style.fg : ph_style.fg2,
 	        -0.1);
 	if (readout[0])
@@ -600,8 +607,8 @@ static void sb_draw_row(CGContextRef ctx, double w, double h, int row)
 		sb_draw_selector(ctx, w, h, top, row);
 	} else if (row == sb_limit) {
 		sb_draw_range(ctx, w, h, top, disabled);
-	} else if (row == sb_limit_off) {
-		sb_draw_switch(ctx, w, h, mid, sb_index(row) == 1);
+	} else if (row == sb_limit_on) {
+		sb_draw_switch(ctx, w, h, mid, sb_index(row));
 	} else if (disabled) {
 		// The Metal HUD is the game's only overlay: say where it is changed instead of a slider
 		// that cannot move
@@ -660,13 +667,13 @@ static void sb_draw(CGContextRef ctx, double w, double h)
 		ph_text(ctx, h, sb_pad, ph_centred(sb_power_mid, sb_f.small), "No battery or power reading on this Mac",
 		        sb_f.small, ph_style.fg3, 0);
 	}
-	sb_hairline(ctx, h, sb_pad, sb_rows_top - sb_row_lead - 8, w - 2 * sb_pad);
+	sb_hairline(ctx, h, sb_pad, sb_rows_top - 8, w - 2 * sb_pad);
 
 	for (int row = 0; row < sb_rows; row++)
 		sb_draw_row(ctx, w, h, row);
 
 	// Right under the settings, where the eye is after a change
-	double foot = sb_row_top(sb_rows) - sb_row_lead + 8;
+	double foot = sb_row_top(sb_rows - 1) + sb_row_heights[sb_rows - 1] + 8;
 	sb_hairline(ctx, h, sb_pad, foot, w - 2 * sb_pad);
 	ph_text(ctx, h, sb_pad, ph_centred(foot + 22, sb_f.small),
 	        sb_status[0] ? sb_status : "Changes apply now and are saved for this game.", sb_f.small,
@@ -838,7 +845,7 @@ static void sb_show(void)
 // The limit at v frames per second, from the slider: not while it is switched off
 static void sb_set_limit(int v)
 {
-	if (sb_index(sb_limit_off) == 1)
+	if (sb_index(sb_limit_on) == 0)
 		return;
 	int top = framelimit_max();
 	v = v < fl_min_fps ? fl_min_fps : v > top ? top : v;
@@ -849,12 +856,12 @@ static void sb_set_limit(int v)
 	sb_apply(sb_keys[sb_limit], value);
 }
 
-// Disable frame limit: off keeps the value; on with no value yet takes the slider's, the
+// Enable frame limit: off keeps the value; on with no value yet takes the slider's, the
 // display's rate
 static void sb_toggle_limit(void)
 {
-	if (sb_index(sb_limit_off) == 0) {
-		sb_apply(sb_keys[sb_limit_off], "1");
+	if (sb_index(sb_limit_on) == 1) {
+		sb_apply(sb_keys[sb_limit_on], "1");
 		return;
 	}
 	if (atomic_load(&fl_mode) == fl_off) {
@@ -863,7 +870,7 @@ static void sb_toggle_limit(void)
 		sb_apply(sb_keys[sb_limit], value);
 	}
 	if (atomic_load(&fl_disabled))
-		sb_apply(sb_keys[sb_limit_off], "0");
+		sb_apply(sb_keys[sb_limit_on], "0");
 }
 
 // Left and Right move along the control as drawn, the limit by one frame per second; Return
@@ -877,7 +884,7 @@ static void sb_step(int row, int delta)
 			sb_set_limit(framelimit_value() + delta);
 		return;
 	}
-	if (row == sb_limit_off) {
+	if (row == sb_limit_on) {
 		sb_toggle_limit();
 		return;
 	}
@@ -934,14 +941,14 @@ static int sb_hit(double x, double y, int *row_out)
 {
 	int row = -1;
 	for (int i = 0; i < sb_rows; i++)
-		if (y >= sb_row_top(i) - sb_row_lead && y < sb_row_top(i + 1) - sb_row_lead)
+		if (y >= sb_row_top(i) && y < sb_row_top(i) + sb_row_heights[i])
 			row = i;
 	*row_out = -1;
 	if (x < 0 || x > sb_width || row < 0)
 		return -1;
 	*row_out = row;
 	double top = sb_row_top(row);
-	if (row == sb_limit_off)
+	if (row == sb_limit_on)
 		return 0;
 	if (row == sb_filter) {
 		double seg_top = top + sb_seg_top;
@@ -971,7 +978,7 @@ static void sb_click(id event)
 	if (row == sb_filter) {
 		if (k >= 0 && k != sb_index(row))
 			sb_apply(sb_keys[row], sb_values[row][k]);
-	} else if (row == sb_limit_off) {
+	} else if (row == sb_limit_on) {
 		sb_toggle_limit();
 	} else if (row == sb_limit && k >= 0) {
 		// A press on the track sets the value under it and starts a drag
@@ -992,7 +999,7 @@ static void sb_hover(id event)
 	int row = -1, k = -1;
 	if (sb_point(event, &x, &y))
 		k = sb_hit(x, y, &row);
-	if ((row == sb_overlay && ph_hud_locked) || row == sb_limit || row == sb_limit_off)
+	if ((row == sb_overlay && ph_hud_locked) || row == sb_limit || row == sb_limit_on)
 		k = -1;
 	if (k < 0)
 		row = -1;

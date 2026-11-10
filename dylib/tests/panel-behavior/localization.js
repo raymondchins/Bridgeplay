@@ -40,7 +40,7 @@ for (const form of Object.keys(FORMS)) {
       // The limit is a slider in FPS, which needs no words, and its switch, which does
       assert(nodes.some(n => n.type === 'Slider' && n.props.valueSuffix === ' FPS'));
       assert(nodes.some(n => n.type === 'Toggle' &&
-        n.props.label === t('Disable frame limit', '停用帧率限制', 'Disattiva limite di fotogrammi')));
+        n.props.label === t('Enable frame limit', '启用帧率限制', 'Attiva limite di fotogrammi')));
       assert.deepEqual(dropdowns[1].props.rgOptions.map(o => o.label), [t('Off', '关闭', 'Disattivato'), 'FPS',
         t('Summary (FPS, frame time, CPU, GPU, memory, battery)', '摘要（FPS、帧时间、CPU、GPU、内存、电池）',
           'Riepilogo (FPS, tempo per fotogramma, CPU, GPU, memoria, batteria)'),

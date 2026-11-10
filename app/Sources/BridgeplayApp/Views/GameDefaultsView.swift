@@ -136,19 +136,20 @@ struct GameDefaultsView: View {
     private func toggleRow(_ setting: GameDefaults.Setting) -> some View {
         StatusRow(title: Self.title(setting), value: caption(setting), menu: resetActions(setting),
                   toggle: Binding(get: { isOn(setting) }, set: { on in
-                      if setting == .frameLimitOff { setLimitOff(on) } else { save(setting, on ? "1" : "0") }
+                      if setting == .frameLimitOff { setLimitOff(!on) } else { save(setting, on ? "1" : "0") }
                   }))
     }
 
+    // Enable Frame Limit shows on when the limit applies, the opposite of FPS_LIMIT_OFF.
     private func isOn(_ setting: GameDefaults.Setting) -> Bool {
-        setting == .frameLimitOff ? limitOff : resolved(setting).value == "1"
+        setting == .frameLimitOff ? !limitOff : resolved(setting).value == "1"
     }
 
     // MARK: Frame rate limit
     //
-    // As on Steam Deck: a slider in whole frames per second from 15 to the fastest display's
-    // rate, and Disable Frame Limit under it, which turns the limit off without losing the
-    // slider's value and dims the slider. overlay-shim holds the limit to the display a game is on.
+    // A slider in whole frames per second from 15 to the fastest display's rate, and Enable
+    // Frame Limit under it, which applies it; switched off, the slider dims and keeps its value.
+    // overlay-shim holds the limit to the display a game is on.
 
     private var maxFPS: Int {
         min(360, max(GameDefaults.minFrameLimit, NSScreen.screens.map(\.maximumFramesPerSecond).max() ?? 60))
@@ -172,8 +173,9 @@ struct GameDefaultsView: View {
                     .monospacedDigit()
                     .foregroundStyle(limitOff ? .tertiary : .secondary)
             }
+            // Whole numbers come from rounding, not step:, which draws a tick for every one of them
             Slider(value: Binding(get: { limitDraft ?? Double(limitValue) }, set: { limitDraft = $0.rounded() }),
-                   in: Double(GameDefaults.minFrameLimit)...Double(maxFPS), step: 1) {
+                   in: Double(GameDefaults.minFrameLimit)...Double(maxFPS)) {
                 Text(Self.title(.frameLimit))
             } minimumValueLabel: {
                 Text(verbatim: "\(GameDefaults.minFrameLimit)")
@@ -397,7 +399,7 @@ struct GameDefaultsView: View {
         case .msync: "MSync"
         case .vsync: String(localized: "Force VSync")
         case .frameLimit: String(localized: "Frame Rate Limit")
-        case .frameLimitOff: String(localized: "Disable Frame Limit")
+        case .frameLimitOff: String(localized: "Enable Frame Limit")
         case .scalingFilter: String(localized: "Scaling Filter")
         case .frameGen: String(localized: "Frame Generation")
         case .frameGenQuality: String(localized: "Quality")
@@ -430,7 +432,7 @@ struct GameDefaultsView: View {
         case .msync: String(localized: "Automatic follows the engine.")
         case .vsync: String(localized: "Waits for the display even when a game turns VSync off.")
         case .frameLimit: String(localized: "Holds games to this many frames per second, from 15 up to the display's refresh rate, and waits for the display they are on. The display's refresh rate is not changed.")
-        case .frameLimitOff: String(localized: "No limit, and the slider keeps its value for when you switch it back on.")
+        case .frameLimitOff: String(localized: "Applies the limit above. Off, games run without one and the slider keeps its value.")
         case .scalingFilter: String(localized: "How a game's frames are scaled up to the screen when it draws fewer pixels, as with High Resolution off. Automatic keeps what Wine does there, sharp pixels; Linear smooths them.")
         case .frameGen, .frameGenQuality, .frameGenEngine: ""
         case .frameGenUI: String(localized: "Keeps static HUD and menus sharp.")

@@ -2498,6 +2498,28 @@
         }
       }
     },
+    "Applies the limit above. Off, games run without one and the slider keeps its value." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applica il limite qui sopra. Disattivato, i giochi girano senza limite e il cursore mantiene il suo valore."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Применяет ограничение выше. Если выключено, игры идут без ограничения, а ползунок сохраняет значение."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用上方的限制。关闭时游戏不受限制，滑块会保留其数值。"
+          }
+        }
+      }
+    },
     "Apply" : {
       "localizations" : {
         "it" : {
@@ -6178,50 +6200,6 @@
         }
       }
     },
-    "Disable Frame Limit" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Disattiva limite di fotogrammi"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Отключить ограничение частоты кадров"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "停用帧率限制"
-          }
-        }
-      }
-    },
-    "Disable frame limit" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Disattiva limite di fotogrammi"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Отключить ограничение частоты кадров"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "停用帧率限制"
-          }
-        }
-      }
-    },
     "Disable hidraw" : {
       "localizations" : {
         "it" : {
@@ -6702,6 +6680,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "DualSense、Xbox、GameSir 等手柄无需映射界面即可使用。游戏首次使用手柄时，请在“输入监控”中允许 Steam。"
+          }
+        }
+      }
+    },
+    "Enable Frame Limit" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva limite di fotogrammi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включить ограничение частоты кадров"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用帧率限制"
+          }
+        }
+      }
+    },
+    "Enable frame limit" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva limite di fotogrammi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включить ограничение частоты кадров"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用帧率限制"
           }
         }
       }
@@ -9874,28 +9896,6 @@
         }
       }
     },
-    "No limit, and the slider keeps its value for when you switch it back on." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nessun limite, e il cursore mantiene il suo valore per quando lo riattivi."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Без ограничения, а ползунок сохраняет значение на случай, если вы снова его включите."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不限制帧率，滑块会保留其数值，以便你重新开启时使用。"
-          }
-        }
-      }
-    },
     "No longer installed" : {
       "localizations" : {
         "it" : {
@@ -10182,6 +10182,28 @@
         }
       }
     },
+    "Off by default, so there is no limit. Switch it on to apply the slider's value; switched off again, the slider keeps it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattivato per impostazione predefinita, quindi senza limite. Attivalo per applicare il valore del cursore; disattivandolo di nuovo, il cursore lo mantiene."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "По умолчанию выключено, то есть ограничения нет. Включите, чтобы применить значение ползунка; при повторном выключении ползунок его сохраняет."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认关闭，即不限制帧率。开启后会应用滑块的数值；再次关闭时滑块会保留该数值。"
+          }
+        }
+      }
+    },
     "On" : {
       "localizations" : {
         "it" : {
@@ -10200,28 +10222,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开启"
-          }
-        }
-      }
-    },
-    "On by default, so there is no limit. Switch it off to use the slider; switching it on again keeps the slider's value." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Attivo per impostazione predefinita, quindi senza limite. Disattivalo per usare il cursore; riattivandolo, il cursore mantiene il suo valore."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "По умолчанию включено, то есть ограничения нет. Выключите его, чтобы использовать ползунок; при повторном включении значение ползунка сохраняется."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "默认开启，即不限制帧率。关闭它即可使用滑块；再次开启时会保留滑块的数值。"
           }
         }
       }

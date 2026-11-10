@@ -27,7 +27,7 @@ for (const form of Object.keys(FORMS)) {
 
   r = run('BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_PERF_OVERLAY=detailed %command%', { BRIDGEPLAY_FPS_LIMIT_OFF: '1' });
   t.ok(/BRIDGEPLAY_FPS_LIMIT_OFF=1/.test(r) && r.includes('BRIDGEPLAY_FPS_LIMIT=30') &&
-       r.includes('BRIDGEPLAY_PERF_OVERLAY=detailed'), `Disable frame limit from the game keeps the value (${r})`);
+       r.includes('BRIDGEPLAY_PERF_OVERLAY=detailed'), `switching the limit off in the game keeps the value (${r})`);
 
   r = run('BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_FPS_LIMIT_OFF=1 %command%', { BRIDGEPLAY_FPS_LIMIT: '47', BRIDGEPLAY_FPS_LIMIT_OFF: '0' });
   t.ok(r === 'BRIDGEPLAY_FPS_LIMIT=47 %command%' && written.length === 1,
@@ -56,7 +56,7 @@ for (const form of Object.keys(FORMS)) {
   r = run('BRIDGEPLAY_FPS_LIMIT=60 %command%', { BRIDGEPLAY_FPS_LIMIT: '30' });
   t.ok(r === '', `a pick matching Game Defaults drops the override (${JSON.stringify(r)})`);
   r = run('', { BRIDGEPLAY_FPS_LIMIT_OFF: '1' });
-  t.ok(r === 'BRIDGEPLAY_FPS_LIMIT_OFF=1 %command%', `Disable frame limit over a Game Defaults limit writes the switch (${r})`);
+  t.ok(r === 'BRIDGEPLAY_FPS_LIMIT_OFF=1 %command%', `switching off a Game Defaults limit writes the switch (${r})`);
   delete globalThis.MSCXFx;
 
   globalThis.MSCXFx = { g: {}, a: {}, e: {}, d: {}, ng: {}, na: {}, h: '/Users/me' };

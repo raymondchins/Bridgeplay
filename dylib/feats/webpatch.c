@@ -457,8 +457,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "s([[\"BRIDGEPLAY_PERF_OVERLAY\",pf(dv(\"BRIDGEPLAY_PERF_OVERLAY\"))===p?\"\":p]," \
     "[\"MTL_HUD_ENABLED\",(\"1\"===dv(\"MTL_HUD_ENABLED\"))===h?\"\":h?\"1\":\"0\"]])}})},\"pov\")," \
     /* The frame rate limit: a slider in whole frames per second from 15 to the fastest \
-       display's refresh rate (Fx.fm), and a switch that turns the limit off and keeps the \
-       slider's value (BRIDGEPLAY_FPS_LIMIT_OFF=1). overlay-shim clamps to the display the game \
+       display's refresh rate (Fx.fm), and Enable frame limit, which applies it; unchecked, the \
+       slider dims and keeps its value (BRIDGEPLAY_FPS_LIMIT_OFF=1). overlay-shim clamps to the display the game \
        is on, so a value from the game, which knows that display, is kept up to 360 even when \
        Fx.fm, read when Steam loaded this page, is lower. display and half from earlier releases show as the rate they give, 0 or no value \
        as no limit. Steam's slider is found by the name its export carries, so a renamed export \
@@ -472,7 +472,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "FL=(l,dl)=>{const n=lf(ev(\"BRIDGEPLAY_FPS_LIMIT\")),off=!n||ev(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",v=n||fm," \
     "set=(x,top)=>{x=Math.min(top||fm,Math.max(15,Math.round(+x)));if(!(x>=15))return;const b=dv(\"BRIDGEPLAY_FPS_LIMIT\");" \
     "s([[\"BRIDGEPLAY_FPS_LIMIT\",/^\\d+$/.test(b)&&+b===x?\"\":String(x)]])}," \
-    "tog=d=>{const b=dv(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",ps=[[\"BRIDGEPLAY_FPS_LIMIT_OFF\",d?(b?\"\":\"1\"):(b?\"0\":\"\")]];" \
+    "tog=on=>{const d=!on,b=dv(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",ps=[[\"BRIDGEPLAY_FPS_LIMIT_OFF\",d?(b?\"\":\"1\"):(b?\"0\":\"\")]];" \
     "d||n||ps.push([\"BRIDGEPLAY_FPS_LIMIT\",String(v)]);s(ps)}," \
     "R=[];for(let x=15;x<fm;x+=5)R.push(x);R.push(fm);R.indexOf(v)<0&&R.push(v);" \
     "return(0," RT ".jsxs)(" BARREL ".XY,{label:l,children:[(0," RT ".jsx)(\"div\",{className:off?\"MSCXDim\":\"\",children:" \
@@ -480,7 +480,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "npKey:\"BRIDGEPLAY_FPS_LIMIT\",npSet:x=>set(x,360),onChange:x=>{off||set(x)}}):" \
     "(0," RT ".jsx)(" BARREL ".m,{rgOptions:R.sort((a,b)=>a-b).map(x=>({data:x,label:x+\" FPS\"})),selectedOption:v," \
     "disabled:off,npKey:\"BRIDGEPLAY_FPS_LIMIT\",npSet:x=>set(x,360),onChange:o=>{off||set(o.data)}})})," \
-    "(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:dl,checked:off,npKey:\"BRIDGEPLAY_FPS_LIMIT_OFF\"," \
+    "(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:dl,checked:!off,npKey:\"BRIDGEPLAY_FPS_LIMIT_OFF\"," \
     "onChange:tog})]},\"fpl\")}," \
     /* The filter Core Animation scales the game's frames to the screen with. 0 leaves it as \
        Wine (nearest with High Resolution off) or a native game (linear) sets it. */ \
@@ -525,7 +525,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "PO(\"Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)\",[{data:\"0\",label:\"Off\"},{data:\"fps\",label:\"FPS\"}," \
     "{data:\"summary\",label:\"Summary (FPS, frame time, CPU, GPU, memory, battery)\"}," \
     "{data:\"detailed\",label:\"Detailed (adds a frame-time graph)\"},{data:\"hud\",label:\"Apple Metal HUD\"}])," \
-    "FL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\",\"Disable frame limit\")," \
+    "FL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\",\"Enable frame limit\")," \
     "SQ(\"Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)\",[" \
     "{data:\"0\",label:\"Automatic (as the game sets it)\"},{data:\"linear\",label:\"Linear (smooth)\"}," \
     "{data:\"nearest\",label:\"Nearest (sharp pixels at any scale)\"}," \
@@ -559,7 +559,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "{data:\"hud\",label:npL(\"Apple Metal HUD\",\"Apple Metal 性能监视器\",\"Metal HUD di Apple\")}])," \
     "FL(npL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\"," \
     "\"帧率限制（与显示器同步，不会更改其刷新率）\",\"Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)\")," \
-    "npL(\"Disable frame limit\",\"停用帧率限制\",\"Disattiva limite di fotogrammi\"))," \
+    "npL(\"Enable frame limit\",\"启用帧率限制\",\"Attiva limite di fotogrammi\"))," \
     "SQ(npL(\"Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)\"," \
     "\"缩放过滤（当游戏绘制的像素少于屏幕时生效，例如关闭高分辨率时）\"," \
     "\"Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)\"),[" \
@@ -602,8 +602,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "(t,ch)=>{let o=t.strLaunchOptions||\"\";const o0=o," \
     /* The sidebar's values only, as the route allows: never the Metal HUD, never display or \
        half. A menu is found by an option only it has, the frame limit's slider and switch by \
-       the npKey they carry. The limit goes before its switch, so a value set while the switch \
-       turns the limit off is kept. */ \
+       the npKey they carry (Enable frame limit is checked for BRIDGEPLAY_FPS_LIMIT_OFF=0). The \
+       limit goes before its switch, so a value set while the limit is switched off is kept. */ \
     "K={BRIDGEPLAY_PERF_OVERLAY:\"hud\",BRIDGEPLAY_SCALING_FILTER:\"integer\"}," \
     "V={BRIDGEPLAY_PERF_OVERLAY:[\"0\",\"fps\",\"summary\",\"detailed\"],BRIDGEPLAY_FPS_LIMIT_OFF:[\"0\",\"1\"]," \
     "BRIDGEPLAY_SCALING_FILTER:[\"0\",\"linear\",\"nearest\",\"integer\"]}," \
@@ -614,7 +614,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     ".forEach(k=>{if(!ch||!(k in ch)||!ok(k,ch[k]))return;" \
     "const d=find(MSCXOpts({details:Object.assign({},t,{strLaunchOptions:o}),write:(a,r)=>{o=r}})," \
     "p=>k in K?Array.isArray(p.rgOptions)&&p.rgOptions.some(z=>z.data===K[k]):p.npKey===k);if(!d)return;" \
-    "k===\"BRIDGEPLAY_FPS_LIMIT\"?d.npSet(+ch[k]):k===\"BRIDGEPLAY_FPS_LIMIT_OFF\"?d.onChange(ch[k]===\"1\"):d.onChange({data:ch[k]})});" \
+    "k===\"BRIDGEPLAY_FPS_LIMIT\"?d.npSet(+ch[k]):k===\"BRIDGEPLAY_FPS_LIMIT_OFF\"?d.onChange(ch[k]===\"0\"):d.onChange({data:ch[k]})});" \
     "if(o!==o0)SteamClient.Apps.SetAppLaunchOptions(t.unAppID,o);return o}"
 
 // One poll's changes, by appid. The route has already removed their files, so an app Steam

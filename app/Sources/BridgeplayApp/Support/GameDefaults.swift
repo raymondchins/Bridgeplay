@@ -35,7 +35,7 @@ enum GameDefaults {
         case msync
         case vsync
         case frameLimit
-        // Disable Frame Limit: off without losing frameLimit's value, as on Steam Deck.
+        // FPS_LIMIT_OFF, which Enable Frame Limit shows inverted: 1 is no limit, frameLimit's value kept.
         case frameLimitOff
         case scalingFilter
         case frameGen
@@ -299,7 +299,7 @@ enum GameDefaults {
         }
     }
 
-    // Disable Frame Limit shows on when the limit is switched off or none is set.
+    // The limit is off when it is switched off or none is set; Enable Frame Limit shows the opposite.
     static func frameLimitIsOff(limit: String?, off: String?) -> Bool {
         off == "1" || frameLimitValue(limit, maxFPS: 360) == nil
     }

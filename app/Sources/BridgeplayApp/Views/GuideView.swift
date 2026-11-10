@@ -104,8 +104,8 @@ struct GuideView: View {
             SteamBlock(title: String(localized: "Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)")) {
                 SteamRow(.slider("60 FPS", 1, true),
                          note: String(localized: "A slider in whole frames per second, from 15 up to your display's refresh rate, as on Steam Deck. The game waits for the display so frames land evenly: smoother pacing and less battery drain. On a game's own display a higher value counts as its refresh rate, and the display's own rate is never changed."))
-                SteamRow(.toggle(String(localized: "Disable frame limit"), true),
-                         note: String(localized: "On by default, so there is no limit. Switch it off to use the slider; switching it on again keeps the slider's value."))
+                SteamRow(.toggle(String(localized: "Enable frame limit"), false),
+                         note: String(localized: "Off by default, so there is no limit. Switch it on to apply the slider's value; switched off again, the slider keeps it."))
             }
 
             SteamBlock(title: String(localized: "Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)")) {
