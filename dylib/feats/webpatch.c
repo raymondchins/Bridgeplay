@@ -614,7 +614,9 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 #define NP_CX_SYNC \
     "globalThis.window&&window.appDetailsStore&&!globalThis.MSCXSyncOn&&" \
     "(globalThis.MSCXSyncOn=setInterval(()=>{if(typeof MSCXRoute!==\"function\"||globalThis.MSCXSyncBusy)return;" \
-    "globalThis.MSCXSyncBusy=1;MSCXRoute(\"NotProton.TakeQuickSettings#1\",0).then(j=>MSCXTake(JSON.parse(j||\"{}\")))" \
+    /* From a resolved promise, so a route that throws at once still reaches finally and clears busy. */ \
+    "globalThis.MSCXSyncBusy=1;Promise.resolve().then(()=>MSCXRoute(\"NotProton.TakeQuickSettings#1\",0))" \
+    ".then(j=>MSCXTake(JSON.parse(j||\"{}\")))" \
     ".catch(e=>console.warn(\"Bridgeplay: quick settings not saved\",e)).finally(()=>{globalThis.MSCXSyncBusy=0})},2000))"
 
 #define NP_CX_OPTIONS_COMPONENT \
