@@ -98,7 +98,7 @@ struct RootView: View {
                             .foregroundStyle(BP.fg3)
                             .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 6)
+                            .padding(.horizontal, 2)
                     }
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
@@ -173,8 +173,10 @@ struct RootView: View {
         .lineSpacing(2)
         .foregroundStyle(BP.fg3)
         .tint(BP.fg)
+        // The card's full width, so the credit wraps at word groups instead of leaving one word
+        // ("Toolkit.", "it") on a line of its own
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 2)
     }
 
     private var libraryCard: some View {
