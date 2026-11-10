@@ -86,11 +86,22 @@ static int connected = 1;
 
 __attribute__((visibility("default"))) id NSApp;
 
-// Wine's: GetCursorPos reads the cursor's place through it
-@interface WineApplicationController : NSObject
+// Wine's: GetCursorPos reads the cursor's place through it, and it keeps its own hidden flag
+@interface WineApplicationController : NSObject {
+@public
+	BOOL cursorHidden;
+}
++ (id)sharedController;
 - (CGPoint)flippedMouseLocation:(CGPoint)point;
 @end
 @implementation WineApplicationController
++ (id)sharedController
+{
+	static WineApplicationController *shared;
+	if (shared == nil)
+		shared = [WineApplicationController new];
+	return shared;
+}
 - (CGPoint)flippedMouseLocation:(CGPoint)point
 {
 	(void)point;
@@ -98,11 +109,20 @@ __attribute__((visibility("default"))) id NSApp;
 }
 @end
 
-static int tapped;
+static int tapped, tap_warps;
 @interface WineEventTapClipCursorHandler : NSObject
 - (CGEventRef)eventTapWithProxy:(CGEventTapProxy)proxy type:(CGEventType)type event:(CGEventRef)event;
+- (BOOL)warpCursorTo:(CGPoint *)to from:(const CGPoint *)from;
 @end
 @implementation WineEventTapClipCursorHandler
+// Wine records each warp here and takes it out of the next event's deltas
+- (BOOL)warpCursorTo:(CGPoint *)to from:(const CGPoint *)from
+{
+	(void)to;
+	(void)from;
+	tap_warps++;
+	return YES;
+}
 - (CGEventRef)eventTapWithProxy:(CGEventTapProxy)proxy type:(CGEventType)type event:(CGEventRef)event
 {
 	(void)proxy;
@@ -212,11 +232,22 @@ static int child(const char *path, const char *mode)
 	blank.name = @"blank";
 	NSCursor *crosshair = [NSCursor new];
 	crosshair.name = @"crosshair";
-	WineApplicationController *wine = [WineApplicationController new];
+	WineApplicationController *wine = [WineApplicationController sharedController];
 	cursor_at = CGPointMake(300, 200);
 	[blank set];
 
-	// Opening once puts the hooks in place, as AppKit coming up does in a game
+	// Wine hid the cursor before the hooks went in (they wait for NSApp): its own flag says so
+	[NSCursor hide];
+	wine->cursorHidden = YES;
+	CHECK(send(event(10, KEY_P, CMD | OPT)), "Option-Command-P did not open the quick settings");
+	CHECK(hides == 0, "a cursor Wine hid before the hooks went in stayed hidden (count %d)", hides);
+	CHECK(send(event(10, KEY_ESCAPE, 0)), "Escape did not close the quick settings");
+	CHECK(hides == 1, "closing did not hide again the cursor Wine hid early (count %d)", hides);
+	[NSCursor unhide];
+	wine->cursorHidden = NO;
+	CHECK(hides == 0, "Wine's unhide did not go through once the quick settings closed");
+
+	// Opening once more over a free cursor leaves it as it is
 	CHECK(send(event(10, KEY_P, CMD | OPT)), "Option-Command-P did not open the quick settings");
 	CHECK(send(event(10, KEY_ESCAPE, 0)), "Escape did not close the quick settings");
 	CHECK(hides == 0 && [cursor_name() isEqualToString:@"blank"] && connected,
@@ -239,6 +270,13 @@ static int child(const char *path, const char *mode)
 	CHECK(connected, "the mouse stayed disconnected from the cursor under the quick settings");
 	CHECK(CGRectIsEmpty(window->confinement), "the game's clip stayed on under the quick settings");
 
+	// Wine's clipping event tap moving the cursor keeps no record of a move not made
+	WineEventTapClipCursorHandler *tap = [WineEventTapClipCursorHandler new];
+	CGPoint tap_to = CGPointMake(305, 255);
+	CHECK([tap warpCursorTo:&tap_to from:NULL] && tap_warps == 0, "Wine's event tap recorded a warp under the quick settings");
+	CGPoint held = [wine flippedMouseLocation:CGPointZero];
+	CHECK(held.x == 305 && held.y == 255, "GetCursorPos did not follow the event tap's move: %.0f,%.0f", held.x, held.y);
+
 	// The game keeps asking each frame; none of it reaches the cursor
 	[NSCursor unhide];
 	[NSCursor hide];
@@ -257,7 +295,6 @@ static int child(const char *path, const char *mode)
 	CGPoint seen = [wine flippedMouseLocation:CGPointZero];
 	CHECK(seen.x == 310 && seen.y == 260, "GetCursorPos followed the cursor under the quick settings: %.0f,%.0f",
 	      seen.x, seen.y);
-	WineEventTapClipCursorHandler *tap = [WineEventTapClipCursorHandler new];
 	[tap eventTapWithProxy:NULL type:kCGEventMouseMoved event:NULL];
 	CHECK(tapped == 0, "Wine's clipping event tap moved the cursor under the quick settings");
 

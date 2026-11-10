@@ -30,6 +30,7 @@ static void (*ch_next_set)(id, SEL);
 static void (*ch_next_confine)(id, SEL, CGRect);
 static CGPoint (*ch_next_flipped)(id, SEL, CGPoint);
 static CGEventRef (*ch_next_tap)(id, SEL, CGEventTapProxy, CGEventType, CGEventRef);
+static BOOL (*ch_next_tap_warp)(id, SEL, CGPoint *, const CGPoint *);
 
 static CGPoint ch_location(void)
 {
@@ -45,11 +46,26 @@ static CGError (*ch_real_warp)(CGPoint) = CGWarpMouseCursorPosition;
 static CGError (*ch_real_associate)(boolean_t) = CGAssociateMouseAndMouseCursorPosition;
 static CGPoint (*ch_real_location)(void) = ch_location;
 
+// ch_taken changes under ch_lock, and the Quartz calls check it and act under it too, so a call
+// from another thread lands wholly before taking or after giving back
 static _Atomic int ch_taken;
 static _Atomic int ch_associated = 1; // as the game last asked
 static os_unfair_lock ch_lock = OS_UNFAIR_LOCK_INIT;
 static CGPoint ch_game_at; // where the game has the cursor while taken, under ch_lock
 static int ch_game_warped;
+
+// A move the game makes while taken: noted, not done
+static int ch_hold_warp(CGPoint point)
+{
+	os_unfair_lock_lock(&ch_lock);
+	int taken = atomic_load(&ch_taken);
+	if (taken) {
+		ch_game_at = point;
+		ch_game_warped = 1;
+	}
+	os_unfair_lock_unlock(&ch_lock);
+	return taken;
+}
 
 // Main thread only
 static int ch_installed;
@@ -134,28 +150,38 @@ static CGEventRef ch_tap(id handler, SEL sel, CGEventTapProxy proxy, CGEventType
 	return ch_next_tap(handler, sel, proxy, type, event);
 }
 
+// Wine's clipping event tap moves the cursor through here and keeps a record of each move, which
+// it takes out of the next event's deltas: a move that is not made must leave no record
+static BOOL ch_tap_warp(id handler, SEL sel, CGPoint *to, const CGPoint *from)
+{
+	if (to != NULL && ch_hold_warp(*to))
+		return YES;
+	return ch_next_tap_warp(handler, sel, to, from);
+}
+
 // Interposed: the shim comes in through DYLD_INSERT_LIBRARIES, so dyld binds every other image's
 // calls here, Wine's driver loaded later included. The shim's own calls reach Quartz.
 static CGError ch_warp(CGPoint point)
 {
-	if (!atomic_load(&ch_taken))
-		return ch_real_warp(point);
 	os_unfair_lock_lock(&ch_lock);
-	ch_game_at = point;
-	ch_game_warped = 1;
+	CGError err = kCGErrorSuccess;
+	if (!atomic_load(&ch_taken)) {
+		err = ch_real_warp(point);
+	} else {
+		ch_game_at = point;
+		ch_game_warped = 1;
+	}
 	os_unfair_lock_unlock(&ch_lock);
-	return kCGErrorSuccess;
+	return err;
 }
 
 static CGError ch_associate(boolean_t connected)
 {
-	if (atomic_load(&ch_taken)) {
-		atomic_store(&ch_associated, connected != 0);
-		return kCGErrorSuccess;
-	}
-	CGError err = ch_real_associate(connected);
+	os_unfair_lock_lock(&ch_lock);
+	CGError err = atomic_load(&ch_taken) ? kCGErrorSuccess : ch_real_associate(connected);
 	if (err == kCGErrorSuccess)
 		atomic_store(&ch_associated, connected != 0);
+	os_unfair_lock_unlock(&ch_lock);
 	return err;
 }
 
@@ -188,9 +214,23 @@ static void cursor_install(void)
 	                        (IMP *)&ch_next_confine);
 	int wine = interpose(objc_getClass("WineApplicationController"), "flippedMouseLocation:", (IMP)ch_flipped,
 	                     (IMP *)&ch_next_flipped);
-	int tap = interpose(objc_getClass("WineEventTapClipCursorHandler"), "eventTapWithProxy:type:event:",
-	                    (IMP)ch_tap, (IMP *)&ch_next_tap);
-	shim_log("overlay_shim cursor: hooks cursor=%d/3 confinement=%d wine=%d tap=%d\n", hooked, confine, wine, tap);
+	Class tap_class = objc_getClass("WineEventTapClipCursorHandler");
+	int tap = interpose(tap_class, "eventTapWithProxy:type:event:", (IMP)ch_tap, (IMP *)&ch_next_tap);
+	tap += interpose(tap_class, "warpCursorTo:from:", (IMP)ch_tap_warp, (IMP *)&ch_next_tap_warp);
+	shim_log("overlay_shim cursor: hooks cursor=%d/3 confinement=%d wine=%d tap=%d/2\n", hooked, confine, wine, tap);
+}
+
+// Wine's own flag, for a hide made before the hooks went in: they wait for NSApp, on a main-queue
+// pass that can come after Wine's first window. Wine hides once, however often it is asked.
+static int ch_wine_hidden(void)
+{
+	Class wine = objc_getClass("WineApplicationController");
+	Ivar flag = wine != Nil ? class_getInstanceVariable(wine, "cursorHidden") : NULL;
+	const char *type = flag != NULL ? ivar_getTypeEncoding(flag) : NULL;
+	if (type == NULL || (strcmp(type, "c") != 0 && strcmp(type, "B") != 0))
+		return 0;
+	id controller = ch_send((id)wine, "sharedController");
+	return controller != nil && *((const char *)controller + ivar_getOffset(flag)) != 0;
 }
 
 // The game's clip on each window that has one is noted and let go
@@ -224,8 +264,12 @@ static void cursor_take(void)
 	os_unfair_lock_lock(&ch_lock);
 	ch_game_at = at;
 	ch_game_warped = 0;
-	os_unfair_lock_unlock(&ch_lock);
 	atomic_store(&ch_taken, 1);
+	os_unfair_lock_unlock(&ch_lock);
+	if (ch_hides == 0 && ch_wine_hidden()) {
+		shim_log("overlay_shim cursor: Wine hid the cursor before the hooks were in\n");
+		ch_hides = 1;
+	}
 
 	ch_release_confinement();
 	if (!atomic_load(&ch_associated))
@@ -249,9 +293,9 @@ static void cursor_give_back(void)
 {
 	if (!atomic_load(&ch_taken))
 		return;
-	atomic_store(&ch_taken, 0);
 	Class cursor = objc_getClass("NSCursor");
 	os_unfair_lock_lock(&ch_lock);
+	atomic_store(&ch_taken, 0);
 	CGPoint at = ch_game_at;
 	int warped = ch_game_warped;
 	os_unfair_lock_unlock(&ch_lock);
