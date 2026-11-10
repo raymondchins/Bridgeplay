@@ -54,7 +54,7 @@ import Testing
         #expect(GameDefaults.problems(in: "FPS_LIMIT=5\n").map(\.setting) == [.frameLimit])
     }
 
-    @Test func theScalingFilterIsLinearUnlessSet() {
+    @Test func theScalingFilterIsAutomaticUnlessSet() {
         #expect(GameDefaults.resolve(.scalingFilter, user: "", shipped: "") == .init(value: "0", source: .engine))
         #expect(GameDefaults.value(.scalingFilter, in: "BRIDGEPLAY_SCALING_FILTER=integer\n") == "integer")
         #expect(GameDefaults.refusal("linear", for: .scalingFilter) == nil)

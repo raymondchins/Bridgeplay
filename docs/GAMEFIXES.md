@@ -38,8 +38,8 @@ is the value. The files are never run as shell code. A file over 64 KiB is ignor
 is rejected, and the rejection logged, when:
 
 - the key is not on the list below (`RETINA`, `STDOUT_NULL`, `VSYNC`, `HIDE_WINE_EXPORTS`,
-  `FRAMEGEN` and the `FRAMEGEN_*` keys also accept their `BRIDGEPLAY_` name, such as
-  `BRIDGEPLAY_RETINA=1`; `BACKEND` does not)
+  `FRAMEGEN`, the `FRAMEGEN_*` keys, `PERF_OVERLAY`, `FPS_LIMIT` and `SCALING_FILTER` also
+  accept their `BRIDGEPLAY_` name, such as `BRIDGEPLAY_RETINA=1`; `BACKEND` does not)
 - the value contains a backtick, `$(`, a quote or a control character, or is over 1024 characters
 
 | Key | Values | Effect |
