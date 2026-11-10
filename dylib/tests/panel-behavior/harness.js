@@ -39,10 +39,12 @@ function panel(emit, form, globals = Object.assign(Object.create(globalThis),
   };
   const build = new Function(names[0], names[1], 'SteamClient', 'globalThis',
     src + '\nreturn { MSCXOpts, MSCXApply: typeof MSCXApply === "function" ? MSCXApply : null,' +
+    ' MSCXTake: typeof MSCXTake === "function" ? MSCXTake : null,' +
     ' MSCXPick: typeof MSCXPick === "function" ? MSCXPick : null,' +
     ' MSCXToolQuery: typeof MSCXToolQuery === "function" ? MSCXToolQuery : null };');
-  const { MSCXOpts, MSCXApply, MSCXPick, MSCXToolQuery } = build(react, barrel, SteamClient, globals);
-  return { render: MSCXOpts, apply: MSCXApply, pick: MSCXPick, toolQuery: MSCXToolQuery, written };
+  const { MSCXOpts, MSCXApply, MSCXTake, MSCXPick, MSCXToolQuery } = build(react, barrel, SteamClient, globals);
+  return { render: MSCXOpts, apply: MSCXApply, take: MSCXTake, pick: MSCXPick, toolQuery: MSCXToolQuery, written,
+           globals };
 }
 
 // Function components are resolved rather than recorded, so a check sees the nodes the

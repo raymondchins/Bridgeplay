@@ -89,7 +89,9 @@ static void scalefilter_note(id layer)
 
 	[layer retain];
 	dispatch_async(dispatch_get_main_queue(), ^{
-		sf_apply((CAMetalLayer *)layer);
+		// The quick settings may have put Automatic back since this was queued
+		if (atomic_load(&sf_mode) != sf_default)
+			sf_apply((CAMetalLayer *)layer);
 		[layer release];
 		atomic_store(&sf_pending, 0);
 	});

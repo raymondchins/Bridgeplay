@@ -83,8 +83,9 @@ static int qs_read_file(int fd, char *pairs, size_t cap) {
     return count;
 }
 
-int np_quick_settings_take(const char *dir, char *json, size_t cap) {
+int np_quick_settings_take(const char *dir, time_t since, char *json, size_t cap, int *stale) {
     size_t len = 0;
+    if (stale) *stale = 0;
     if (cap < 3) return -1;
     json[0] = '\0';
     qs_append(json, cap, &len, "{");
@@ -103,8 +104,10 @@ int np_quick_settings_take(const char *dir, char *json, size_t cap) {
             int fd = open(taken, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
             char pairs[512];
             struct stat st;
-            int count = fd >= 0 && fstat(fd, &st) == 0 && S_ISREG(st.st_mode)
-                ? qs_read_file(fd, pairs, sizeof pairs) : 0;
+            int regular = fd >= 0 && fstat(fd, &st) == 0 && S_ISREG(st.st_mode);
+            int fresh = regular && st.st_mtime >= since;
+            if (regular && !fresh && stale) (*stale)++;
+            int count = fresh ? qs_read_file(fd, pairs, sizeof pairs) : 0;
             if (fd >= 0) close(fd);
             unlink(taken);
             if (!count) continue;

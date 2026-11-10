@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/sysctl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/file.h>
@@ -484,6 +485,20 @@ static int open_prefix_log(uintptr_t request, uintptr_t response) {
     return answer_json(response, appid, opened ? "{\"opened\":true}" : "{\"error\":\"log\"}");
 }
 
+// When this Steam process started: a change a game left before then was written under an
+// earlier Steam session, maybe another account's, so it is not saved into this one's.
+static time_t steam_started(void) {
+    static time_t started;
+    if (!started) {
+        struct kinfo_proc info;
+        size_t size = sizeof info;
+        int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
+        started = sysctl(mib, 4, &info, &size, NULL, 0) == 0 && size == sizeof info
+            ? info.kp_proc.p_starttime.tv_sec : time(NULL);
+    }
+    return started;
+}
+
 // Polled by the page every couple of seconds; any appid in the request is ignored.
 static int take_quick_settings(uintptr_t request, uintptr_t response) {
     (void)request;
@@ -491,7 +506,9 @@ static int take_quick_settings(uintptr_t request, uintptr_t response) {
     if (!home) return RESULT_FAIL;
     char dir[PATH_MAX], json[STATE_JSON_MAX];
     np_support_path(dir, sizeof dir, home, "quick-settings");
-    int apps = np_quick_settings_take(dir, json, sizeof json);
+    int stale = 0;
+    int apps = np_quick_settings_take(dir, steam_started(), json, sizeof json, &stale);
+    if (stale > 0) NP_LOG("compatsvc: dropped %d quick settings change(s) left from an earlier Steam session", stale);
     if (apps < 0) return RESULT_FAIL;
     if (apps > 0) NP_LOG("compatsvc: quick settings from %d game(s): %s", apps, json);
     return answer_json(response, 0, json);

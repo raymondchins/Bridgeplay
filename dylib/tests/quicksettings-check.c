@@ -3,6 +3,7 @@
 #include "../feats/quicksettings.c"
 
 #include <stdlib.h>
+#include <sys/time.h>
 
 static int failed;
 
@@ -34,32 +35,32 @@ int main(void) {
     if (!dir) return 1;
     char json[2048];
 
-    np_quick_settings_take("/nonexistent/quick-settings", json, sizeof json);
+    np_quick_settings_take("/nonexistent/quick-settings", 0, json, sizeof json, NULL);
     is("a missing folder answers an empty object", "{}", json);
 
     put(dir, "3372060.conf", "BRIDGEPLAY_FPS_LIMIT=30\nBRIDGEPLAY_PERF_OVERLAY=summary\r\n");
-    int n = np_quick_settings_take(dir, json, sizeof json);
+    int n = np_quick_settings_take(dir, 0, json, sizeof json, NULL);
     is("a game's changes come back as JSON", "{\"3372060\":{\"BRIDGEPLAY_FPS_LIMIT\":\"30\","
        "\"BRIDGEPLAY_PERF_OVERLAY\":\"summary\"}}", json);
     is("one app", "1", n == 1 ? "1" : "other");
     is("and the file is gone", "no", exists(dir, "3372060.conf") ? "yes" : "no");
-    np_quick_settings_take(dir, json, sizeof json);
+    np_quick_settings_take(dir, 0, json, sizeof json, NULL);
     is("so a second poll finds nothing", "{}", json);
 
     put(dir, "42.conf", "BRIDGEPLAY_FPS_LIMIT=45\nBRIDGEPLAY_SCALING_FILTER=fsr\nPATH=/evil\n"
         "DYLD_INSERT_LIBRARIES=/x\nBRIDGEPLAY_SCALING_FILTER=integer\nnot a line\n");
-    np_quick_settings_take(dir, json, sizeof json);
+    np_quick_settings_take(dir, 0, json, sizeof json, NULL);
     is("only menu values of the three keys pass", "{\"42\":{\"BRIDGEPLAY_SCALING_FILTER\":\"integer\"}}", json);
 
     put(dir, "43.conf", "BRIDGEPLAY_FPS_LIMIT=5\n");
-    np_quick_settings_take(dir, json, sizeof json);
+    np_quick_settings_take(dir, 0, json, sizeof json, NULL);
     is("a file with nothing allowed is dropped", "{}", json);
     is("and removed", "no", exists(dir, "43.conf") ? "yes" : "no");
 
     put(dir, "notes.conf", "BRIDGEPLAY_FPS_LIMIT=30\n");
     put(dir, "007.conf", "BRIDGEPLAY_FPS_LIMIT=30\n");
     put(dir, "12345678901.conf", "BRIDGEPLAY_FPS_LIMIT=30\n");
-    np_quick_settings_take(dir, json, sizeof json);
+    np_quick_settings_take(dir, 0, json, sizeof json, NULL);
     is("names that are not an appid are ignored", "{}", json);
     is("and left in place", "yes", exists(dir, "notes.conf") && exists(dir, "007.conf") ? "yes" : "no");
 
@@ -67,8 +68,23 @@ int main(void) {
     snprintf(target, sizeof target, "%s/notes.conf", dir);
     snprintf(link, sizeof link, "%s/99.conf", dir);
     symlink(target, link);
-    np_quick_settings_take(dir, json, sizeof json);
+    np_quick_settings_take(dir, 0, json, sizeof json, NULL);
     is("a link is not followed", "{}", json);
+
+    put(dir, "44.conf", "BRIDGEPLAY_FPS_LIMIT=30\n");
+    char old_path[1024];
+    snprintf(old_path, sizeof old_path, "%s/44.conf", dir);
+    struct timeval then[2] = { { time(NULL) - 3600, 0 }, { time(NULL) - 3600, 0 } };
+    utimes(old_path, then);
+    int stale = 0;
+    np_quick_settings_take(dir, time(NULL) - 60, json, sizeof json, &stale);
+    is("a change left from an earlier Steam session is not handed on", "{}", json);
+    is("it is counted", "1", stale == 1 ? "1" : "other");
+    is("and removed", "no", exists(dir, "44.conf") ? "yes" : "no");
+    put(dir, "45.conf", "BRIDGEPLAY_FPS_LIMIT=30\n");
+    np_quick_settings_take(dir, time(NULL) - 60, json, sizeof json, &stale);
+    is("one written in this session still is", "{\"45\":{\"BRIDGEPLAY_FPS_LIMIT\":\"30\"}}", json);
+    is("and nothing is counted stale", "0", stale == 0 ? "0" : "other");
 
     is("allowed: overlay off", "1", np_quick_settings_allowed("BRIDGEPLAY_PERF_OVERLAY", "0") ? "1" : "0");
     is("refused: the Metal HUD is not a sidebar choice", "0",

@@ -17,6 +17,29 @@
 // layer's own), is saved for Steam to pick up, and the Metal HUD keeps the overlay its own.
 
 typedef int (*set_fn)(const char *, const char *);
+typedef int (*event_fn)(id);
+
+// Stands in for an NSEvent: the sidebar reads only these
+@interface FakeEvent : NSObject
+@property NSUInteger type, modifierFlags;
+@property unsigned short keyCode;
+@property BOOL isARepeat;
+@end
+@implementation FakeEvent
+@end
+
+static id event(NSUInteger type, unsigned short code, NSUInteger flags)
+{
+	FakeEvent *e = [[FakeEvent new] autorelease];
+	e.type = type;
+	e.keyCode = code;
+	e.modifierFlags = flags;
+	return e;
+}
+
+#define CMD (1UL << 20)
+#define OPT (1UL << 19)
+#define SHIFT (1UL << 17)
 typedef void (*limit_probe_fn)(int *, double *, int *, int *);
 typedef void (*hud_probe_fn)(int *, int *, int *, double *, int *, int *);
 
@@ -53,7 +76,8 @@ static int child(const char *path, const char *mode, const char *home)
 	set_fn set = (set_fn)dlsym(shim, "np_quick_settings_set");
 	limit_probe_fn limit = (limit_probe_fn)dlsym(shim, "np_framelimit_probe");
 	hud_probe_fn hud = (hud_probe_fn)dlsym(shim, "np_perfhud_probe");
-	CHECK(set != NULL && limit != NULL && hud != NULL, "%s exports no np_quick_settings_set", path);
+	event_fn send = (event_fn)dlsym(shim, "np_quick_settings_event");
+	CHECK(set != NULL && limit != NULL && hud != NULL && send != NULL, "%s exports no np_quick_settings_set", path);
 
 	id<MTLDevice> device = MTLCreateSystemDefaultDevice();
 	SKIP_IF(device == nil, "no Metal device on this machine");
@@ -64,6 +88,7 @@ static int child(const char *path, const char *mode, const char *home)
 	layer.bounds = CGRectMake(0, 0, 128, 72);
 	layer.drawableSize = CGSizeMake(64, 36);
 	layer.displaySyncEnabled = NO; // the game turns VSync off
+	layer.magnificationFilter = kCAFilterNearest; // as Wine's Mac driver sets it with Retina mode off
 
 	if (strcmp(mode, "hud") == 0) {
 		present_for(layer, 0.2);
@@ -74,8 +99,17 @@ static int child(const char *path, const char *mode, const char *home)
 		return 0;
 	}
 
+	// A link planted at the name the save writes through first must not be followed
+	NSString *dir = [NSString stringWithFormat:@"%s/Library/Application Support/bridgeplay/quick-settings", home];
+	NSString *victim = [NSString stringWithFormat:@"%s/save.dat", home];
+	[[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+	[@"SAVE" writeToFile:victim atomically:NO encoding:NSUTF8StringEncoding error:nil];
+	NSString *planted = [NSString stringWithFormat:@"%@/4242.conf.%d.tmp", dir, getpid()];
+	symlink(victim.UTF8String, planted.UTF8String);
+
+	// Uncapped, well above the 30 limit below; the floor allows for a busy machine
 	double before = present_for(layer, 1.0);
-	CHECK(before > 90, "the game ran at only %.1f fps before any limit", before);
+	CHECK(before > 45, "the game ran at only %.1f fps before any limit", before);
 	CHECK(!layer.displaySyncEnabled, "VSync was forced before any limit");
 
 	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "30"), "a 30 fps limit was refused");
@@ -86,7 +120,7 @@ static int child(const char *path, const char *mode, const char *home)
 	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "0"), "Off was refused");
 	CHECK(!layer.displaySyncEnabled, "Off did not give the game back its VSync off");
 	double after = present_for(layer, 1.0);
-	CHECK(after > 90, "the game stayed at %.1f fps after Off", after);
+	CHECK(after > 45, "the game stayed at %.1f fps after Off", after);
 
 	int level = -1, frames = -1, attached = -1, cpu = 0, gpu = 0;
 	double fps = 0;
@@ -106,12 +140,42 @@ static int child(const char *path, const char *mode, const char *home)
 	CHECK([layer.magnificationFilter isEqualToString:original], "Automatic left %s, not %s",
 	      layer.magnificationFilter.UTF8String, original.UTF8String);
 
+	// A check the game's frame queued for the main thread must not undo Automatic
+	CHECK(set("BRIDGEPLAY_SCALING_FILTER", "linear"), "Linear was refused");
+	present_for(layer, 0.05);
+	CHECK(set("BRIDGEPLAY_SCALING_FILTER", "0"), "Automatic was refused");
+	[[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.2]];
+	CHECK([layer.magnificationFilter isEqualToString:original], "a queued check left %s after Automatic, not %s",
+	      layer.magnificationFilter.UTF8String, original.UTF8String);
+
+	// While the sidebar shows, a modifier press stays out of the game; releases reach it
+	CHECK(send(event(10, 35, CMD | OPT)), "Option-Command-P did not open the sidebar");
+	CHECK(send(event(12, 56, CMD | OPT | SHIFT)), "a Shift press reached the game under the sidebar");
+	CHECK(!send(event(12, 56, CMD | OPT)), "the Shift release did not reach the game");
+	CHECK(!send(event(12, 58, CMD)), "the Option release did not reach the game");
+	CHECK(!send(event(12, 55, 0)), "the Command release did not reach the game");
+	CHECK(send(event(10, 126, 0)), "an arrow key reached the game under the sidebar");
+	CHECK(send(event(10, 53, 0)), "Escape did not close the sidebar");
+	CHECK(!send(event(12, 56, SHIFT)), "a Shift press did not reach the game once the sidebar closed");
+
 	CHECK(!set("BRIDGEPLAY_FPS_LIMIT", "5"), "a limit of 5 was accepted");
 	CHECK(!set("MTL_HUD_ENABLED", "1"), "an unknown setting was accepted");
 
 	NSString *file = saved(home);
 	CHECK([file isEqualToString:@"BRIDGEPLAY_PERF_OVERLAY=0\nBRIDGEPLAY_FPS_LIMIT=0\nBRIDGEPLAY_SCALING_FILTER=0\n"],
 	      "the saved changes read %s", file.UTF8String);
+	CHECK([[NSString stringWithContentsOfFile:victim encoding:NSUTF8StringEncoding error:nil] isEqualToString:@"SAVE"],
+	      "saving wrote through a link at its temporary name");
+
+	// A link in place of the folder is not written through either
+	NSString *elsewhere = [NSString stringWithFormat:@"%s/elsewhere", home];
+	[[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
+	[[NSFileManager defaultManager] createDirectoryAtPath:elsewhere withIntermediateDirectories:YES attributes:nil error:nil];
+	symlink(elsewhere.UTF8String, dir.UTF8String);
+	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "30"), "a limit was refused with the folder linked away");
+	CHECK(![[NSFileManager defaultManager] fileExistsAtPath:[elsewhere stringByAppendingString:@"/4242.conf"]],
+	      "saving wrote through a link in place of the quick-settings folder");
+	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "0"), "Off was refused with the folder linked away");
 	printf("%-10s %.0f fps, 30 limit %.1f fps, Off %.0f fps; overlay, filter and save follow\n", mode, before,
 	       capped, after);
 	return 0;

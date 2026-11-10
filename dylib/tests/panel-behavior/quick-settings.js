@@ -52,5 +52,48 @@ for (const form of Object.keys(FORMS)) {
 
   failed += t.failed;
 }
-if (failed) { console.log(`quick settings: ${failed} failed`); process.exit(1); }
-console.log('quick settings: in-game changes are written as the panel writes them');
+
+// The route has removed a change's file before the page asks Steam for the app, so a change
+// Steam cannot place yet waits in the page and is tried again on the next polls.
+async function takeChecks(form) {
+  const { take, written, globals } = panel(emit, form);
+  const t = runner(form);
+  t.ok(typeof take === 'function', 'the payload defines MSCXTake');
+  const known = new Set();
+  globals.window = { appDetailsStore: { RequestAppDetails: async id => {
+    if (id === 7) return null;
+    if (!known.has(id)) throw new Error('no details yet');
+    return details('', { unAppID: id });
+  } } };
+  // The payload's own "Bridgeplay: …" lines stay out of the test output
+  const log = console.log, warn = console.warn;
+  const quiet = f => (...a) => { if (!String(a[0]).startsWith('Bridgeplay:')) f(...a); };
+  console.log = quiet(log);
+  console.warn = quiet(warn);
+  try {
+    await take({ 287700: { BRIDGEPLAY_FPS_LIMIT: '30' } });
+    t.ok(written.length === 0 && globals.MSCXSyncWait['287700'], 'a change waits while Steam has no details');
+    await take({ 287700: { BRIDGEPLAY_PERF_OVERLAY: 'fps' }, 300: { BRIDGEPLAY_SCALING_FILTER: 'linear' } });
+    known.add(287700);
+    await take({});
+    const o = written.length === 1 ? written[0].opts : '';
+    t.ok(o.includes('BRIDGEPLAY_FPS_LIMIT=30') && o.includes('BRIDGEPLAY_PERF_OVERLAY=fps'),
+         `it is written once Steam has the app, with the picks made meanwhile (${JSON.stringify(written)})`);
+    t.ok(!globals.MSCXSyncWait['287700'] && globals.MSCXSyncWait['300'],
+         'an app Steam refuses does not hold back another');
+    await take({ 7: { BRIDGEPLAY_FPS_LIMIT: '30' } });
+    t.ok(globals.MSCXSyncWait['7'], 'no details at all waits too');
+    for (let i = 0; i < 40; i++) await take({});
+    t.ok(Object.keys(globals.MSCXSyncWait).length === 0, 'and after about a minute the change is dropped');
+  } finally {
+    console.log = log;
+    console.warn = warn;
+  }
+  return t.failed;
+}
+
+(async () => {
+  for (const form of Object.keys(FORMS)) failed += await takeChecks(form);
+  if (failed) { console.log(`quick settings: ${failed} failed`); process.exit(1); }
+  console.log('quick settings: in-game changes are written as the panel writes them, and wait for Steam');
+})();

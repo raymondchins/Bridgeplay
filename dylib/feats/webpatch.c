@@ -597,19 +597,30 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "if(d&&V[k].indexOf(ch[k])>=0)d.onChange({data:ch[k]})});" \
     "if(o!==o0)SteamClient.Apps.SetAppLaunchOptions(t.unAppID,o);return o}"
 
+// One poll's changes, by appid. The route has already removed their files, so an app Steam
+// has no details for yet keeps its changes here and is tried again on the next polls (a
+// newer pick of the same setting wins), for about a minute, before they are dropped.
+#define NP_CX_TAKE \
+    "async q=>{const w=globalThis.MSCXSyncWait||{};globalThis.MSCXSyncWait={};" \
+    "for(const id of Object.keys(q||{}))w[id]={ch:Object.assign({},w[id]&&w[id].ch,q[id]),n:0};" \
+    "for(const id of Object.keys(w)){let t=null;" \
+    "try{t=await globalThis.window.appDetailsStore.RequestAppDetails(+id)}catch(e){}" \
+    "if(t){try{console.log(\"Bridgeplay: quick settings for app \"+id+\" saved: \"+MSCXApply(t,w[id].ch))}" \
+    "catch(e){console.warn(\"Bridgeplay: quick settings for app \"+id+\" not saved\",e)}}" \
+    "else if(++w[id].n<30)globalThis.MSCXSyncWait[id]=w[id];" \
+    "else console.warn(\"Bridgeplay: quick settings for app \"+id+\" dropped, Steam has no details for it\")}}"
+
 // Started once per page context; a page without Steam's app store (the test harness) skips it.
 #define NP_CX_SYNC \
     "globalThis.window&&window.appDetailsStore&&!globalThis.MSCXSyncOn&&" \
     "(globalThis.MSCXSyncOn=setInterval(()=>{if(typeof MSCXRoute!==\"function\"||globalThis.MSCXSyncBusy)return;" \
-    "globalThis.MSCXSyncBusy=1;MSCXRoute(\"NotProton.TakeQuickSettings#1\",0).then(async j=>{const q=JSON.parse(j||\"{}\");" \
-    "for(const id of Object.keys(q)){const t=await window.appDetailsStore.RequestAppDetails(+id);" \
-    "if(t){const r=MSCXApply(t,q[id]);console.log(\"Bridgeplay: quick settings for app \"+id+\" saved: \"+r)}}})" \
+    "globalThis.MSCXSyncBusy=1;MSCXRoute(\"NotProton.TakeQuickSettings#1\",0).then(j=>MSCXTake(JSON.parse(j||\"{}\")))" \
     ".catch(e=>console.warn(\"Bridgeplay: quick settings not saved\",e)).finally(()=>{globalThis.MSCXSyncBusy=0})},2000))"
 
 #define NP_CX_OPTIONS_COMPONENT \
     "MSCXLaunch=" NP_CX_LAUNCH ",MSCXPick=" NP_CX_PICK "," \
     "MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C4, NP_C5) "," \
-    "MSCXApply=" NP_CX_APPLY ",MSCXSync=" NP_CX_SYNC ","
+    "MSCXApply=" NP_CX_APPLY ",MSCXTake=" NP_CX_TAKE ",MSCXSync=" NP_CX_SYNC ","
 
 // Valve is testing a new compatibility page UI, this logic relates to supporting that
 #define NP_CX_OPTIONS_STATEMENT \
@@ -617,7 +628,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "var MSCXPick=" NP_CX_PICK ";" \
     "var MSCXToolQuery=" NP_CX_TOOL_QUERY ";" \
     "var MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C3, NP_C4) ";" \
-    "var MSCXApply=" NP_CX_APPLY ";var MSCXSync=" NP_CX_SYNC ";"
+    "var MSCXApply=" NP_CX_APPLY ";var MSCXTake=" NP_CX_TAKE ";var MSCXSync=" NP_CX_SYNC ";"
 
 // 1.0.x saved CrossOver settings without %command%, this migrates them.
 #define NP_LAUNCH_MIGRATION_RULE \

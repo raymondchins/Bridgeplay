@@ -18,6 +18,7 @@
 // its own and no change of focus. BRIDGEPLAY_QUICK_SETTINGS=0 turns it off.
 
 #import <pwd.h>
+#import <fcntl.h>
 #import <sys/stat.h>
 
 enum { sb_overlay, sb_limit, sb_filter, sb_rows };
@@ -51,6 +52,10 @@ static const int sb_counts[sb_rows] = { 4, 6, 4 };
 #define sb_mod_control (1UL << 18)
 #define sb_mod_option (1UL << 19)
 #define sb_mod_command (1UL << 20)
+// Caps Lock to Fn: the keys a flagsChanged event reports
+#define sb_mod_keys (0xffUL << 16)
+
+static NSUInteger sb_mods; // the modifiers held as the game last saw them, main thread
 
 static int sb_enabled;
 static char sb_appid[16];
@@ -191,7 +196,9 @@ static int sb_save(const char *key, const char *value)
 	char support[1024], dir[1100], path[1200], tmp[1300];
 	sb_support(support, sizeof(support));
 	snprintf(dir, sizeof(dir), "%s/quick-settings", support);
-	if (!support[0] || (mkdir(dir, 0700) != 0 && errno != EEXIST)) {
+	struct stat st;
+	// A link in place of the folder is refused, so nothing is written where it points
+	if (!support[0] || (mkdir(dir, 0700) != 0 && errno != EEXIST) || lstat(dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
 		snprintf(sb_status, sizeof(sb_status), "Applied for this session. Could not save it.");
 		return 0;
 	}
@@ -216,7 +223,12 @@ static int sb_save(const char *key, const char *value)
 		if (strcmp(key, sb_keys[i]) == 0)
 			snprintf(kept[i], sizeof(kept[i]), "%s", value);
 
-	FILE *out = fopen(tmp, "w");
+	// A new file of our own: never one already there, nor a link's target
+	unlink(tmp);
+	int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+	FILE *out = fd >= 0 ? fdopen(fd, "w") : NULL;
+	if (fd >= 0 && out == NULL)
+		close(fd);
 	int ok = out != NULL;
 	for (int i = 0; ok && i < sb_rows; i++)
 		if (kept[i][0])
@@ -867,9 +879,11 @@ static int sidebar_send_event(id event)
 	int key_down = type == 10;
 	unsigned short code = 0;
 	int shortcut = 0;
+	NSUInteger flags = 0;
+	if (key_down || type == 12)
+		flags = ((NSUInteger (*)(id, SEL))objc_msgSend)(event, sel_registerName("modifierFlags"));
 	if (key_down) {
 		code = ((unsigned short (*)(id, SEL))objc_msgSend)(event, sel_registerName("keyCode"));
-		NSUInteger flags = ((NSUInteger (*)(id, SEL))objc_msgSend)(event, sel_registerName("modifierFlags"));
 		BOOL repeat = ((BOOL (*)(id, SEL))objc_msgSend)(event, sel_registerName("isARepeat"));
 		shortcut = code == sb_key_p && (flags & sb_mod_command) && (flags & sb_mod_option) &&
 		           !(flags & (sb_mod_control | sb_mod_shift)) && !repeat;
@@ -878,6 +892,7 @@ static int sidebar_send_event(id event)
 		if (!shortcut)
 			return 0;
 		sb_show();
+		sb_mods = flags & sb_mod_keys;
 		return 1;
 	}
 	switch (type) {
@@ -917,7 +932,14 @@ static int sidebar_send_event(id event)
 		return 1;
 	case 3: case 7: case 22: case 25: case 27: // other presses, drags, scrolls
 		return 1;
-	default: // key and button releases, modifier changes: the game keeps an accurate picture
+	case 12: { // modifiers: a release reaches the game, so nothing stays held; a press does not
+		NSUInteger now = flags & sb_mod_keys;
+		if (now & ~sb_mods)
+			return 1;
+		sb_mods = now;
+		return 0;
+	}
+	default: // key and button releases: the game keeps an accurate picture
 		return 0;
 	}
 }
@@ -982,4 +1004,11 @@ static void sb_maybe_hint(void)
 __attribute__((visibility("default"))) int np_quick_settings_set(const char *key, const char *value)
 {
 	return sb_apply(key, value);
+}
+
+// Test entry: one event through the sidebar, as NSApplication sendEvent: hands it over; 1 when
+// the sidebar takes it, 0 when the game gets it. Main thread.
+__attribute__((visibility("default"))) int np_quick_settings_event(id event)
+{
+	return sidebar_send_event(event);
 }

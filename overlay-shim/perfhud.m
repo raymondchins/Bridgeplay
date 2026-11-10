@@ -420,10 +420,11 @@ struct ph_style {
 
 static struct ph_style ph_style;
 
-static void ph_style_load(void)
+// The sampler's queue (the overlay) and the main thread (the sidebar, its hint) both draw, so the
+// style is made once, before either reads a font.
+static void ph_style_make(void *unused)
 {
-	if (ph_style.value != NULL)
-		return;
+	(void)unused;
 	CGColorSpaceRef srgb = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
 	CGFloat fg[] = { PH_RGB(0xF5F5F7, 1) }, fg2[] = { PH_RGB(0xA1A1A6, 1) },
 	        fg3[] = { PH_RGB(0x86868B, 1) }, line[] = { 1, 1, 1, 0.10 };
@@ -437,6 +438,12 @@ static void ph_style_load(void)
 	// 10.5 and 11 pt: the smallest that stay readable over a game on a Retina window
 	ph_style.label = ph_font(10.5, 500);
 	ph_style.small = ph_font(11, 400);
+}
+
+static void ph_style_load(void)
+{
+	static dispatch_once_t once;
+	dispatch_once_f(&once, NULL, ph_style_make);
 }
 
 // The baseline that centres a font's capitals on the line at y: how a label and the value
