@@ -813,12 +813,15 @@ static void sb_show(void)
 	}
 	sb_mark_seen();
 	sb_redraw();
-	// The battery and power figures move while it is open
+	// The battery and power figures move while it is open, and the game can move to another
+	// display, whose rate is the limit slider's top
 	sb_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
 	dispatch_source_set_timer(sb_timer, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), 2 * NSEC_PER_SEC,
 	                          200 * NSEC_PER_MSEC);
 	dispatch_source_set_event_handler(sb_timer, ^{
 		@autoreleasepool {
+			if (sb_host != nil)
+				ph_read_screen(sb_host);
 			sb_redraw();
 		}
 	});
