@@ -15,6 +15,8 @@ struct GameDefaultsView: View {
     @State private var failure: String?
     @State private var confirmsReset = false
     @State private var clearing: GameDefaults.Override?
+    // The frame rate limit while its slider is dragged; written when the drag ends
+    @State private var limitDraft: Double?
 
     private var hasD3DMetal: Bool { status.snapshot?.gptkSource != nil }
 
@@ -34,8 +36,11 @@ struct GameDefaultsView: View {
             }
             Section {
                 toggleRow(.highResolution)
-                toggleRow(.metalHUD)
+                overlayRow
                 toggleRow(.vsync)
+                frameLimitRow
+                toggleRow(.frameLimitOff)
+                choiceRow(.scalingFilter)
             } header: {
                 Text("Display")
             }
@@ -130,18 +135,134 @@ struct GameDefaultsView: View {
 
     private func toggleRow(_ setting: GameDefaults.Setting) -> some View {
         StatusRow(title: Self.title(setting), value: caption(setting), menu: resetActions(setting),
-                  toggle: Binding(get: { resolved(setting).value == "1" }, set: { save(setting, $0 ? "1" : "0") }))
+                  toggle: Binding(get: { isOn(setting) }, set: { on in
+                      if setting == .frameLimitOff { setLimitOff(!on) } else { save(setting, on ? "1" : "0") }
+                  }))
+    }
+
+    // Enable Frame Limit shows on when the limit applies, the opposite of FPS_LIMIT_OFF.
+    private func isOn(_ setting: GameDefaults.Setting) -> Bool {
+        setting == .frameLimitOff ? !limitOff : resolved(setting).value == "1"
+    }
+
+    // MARK: Frame rate limit
+    //
+    // A slider in whole frames per second from 15 to the fastest display's rate, and Enable
+    // Frame Limit under it, which applies it; switched off, the slider dims and keeps its value.
+    // overlay-shim holds the limit to the display a game is on.
+
+    private var maxFPS: Int {
+        min(360, max(GameDefaults.minFrameLimit, NSScreen.screens.map(\.maximumFramesPerSecond).max() ?? 60))
+    }
+
+    private var limitValue: Int {
+        GameDefaults.frameLimitValue(resolved(.frameLimit).value, maxFPS: maxFPS) ?? maxFPS
+    }
+
+    private var limitOff: Bool {
+        GameDefaults.frameLimitIsOff(limit: resolved(.frameLimit).value, off: resolved(.frameLimitOff).value)
+    }
+
+    private var frameLimitRow: some View {
+        let shown = Int(limitDraft ?? Double(limitValue))
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 0) {
+                label(.frameLimit)
+                Spacer(minLength: 12)
+                Text(verbatim: "\(shown) FPS")
+                    .monospacedDigit()
+                    .foregroundStyle(limitOff ? .tertiary : .secondary)
+            }
+            // Whole numbers come from rounding, not step:, which draws a tick for every one of them
+            Slider(value: Binding(get: { limitDraft ?? Double(limitValue) }, set: { limitDraft = $0.rounded() }),
+                   in: Double(GameDefaults.minFrameLimit)...Double(maxFPS)) {
+                Text(Self.title(.frameLimit))
+            } minimumValueLabel: {
+                Text(verbatim: "\(GameDefaults.minFrameLimit)")
+            } maximumValueLabel: {
+                Text(verbatim: "\(maxFPS)")
+            } onEditingChanged: { editing in
+                guard !editing, let draft = limitDraft else { return }
+                limitDraft = nil
+                save(.frameLimit, String(Int(draft)))
+            }
+            .labelsHidden()
+            .disabled(limitOff)
+            .padding(.leading, StatusMetrics.textInset)
+        }
+        .contextMenu {
+            ForEach(resetActions(.frameLimit), id: \.label) { action in
+                Button(action.label, action: action.perform)
+            }
+        }
+    }
+
+    // Off keeps the value; on with no value set takes the slider's, the display's rate.
+    private func setLimitOff(_ off: Bool) {
+        if !off, GameDefaults.frameLimitValue(resolved(.frameLimit).value, maxFPS: maxFPS) == nil {
+            save(.frameLimit, String(limitValue))
+        }
+        save(.frameLimitOff, off ? "1" : "0")
     }
 
     private func label(_ setting: GameDefaults.Setting) -> some View {
+        label(Self.title(setting), caption(setting))
+    }
+
+    private func label(_ title: String, _ caption: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(Self.title(setting))
+            Text(title)
                 .font(BP.sans(13, .semibold))
                 .tracking(-0.1)
-            Text(caption(setting))
+            Text(caption)
                 .foregroundStyle(.secondary)
         }
         .padding(.leading, StatusMetrics.textInset)
+    }
+
+    // Bridgeplay's performance overlay and Apple's Metal HUD are one choice, as in Steam
+    // Properties › Bridgeplay; overlay-shim shows the Metal HUD when a conf turns on both.
+    private var overlayChoice: String {
+        resolved(.metalHUD).value == "1" ? "hud" : (resolved(.perfOverlay).value ?? "0")
+    }
+
+    private var overlayCaption: String {
+        let sources = [resolved(.perfOverlay).source, resolved(.metalHUD).source]
+        var parts = [Self.summary(.perfOverlay)]
+        if sources.contains(.user) {
+            parts.append(String(localized: "Set by you."))
+        } else if sources.contains(.bridgeplay) {
+            parts.append(String(localized: "Bridgeplay's default."))
+        }
+        return parts.joined(separator: " ")
+    }
+
+    private var overlayRow: some View {
+        HStack(alignment: .center, spacing: 0) {
+            label(Self.title(.perfOverlay), overlayCaption)
+            Spacer(minLength: 12)
+            Picker(Self.title(.perfOverlay), selection: Binding(get: { overlayChoice }, set: saveOverlay)) {
+                ForEach(Self.options(.perfOverlay) + ["hud"], id: \.self) { option in
+                    Text(Self.optionLabel(option, for: .perfOverlay)).tag(option)
+                }
+            }
+            .labelsHidden()
+            .fixedSize()
+        }
+        .contextMenu {
+            if resolved(.perfOverlay).source == .user || resolved(.metalHUD).source == .user {
+                Button(String(localized: "Reset to Bridgeplay's Default")) {
+                    save(.perfOverlay, nil)
+                    save(.metalHUD, nil)
+                }
+            }
+        }
+    }
+
+    private func saveOverlay(_ choice: String) {
+        let hud = choice == "hud"
+        save(.perfOverlay, hud ? "0" : choice)
+        save(.metalHUD, hud ? "1" : "0")
     }
 
     private func choiceRow(_ setting: GameDefaults.Setting) -> some View {
@@ -155,7 +276,7 @@ struct GameDefaultsView: View {
                 if setting.fallback == nil {
                     Text("Automatic").tag("")
                 }
-                ForEach(Self.options(setting), id: \.self) { option in
+                ForEach(choices(setting), id: \.self) { option in
                     Text(Self.optionLabel(option, for: setting)).tag(option)
                 }
             }
@@ -167,6 +288,14 @@ struct GameDefaultsView: View {
                 Button(action.label, action: action.perform)
             }
         }
+    }
+
+    // The page's options, plus a valid value the conf sets that the page does not list
+    // (FRAMEGEN=1 written by hand), so the picker shows what games actually get.
+    private func choices(_ setting: GameDefaults.Setting) -> [String] {
+        let options = Self.options(setting)
+        guard let current = resolved(setting).value, !options.contains(current) else { return options }
+        return options + [current]
     }
 
     private var dllRow: some View {
@@ -262,12 +391,16 @@ struct GameDefaultsView: View {
         case .backend: String(localized: "Graphics Backend")
         case .highResolution: String(localized: "High Resolution")
         case .metalHUD: String(localized: "Metal HUD")
+        case .perfOverlay: String(localized: "Performance Overlay")
         case .nvapi: String(localized: "Report an NVIDIA GPU")
         case .metalFX: String(localized: "DLSS through MetalFX")
         case .dlssFrameGen: String(localized: "DLSS Frame Generation")
         case .advertiseAVX: String(localized: "Advertise AVX2 to Rosetta")
         case .msync: "MSync"
         case .vsync: String(localized: "Force VSync")
+        case .frameLimit: String(localized: "Frame Rate Limit")
+        case .frameLimitOff: String(localized: "Enable Frame Limit")
+        case .scalingFilter: String(localized: "Scaling Filter")
         case .frameGen: String(localized: "Frame Generation")
         case .frameGenQuality: String(localized: "Quality")
         case .frameGenUI: String(localized: "Protect UI")
@@ -291,12 +424,16 @@ struct GameDefaultsView: View {
         case .backend: String(localized: "Automatic picks D3DMetal when the Game Porting Toolkit is linked, and DXMT otherwise.")
         case .highResolution: String(localized: "Sharper on Retina displays, but games run slower.")
         case .metalHUD: String(localized: "Shows frame rate and GPU details in a corner while you play.")
+        case .perfOverlay: String(localized: "Frame rate, frame time, CPU, GPU, memory and battery in the top-left corner while you play, or Apple's Metal HUD.")
         case .nvapi: String(localized: "Lets games offer DLSS, served by MetalFX. Some games take NVIDIA-only paths with it.")
         case .metalFX: String(localized: "Only takes effect when DLSS is switched on in the game.")
         case .dlssFrameGen: String(localized: "Lets games offer DLSS frame generation. Experimental: it can freeze the Mac on some setups.")
         case .advertiseAVX: String(localized: "Many games quit without it.")
         case .msync: String(localized: "Automatic follows the engine.")
         case .vsync: String(localized: "Waits for the display even when a game turns VSync off.")
+        case .frameLimit: String(localized: "Holds games to this many frames per second, from 15 up to the display's refresh rate, and waits for the display they are on. The display's refresh rate is not changed.")
+        case .frameLimitOff: String(localized: "Applies the limit above. Off, games run without one and the slider keeps its value.")
+        case .scalingFilter: String(localized: "How a game's frames are scaled up to the screen when it draws fewer pixels, as with High Resolution off. Automatic keeps what Wine does there, sharp pixels; Linear smooths them.")
         case .frameGen, .frameGenQuality, .frameGenEngine: ""
         case .frameGenUI: String(localized: "Keeps static HUD and menus sharp.")
         case .frameGenFallback: String(localized: "Skips generated frames that would smear.")
@@ -323,6 +460,15 @@ struct GameDefaultsView: View {
         case (.frameGenQuality, _): String(localized: "Balanced")
         case (.frameGenEngine, "metalfx"): "MetalFX"
         case (.frameGenEngine, _): String(localized: "Built-in optical flow")
+        case (.perfOverlay, "fps"): "FPS"
+        case (.perfOverlay, "summary"): String(localized: "Summary")
+        case (.perfOverlay, "detailed"): String(localized: "Detailed")
+        case (.perfOverlay, "hud"): String(localized: "Apple Metal HUD")
+        case (.perfOverlay, _): String(localized: "Off")
+        case (.scalingFilter, "nearest"): String(localized: "Nearest")
+        case (.scalingFilter, "integer"): String(localized: "Integer")
+        case (.scalingFilter, "linear"): String(localized: "Linear")
+        case (.scalingFilter, _): String(localized: "Automatic")
         default: option
         }
     }

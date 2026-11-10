@@ -71,7 +71,7 @@ To add yours: after you play, Bridgeplay asks once per game *How did it run?* On
 3. **Follow the Setup Assistant**: Rosetta, Apple's graphics (Download fetches them, and Steam from Valve if it's missing), Steam sign-in, App Management and a couple of other standard macOS prompts. Every download is verified: Bridgeplay's signature or pinned hashes for its own files and the engine, Apple's signature for the toolkit's files, Valve's for Steam. Setup modifies your Steam app; see [What Bridgeplay changes in Steam](#what-bridgeplay-changes-in-steam).
 4. **Press Play** on any Windows game in Steam. The first time you use a controller, allow Steam's Input Monitoring request.
 
-Each game's Bridgeplay settings (graphics backend, Metal HUD, DLSS, frame generation, controllers) are in Steam: right-click the game, **Properties… › Bridgeplay**.
+Each game's Bridgeplay settings (graphics backend, performance overlay, frame rate limit, scaling filter, DLSS, frame generation, controllers) are in Steam: right-click the game, **Properties… › Bridgeplay**.
 
 Updates install themselves: Bridgeplay, its patch in Steam and the engine. **Refresh** on the Status page checks on demand.
 

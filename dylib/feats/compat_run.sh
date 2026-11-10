@@ -415,7 +415,7 @@ gamefix_reason() {
   case "$1" in
     BACKEND)
       case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
-    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK|ROCKSTAR_SHIM)
+    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK|ROCKSTAR_SHIM|FPS_LIMIT_OFF)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     FRAMEGEN)
       # 1 is the 2x of the first release.
@@ -424,6 +424,16 @@ gamefix_reason() {
       case "$2" in performance|balanced|quality) ;; *) echo "not performance, balanced or quality" ;; esac ;;
     FRAMEGEN_ENGINE)
       case "$2" in own|metalfx) ;; *) echo "not own or metalfx" ;; esac ;;
+    PERF_OVERLAY)
+      case "$2" in 0|fps|summary|detailed) ;; *) echo "not 0, fps, summary or detailed" ;; esac ;;
+    SCALING_FILTER)
+      case "$2" in 0|linear|nearest|integer) ;; *) echo "not 0, linear, nearest or integer" ;; esac ;;
+    FPS_LIMIT)
+      case "$2" in
+        0|display|half|[1-9][0-9]|[1-3][0-9][0-9])
+          case "$2" in [1-3][0-9][0-9]) [ "$2" -le 360 ] || echo "not 0, display, half or 10 to 360" ;; esac ;;
+        *) echo "not 0, display, half or 10 to 360" ;;
+      esac ;;
     DLLOVERRIDES)
       valid_dll_overrides "$2" || echo "not Wine override syntax" ;;
     ARGS)
@@ -461,7 +471,7 @@ gamefix_read() {
     fi
     # The keys that set a BRIDGEPLAY_ variable also take its full name: BRIDGEPLAY_RETINA=1 is RETINA=1.
     case "$key" in
-      BRIDGEPLAY_STDOUT_NULL|BRIDGEPLAY_VSYNC|BRIDGEPLAY_HIDE_WINE_EXPORTS|BRIDGEPLAY_RETINA|BRIDGEPLAY_FRAMEGEN|BRIDGEPLAY_FRAMEGEN_?*)
+      BRIDGEPLAY_STDOUT_NULL|BRIDGEPLAY_VSYNC|BRIDGEPLAY_HIDE_WINE_EXPORTS|BRIDGEPLAY_RETINA|BRIDGEPLAY_FRAMEGEN|BRIDGEPLAY_FRAMEGEN_?*|BRIDGEPLAY_PERF_OVERLAY|BRIDGEPLAY_FPS_LIMIT|BRIDGEPLAY_FPS_LIMIT_OFF|BRIDGEPLAY_SCALING_FILTER)
         key=${key#BRIDGEPLAY_} ;;
     esac
     value=${line#*=}
@@ -519,7 +529,7 @@ load_gamefixes() {
       RETINA) gamefix_apply_env NOTPROTON_RETINA "$value" "$from" ;;
       # Steam reads SteamDeck in mixed case, which a conf key cannot spell.
       STEAMDECK) gamefix_apply_env SteamDeck "$value" "$from" ;;
-      FRAMEGEN|FRAMEGEN_QUALITY|FRAMEGEN_UI|FRAMEGEN_FALLBACK|FRAMEGEN_ENGINE)
+      FRAMEGEN|FRAMEGEN_QUALITY|FRAMEGEN_UI|FRAMEGEN_FALLBACK|FRAMEGEN_ENGINE|PERF_OVERLAY|FPS_LIMIT|FPS_LIMIT_OFF|SCALING_FILTER)
         gamefix_apply_env "NOTPROTON_$key" "$value" "$from" ;;
       *) gamefix_apply_env "$key" "$value" "$from" ;;
     esac
@@ -3438,6 +3448,8 @@ export WINELOADER="$WINELOADER"
 wine_log="$loader_root/bridgeplay-wine.log"
 exec > "\$wine_log" 2>&1
 shim="$np_support/overlay-shim.dylib"
+# Off as np-native's is_off reads it: unset, 0, off, false or no, in any case
+wants() { case "\$1" in ''|0|[Oo][Ff][Ff]|[Ff][Aa][Ll][Ss][Ee]|[Nn][Oo]) return 1 ;; esac; }
 if [ -n "\$STEAM_DYLD_INSERT_LIBRARIES" ]; then
   if [ -f "\$shim" ]; then
     export DYLD_INSERT_LIBRARIES="\$shim:\$STEAM_DYLD_INSERT_LIBRARIES"
@@ -3445,8 +3457,10 @@ if [ -n "\$STEAM_DYLD_INSERT_LIBRARIES" ]; then
   else
     export DYLD_INSERT_LIBRARIES="\$STEAM_DYLD_INSERT_LIBRARIES"
   fi
-elif [ -f "\$shim" ] && [ "\${NOTPROTON_FRAMEGEN:-0}" != 0 ] && [ "\$NOTPROTON_FRAMEGEN" != off ]; then
-  # Frame generation lives in the shim, so it loads without the Steam overlay too.
+elif [ -f "\$shim" ] && { wants "\$NOTPROTON_FRAMEGEN" || wants "\$NOTPROTON_PERF_OVERLAY" ||
+  { wants "\$NOTPROTON_FPS_LIMIT" && [ "\$NOTPROTON_FPS_LIMIT_OFF" != 1 ]; } || wants "\$NOTPROTON_SCALING_FILTER"; }; then
+  # Frame generation, the performance overlay, the frame rate limit and the scaling filter
+  # live in the shim, so it loads without the Steam overlay too.
   export DYLD_INSERT_LIBRARIES="\$shim"
   export NOTPROTON_OVERLAY_SHIM="\$shim"
 fi
@@ -3557,7 +3571,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | LC_ALL=C sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|FEX_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|NOTPROTON_HIDE_WINE_EXPORTS|NOTPROTON_ROCKSTAR_DXGI|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
+for name in $(env | LC_ALL=C sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|FEX_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_PERF_OVERLAY|NOTPROTON_FPS_LIMIT(_OFF)?|NOTPROTON_SCALING_FILTER|NOTPROTON_QUICK_SETTINGS|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|NOTPROTON_HIDE_WINE_EXPORTS|NOTPROTON_ROCKSTAR_DXGI|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"

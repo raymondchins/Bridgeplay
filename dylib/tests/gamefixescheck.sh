@@ -126,7 +126,7 @@ launch() {
 			compose_dll_overrides
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
-				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE CX_GRAPHICS_BACKEND \
+				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE NOTPROTON_PERF_OVERLAY NOTPROTON_FPS_LIMIT NOTPROTON_FPS_LIMIT_OFF NOTPROTON_SCALING_FILTER CX_GRAPHICS_BACKEND \
 				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS NOTPROTON_ROCKSTAR_DXGI CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
@@ -187,7 +187,7 @@ default_conf '# shipped fix' '' '  DXVK_HUD=fps  ' "VKD3D_CONFIG=dxr$(printf '\r
 	"DXMT_A=\$(touch $case_dir/pwned)" 'DXMT_B=`touch pwned`' 'DXMT_C="quoted"' "DXMT_D='single'" \
 	'BACKEND=vulkan' 'MSYNC=2' 'RETINA=yes' 'DLLOVERRIDES=dxgi=native' 'DLLOVERRIDES=;=n' \
 	'DXMT_=1' 'MTL_HUD_ENABLED=1' 'FRAMEGEN=4' 'FRAMEGEN_QUALITY=ultra' 'FRAMEGEN_UI=2' \
-	'FRAMEGEN_FALLBACK=yes' 'FRAMEGEN_ENGINE=fsr' 'FRAMEGEN_OTHER=1' 'CX_FWD_COMPAT_GL_CTX=1'
+	'FRAMEGEN_FALLBACK=yes' 'FRAMEGEN_ENGINE=fsr' 'FRAMEGEN_OTHER=1' 'CX_FWD_COMPAT_GL_CTX=1' 'PERF_OVERLAY=full'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a padded value is trimmed" "fps" "$(got DXVK_HUD)"
 is "a CRLF line ends cleanly" "dxr" "$(got VKD3D_CONFIG)"
@@ -218,6 +218,8 @@ has "FRAMEGEN_FALLBACK must be 0 or 1" "rejected FRAMEGEN_FALLBACK: not 0 or 1" 
 has "FRAMEGEN_ENGINE must be an engine" "rejected FRAMEGEN_ENGINE: not own or metalfx" "$case_dir/log"
 has "an unknown FRAMEGEN_ key is not on the allow-list" "rejected FRAMEGEN_OTHER: not on the allow-list" "$case_dir/log"
 is "a rejected FRAMEGEN leaves frame generation unset" "<unset>" "$(got NOTPROTON_FRAMEGEN)"
+has "PERF_OVERLAY must be a level" "rejected PERF_OVERLAY: not 0, fps, summary or detailed" "$case_dir/log"
+is "a rejected PERF_OVERLAY leaves the overlay unset" "<unset>" "$(got NOTPROTON_PERF_OVERLAY)"
 has "applied values are logged" "applied DXVK_HUD=fps from the default conf" "$case_dir/log"
 
 echo "== precedence: launch options > user conf > default conf > auto > default"
@@ -664,10 +666,115 @@ new_case
 full_engine
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "no conf leaves the quality to the shim" "<unset>" "$(got NOTPROTON_FRAMEGEN_QUALITY)"
+is "no conf leaves the performance overlay off" "<unset>" "$(got NOTPROTON_PERF_OVERLAY)"
+
+echo "== SCALING_FILTER"
+for value in 0 linear nearest integer; do
+	new_case
+	full_engine
+	user_conf "SCALING_FILTER=$value"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	is "SCALING_FILTER=$value maps to NOTPROTON_SCALING_FILTER" "$value" "$(got NOTPROTON_SCALING_FILTER)"
+done
+for bad in fsr nis Nearest pixel 1; do
+	new_case
+	full_engine
+	user_conf "SCALING_FILTER=$bad"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	has "SCALING_FILTER=$bad is refused" "rejected SCALING_FILTER: not 0, linear, nearest or integer" "$case_dir/log"
+	is "a refused SCALING_FILTER=$bad leaves it unset" "<unset>" "$(got NOTPROTON_SCALING_FILTER)"
+done
+new_case
+full_engine
+printf 'SCALING_FILTER=nearest\n' > "$case_dir/support/gamefixes/default.conf"
+user_conf 'BRIDGEPLAY_SCALING_FILTER=integer'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a per-game filter wins over Game Defaults, BRIDGEPLAY_ name and all" "integer" "$(got NOTPROTON_SCALING_FILTER)"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_SCALING_FILTER=0
+is "a launch option sets the filter back over the confs" "0" "$(got NOTPROTON_SCALING_FILTER)"
+new_case
+full_engine
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "no conf leaves the filter alone" "<unset>" "$(got NOTPROTON_SCALING_FILTER)"
+
+echo "== FPS_LIMIT"
+for value in 0 display half 10 30 60 144 360; do
+	new_case
+	full_engine
+	user_conf "FPS_LIMIT=$value"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	is "FPS_LIMIT=$value maps to NOTPROTON_FPS_LIMIT" "$value" "$(got NOTPROTON_FPS_LIMIT)"
+done
+new_case
+full_engine
+printf 'FPS_LIMIT=half\n' > "$case_dir/support/gamefixes/default.conf"
+user_conf 'BRIDGEPLAY_FPS_LIMIT=40'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a per-game limit wins over Game Defaults, BRIDGEPLAY_ name and all" "40" "$(got NOTPROTON_FPS_LIMIT)"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_FPS_LIMIT=30
+is "the limit launch option wins over both confs" "30" "$(got NOTPROTON_FPS_LIMIT)"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_FPS_LIMIT=0
+is "a launch option turns the limit off over the confs" "0" "$(got NOTPROTON_FPS_LIMIT)"
+new_case
+full_engine
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "no conf leaves no limit" "<unset>" "$(got NOTPROTON_FPS_LIMIT)"
+for bad in 5 9 361 400 1000 max 30fps -30; do
+	new_case
+	full_engine
+	user_conf "FPS_LIMIT=$bad"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	has "FPS_LIMIT=$bad is refused" "rejected FPS_LIMIT: not 0, display, half or 10 to 360" "$case_dir/log"
+	is "a refused FPS_LIMIT=$bad leaves no limit" "<unset>" "$(got NOTPROTON_FPS_LIMIT)"
+done
+echo "== FPS_LIMIT_OFF"
+for value in 0 1; do
+	new_case
+	full_engine
+	user_conf "FPS_LIMIT=45
+FPS_LIMIT_OFF=$value"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	is "FPS_LIMIT_OFF=$value maps to NOTPROTON_FPS_LIMIT_OFF" "$value" "$(got NOTPROTON_FPS_LIMIT_OFF)"
+	is "and FPS_LIMIT=45 is kept beside it" "45" "$(got NOTPROTON_FPS_LIMIT)"
+done
+new_case
+full_engine
+printf 'FPS_LIMIT=40\nBRIDGEPLAY_FPS_LIMIT_OFF=1\n' > "$case_dir/support/gamefixes/default.conf"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "Game Defaults can switch the limit off, BRIDGEPLAY_ name and all" "1" "$(got NOTPROTON_FPS_LIMIT_OFF)"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_FPS_LIMIT_OFF=0
+is "a launch option switches it back on over the confs" "0" "$(got NOTPROTON_FPS_LIMIT_OFF)"
+for bad in 2 yes on -1; do
+	new_case
+	full_engine
+	user_conf "FPS_LIMIT_OFF=$bad"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	has "FPS_LIMIT_OFF=$bad is refused" "rejected FPS_LIMIT_OFF: not 0 or 1" "$case_dir/log"
+	is "a refused FPS_LIMIT_OFF=$bad sets nothing" "<unset>" "$(got NOTPROTON_FPS_LIMIT_OFF)"
+done
+
+echo "== PERF_OVERLAY"
+for level in 0 fps summary detailed; do
+	new_case
+	full_engine
+	user_conf "PERF_OVERLAY=$level"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	is "PERF_OVERLAY=$level maps to NOTPROTON_PERF_OVERLAY" "$level" "$(got NOTPROTON_PERF_OVERLAY)"
+done
+new_case
+full_engine
+printf 'PERF_OVERLAY=summary\n' > "$case_dir/support/gamefixes/default.conf"
+user_conf 'BRIDGEPLAY_PERF_OVERLAY=detailed'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "the per-game conf wins over Game Defaults, BRIDGEPLAY_ name and all" "detailed" "$(got NOTPROTON_PERF_OVERLAY)"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_PERF_OVERLAY=fps
+is "the launch option wins over both confs" "fps" "$(got NOTPROTON_PERF_OVERLAY)"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_PERF_OVERLAY=0
+is "a launch option turns it off over the confs" "0" "$(got NOTPROTON_PERF_OVERLAY)"
 
 # The stub reports NOTPROTON_OVERLAY_SHIM, set beside DYLD_INSERT_LIBRARIES, since SIP strips DYLD_* from /bin/sh.
 # Without SIP (GitHub runners) dyld does load the shim into /bin/sh, so it is a real, empty arm64e dylib.
-echo "== the launcher loads the shim for frame generation unless it is off"
+echo "== the launcher loads the shim for frame generation and the performance overlay unless they are off"
 mkdir -p "$work/launcher/Contents/MacOS" "$work/launcher/home/Library/Application Support/bridgeplay"
 clang -dynamiclib -arch arm64e -arch arm64 -arch x86_64 -x c /dev/null \
 	-o "$work/launcher/home/Library/Application Support/bridgeplay/overlay-shim.dylib"
@@ -688,15 +795,43 @@ for spec in '-:none' '0:none' 'off:none' '1:shim' '2:shim' '3:shim' 'adaptive:sh
 	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
 	is "NOTPROTON_FRAMEGEN=${fg#-} without the Steam overlay: $want" "$want" "$got_dyld"
 done
+for spec in '0:none' 'off:none' 'OFF:none' 'false:none' 'No:none' 'fps:shim' 'summary:shim' 'detailed:shim'; do
+	po=${spec%%:*} want=${spec#*:}
+	env -i PATH="$PATH" NOTPROTON_PERF_OVERLAY="$po" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
+	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
+	is "NOTPROTON_PERF_OVERLAY=$po without the Steam overlay: $want" "$want" "$got_dyld"
+done
+for spec in '0:none' 'off:none' 'display:shim' 'half:shim' '30:shim'; do
+	fl=${spec%%:*} want=${spec#*:}
+	env -i PATH="$PATH" NOTPROTON_FPS_LIMIT="$fl" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
+	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
+	is "NOTPROTON_FPS_LIMIT=$fl without the Steam overlay: $want" "$want" "$got_dyld"
+done
+for spec in '1:none' '0:shim'; do
+	off=${spec%%:*} want=${spec#*:}
+	env -i PATH="$PATH" NOTPROTON_FPS_LIMIT=45 NOTPROTON_FPS_LIMIT_OFF="$off" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
+	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
+	is "a limit of 45 with NOTPROTON_FPS_LIMIT_OFF=$off without the Steam overlay: $want" "$want" "$got_dyld"
+done
+for spec in '0:none' 'off:none' 'linear:shim' 'nearest:shim' 'integer:shim'; do
+	sfv=${spec%%:*} want=${spec#*:}
+	env -i PATH="$PATH" NOTPROTON_SCALING_FILTER="$sfv" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
+	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
+	is "NOTPROTON_SCALING_FILTER=$sfv without the Steam overlay: $want" "$want" "$got_dyld"
+done
 
 echo "== the launcher receives the allow-listed variables"
 set --
 out=$(env -i PATH="$PATH" forward="$forward" VKD3D_CONFIG=dxr MVK_CONFIG_LOG_LEVEL=1 \
 	STAGING_SHARED_MEMORY=1 WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 CX_FWD_COMPAT_GL_CTX=1 \
 	DXVK_HUD=fps NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 \
-	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | LC_ALL=C sort | tr '\n' ' ')
+	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_FPS_LIMIT=30 NOTPROTON_FPS_LIMIT_OFF=1 NOTPROTON_SCALING_FILTER=nearest NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | LC_ALL=C sort | tr '\n' ' ')
 is "VKD3D_, MVK_, STAGING_, WINE_ topology and CX_FWD_COMPAT_GL_CTX variables are forwarded" \
-	"CX_FWD_COMPAT_GL_CTX=1 DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
+	"CX_FWD_COMPAT_GL_CTX=1 DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FPS_LIMIT=30 NOTPROTON_FPS_LIMIT_OFF=1 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_SCALING_FILTER=nearest STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
 
 echo "== the wineserver directory self-heal"
 heal=$(sed -n '/^heal_wine_tmp() {$/,/^}$/p' "$SRC")

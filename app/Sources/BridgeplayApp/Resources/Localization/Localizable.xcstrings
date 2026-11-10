@@ -1706,6 +1706,28 @@
         }
       }
     },
+    "A slider in whole frames per second, from 15 up to your display's refresh rate, as on Steam Deck. The game waits for the display so frames land evenly: smoother pacing and less battery drain. On a game's own display a higher value counts as its refresh rate, and the display's own rate is never changed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un cursore in fotogrammi al secondo interi, da 15 fino alla frequenza del display, come su Steam Deck. Il gioco attende il display perché i fotogrammi arrivino regolari: ritmo più fluido e meno consumo di batteria. Sul display del gioco un valore più alto vale come la sua frequenza, e la frequenza del display non viene mai cambiata."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ползунок в целых кадрах в секунду, от 15 до частоты обновления дисплея, как на Steam Deck. Игра ждёт дисплей, чтобы кадры выводились равномерно: плавнее темп и меньше расход батареи. На дисплее игры более высокое значение считается его частотой обновления, а частота самого дисплея никогда не меняется."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以整数帧率调节的滑块，从 15 到显示器的刷新率，与 Steam Deck 相同。游戏会等待显示器，使帧均匀呈现：节奏更流畅，电池消耗更少。在游戏所在的显示器上，更高的数值按其刷新率计算，显示器本身的刷新率不会被更改。"
+          }
+        }
+      }
+    },
     "A star on GitHub helps other people find it." : {
       "localizations" : {
         "it" : {
@@ -2388,6 +2410,28 @@
         }
       }
     },
+    "Apple Metal HUD" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metal HUD di Apple"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metal HUD от Apple"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Metal 性能监视器"
+          }
+        }
+      }
+    },
     "Apple silicon" : {
       "localizations" : {
         "it" : {
@@ -2432,28 +2476,6 @@
         }
       }
     },
-    "Apple's performance overlay: frame rate, frame time and GPU use." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L'overlay delle prestazioni di Apple: frame rate, tempo di frame e uso della GPU."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Оверлей производительности Apple: частота кадров, время кадра и загрузка GPU."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple 的性能叠层：帧率、帧时间和 GPU 占用。"
-          }
-        }
-      }
-    },
     "Apple's translator for Windows games. Asks for your Mac password." : {
       "localizations" : {
         "it" : {
@@ -2472,6 +2494,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple 的 Windows 游戏转译工具。需要输入 Mac 密码。"
+          }
+        }
+      }
+    },
+    "Applies the limit above. Off, games run without one and the slider keeps its value." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applica il limite qui sopra. Disattivato, i giochi girano senza limite e il cursore mantiene il suo valore."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Применяет ограничение выше. Если выключено, игры идут без ограничения, а ползунок сохраняет значение."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用上方的限制。关闭时游戏不受限制，滑块会保留其数值。"
           }
         }
       }
@@ -2626,6 +2670,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自动"
+          }
+        }
+      }
+    },
+    "Automatic (Wine keeps pixels sharp with High Resolution off)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatico (con Alta risoluzione disattivata Wine mantiene i pixel nitidi)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автоматически (при выключенном высоком разрешении Wine сохраняет пиксели чёткими)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动（关闭高分辨率时 Wine 保持像素锐利）"
           }
         }
       }
@@ -4059,6 +4125,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 默认值。"
+          }
+        }
+      }
+    },
+    "Bridgeplay's overlay in the top-left corner while you play. FPS shows the frame rate alone, Summary adds frame time, CPU, GPU, memory and battery in one row, and Detailed a panel with a frame-time graph. Apple Metal HUD shows Apple's own overlay instead. Off by default. While a game runs, Option-Command-P opens Bridgeplay's quick settings on the right of the game: the overlay, the frame rate limit and the scaling filter change at once and are saved for that game. Use the arrow keys or click, and Esc to close." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'overlay di Bridgeplay nell'angolo in alto a sinistra mentre giochi. FPS mostra solo la frequenza dei fotogrammi, Riepilogo aggiunge in una riga tempo per fotogramma, CPU, GPU, memoria e batteria, e Dettagliato un pannello con il grafico dei tempi per fotogramma. Metal HUD di Apple mostra invece l'overlay di Apple. Disattivato per impostazione predefinita. Mentre un gioco è in esecuzione, Opzione-Comando-P apre le impostazioni rapide di Bridgeplay a destra del gioco: overlay, limite di fotogrammi e filtro di scala cambiano subito e vengono salvati per quel gioco. Usa i tasti freccia o fai clic, ed Esc per chiudere."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оверлей Bridgeplay в левом верхнем углу во время игры. FPS показывает только частоту кадров, «Сводка» добавляет в одну строку время кадра, CPU, GPU, память и батарею, а «Подробно» — панель с графиком времени кадра. «Metal HUD от Apple» показывает вместо него оверлей Apple. По умолчанию выключено. Пока игра запущена, Option-Command-P открывает быстрые настройки Bridgeplay справа от игры: оверлей, ограничение частоты кадров и фильтр масштабирования меняются сразу и сохраняются для этой игры. Используйте клавиши со стрелками или щелчок, а Esc — чтобы закрыть."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏时 Bridgeplay 的叠加层显示在左上角。FPS 只显示帧率，摘要在一行中加上帧时间、CPU、GPU、内存和电池，详细则是带帧时间图表的面板。Apple Metal 性能监视器改为显示 Apple 自己的叠加层。默认关闭。游戏运行时，按 Option-Command-P 会在游戏右侧打开 Bridgeplay 快捷设置：叠加层、帧率限制和缩放过滤会立即生效，并为该游戏保存。使用方向键或点击操作，按 Esc 关闭。"
           }
         }
       }
@@ -6068,6 +6156,28 @@
         }
       }
     },
+    "Detailed" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dettagliato"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подробно"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "详细"
+          }
+        }
+      }
+    },
     "Didn't run" : {
       "localizations" : {
         "it" : {
@@ -6570,6 +6680,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "DualSense、Xbox、GameSir 等手柄无需映射界面即可使用。游戏首次使用手柄时，请在“输入监控”中允许 Steam。"
+          }
+        }
+      }
+    },
+    "Enable Frame Limit" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva limite di fotogrammi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включить ограничение частоты кадров"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用帧率限制"
+          }
+        }
+      }
+    },
+    "Enable frame limit" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva limite di fotogrammi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включить ограничение частоты кадров"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用帧率限制"
           }
         }
       }
@@ -7190,6 +7344,72 @@
         }
       }
     },
+    "Frame Rate Limit" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limite di fotogrammi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ограничение частоты кадров"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧率限制"
+          }
+        }
+      }
+    },
+    "Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ограничение частоты кадров (синхронизировано с дисплеем, его частота обновления не меняется)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧率限制（与显示器同步，不会更改其刷新率）"
+          }
+        }
+      }
+    },
+    "Frame rate, frame time, CPU, GPU, memory and battery in the top-left corner while you play, or Apple's Metal HUD." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frequenza dei fotogrammi, tempo per fotogramma, CPU, GPU, memoria e batteria nell'angolo in alto a sinistra mentre giochi, oppure il Metal HUD di Apple."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Частота кадров, время кадра, CPU, GPU, память и батарея в левом верхнем углу во время игры или Metal HUD от Apple."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏时在左上角显示帧率、帧时间、CPU、GPU、内存和电池，或改用 Apple 的 Metal 性能监视器。"
+          }
+        }
+      }
+    },
     "Free software under the GPL-3.0, with no warranty." : {
       "localizations" : {
         "it" : {
@@ -7674,6 +7894,50 @@
         }
       }
     },
+    "Holds games to this many frames per second, from 15 up to the display's refresh rate, and waits for the display they are on. The display's refresh rate is not changed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limita i giochi a questo numero di fotogrammi al secondo, da 15 fino alla frequenza del display, e attende il display su cui si trovano. La frequenza del display non cambia."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ограничивает игры этим числом кадров в секунду, от 15 до частоты обновления дисплея, и ждёт дисплей, на котором они идут. Частота обновления дисплея не меняется."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将游戏限制为此帧率，从 15 到显示器的刷新率，并等待游戏所在的显示器。不会更改显示器的刷新率。"
+          }
+        }
+      }
+    },
+    "How a game's frames are scaled up to the screen when it draws fewer pixels, as with High Resolution off. Automatic keeps what Wine does there, sharp pixels; Linear smooths them." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Come i fotogrammi di un gioco vengono ingranditi sullo schermo quando disegna meno pixel, come con Alta risoluzione disattivata. Automatico mantiene ciò che fa Wine, pixel nitidi; Lineare li ammorbidisce."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как кадры игры растягиваются на экран, когда она рисует меньше пикселей, например при выключенном высоком разрешении. «Автоматически» оставляет то, что делает Wine, — чёткие пиксели; «Линейный» их сглаживает."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当游戏绘制的像素少于屏幕时（例如关闭高分辨率），其画面如何放大到屏幕。自动保持 Wine 的做法，即锐利像素；线性会将其平滑。"
+          }
+        }
+      }
+    },
     "How did each game run? Games you already answered for this version of Bridgeplay, games you asked not to be asked about, and games already verified on a Mac like yours are left out." : {
       "localizations" : {
         "it" : {
@@ -7736,6 +8000,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "游戏的 DirectX 如何到达你的 GPU。“自动”会按游戏选择。D3DMetal（Apple 的 Game Porting Toolkit）运行 DirectX 11 和 12，为默认选项。DXMT 直接在 Metal 上运行 DirectX 10 和 11。DXVK 通过 Vulkan 运行 DirectX 9 到 11。WineD3D 是 Wine 自带的转换层，适用于很老的游戏。"
+          }
+        }
+      }
+    },
+    "How the game's frames are scaled up to your screen. Automatic keeps what happens today: Wine doubles each pixel sharply with High Resolution off, and Mac games are smoothed. Linear smooths, Nearest keeps every pixel sharp, which suits pixel art, and Integer is sharp only at an exact 2x or 3x. MetalFX upscaling, when on, runs first." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Come i fotogrammi del gioco vengono ingranditi sullo schermo. Automatico mantiene il comportamento attuale: con Alta risoluzione disattivata Wine raddoppia ogni pixel in modo nitido, e i giochi per Mac vengono ammorbiditi. Lineare ammorbidisce, Nearest mantiene ogni pixel nitido, adatto alla pixel art, e Intero è nitido solo a 2x o 3x esatti. L'upscaling MetalFX, se attivo, viene prima."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как кадры игры растягиваются на ваш экран. «Автоматически» оставляет всё как сейчас: при выключенном высоком разрешении Wine чётко удваивает каждый пиксель, а игры для Mac сглаживаются. «Линейный» сглаживает, «Ближайший» сохраняет каждый пиксель чётким, что подходит для пиксель-арта, а «Целочисленный» чёткий только при ровно 2x или 3x. Масштабирование MetalFX, если включено, выполняется первым."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏画面如何放大到屏幕。自动保持现在的效果：关闭高分辨率时 Wine 会将每个像素锐利地放大一倍，Mac 游戏则会被平滑。线性会平滑，最近邻让每个像素保持锐利，适合像素风格，整数仅在正好 2 倍或 3 倍时锐利。若开启 MetalFX 超分辨率，它会先执行。"
           }
         }
       }
@@ -8378,6 +8664,28 @@
         }
       }
     },
+    "Integer" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intero"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Целочисленный"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整数"
+          }
+        }
+      }
+    },
     "It installs when you quit Bridgeplay, or you can restart now." : {
       "localizations" : {
         "it" : {
@@ -8884,6 +9192,28 @@
         }
       }
     },
+    "Linear" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lineare"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Линейный"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "线性"
+          }
+        }
+      }
+    },
     "Linked." : {
       "localizations" : {
         "it" : {
@@ -9368,6 +9698,28 @@
         }
       }
     },
+    "Nearest" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nearest"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ближайший"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近邻"
+          }
+        }
+      }
+    },
     "Needs rebuilding" : {
       "localizations" : {
         "it" : {
@@ -9830,6 +10182,28 @@
         }
       }
     },
+    "Off by default, so there is no limit. Switch it on to apply the slider's value; switched off again, the slider keeps it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattivato per impostazione predefinita, quindi senza limite. Attivalo per applicare il valore del cursore; disattivandolo di nuovo, il cursore lo mantiene."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "По умолчанию выключено, то есть ограничения нет. Включите, чтобы применить значение ползунка; при повторном выключении ползунок его сохраняет."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认关闭，即不限制帧率。开启后会应用滑块的数值；再次关闭时滑块会保留该数值。"
+          }
+        }
+      }
+    },
     "On" : {
       "localizations" : {
         "it" : {
@@ -9896,24 +10270,24 @@
         }
       }
     },
-    "Only on native Mac games, next to Metal HUD and Frame Generation. Raw HID suits Unity, SDL and Unreal games, GameController uses Apple's framework, and Off leaves controllers alone." : {
+    "Only on native Mac games, next to the Performance Overlay and Frame Generation. Raw HID suits Unity, SDL and Unreal games, GameController uses Apple's framework, and Off leaves controllers alone." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Solo per i giochi nativi per Mac, accanto a Metal HUD e Generazione fotogrammi. Raw HID va bene per i giochi Unity, SDL e Unreal, GameController usa il framework di Apple e Disattivato lascia stare i controller."
+            "value" : "Solo per i giochi nativi per Mac, accanto a Overlay delle prestazioni e Generazione fotogrammi. Raw HID va bene per i giochi Unity, SDL e Unreal, GameController usa il framework di Apple e Disattivato lascia stare i controller."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Только для нативных игр Mac, рядом с Metal HUD и генерацией кадров. Raw HID подходит для игр на Unity, SDL и Unreal, GameController использует фреймворк Apple, а «Выкл.» не трогает геймпады."
+            "value" : "Только для нативных игр Mac, рядом с оверлеем производительности и генерацией кадров. Raw HID подходит для игр на Unity, SDL и Unreal, GameController использует фреймворк Apple, а «Выкл.» не трогает геймпады."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅限原生 Mac 游戏，位于 Metal HUD 和帧生成旁边。Raw HID 适合 Unity、SDL 和 Unreal 游戏，GameController 使用 Apple 的框架，关闭则不处理控制器。"
+            "value" : "仅限原生 Mac 游戏，位于性能叠加层和帧生成旁边。Raw HID 适合 Unity、SDL 和 Unreal 游戏，GameController 使用 Apple 的框架，关闭则不处理控制器。"
           }
         }
       }
@@ -10464,6 +10838,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "性能"
+          }
+        }
+      }
+    },
+    "Performance Overlay" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overlay delle prestazioni"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оверлей производительности"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "性能叠加层"
+          }
+        }
+      }
+    },
+    "Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overlay delle prestazioni (in gioco, ⌥⌘P apre le impostazioni rapide di questi controlli)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оверлей производительности (в игре ⌥⌘P открывает быстрые настройки для этих параметров)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "性能叠加层（游戏中按 ⌥⌘P 打开这些设置的快捷面板）"
           }
         }
       }
@@ -12514,6 +12932,50 @@
         }
       }
     },
+    "Scaling Filter" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtro di scala"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фильтр масштабирования"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩放过滤"
+          }
+        }
+      }
+    },
+    "Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фильтр масштабирования (когда игра рисует меньше пикселей, чем у экрана, например при выключенном высоком разрешении)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩放过滤（当游戏绘制的像素少于屏幕时生效，例如关闭高分辨率时）"
+          }
+        }
+      }
+    },
     "Select a copy of CrossOver." : {
       "localizations" : {
         "it" : {
@@ -14471,6 +14933,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在停止 Steam"
+          }
+        }
+      }
+    },
+    "Summary" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riepilogo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сводка"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "摘要"
           }
         }
       }

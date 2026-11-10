@@ -7,7 +7,7 @@ const os = require('os');
 const path = require('path');
 const vm = require('vm');
 const { execFileSync } = require('child_process');
-const { panel, walk, details, runner, FORMS } = require('./harness');
+const { panel, walk, details, runner, FORMS, hud } = require('./harness');
 
 const emit = process.argv[2];
 if (!emit) { console.error('usage: effective.js <emit>'); process.exit(2); }
@@ -32,12 +32,18 @@ put('gamefixes-default/1888930.conf', 'ROSETTA_ADVERTISE_AVX=1\n');
 // Bridgeplay's shipped defaults for every game sit under the user's Game Defaults.
 put('gamefixes-default/default.conf', 'MTL_HUD_ENABLED=0\nDXMT_ENABLE_NVEXT=1\nRETINA=0\n');
 // The run script's short keys also take the BRIDGEPLAY_ name.
-put('gamefixes/1778821.conf', 'BRIDGEPLAY_FRAMEGEN=0\n');
+put('gamefixes/1778821.conf', 'BRIDGEPLAY_FRAMEGEN=0\nPERF_OVERLAY=summary\n');
+put('gamefixes/1778822.conf', 'BRIDGEPLAY_PERF_OVERLAY=detailed\nFPS_LIMIT=30\n');
+put('gamefixes/1778826.conf', 'BRIDGEPLAY_FPS_LIMIT=half\nSCALING_FILTER=integer\n');
 // np-native's own confs: raw variable names, export and quotes allowed, and the pre-3.0
 // NOTPROTON_ spelling still read under the BRIDGEPLAY_ name.
 put('gamefixes/native-default.conf', '# native\nexport MTL_HUD_ENABLED=1\nNP_PAD_MODE = "hid"\n' +
   'NOTPROTON_FRAMEGEN=3\nFRAMEGEN=2\nBRIDGEPLAY_RETINA=1\n');
 put('gamefixes/native/1778820.conf', "NP_PAD_MODE='gc'\nBRIDGEPLAY_FRAMEGEN_ENGINE=metalfx\n");
+put('gamefixes/native/1778823.conf', 'NOTPROTON_PERF_OVERLAY=fps\nBRIDGEPLAY_FPS_LIMIT=display\nBRIDGEPLAY_SCALING_FILTER=nearest\n');
+// As in np-native, the NOTPROTON_ spelling wins in the same file, before or after.
+put('gamefixes/native/1778824.conf', 'NOTPROTON_PERF_OVERLAY=fps\nBRIDGEPLAY_PERF_OVERLAY=detailed\n');
+put('gamefixes/native/1778825.conf', 'BRIDGEPLAY_FRAMEGEN=3\nNOTPROTON_FRAMEGEN=2\nBRIDGEPLAY_FRAMEGEN=adaptive\n');
 // The first tool is the default one, and its name runs past the 16 characters a value may.
 put('tools',
   'bridgeplay-proton-winecx-11.17\twinecx-11.17\trosetta\tWineCX 11.17 (msync, D3DMetal)\n' +
@@ -91,13 +97,26 @@ t0.ok(!!fx && fx.d.BRIDGEPLAY_FRAMEGEN_UI === '1' && fx.d.BRIDGEPLAY_FRAMEGEN_FA
       'Protect UI and the fast-motion fallback default on');
 t0.ok(!!fx && JSON.stringify(fx.ng) === '{"MTL_HUD_ENABLED":"1","NP_PAD_MODE":"hid","BRIDGEPLAY_FRAMEGEN":"3"}',
       `native-default.conf is read the way np-native reads it (${fx && JSON.stringify(fx.ng)})`);
-t0.ok(!!fx && JSON.stringify(fx.na) === '{"1778820":{"NP_PAD_MODE":"gc","BRIDGEPLAY_FRAMEGEN_ENGINE":"metalfx"}}',
+t0.ok(!!fx && fx.a[1778821] && fx.a[1778821].BRIDGEPLAY_PERF_OVERLAY === 'summary' &&
+      fx.a[1778822] && fx.a[1778822].BRIDGEPLAY_PERF_OVERLAY === 'detailed',
+      `PERF_OVERLAY reaches the panel in either spelling (${fx && JSON.stringify(fx.a)})`);
+t0.ok(!!fx && fx.a[1778822].BRIDGEPLAY_FPS_LIMIT === '30' && fx.a[1778826] && fx.a[1778826].BRIDGEPLAY_FPS_LIMIT === 'half' &&
+      fx.na[1778823].BRIDGEPLAY_FPS_LIMIT === 'display',
+      `FPS_LIMIT reaches the panel in either spelling, native too (${fx && JSON.stringify(fx.a)})`);
+t0.ok(!!fx && fx.a[1778826].BRIDGEPLAY_SCALING_FILTER === 'integer' && fx.na[1778823].BRIDGEPLAY_SCALING_FILTER === 'nearest',
+      `SCALING_FILTER reaches the panel, native too (${fx && JSON.stringify(fx.na)})`);
+t0.ok(!!fx && fx.na[1778823] && fx.na[1778823].BRIDGEPLAY_PERF_OVERLAY === 'fps',
+      `a native conf's overlay level reaches the panel (${fx && JSON.stringify(fx.na)})`);
+t0.ok(!!fx && fx.na[1778824] && fx.na[1778824].BRIDGEPLAY_PERF_OVERLAY === 'fps' &&
+      fx.na[1778825] && fx.na[1778825].BRIDGEPLAY_FRAMEGEN === '2',
+      `a NOTPROTON_ line wins over BRIDGEPLAY_ in one native conf, as np-native reads it (${fx && JSON.stringify(fx.na)})`);
+t0.ok(!!fx && JSON.stringify(fx.na[1778820]) === '{"NP_PAD_MODE":"gc","BRIDGEPLAY_FRAMEGEN_ENGINE":"metalfx"}',
       `native/<appid>.conf lands per app (${fx && JSON.stringify(fx.na)})`);
 t0.ok(!!legacyFx && legacyFx.g.BRIDGEPLAY_RETINA === '1',
       `a home with only the pre-3.0 support folder is still read (${legacyFx && JSON.stringify(legacyFx.g)})`);
 failed += t0.failed;
 
-const LABELS = ['Metal HUD', 'DLSS', 'Advertise AVX2 to Rosetta', 'MSync', 'High Resolution',
+const LABELS = ['DLSS', 'Advertise AVX2 to Rosetta', 'MSync', 'High Resolution',
                 'Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)'];
 globalThis.MSCXFx = fx;
 for (const form of Object.keys(FORMS)) {
@@ -109,6 +128,8 @@ for (const form of Object.keys(FORMS)) {
   const on = checked({ strCompatToolName: '' });
   t.ok(LABELS.every(l => on.includes(l)),
        `a game on the default tool shows every conf and engine default on (${on.join(',')})`);
+  t.ok(hud(walk(P({ details: details('', { unAppID: 1778820, strCompatToolName: '' }) }))).props.checked,
+       'the Metal HUD from the global conf shows in the overlay menu');
   t.ok(checked({ strCompatToolName: 'bridgeplay-proton-winecx-11.17' }).includes('MSync'),
        'the default tool named outright reads MSync as on');
   t.ok(!checked({ strCompatToolName: 'bridgeplay-proton-winehq' }).includes('MSync'),
@@ -127,12 +148,12 @@ for (const form of Object.keys(FORMS)) {
   // A native build reads np-native's confs and writes under the escaped home.
   const mac = { vecPlatforms: ['osx'], strCompatToolName: '' };
   ns = fg(1778820, '', mac);
-  t.ok(lab(ns, 'Metal HUD').props.checked === true && lab(ns, 'Mode').props.selectedOption === '3' &&
+  t.ok(hud(ns).props.checked === true && lab(ns, 'Mode').props.selectedOption === '3' &&
        lab(ns, 'Controller layer').props.selectedOption === 'gc' && lab(ns, 'Engine').props.selectedOption === 'metalfx',
        'a native game shows the native confs, per app over default');
   t.ok(lab(fg(999, '', mac), 'Controller layer').props.selectedOption === 'hid', 'another native game gets the default');
   written.length = 0;
-  lab(fg(999, '-novid', mac), 'Metal HUD').props.onChange(false);
+  hud(fg(999, '-novid', mac)).props.onChange(false);
   const want = "'" + home.replace(/'/g, "'\\''") + "/.bridgeplay/np-native' MTL_HUD_ENABLED=0 %command% -novid";
   t.ok(written.length === 1 && written[0].opts === want, `the launcher path is the user's home (${written[0] && written[0].opts})`);
   failed += t.failed;

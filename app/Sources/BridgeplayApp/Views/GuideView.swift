@@ -86,8 +86,6 @@ struct GuideView: View {
             SteamBlock(title: String(localized: "Graphics")) {
                 SteamRow(.dropdown(nil, String(localized: "Automatic")),
                          note: String(localized: "How the game's DirectX reaches your GPU. Automatic picks per game. D3DMetal (Apple's Game Porting Toolkit) runs DirectX 11 and 12 and is the default. DXMT runs DirectX 10 and 11 directly on Metal. DXVK runs DirectX 9 to 11 through Vulkan. WineD3D is Wine's own translation, for very old games."))
-                SteamRow(.check(String(localized: "Metal HUD"), true),
-                         note: String(localized: "Apple's performance overlay: frame rate, frame time and GPU use."))
                 SteamRow(.check("DLSS", true),
                          note: String(localized: "Lets the game offer NVIDIA DLSS. Apple's MetalFX does the upscaling, and DLSS Frame Generation is experimental and off by default. Turn DLSS on in the game's own settings as well."))
                 SteamRow(.check(String(localized: "Advertise AVX2 to Rosetta"), true),
@@ -96,6 +94,23 @@ struct GuideView: View {
                          note: String(localized: "A faster way for the game's threads to wait on each other. Leave it on unless a game hangs."))
                 SteamRow(.check(String(localized: "High Resolution"), true),
                          note: String(localized: "Draws at your display's full Retina resolution instead of half. Sharper, heavier on the GPU."))
+            }
+
+            SteamBlock(title: String(localized: "Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)")) {
+                SteamRow(.dropdown(nil, String(localized: "Off")),
+                         note: String(localized: "Bridgeplay's overlay in the top-left corner while you play. FPS shows the frame rate alone, Summary adds frame time, CPU, GPU, memory and battery in one row, and Detailed a panel with a frame-time graph. Apple Metal HUD shows Apple's own overlay instead. Off by default. While a game runs, Option-Command-P opens Bridgeplay's quick settings on the right of the game: the overlay, the frame rate limit and the scaling filter change at once and are saved for that game. Use the arrow keys or click, and Esc to close."))
+            }
+
+            SteamBlock(title: String(localized: "Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)")) {
+                SteamRow(.slider("60 FPS", 1, true),
+                         note: String(localized: "A slider in whole frames per second, from 15 up to your display's refresh rate, as on Steam Deck. The game waits for the display so frames land evenly: smoother pacing and less battery drain. On a game's own display a higher value counts as its refresh rate, and the display's own rate is never changed."))
+                SteamRow(.toggle(String(localized: "Enable frame limit"), false),
+                         note: String(localized: "Off by default, so there is no limit. Switch it on to apply the slider's value; switched off again, the slider keeps it."))
+            }
+
+            SteamBlock(title: String(localized: "Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)")) {
+                SteamRow(.dropdown(nil, String(localized: "Automatic (Wine keeps pixels sharp with High Resolution off)")),
+                         note: String(localized: "How the game's frames are scaled up to your screen. Automatic keeps what happens today: Wine doubles each pixel sharply with High Resolution off, and Mac games are smoothed. Linear smooths, Nearest keeps every pixel sharp, which suits pixel art, and Integer is sharp only at an exact 2x or 3x. MetalFX upscaling, when on, runs first."))
             }
 
             SteamBlock(title: String(localized: "MetalFX Upscaling (Samples from the resolution the game is set to)")) {
@@ -125,7 +140,7 @@ struct GuideView: View {
 
             SteamBlock(title: String(localized: "Native Mac games")) {
                 SteamRow(.dropdown(String(localized: "Controller layer"), String(localized: "Automatic")),
-                         note: String(localized: "Only on native Mac games, next to Metal HUD and Frame Generation. Raw HID suits Unity, SDL and Unreal games, GameController uses Apple's framework, and Off leaves controllers alone."))
+                         note: String(localized: "Only on native Mac games, next to the Performance Overlay and Frame Generation. Raw HID suits Unity, SDL and Unreal games, GameController uses Apple's framework, and Off leaves controllers alone."))
             }
         }
     }
@@ -340,7 +355,7 @@ private struct SteamPropertiesDrawing: View {
                 .padding(7).background(Steam.row)
                 Text("Graphics").font(Steam.font(11, .semibold)).foregroundStyle(.white).padding(.top, 4)
                 mini(String(localized: "Automatic"), wide: true)
-                ForEach([String(localized: "Metal HUD"), "DLSS", "MSync", String(localized: "High Resolution")], id: \.self) { label in
+                ForEach(["DLSS", "MSync", String(localized: "High Resolution")], id: \.self) { label in
                     HStack(spacing: 7) {
                         checkbox(true)
                         Text(verbatim: label).font(Steam.font(9.5, .regular)).foregroundStyle(Steam.text)
@@ -399,6 +414,8 @@ private struct SteamRow: View {
         case toggle(String, Bool)
         case dropdown(String?, String)
         case check(String, Bool)
+        // Steam's slider: its value, where it sits on the track (0 to 1), and whether it is dimmed
+        case slider(String, Double, Bool)
     }
 
     let control: Control
@@ -457,6 +474,21 @@ private struct SteamRow: View {
                 Spacer()
             }
             .padding(.horizontal, 10).frame(height: 38).background(Steam.row)
+        case .slider(let value, let at, let dimmed):
+            VStack(alignment: .leading, spacing: 6) {
+                GeometryReader { box in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Steam.control).frame(height: 6)
+                        Capsule().fill(Steam.blue).frame(width: box.size.width * at, height: 6)
+                        Circle().fill(.white).frame(width: 16, height: 16)
+                            .offset(x: box.size.width * at - 8)
+                    }
+                    .frame(height: 16)
+                }
+                .frame(height: 16)
+                Text(verbatim: value).font(Steam.font(12, .regular)).foregroundStyle(Steam.dim)
+            }
+            .opacity(dimmed ? 0.45 : 1)
         }
     }
 

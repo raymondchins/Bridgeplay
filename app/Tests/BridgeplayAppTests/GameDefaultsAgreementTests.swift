@@ -25,12 +25,18 @@ struct GameDefaultsAgreementTests {
             patterns.contains { $0 == key || ($0.hasSuffix("_?*") && key.hasPrefix($0.dropLast(2))) }
         }
 
-        // The values of its `case "$2" in a|b)`, nil when it takes any value.
+        // The values of its first `case "$2" in a|b)`, nil when it takes any value. A value can
+        // be a shell pattern, such as FPS_LIMIT's [1-9][0-9].
         var values: Set<String>? {
-            guard let start = body.range(of: "case \"$2\" in ") else { return nil }
-            let rest = body[start.upperBound...]
+            guard let start = body.range(of: "case \"$2\" in") else { return nil }
+            let rest = body[start.upperBound...].drop { $0 == " " || $0 == "\n" }
             guard let close = rest.firstIndex(of: ")") else { return nil }
             return Set(rest[..<close].split(separator: "|").map(String.init))
+        }
+
+        // Whether `case "$2"` takes value, matched as sh matches a case pattern.
+        func accepts(_ value: String) -> Bool {
+            (values ?? []).contains { fnmatch($0, value, 0) == 0 }
         }
     }
 
@@ -63,11 +69,19 @@ struct GameDefaultsAgreementTests {
             let arm = try #require(arms.first { $0.matches(key) && $0.patterns != ["*"] }, "\(key) is not on the allow-list")
             if setting == .dllOverrides {
                 #expect(arm.body.contains("valid_dll_overrides"))
+            } else if setting == .frameLimit {
+                // 0, display, half, or a whole number from 10 to 360 (the arm's -le 360).
+                #expect(arm.body.contains("[ \"$2\" -le 360 ]"))
+                for probe in ["0", "display", "half", "9", "10", "60", "99", "100", "360", "361", "399", "400",
+                              "1000", "060", "6O", "-30", "+30", "half2"] {
+                    let shell = arm.accepts(probe) && (Int(probe).map { $0 <= 360 } ?? true)
+                    #expect(GameDefaults.validFrameLimit(probe) == shell, "FPS_LIMIT=\(probe)")
+                }
             } else {
                 #expect(arm.values == setting.accepted.map { Set($0) }, "\(key): \(String(describing: arm.values))")
             }
             if case .choice(let offered) = setting.kind {
-                #expect(Set(offered).isSubset(of: arm.values ?? []), "\(key) offers a value the run script refuses")
+                #expect(offered.allSatisfy(arm.accepts), "\(key) offers a value the run script refuses")
             }
         }
     }

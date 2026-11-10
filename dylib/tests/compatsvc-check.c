@@ -190,6 +190,7 @@ static pid_t stub_waitpid(pid_t pid, int *status, int options) {
 #define posix_spawn stub_posix_spawn
 #define waitpid stub_waitpid
 
+#include "../feats/quicksettings.c"
 #include "../feats/compatsvc.c"
 
 // Minimal protobuf decoder for the captured reply. Enough to find field values.

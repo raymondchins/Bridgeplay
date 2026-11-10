@@ -25,6 +25,76 @@ import Testing
         #expect(GameDefaults.setting(.metalHUD, to: "0", in: "MTL_HUD_ENABLED=1\n") == "")
     }
 
+    @Test func thePerformanceOverlayIsALevelOffByDefault() {
+        #expect(GameDefaults.resolve(.perfOverlay, user: "", shipped: "") == .init(value: "0", source: .engine))
+        #expect(GameDefaults.value(.perfOverlay, in: "PERF_OVERLAY=summary\n") == "summary")
+        #expect(GameDefaults.value(.perfOverlay, in: "BRIDGEPLAY_PERF_OVERLAY=detailed\n") == "detailed")
+        // What the run script refuses is skipped, as it is there
+        #expect(GameDefaults.value(.perfOverlay, in: "PERF_OVERLAY=fps\nPERF_OVERLAY=full\n") == "fps")
+        #expect(GameDefaults.refusal("full", for: .perfOverlay) != nil)
+        #expect(GameDefaults.setting(.perfOverlay, to: "fps", in: "") == GameDefaults.header + "\nPERF_OVERLAY=fps\n")
+        #expect(GameDefaults.setting(.perfOverlay, to: "0", in: "BRIDGEPLAY_PERF_OVERLAY=fps\n") == "")
+        #expect(GameDefaults.Setting.perfOverlay.launchKeys == ["BRIDGEPLAY_PERF_OVERLAY", "NOTPROTON_PERF_OVERLAY"])
+        #expect(GameDefaults.launchOverrides("BRIDGEPLAY_PERF_OVERLAY=summary %command%") == [.perfOverlay])
+        #expect(GameDefaults.confOverrides("PERF_OVERLAY=detailed\nMTL_HUD_ENABLED=1\n") == [.metalHUD, .perfOverlay])
+    }
+
+    @Test func theFrameRateLimitTakesTheRunScriptsValues() {
+        #expect(GameDefaults.resolve(.frameLimit, user: "", shipped: "") == .init(value: "0", source: .engine))
+        for value in ["0", "display", "half", "10", "30", "45", "144", "360"] {
+            #expect(GameDefaults.refusal(value, for: .frameLimit) == nil, "\(value)")
+        }
+        for value in ["5", "9", "361", "400", "030", "max", "30fps", "-30", "", "Display"] {
+            #expect(GameDefaults.refusal(value, for: .frameLimit) != nil, "\(value)")
+        }
+        #expect(GameDefaults.value(.frameLimit, in: "BRIDGEPLAY_FPS_LIMIT=half\nFPS_LIMIT=400\n") == "half")
+        #expect(GameDefaults.setting(.frameLimit, to: "30", in: "") == GameDefaults.header + "\nFPS_LIMIT=30\n")
+        #expect(GameDefaults.setting(.frameLimit, to: "0", in: "FPS_LIMIT=30\n") == "")
+        #expect(GameDefaults.launchOverrides("BRIDGEPLAY_FPS_LIMIT=30 %command%") == [.frameLimit])
+        #expect(GameDefaults.problems(in: "FPS_LIMIT=5\n").map(\.setting) == [.frameLimit])
+    }
+
+    @Test func theFrameRateLimitSliderReadsEveryValueTheShimDoes() {
+        // A number held to 15 and the display's rate; display and half from earlier releases
+        #expect(GameDefaults.frameLimitValue("45", maxFPS: 60) == 45)
+        #expect(GameDefaults.frameLimitValue("10", maxFPS: 60) == 15)
+        #expect(GameDefaults.frameLimitValue("90", maxFPS: 60) == 60)
+        #expect(GameDefaults.frameLimitValue("90", maxFPS: 120) == 90)
+        #expect(GameDefaults.frameLimitValue("display", maxFPS: 120) == 120)
+        #expect(GameDefaults.frameLimitValue("half", maxFPS: 60) == 30)
+        #expect(GameDefaults.frameLimitValue("half", maxFPS: 75) == 38)
+        for none in [nil, "", "0", "5", "max"] as [String?] {
+            #expect(GameDefaults.frameLimitValue(none, maxFPS: 60) == nil, "\(String(describing: none))")
+        }
+    }
+
+    @Test func disableFrameLimitKeepsTheValue() {
+        #expect(GameDefaults.resolve(.frameLimitOff, user: "", shipped: "") == .init(value: "0", source: .engine))
+        #expect(GameDefaults.frameLimitIsOff(limit: "0", off: "0"))
+        #expect(GameDefaults.frameLimitIsOff(limit: nil, off: nil))
+        #expect(GameDefaults.frameLimitIsOff(limit: "45", off: "1"))
+        #expect(!GameDefaults.frameLimitIsOff(limit: "45", off: "0"))
+        #expect(!GameDefaults.frameLimitIsOff(limit: "half", off: nil))
+        let off = GameDefaults.setting(.frameLimitOff, to: "1", in: "FPS_LIMIT=45\n")
+        #expect(off == "FPS_LIMIT=45\nFPS_LIMIT_OFF=1\n")
+        #expect(GameDefaults.value(.frameLimit, in: off) == "45")
+        #expect(GameDefaults.setting(.frameLimitOff, to: "0", in: off) == "FPS_LIMIT=45\n")
+        #expect(GameDefaults.refusal("2", for: .frameLimitOff) != nil)
+        #expect(GameDefaults.value(.frameLimitOff, in: "BRIDGEPLAY_FPS_LIMIT_OFF=1\n") == "1")
+        #expect(GameDefaults.launchOverrides("BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_FPS_LIMIT_OFF=1 %command%")
+                == [.frameLimit, .frameLimitOff])
+    }
+
+    @Test func theScalingFilterIsAutomaticUnlessSet() {
+        #expect(GameDefaults.resolve(.scalingFilter, user: "", shipped: "") == .init(value: "0", source: .engine))
+        #expect(GameDefaults.value(.scalingFilter, in: "BRIDGEPLAY_SCALING_FILTER=integer\n") == "integer")
+        #expect(GameDefaults.refusal("linear", for: .scalingFilter) == nil)
+        #expect(GameDefaults.refusal("fsr", for: .scalingFilter) != nil)
+        #expect(GameDefaults.setting(.scalingFilter, to: "nearest", in: "") == GameDefaults.header + "\nSCALING_FILTER=nearest\n")
+        #expect(GameDefaults.setting(.scalingFilter, to: "0", in: "SCALING_FILTER=nearest\n") == "")
+        #expect(GameDefaults.launchOverrides("BRIDGEPLAY_SCALING_FILTER=nearest %command%") == [.scalingFilter])
+    }
+
     @Test func writesAndReadsBackAFile() throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "gamedefaults-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }

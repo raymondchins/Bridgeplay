@@ -1,5 +1,5 @@
 'use strict';
-const { panel, walk, details, runner, FORMS } = require('./harness');
+const { panel, walk, details, runner, FORMS, hud: hudOf } = require('./harness');
 
 const emit = process.argv[2];
 if (!emit) { console.error('usage: launch-options.js <emit>'); process.exit(2); }
@@ -10,7 +10,7 @@ for (const form of Object.keys(FORMS)) {
   const t = runner(form);
   const nodes = opts => walk(P({ details: details(opts) }));
   const last = () => written[written.length - 1].opts;
-  const hud = opts => nodes(opts).find(x => x.props.label === 'Metal HUD');
+  const hud = opts => hudOf(nodes(opts));
 
   for (const assignment of ['MTL_HUD_ENABLED="1"', "MTL_HUD_ENABLED='1'",
                             'MTL_HUD_ENABLED=\\1']) {
@@ -76,7 +76,8 @@ for (const form of Object.keys(FORMS)) {
 
   const upscaled = 'CX_GRAPHICS_BACKEND=dxmt DXMT_METALFX_SPATIAL_SWAPCHAIN="1" '
                  + 'DXMT_CONFIG="d3d11.metalSpatialUpscaleFactor=1.5" %command%';
-  t.ok(nodes(upscaled).filter(x => x.type === 'Dropdown')[1].props.selectedOption === '1.5',
+  t.ok(nodes(upscaled).find(x => x.type === 'Dropdown' && x.props.rgOptions.some(o => o.data === '1.5'))
+         .props.selectedOption === '1.5',
        'reads the factor from quoted DXMT_CONFIG');
 
   t.ok(!hud('MTL_HUD_ENABLED=1 -windowed').props.checked,
@@ -113,7 +114,9 @@ for (const form of Object.keys(FORMS)) {
                      'nice -n 5 CX_GRAPHICS_BACKEND=dxmt %command%']) {
     written.length = 0;
     const ns = nodes(odd);
-    t.ok(ns.every(x => !x.props.disabled && x.props.role !== 'status'), `edits ${JSON.stringify(odd)}`);
+    // The limit slider is disabled while its switch turns the limit off, which says nothing about the line
+    t.ok(ns.every(x => (!x.props.disabled || x.props.npKey === 'BRIDGEPLAY_FPS_LIMIT') && x.props.role !== 'status'),
+         `edits ${JSON.stringify(odd)}`);
     hud(odd).props.onChange(true);
     t.ok(written.length === 1 && hud(last()).props.checked, `turns the HUD on in ${JSON.stringify(odd)}`);
     t.ok((last().match(/%command%/gi) || []).length === Math.max(1, (odd.match(/%command%/gi) || []).length),

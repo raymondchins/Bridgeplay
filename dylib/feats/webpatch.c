@@ -2,6 +2,7 @@
 // as Bridgeplay, since on a Mac every setting on it is Bridgeplay's
 #include "webpatch.h"
 #include "nativeplatform.h"
+#include "displayrate.h"
 #include "../util/log.h"
 #include "../util/file.h"
 
@@ -366,6 +367,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "padding:0;margin:10px 0;background:none}" \
     ".MSCXPanel .MSCXDrop>*{width:100%;max-width:none;margin:0}" \
     ".MSCXNoBottomGap{margin-bottom:0}" \
+    ".MSCXPanel .MSCXDim{opacity:.45;pointer-events:none}" \
     ".MSCXBtns{display:flex;gap:8px}" \
     ".MSCXBtn{background:#3d4450;color:#fff;border:none;border-radius:2px;padding:6px 14px;" \
     "font-size:14px;cursor:pointer}.MSCXBtn:hover{background:#4c5361}" \
@@ -382,6 +384,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 #define NP_CX_OPTIONS_BODY(ARG, RT, BARREL) \
     ARG "=>{" \
     "const t=" ARG ".details,o=t.strLaunchOptions||\"\"," \
+    /* MSCXApply hands in its own writer, to run several changes into one write. */ \
+    "W=" ARG ".write||((a,b)=>SteamClient.Apps.SetAppLaunchOptions(a,b))," \
     "fex=" NP_FEX_TOOLS ".indexOf(t.strCompatToolName||\"" NP_FALLBACK_TOOL "\")>=0," \
     "npZh=" NP_WEB_IS_ZH ",npIt=" NP_WEB_IS_IT ",npL=(en,zh,it)=>npZh?zh:npIt&&it?it:en," \
     NP_CX_LAUNCH_PARSE \
@@ -399,7 +403,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "else{let at=E.p;r=o.slice(0,at)+(add?add+\" \":\"\");" \
     "E.e.forEach(w=>{if(ps.some(p=>o.startsWith(p[0]+\"=\",w.start))){" \
     "r+=o.slice(at,w.start);at=w.end;while(o[at]===\" \"||o[at]===\"\\t\")at++}});r+=o.slice(at)}" \
-    "SteamClient.Apps.SetAppLaunchOptions(t.unAppID,r.trim()===\"%command%\"?\"\":r)}," \
+    "W(t.unAppID,r.trim()===\"%command%\"?\"\":r)}," \
     /* Native games run through np-native, which also forces arm64: <launcher> VAR=VALUE ... \
        %command% <game args>. Assignments are read from any word before %command%, so the \
        older "/usr/bin/arch ... -e VAR=VALUE" form is understood, and rewritten without the \
@@ -413,7 +417,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "ps.forEach(p=>{const i=vs.findIndex(x=>x[0]===p[0]);vs=vs.filter(x=>x[0]!==p[0]);" \
     "if(p[1])vs.splice(i<0?vs.length:i,0,[p[0],p[0]+\"=\"+qv(p[1])])});" \
     "const h=[qv(L)].concat(vs.map(x=>x[1])).join(\" \");" \
-    "SteamClient.Apps.SetAppLaunchOptions(t.unAppID," \
+    "W(t.unAppID," \
     "c?o.slice(0,E.p)+h+\" \"+o.slice(c.start):h+\" %command%\"+(o.trim()?\" \"+o.trim():\"\"))}," \
     /* Writing BRIDGEPLAY_<X> drops a NOTPROTON_<X> the line still carries. */ \
     "s=ps=>{ps=ps.concat(ps.filter(p=>/^BRIDGEPLAY_/.test(p[0])).map(p=>[\"NOTPROTON_\"+p[0].slice(11),\"\"]));" \
@@ -444,6 +448,46 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "fo&&T([\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"],\"Fast-motion fallback (skips frames that would smear)\",\"1\",\"0\")," \
     "fo&&D(\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"Engine\",[{data:\"own\",label:\"Built-in optical flow\"}," \
     "{data:\"metalfx\",label:\"MetalFX\"}],lc(\"own\"))]},\"fgn\")," \
+    /* The performance overlay and Apple's Metal HUD are one choice, so only one of them \
+       is ever on screen. The Metal HUD wins in overlay-shim when both come from the confs. */ \
+    "pf=x=>{x=(x||\"\").toLowerCase();return x===\"1\"?\"fps\":/^(fps|summary|detailed)$/.test(x)?x:\"0\"}," \
+    "PO=(l,O)=>(0," RT ".jsx)(" BARREL ".XY,{label:l,children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:O," \
+    "selectedOption:\"1\"===ev(\"MTL_HUD_ENABLED\")?\"hud\":pf(ev(\"BRIDGEPLAY_PERF_OVERLAY\"))," \
+    "onChange:v=>{const h=\"hud\"===v.data,p=h?\"0\":v.data;" \
+    "s([[\"BRIDGEPLAY_PERF_OVERLAY\",pf(dv(\"BRIDGEPLAY_PERF_OVERLAY\"))===p?\"\":p]," \
+    "[\"MTL_HUD_ENABLED\",(\"1\"===dv(\"MTL_HUD_ENABLED\"))===h?\"\":h?\"1\":\"0\"]])}})},\"pov\")," \
+    /* The frame rate limit: a slider in whole frames per second from 15 to the fastest \
+       display's refresh rate (Fx.fm), and Enable frame limit, which applies it; unchecked, the \
+       slider dims and keeps its value (BRIDGEPLAY_FPS_LIMIT_OFF=1). overlay-shim clamps to the display the game \
+       is on, so a value from the game, which knows that display, is kept up to 360 even when \
+       Fx.fm, read when Steam loaded this page, is lower. display and half from earlier releases show as the rate they give, 0 or no value \
+       as no limit. Steam's slider is found by the name its export carries, so a renamed export \
+       still works; without it, a menu in steps of 5 stands in. npKey and npSet are for \
+       MSCXApply, which sets the value even while the switch dims the slider. */ \
+    "fm=+Fx.fm>=15&&+Fx.fm<=360?+Fx.fm:60," \
+    "lf=x=>{x=(x||\"\").toLowerCase();return x===\"display\"?fm:x===\"half\"?Math.max(15,Math.round(fm/2)):" \
+    "/^\\d+$/.test(x)&&+x>=10&&+x<=360?Math.min(fm,Math.max(15,+x)):0}," \
+    "SL=globalThis.MSCXSliderField||(globalThis.MSCXSliderField=(()=>{try{return Object.values(" BARREL ")" \
+    ".find(f=>typeof f===\"function\"&&/\"SliderField\"/.test(String(f)))}catch(e){return null}})())," \
+    "FL=(l,dl)=>{const n=lf(ev(\"BRIDGEPLAY_FPS_LIMIT\")),off=!n||ev(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",v=n||fm," \
+    "set=(x,top)=>{x=Math.min(top||fm,Math.max(15,Math.round(+x)));if(!(x>=15))return;const b=dv(\"BRIDGEPLAY_FPS_LIMIT\");" \
+    "s([[\"BRIDGEPLAY_FPS_LIMIT\",/^\\d+$/.test(b)&&+b===x?\"\":String(x)]])}," \
+    "tog=on=>{const d=!on,b=dv(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",ps=[[\"BRIDGEPLAY_FPS_LIMIT_OFF\",d?(b?\"\":\"1\"):(b?\"0\":\"\")]];" \
+    "d||n||ps.push([\"BRIDGEPLAY_FPS_LIMIT\",String(v)]);s(ps)}," \
+    "R=[];for(let x=15;x<fm;x+=5)R.push(x);R.push(fm);R.indexOf(v)<0&&R.push(v);" \
+    "return(0," RT ".jsxs)(" BARREL ".XY,{label:l,children:[(0," RT ".jsx)(\"div\",{className:off?\"MSCXDim\":\"\",children:" \
+    "SL?(0," RT ".jsx)(SL,{min:15,max:fm,value:v,showValue:!0,valueSuffix:\" FPS\",disabled:off," \
+    "npKey:\"BRIDGEPLAY_FPS_LIMIT\",npSet:x=>set(x,360),onChange:x=>{off||set(x)}}):" \
+    "(0," RT ".jsx)(" BARREL ".m,{rgOptions:R.sort((a,b)=>a-b).map(x=>({data:x,label:x+\" FPS\"})),selectedOption:v," \
+    "disabled:off,npKey:\"BRIDGEPLAY_FPS_LIMIT\",npSet:x=>set(x,360),onChange:o=>{off||set(o.data)}})})," \
+    "(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:dl,checked:!off,npKey:\"BRIDGEPLAY_FPS_LIMIT_OFF\"," \
+    "onChange:tog})]},\"fpl\")}," \
+    /* The filter Core Animation scales the game's frames to the screen with. 0 leaves it as \
+       Wine (nearest with High Resolution off) or a native game (linear) sets it. */ \
+    "sq=x=>{x=(x||\"\").toLowerCase();return/^(linear|nearest|integer)$/.test(x)?x:\"0\"}," \
+    "SQ=(l,O)=>(0," RT ".jsx)(" BARREL ".XY,{label:l,children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:O," \
+    "selectedOption:sq(ev(\"BRIDGEPLAY_SCALING_FILTER\"))," \
+    "onChange:v=>s([[\"BRIDGEPLAY_SCALING_FILTER\",sq(dv(\"BRIDGEPLAY_SCALING_FILTER\"))===v.data?\"\":v.data]])})},\"scf\")," \
     /* A toggle that is on unless set to "0" (upstream 1.2.0: AVX2, FEX x87 precision). */ \
     "X=(k,l)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
     "checked:\"0\"!==ev(k),onChange:v=>s([[k,v?\"\":\"0\"]])},k)," \
@@ -475,10 +519,17 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "OV=[\"CX_GRAPHICS_BACKEND\",\"MTL_HUD_ENABLED\",\"D3DM_ENABLE_METALFX\",\"DXMT_ENABLE_NVEXT\"," \
     "\"ROSETTA_ADVERTISE_AVX\",\"WINEMSYNC\",\"BRIDGEPLAY_RETINA\",\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"DXMT_CONFIG\"," \
     "\"BRIDGEPLAY_FRAMEGEN\",\"BRIDGEPLAY_FRAMEGEN_QUALITY\",\"BRIDGEPLAY_FRAMEGEN_UI\",\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"," \
-    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
+    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\",\"BRIDGEPLAY_FPS_LIMIT_OFF\",\"BRIDGEPLAY_SCALING_FILTER\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
     "if(nat)return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
-    "T([\"MTL_HUD_ENABLED\"],\"Metal HUD\",\"1\"),FG()," \
+    "PO(\"Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)\",[{data:\"0\",label:\"Off\"},{data:\"fps\",label:\"FPS\"}," \
+    "{data:\"summary\",label:\"Summary (FPS, frame time, CPU, GPU, memory, battery)\"}," \
+    "{data:\"detailed\",label:\"Detailed (adds a frame-time graph)\"},{data:\"hud\",label:\"Apple Metal HUD\"}])," \
+    "FL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\",\"Enable frame limit\")," \
+    "SQ(\"Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)\",[" \
+    "{data:\"0\",label:\"Automatic (as the game sets it)\"},{data:\"linear\",label:\"Linear (smooth)\"}," \
+    "{data:\"nearest\",label:\"Nearest (sharp pixels at any scale)\"}," \
+    "{data:\"integer\",label:\"Integer (sharp at exact 2x or 3x, smooth otherwise)\"}]),FG()," \
     "(0," RT ".jsx)(" BARREL ".XY,{label:\"Controllers\",children:" \
     "D(\"NP_PAD_MODE\",\"Controller layer\",[{data:\"\",label:\"Automatic\"},{data:\"hid\",label:\"Raw HID (Unity, SDL, Unreal)\"}," \
     "{data:\"gc\",label:\"GameController\"},{data:\"off\",label:\"Off\"}],lc(\"\"))},\"ctl\")" \
@@ -493,13 +544,32 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     ".concat(\"\"===v.data||\"dxmt\"===v.data?[]:" \
     "[[\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"\"],[\"DXMT_CONFIG\",fx(\"\")]])" \
     ".concat(\"dxmt\"===v.data?[]:[[\"DXMT_ENABLE_NVEXT\",\"\"]]))})," \
-    "T([\"MTL_HUD_ENABLED\"],npL(\"Metal HUD\",\"Metal 性能监视器\",\"Metal HUD\"),\"1\")," \
     "dm&&T([\"D3DM_ENABLE_METALFX\"],\"DLSS\",\"1\")," \
     "\"dxmt\"===b&&T([\"DXMT_ENABLE_NVEXT\"],\"DLSS\",\"1\")," \
     "!fex&&X(\"ROSETTA_ADVERTISE_AVX\",npL(\"Advertise AVX2 to Rosetta\",\"向 Rosetta 声明 AVX2 支持\",\"Segnala AVX2 a Rosetta\"))," \
     "T([\"WINEMSYNC\"],\"MSync\",\"1\",\"0\")," \
     "T([\"BRIDGEPLAY_RETINA\"],npL(\"High Resolution\",\"高分辨率\",\"Alta risoluzione\"),\"1\",\"0\")" \
     "]},\"gfx\")," \
+    "PO(npL(\"Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)\",\"性能叠加层（游戏中按 ⌥⌘P 打开这些设置的快捷面板）\",\"Overlay delle prestazioni (in gioco, ⌥⌘P apre le impostazioni rapide di questi controlli)\"),[" \
+    "{data:\"0\",label:npL(\"Off\",\"关闭\",\"Disattivato\")},{data:\"fps\",label:\"FPS\"}," \
+    "{data:\"summary\",label:npL(\"Summary (FPS, frame time, CPU, GPU, memory, battery)\"," \
+    "\"摘要（FPS、帧时间、CPU、GPU、内存、电池）\",\"Riepilogo (FPS, tempo per fotogramma, CPU, GPU, memoria, batteria)\")}," \
+    "{data:\"detailed\",label:npL(\"Detailed (adds a frame-time graph)\",\"详细（增加帧时间图表）\"," \
+    "\"Dettagliato (aggiunge il grafico dei tempi per fotogramma)\")}," \
+    "{data:\"hud\",label:npL(\"Apple Metal HUD\",\"Apple Metal 性能监视器\",\"Metal HUD di Apple\")}])," \
+    "FL(npL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\"," \
+    "\"帧率限制（与显示器同步，不会更改其刷新率）\",\"Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)\")," \
+    "npL(\"Enable frame limit\",\"启用帧率限制\",\"Attiva limite di fotogrammi\"))," \
+    "SQ(npL(\"Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)\"," \
+    "\"缩放过滤（当游戏绘制的像素少于屏幕时生效，例如关闭高分辨率时）\"," \
+    "\"Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)\"),[" \
+    "{data:\"0\",label:npL(\"Automatic (Wine keeps pixels sharp with High Resolution off)\"," \
+    "\"自动（关闭高分辨率时 Wine 保持像素锐利）\",\"Automatico (con Alta risoluzione disattivata Wine mantiene i pixel nitidi)\")}," \
+    "{data:\"linear\",label:npL(\"Linear (smooth)\",\"线性（平滑）\",\"Lineare (morbido)\")}," \
+    "{data:\"nearest\",label:npL(\"Nearest (sharp pixels at any scale)\",\"最近邻（任何比例都保持锐利像素）\"," \
+    "\"Nearest (pixel nitidi a qualsiasi scala)\")}," \
+    "{data:\"integer\",label:npL(\"Integer (sharp at exact 2x or 3x, smooth otherwise)\"," \
+    "\"整数（正好 2 倍或 3 倍时锐利，其他比例平滑）\",\"Intero (nitido a 2x o 3x esatti, morbido altrimenti)\")}])," \
     "dx&&(0," RT ".jsx)(" BARREL ".XY," \
     "{label:npL(\"MetalFX Upscaling (Samples from the resolution the game is set to)\"," \
     "\"MetalFX 超分辨率（以游戏设置的分辨率为采样来源）\",\"Upscaling MetalFX (ingrandisce l'immagine dalla risoluzione impostata nel gioco)\")," \
@@ -524,16 +594,63 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 #define NP_CX_OPTIONS_CAPTURE(RT, BARREL) \
     "((npReact,npUI)=>" NP_CX_OPTIONS_BODY("np", "npReact()", "npUI()") ")(()=>" RT ",()=>" BARREL ")"
 
+// Changes from a game's in-game quick settings (overlay-shim/sidebar.m, collected by the
+// NotProton.TakeQuickSettings route) go through the panel's own menus, so a pick in the game
+// is written exactly as the same pick in Steam Properties › Bridgeplay would be: the same
+// keys, the same native or Wine form, nothing written when it matches the game's confs.
+#define NP_CX_APPLY \
+    "(t,ch)=>{let o=t.strLaunchOptions||\"\";const o0=o," \
+    /* The sidebar's values only, as the route allows: never the Metal HUD, never display or \
+       half. A menu is found by an option only it has, the frame limit's slider and switch by \
+       the npKey they carry (Enable frame limit is checked for BRIDGEPLAY_FPS_LIMIT_OFF=0). The \
+       limit goes before its switch, so a value set while the limit is switched off is kept. */ \
+    "K={BRIDGEPLAY_PERF_OVERLAY:\"hud\",BRIDGEPLAY_SCALING_FILTER:\"integer\"}," \
+    "V={BRIDGEPLAY_PERF_OVERLAY:[\"0\",\"fps\",\"summary\",\"detailed\"],BRIDGEPLAY_FPS_LIMIT_OFF:[\"0\",\"1\"]," \
+    "BRIDGEPLAY_SCALING_FILTER:[\"0\",\"linear\",\"nearest\",\"integer\"]}," \
+    "ok=(k,x)=>k===\"BRIDGEPLAY_FPS_LIMIT\"?/^\\d+$/.test(x)&&+x>=15&&+x<=360:(V[k]||[]).indexOf(x)>=0," \
+    "find=(n,f)=>{let r=null;const w=x=>{if(r||!x||typeof x!==\"object\")return;if(Array.isArray(x))return x.forEach(w);" \
+    "const p=x.props;if(!p)return;if(f(p))r=p;else w(p.children)};w(n);return r};" \
+    "[\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\",\"BRIDGEPLAY_FPS_LIMIT_OFF\",\"BRIDGEPLAY_SCALING_FILTER\"]" \
+    ".forEach(k=>{if(!ch||!(k in ch)||!ok(k,ch[k]))return;" \
+    "const d=find(MSCXOpts({details:Object.assign({},t,{strLaunchOptions:o}),write:(a,r)=>{o=r}})," \
+    "p=>k in K?Array.isArray(p.rgOptions)&&p.rgOptions.some(z=>z.data===K[k]):p.npKey===k);if(!d)return;" \
+    "k===\"BRIDGEPLAY_FPS_LIMIT\"?d.npSet(+ch[k]):k===\"BRIDGEPLAY_FPS_LIMIT_OFF\"?d.onChange(ch[k]===\"0\"):d.onChange({data:ch[k]})});" \
+    "if(o!==o0)SteamClient.Apps.SetAppLaunchOptions(t.unAppID,o);return o}"
+
+// One poll's changes, by appid. The route has already removed their files, so an app Steam
+// has no details for yet keeps its changes here and is tried again on the next polls (a
+// newer pick of the same setting wins), for about a minute, before they are dropped.
+#define NP_CX_TAKE \
+    "async q=>{const w=globalThis.MSCXSyncWait||{};globalThis.MSCXSyncWait={};" \
+    "for(const id of Object.keys(q||{}))w[id]={ch:Object.assign({},w[id]&&w[id].ch,q[id]),n:0};" \
+    "for(const id of Object.keys(w)){let t=null;" \
+    "try{t=await globalThis.window.appDetailsStore.RequestAppDetails(+id)}catch(e){}" \
+    "if(t){try{console.log(\"Bridgeplay: quick settings for app \"+id+\" saved: \"+MSCXApply(t,w[id].ch))}" \
+    "catch(e){console.warn(\"Bridgeplay: quick settings for app \"+id+\" not saved\",e)}}" \
+    "else if(++w[id].n<30)globalThis.MSCXSyncWait[id]=w[id];" \
+    "else console.warn(\"Bridgeplay: quick settings for app \"+id+\" dropped, Steam has no details for it\")}}"
+
+// Started once per page context; a page without Steam's app store (the test harness) skips it.
+#define NP_CX_SYNC \
+    "globalThis.window&&window.appDetailsStore&&!globalThis.MSCXSyncOn&&" \
+    "(globalThis.MSCXSyncOn=setInterval(()=>{if(typeof MSCXRoute!==\"function\"||globalThis.MSCXSyncBusy)return;" \
+    /* From a resolved promise, so a route that throws at once still reaches finally and clears busy. */ \
+    "globalThis.MSCXSyncBusy=1;Promise.resolve().then(()=>MSCXRoute(\"NotProton.TakeQuickSettings#1\",0))" \
+    ".then(j=>MSCXTake(JSON.parse(j||\"{}\")))" \
+    ".catch(e=>console.warn(\"Bridgeplay: quick settings not saved\",e)).finally(()=>{globalThis.MSCXSyncBusy=0})},2000))"
+
 #define NP_CX_OPTIONS_COMPONENT \
     "MSCXLaunch=" NP_CX_LAUNCH ",MSCXPick=" NP_CX_PICK "," \
-    "MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C4, NP_C5) ","
+    "MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C4, NP_C5) "," \
+    "MSCXApply=" NP_CX_APPLY ",MSCXTake=" NP_CX_TAKE ",MSCXSync=" NP_CX_SYNC ","
 
 // Valve is testing a new compatibility page UI, this logic relates to supporting that
 #define NP_CX_OPTIONS_STATEMENT \
     "var MSCXLaunch=" NP_CX_LAUNCH ";" \
     "var MSCXPick=" NP_CX_PICK ";" \
     "var MSCXToolQuery=" NP_CX_TOOL_QUERY ";" \
-    "var MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C3, NP_C4) ";"
+    "var MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C3, NP_C4) ";" \
+    "var MSCXApply=" NP_CX_APPLY ";var MSCXTake=" NP_CX_TAKE ";var MSCXSync=" NP_CX_SYNC ";"
 
 // 1.0.x saved CrossOver settings without %command%, this migrates them.
 #define NP_LAUNCH_MIGRATION_RULE \
@@ -845,6 +962,7 @@ int np_webpatch_should_patch(const char *path) {
 static const char *const fx_bridgeplay_keys[] = {
     "BRIDGEPLAY_RETINA", "BRIDGEPLAY_FRAMEGEN", "BRIDGEPLAY_FRAMEGEN_QUALITY",
     "BRIDGEPLAY_FRAMEGEN_UI", "BRIDGEPLAY_FRAMEGEN_FALLBACK", "BRIDGEPLAY_FRAMEGEN_ENGINE",
+    "BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_FPS_LIMIT", "BRIDGEPLAY_FPS_LIMIT_OFF", "BRIDGEPLAY_SCALING_FILTER",
 };
 
 // The BRIDGEPLAY_ name whose suffix follows prefix in key ("" for the run script's short
@@ -877,7 +995,11 @@ static const char *fx_native_key(const char *key) {
     static const char *const keys[] = { "MTL_HUD_ENABLED", "NP_PAD_MODE" };
     for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
         if (strcmp(key, keys[i]) == 0) return keys[i];
-    if (strncmp(key, "BRIDGEPLAY_FRAMEGEN", 19) != 0 && strncmp(key, "NOTPROTON_FRAMEGEN", 18) != 0)
+    if (strncmp(key, "BRIDGEPLAY_FRAMEGEN", 19) != 0 && strncmp(key, "NOTPROTON_FRAMEGEN", 18) != 0 &&
+        strcmp(key, "BRIDGEPLAY_PERF_OVERLAY") != 0 && strcmp(key, "NOTPROTON_PERF_OVERLAY") != 0 &&
+        strcmp(key, "BRIDGEPLAY_FPS_LIMIT") != 0 && strcmp(key, "NOTPROTON_FPS_LIMIT") != 0 &&
+        strcmp(key, "BRIDGEPLAY_FPS_LIMIT_OFF") != 0 && strcmp(key, "NOTPROTON_FPS_LIMIT_OFF") != 0 &&
+        strcmp(key, "BRIDGEPLAY_SCALING_FILTER") != 0 && strcmp(key, "NOTPROTON_SCALING_FILTER") != 0)
         return NULL;
     const char *bp = fx_bridgeplay_key(key, "BRIDGEPLAY_");
     return bp ? bp : fx_bridgeplay_key(key, "NOTPROTON_");
@@ -925,6 +1047,10 @@ static void fx_read(const char *path, fx_set_t *set, int native) {
     FILE *f = fopen(path, "r");
     if (!f) return;
     char line[256];
+    // np-native lets NOTPROTON_<X> win over BRIDGEPLAY_<X> from the same file, whatever
+    // the order, so a BRIDGEPLAY_ line does not replace a key this file set the old way.
+    const char *legacy[sizeof(set->p) / sizeof(set->p[0])];
+    size_t nlegacy = 0;
     while (fgets(line, sizeof(line), f)) {
         char *b = fx_trim(line);
         if (native && strncmp(b, "export ", 7) == 0) b = fx_trim(b + 7);
@@ -943,6 +1069,15 @@ static void fx_read(const char *path, fx_set_t *set, int native) {
                 val++;
             }
             key = fx_native_key(b);
+            if (key && fx_safe(val)) {
+                size_t i = 0;
+                while (i < nlegacy && strcmp(legacy[i], key) != 0) i++;
+                if (strncmp(b, "NOTPROTON_", 10) == 0) {
+                    if (i == nlegacy && nlegacy < sizeof(legacy) / sizeof(legacy[0])) legacy[nlegacy++] = key;
+                } else if (i < nlegacy) {
+                    continue;
+                }
+            }
         } else {
             key = fx_panel_key(b);
         }
@@ -1121,7 +1256,8 @@ static int fx_build(char *buf, size_t cap) {
     if (n < 0 || (size_t)n >= cap - len) return 0;
     len += (size_t)n;
     if (!fx_json_str(buf, cap, &len, home)) return 0;
-    n = snprintf(buf + len, cap - len, "};");
+    // The frame rate limit slider's top: the fastest display's refresh rate now.
+    n = snprintf(buf + len, cap - len, ",\"fm\":%d};", np_display_max_hz());
     if (n < 0 || (size_t)n >= cap - len) return 0;
     return 1;
 }

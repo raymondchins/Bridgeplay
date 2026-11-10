@@ -212,7 +212,8 @@ https://github.com/sparkle-project/Sparkle/blob/2.10.0/LICENSE
 
 The app's interface uses the Geist and Unbounded typefaces, bundled in
 app/Sources/BridgeplayUI/Resources/Fonts/ under the SIL Open Font License 1.1
-(OFL-Geist.txt, OFL-Unbounded.txt there). Game covers shown in the app are read
+(OFL-Geist.txt, OFL-Unbounded.txt there). overlay-shim.dylib embeds the same
+geist.woff2, under the same license, for the in-game performance overlay. Game covers shown in the app are read
 from the user's own Steam library cache or Steam's CDN at run time; none ship
 with Bridgeplay.
 
