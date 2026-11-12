@@ -23,10 +23,9 @@ enum BetaUpdatesUI {
 
     // Whether "No stable release includes your beta yet" shows after a check. A background check
     // leaves it as it was. A release this Mac can't run is not a missing one; Sparkle says why.
-    static func leavingNothingFound(found: Bool, byUser: Bool, unsupported: Bool, state: UpdaterState,
-                                    before: Bool) -> Bool {
-        guard !found, state == .leaving else { return false }
-        return byUser ? !unsupported : before
+    static func leavingNothingFound(result: CheckResult, byUser: Bool, state: UpdaterState, before: Bool) -> Bool {
+        guard result != .found, state == .leaving else { return false }
+        return byUser ? result == .nothing : before
     }
 }
 

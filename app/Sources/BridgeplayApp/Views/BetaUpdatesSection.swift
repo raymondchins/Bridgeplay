@@ -7,6 +7,7 @@ struct BetaUpdatesSection: View {
     var body: some View {
         let updater = AppUpdater.shared
         let running = updater.running
+        let confirmation = beta.asking.map { BetaCopy.confirmation($0, running: running, pending: updater.pending) }
         if BetaUpdatesUI.visible(shown: updater.betaUIShown, state: updater.state, backOnStable: updater.backOnStable) {
             Section {
                 if let back = updater.backOnStable {
@@ -41,10 +42,6 @@ struct BetaUpdatesSection: View {
                 Text("Updates")
             }
         }
-    }
-
-    private var confirmation: BetaConfirmation? {
-        beta.asking.map { BetaCopy.confirmation($0, running: AppUpdater.shared.running, pending: AppUpdater.shared.pending) }
     }
 
     private var asking: Binding<Bool> {

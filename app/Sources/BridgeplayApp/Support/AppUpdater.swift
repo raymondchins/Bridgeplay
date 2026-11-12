@@ -46,10 +46,10 @@ final class AppUpdater {
         finder.report = { [weak self] in self?.flow.apply($0) }
         finder.installerReady = { [weak self] in self?.installNow = $0 }
         finder.pendingChanged = { [weak self] in self?.pending = $0 }
-        finder.checked = { [weak self] found, byUser, unsupported, state in
+        finder.checked = { [weak self] result, byUser, state in
             guard let self else { return }
-            leavingNothingFound = BetaUpdatesUI.leavingNothingFound(found: found, byUser: byUser, unsupported: unsupported,
-                                                                    state: state, before: leavingNothingFound)
+            leavingNothingFound = BetaUpdatesUI.leavingNothingFound(result: result, byUser: byUser, state: state,
+                                                                    before: leavingNothingFound)
         }
         whatsNew = LatestRelease.takeWhatsNew(
             build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
@@ -80,12 +80,6 @@ final class AppUpdater {
     func dismissBackOnStable() {
         BetaCatchUp.acknowledge(.standard)
         backOnStable = nil
-    }
-
-    // After quit or relaunch: the pending update if there is one (it installs whatever the
-    // preference says), else the running build, and the state that build will be in.
-    var prediction: UpdatePrediction {
-        .make(running: finder.routing.running, enrolled: betaEnrolled, pending: pending)
     }
 
     // Always allowed, and takes effect at once; a pending update still installs.
@@ -175,11 +169,12 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
     var report: ((UpdateEvent) -> Void)?
     var installerReady: ((@escaping () -> Void) -> Void)?
     var pendingChanged: ((PendingUpdate?) -> Void)?
-    // Found or not, whether the user asked, whether the newest item needs another macOS or Mac,
-    // and the state the check ran in.
-    var checked: ((Bool, Bool, Bool, UpdaterState) -> Void)?
+    // What the check found, whether the user asked, and the state it ran in.
+    var checked: ((CheckResult, Bool, UpdaterState) -> Void)?
     private var userCheck = false
-    var routing = UpdateRouting(running: .current, settings: .read(.standard))
+    var routing = UpdateRouting(running: .current, settings: .read(.standard)) {
+        didSet { if routing.pending != oldValue.pending { pendingChanged?(routing.pending) } }
+    }
 
     func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
         routing.startCheck(settings: .read(.standard))
@@ -210,23 +205,20 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
         LatestRelease.record(build: item.versionString, version: item.displayVersionString, notes: item.itemDescription,
                              state: routing.state)
         UpdateLog.note(routing.found(FeedItem(item), feedURL: updater.feedURL?.absoluteString))
-        pendingChanged?(routing.pending)
-        checked?(true, userCheck, false, routing.state)
+        checked?(.found, userCheck, routing.state)
         report?(.found(version: item.displayVersionString))
     }
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
         let reason = ((error as NSError).userInfo[SPUNoUpdateFoundReasonKey] as? NSNumber)
             .flatMap { SPUNoUpdateFoundReason(rawValue: $0.int32Value) }
-        UpdateLog.note(routing.notFound(reason: Self.describe(reason), feedURL: updater.feedURL?.absoluteString))
-        pendingChanged?(routing.pending)
-        let unsupported = [.systemIsTooOld, .systemIsTooNew, .hardwareDoesNotSupportARM64].contains(reason)
-        checked?(false, userCheck, unsupported, routing.state)
+        let (text, result) = Self.describe(reason)
+        UpdateLog.note(routing.notFound(reason: text, feedURL: updater.feedURL?.absoluteString))
+        checked?(result, userCheck, routing.state)
     }
 
     func updater(_ updater: SPUUpdater, willDownloadUpdate item: SUAppcastItem, with request: NSMutableURLRequest) {
         routing.downloading(FeedItem(item))
-        pendingChanged?(routing.pending)
         report?(.downloading(version: item.displayVersionString))
     }
 
@@ -239,7 +231,6 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
     func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem,
                  immediateInstallationBlock immediateInstallHandler: @escaping () -> Void) -> Bool {
         routing.waitingForQuit(FeedItem(item))
-        pendingChanged?(routing.pending)
         installerReady?(immediateInstallHandler)
         report?(.ready(version: item.displayVersionString))
         return true
@@ -250,7 +241,6 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
         let feedError = error.map { $0.domain == SUSparkleErrorDomain && Self.feedErrors.contains(Int($0.code)) } ?? false
         UpdateLog.note(routing.finished(error: error.map { "\($0.domain) \($0.code)" }, feedFailed: feedError,
                                         feedURL: updater.feedURL?.absoluteString))
-        pendingChanged?(routing.pending)
         report?(.cycleFinished)
     }
 
@@ -258,14 +248,14 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
     private static let feedErrors: Set<Int> = [Int(SUError.appcastParseError.rawValue), Int(SUError.appcastError.rawValue),
                                                Int(SUError.downloadError.rawValue)]
 
-    private static func describe(_ reason: SPUNoUpdateFoundReason?) -> String {
+    private static func describe(_ reason: SPUNoUpdateFoundReason?) -> (String, CheckResult) {
         switch reason {
-        case .onLatestVersion: "up to date"
-        case .onNewerThanLatestVersion: "newer than the feed"
-        case .systemIsTooOld: "macOS too old for the newest item"
-        case .systemIsTooNew: "macOS too new for the newest item"
-        case .hardwareDoesNotSupportARM64: "hardware unsupported"
-        default: "no update"
+        case .onLatestVersion: ("up to date", .nothing)
+        case .onNewerThanLatestVersion: ("newer than the feed", .nothing)
+        case .systemIsTooOld: ("macOS too old for the newest item", .unsupported)
+        case .systemIsTooNew: ("macOS too new for the newest item", .unsupported)
+        case .hardwareDoesNotSupportARM64: ("hardware unsupported", .unsupported)
+        default: ("no update", .nothing)
         }
     }
 
@@ -281,7 +271,6 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
                                                    state: SPUUserUpdateState) {
         if state.stage != .notDownloaded {
             UpdateLog.note(routing.resuming(FeedItem(update)))
-            pendingChanged?(routing.pending)
         }
         guard !state.userInitiated else { return }
         report?(.reminder(version: update.displayVersionString, downloaded: state.stage != .notDownloaded))

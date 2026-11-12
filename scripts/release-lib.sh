@@ -95,6 +95,9 @@ release_published_betas() {
 		| [.tag_name, (if (.body // "") == "" then "-" else (.body | @base64) end)] | @tsv' 2>&1) \
 		|| { echo "==> can't read the releases of $slug: $_list" >&2; return 1; }
 	: >"$1.tmp"
+	# One ls-remote for the whole loop (release_tag_commit runs in subshells, so it can't keep its
+	# own); cleared after it, since later lookups may be of tags this run creates.
+	if _refs=$(git ls-remote --tags "$remote" 2>/dev/null); then release_refs=${_refs:- }; fi
 	while IFS=$_tab read -r _tag _body64; do
 		[ -n "$_tag" ] || continue
 		_body=""
@@ -122,6 +125,7 @@ release_published_betas() {
 	done <<EOF
 $_list
 EOF
+	release_refs=""
 	sort -n "$1.tmp" >"$1"
 	rm -f "$1.tmp"
 }
@@ -154,8 +158,9 @@ release_tree_diff() {
 	done
 }
 
-# release_gate HEAD PREVIOUS BETAS: decides what the stable at commit HEAD is (R4). PREVIOUS is
-# the previous stable's commit, empty for none; BETAS is release_published_betas' file. Sets:
+# release_gate HEAD PREVIOUS BETAS [BUILD]: decides what the stable at commit HEAD is (R4). PREVIOUS
+# is the previous stable's commit, empty for none; BETAS is release_published_betas' file; BUILD,
+# the stable's build, must be above every beta it contains. Sets:
 #   gate_contains   the builds of every published beta HEAD contains, as release_ranges prints
 #   gate_promoted   the beta tag this stable ships the tree of, or none (a hotfix or plain stable)
 #   gate_data       compat/** paths that differ from that beta's tree, one per line
@@ -164,7 +169,7 @@ release_gate() {
 	gate_contains=""
 	gate_promoted=none
 	gate_data=""
-	gate_max_build=0
+	_max=0
 	_contained=""
 	_new=""
 	_others=""
@@ -173,7 +178,7 @@ release_gate() {
 		if git merge-base --is-ancestor "$_c" "$1" 2>/dev/null; then
 			_contained="$_contained$_b
 "
-			[ "$_b" -le "$gate_max_build" ] || gate_max_build=$_b
+			[ "$_b" -le "$_max" ] || _max=$_b
 			if [ -z "$2" ] || ! git merge-base --is-ancestor "$_c" "$2" 2>/dev/null; then
 				_new="$_b $_t $_c $_s"
 			fi
@@ -183,6 +188,13 @@ release_gate() {
 		fi
 	done <"$3"
 	gate_contains=$(printf '%s' "$_contained" | release_ranges)
+	# A beta app takes only a higher build, so a lower one would never reach its testers.
+	_low=0
+	if [ -n "${4:-}" ] && [ "$4" -le "$_max" ]; then
+		echo "==> build $4 is not above build $_max, a beta this stable contains, so that beta's testers would never" >&2
+		echo "    get it; run scripts/bump-version.sh build, commit, push and release again." >&2
+		_low=1
+	fi
 
 	if [ -z "$_new" ]; then
 		# A hotfix or plain stable, unless it ships a beta's tree without containing it.
@@ -198,7 +210,7 @@ release_gate() {
 			echo "    no rebase), then bump and release again." >&2
 			return 1
 		fi
-		return 0
+		return "$_low"
 	fi
 
 	# A promotion: the newest new beta (the last one read, by build) is the one it ships.
@@ -229,6 +241,7 @@ release_gate() {
 	fi
 	gate_promoted=$_tag
 	gate_data=$(printf '%s\n' "$_diff" | grep '^compat/' || true)
+	return "$_low"
 }
 
 # --- the stable feed -----------------------------------------------------------------------
@@ -303,16 +316,11 @@ feed_guard() {
 		_no "has $_n containsBetas elements, not one"
 	else
 		_v=$(xp "$_f" "string($_item/*[local-name()='containsBetas' and namespace-uri()='$BRIDGEPLAY_NS'])")
-		printf '%s\n' "$_v" | grep -Eqx '([0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*)?' \
+		is_build_list "$_v" \
 			|| _no "has containsBetas '$_v', not a list like 81-85,87"
 	fi
-	if ! grep -q 'sparkle-signatures:' "$_f"; then
-		_no "is not signed (no sparkle-signatures block)"
-	else
-		# shellcheck disable=SC2086 # key_args is empty or two words
-		"$sparkle/sign_update" --verify $key_args "$_f" >/dev/null 2>&1 \
-			|| _no "has a feed signature that does not verify; it changed after signing or another key signed it"
-	fi
+	_p=$(feed_signature_problem "$_f")
+	[ -z "$_p" ] || _no "$_p"
 	return "$_bad"
 }
 
@@ -325,6 +333,16 @@ WITHDRAWN_LINE='Withdrawn from the beta feed:'
 
 is_stable_tag() { printf '%s\n' "$1" | grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+'; }
 is_beta_tag() { printf '%s\n' "$1" | grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+-beta\.[1-9][0-9]*'; }
+# is_build_list TEXT: beta builds as release_ranges prints them (81-85,87), or empty.
+is_build_list() { printf '%s\n' "$1" | grep -Eqx '([0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*)?'; }
+
+# feed_signature_problem FILE: what is wrong with FILE's feed signature, or nothing.
+feed_signature_problem() {
+	grep -q 'sparkle-signatures:' "$1" || { echo "is not signed (no sparkle-signatures block)"; return 0; }
+	# shellcheck disable=SC2086 # key_args is empty or two words
+	"$sparkle/sign_update" --verify $key_args "$1" >/dev/null 2>&1 \
+		|| echo "has a feed signature that does not verify; it changed after signing or another key signed it"
+}
 
 # release_list FILE: every release of $slug, drafts included, one per line, tab-separated: tag,
 # draft, prerelease, published_at, Bridgeplay.zip's digest and size, the asset names joined
@@ -404,7 +422,7 @@ release_record() {
 		[ "$_kind" = stable ] || { echo "==> $1's ledger says kind '$_kind', not stable" >&2; return 1; }
 		_contains=$(_rf contains-betas)
 		[ "$_contains" != none ] || _contains=""
-		printf '%s\n' "$_contains" | grep -Eqx '([0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*)?' \
+		is_build_list "$_contains" \
 			|| { echo "==> $1's ledger has contains-betas '$_contains', not a list like 81-85,87" >&2; return 1; }
 	fi
 	[ "$(_rf tag)" = "$1" ] && [ "v$_label" = "$1" ] \
@@ -607,7 +625,7 @@ beta_feed_guard() {
 		if [ -z "$_c" ]; then
 			is_stable_tag "v$_sv" || _no "has a stable item labelled '$_sv', not a plain X.Y.Z"
 			_l=$(xp "$_f" "string($_it/$_cb)")
-			if [ "$(xp "$_f" "count($_it/$_cb)")" != 1 ] || ! printf '%s\n' "$_l" | grep -Eqx '([0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*)?'; then
+			if [ "$(xp "$_f" "count($_it/$_cb)")" != 1 ] || ! is_build_list "$_l"; then
 				_no "has a stable item whose containsBetas is missing or not a list like 81-85,87"
 			fi
 		else
@@ -637,13 +655,8 @@ beta_feed_guard() {
 	if [ -n "${3:-}" ]; then
 		case $_seen in *" $3 "*) ;; *) _no "does not carry build $3" ;; esac
 	fi
-	if ! grep -q 'sparkle-signatures:' "$_f"; then
-		_no "is not signed (no sparkle-signatures block)"
-	else
-		# shellcheck disable=SC2086 # key_args is empty or two words
-		"$sparkle/sign_update" --verify $key_args "$_f" >/dev/null 2>&1 \
-			|| _no "has a feed signature that does not verify; it changed after signing or another key signed it"
-	fi
+	_p=$(feed_signature_problem "$_f")
+	[ -z "$_p" ] || _no "$_p"
 	return "$_bad"
 }
 

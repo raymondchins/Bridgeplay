@@ -650,13 +650,13 @@ git_in "$fx" checkout -q -B main "$p0"
 change src/hotfix.c hotfix "fix: a hotfix during the soak"
 h1=$(sha)
 
-gate() { # gate HEAD [PREVIOUS]: release_gate in the fixture, previous v0.7.64
+gate() { # gate HEAD [PREVIOUS [BUILD]]: release_gate in the fixture, previous v0.7.64
 	(
 		cd "$fx"
 		remote=mirror
 		remote_url=$origin
 		release_published_betas "$work/betas" || exit 9
-		release_gate "$1" "${2-$p0}" "$work/betas" || exit 1
+		release_gate "$1" "${2-$p0}" "$work/betas" "${3:-}" || exit 1
 		printf 'contains=%s\npromoted=%s\ndata=%s\n' "$gate_contains" "$gate_promoted" "$(printf '%s' "$gate_data" | tr '\n' ' ')"
 	)
 }
@@ -684,6 +684,10 @@ expect_code "R4: the merged RC is accepted" 0 gate "$b3"
 expect_has "R4: it contains its betas, not the stray one" "contains=82-83,86" "$out"
 expect_has "R4: promoted from the RC" "promoted=v0.7.65-beta.3" "$out"
 expect_has "R4: the compat data is listed" "data=compat/games.json" "$out"
+expect_code "R4: a build above the RC it contains" 0 gate "$b3" "$p0" 87
+expect_code "R4: a build that is not above the RC" 1 gate "$b3" "$p0" 86
+expect_has "R4: the build is named" "build 86 is not above build 86, a beta this stable contains" "$out"
+expect_has "R4: the remedy for the build" "run scripts/bump-version.sh build" "$out"
 
 # Anything else after the RC is refused, the compat data is not blamed.
 git_in "$fx" checkout -q -b cand-b2 "$b3"

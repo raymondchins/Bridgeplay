@@ -56,7 +56,7 @@ if [ -n "${BRIDGEPLAY_BETA+set}" ]; then
 		planned=$(semver_next patch "$committed")
 	else
 		is_semver "$planned" || die "BRIDGEPLAY_BETA_PLANNED '$planned' is not X.Y.Z"
-		[ "$planned" = "$committed" ] || semver_gt "$planned" "$committed" \
+		semver_ge "$planned" "$committed" \
 			|| die "BRIDGEPLAY_BETA_PLANNED $planned is below the committed version $committed"
 	fi
 	version=$planned-beta.$BRIDGEPLAY_BETA

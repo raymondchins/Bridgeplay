@@ -159,15 +159,14 @@ struct BetaUpdatesUITests {
 
     @Test("No stable release found: shown only after a check the user asked for that found nothing it could run")
     func leavingNothingFound() {
-        func after(found: Bool = false, byUser: Bool = true, unsupported: Bool = false,
-                   state: UpdaterState = .leaving, before: Bool = false) -> Bool {
-            BetaUpdatesUI.leavingNothingFound(found: found, byUser: byUser, unsupported: unsupported,
-                                              state: state, before: before)
+        func after(_ result: CheckResult = .nothing, byUser: Bool = true, state: UpdaterState = .leaving,
+                   before: Bool = false) -> Bool {
+            BetaUpdatesUI.leavingNothingFound(result: result, byUser: byUser, state: state, before: before)
         }
         #expect(after())
-        #expect(!after(unsupported: true), "a release that needs another macOS exists")
-        #expect(!after(unsupported: true, before: true))
-        #expect(!after(found: true, before: true))
+        #expect(!after(.unsupported), "a release that needs another macOS exists")
+        #expect(!after(.unsupported, before: true))
+        #expect(!after(.found, before: true))
         #expect(!after(state: .beta, before: true))
         #expect(!after(state: .stable, before: true))
         #expect(after(byUser: false, before: true), "a background check leaves it")

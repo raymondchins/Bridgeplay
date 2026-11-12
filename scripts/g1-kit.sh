@@ -267,13 +267,7 @@ cmd_feed() {
 			echo "            <sparkle:version>$build</sparkle:version>"
 			echo "            <sparkle:shortVersionString>$label</sparkle:shortVersionString>"
 			echo '            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>'
-			if [ -z "$channel" ] && [ "$catchup" -eq 1 ]; then
-				if [ -n "$list" ]; then
-					echo "            <bridgeplay:containsBetas>$list</bridgeplay:containsBetas>"
-				else
-					echo '            <bridgeplay:containsBetas></bridgeplay:containsBetas>'
-				fi
-			fi
+			[ -z "$channel" ] && [ "$catchup" -eq 1 ] && echo "            <bridgeplay:containsBetas>$list</bridgeplay:containsBetas>"
 			echo '            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>'
 			echo "            <enclosure url=\"$url\" $(cat "$kit/apps/$build/enclosure") type=\"application/octet-stream\"/>"
 			echo '        </item>'
@@ -475,7 +469,7 @@ cmd_scenario() {
 			start 80
 			cmd_feed stable 83=
 			cmd_feed beta 83= 82 ;;
-		X-2)
+		X-2 | X-8)
 			start 80
 			cmd_feed stable 80=
 			cmd_feed beta 80= 82
@@ -500,11 +494,6 @@ cmd_scenario() {
 			start 82
 			cmd_feed stable 86=82,84
 			cmd_feed beta 86=82,84 ;;
-		X-8)
-			start 80
-			cmd_feed stable 80=
-			cmd_feed beta 80= 82
-			beta_ui ;;
 		R2-pending | R2-resumable)
 			start 82
 			enrol

@@ -200,7 +200,7 @@ if [ "$mode" = stable ]; then
 			*" appcast.xml "*) ;;
 			*) check "the Latest release $latest_tag has no appcast.xml, so the update feed is down; mark an app release Latest first" ;;
 		esac
-		echo "$latest_tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+		is_stable_tag "$latest_tag" \
 			|| check "the Latest release $latest_tag is not a vX.Y.Z app release; mark an app release Latest first"
 	fi
 
@@ -243,19 +243,15 @@ if [ "$mode" = stable ]; then
 	gate_contains=""
 	gate_promoted=none
 	gate_data=""
-	gate_max_build=0
 	if [ "$resume" -eq 0 ]; then
 		release_published_betas "$work/betas" || die "can't tell which betas are published (above); nothing was claimed or built"
 		previous_commit=""
-		if [ -s "$work/betas" ] && printf '%s\n' "$previous" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+		if [ -s "$work/betas" ] && is_stable_tag "$previous"; then
 			previous_commit=$(release_tag_commit "$previous") \
 				|| die "can't find the commit of the previous stable $previous on $remote ($remote_url)"
 		fi
-		release_gate "$head" "$previous_commit" "$work/betas" \
+		release_gate "$head" "$previous_commit" "$work/betas" "$build" \
 			|| check "this stable may not ship as it is (above)"
-		# A beta app takes only a higher build, so a lower one would never reach its testers.
-		[ "$build" -gt "$gate_max_build" ] \
-			|| check "build $build is not above build $gate_max_build, a beta this stable contains, so that beta's testers would never get it; run scripts/bump-version.sh build, commit, push and release again"
 		echo "==> contains betas: ${gate_contains:-none}; promoted from: $gate_promoted"
 		if [ -n "$gate_data" ]; then
 			echo "==> data changed since $gate_promoted (compat/** may differ from the beta):"
@@ -339,7 +335,7 @@ if [ "$mode" = beta ]; then
 			check "v$planned is already a stable release, so betas can't be named after it; rename $source_branch to the next version"
 		fi
 		# Equal once main's bump for this release is merged into its release branch (R4).
-		[ "$planned" = "$committed" ] || semver_gt "$planned" "$committed" \
+		semver_ge "$planned" "$committed" \
 			|| check "the beta's release $planned is below the committed version $committed (dylib/version.h)"
 		planned_re=$(printf '%s' "$planned" | sed 's/\./\\./g')
 		n=$({ cut -f1 "$work/releases"; printf '%s\n' "$remote_tags" | awk '{ sub(/^refs\/tags\//, "", $2); sub(/\^\{\}$/, "", $2); print $2 }'; } \

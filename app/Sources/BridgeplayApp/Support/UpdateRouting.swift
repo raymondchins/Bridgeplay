@@ -208,6 +208,9 @@ struct ItemChoice: Equatable, Sendable {
 }
 
 // An update Sparkle has downloaded: waiting for quit, or kept to resume.
+// What a check ended with. Unsupported: the newest item needs another macOS or Mac.
+enum CheckResult: Equatable, Sendable { case found, nothing, unsupported }
+
 struct PendingUpdate: Equatable, Sendable {
     enum Stage: String, Equatable, Sendable { case downloading, waitingForQuit = "waiting for quit", resumable }
 
@@ -361,21 +364,23 @@ struct UpdateRouting: Equatable, Sendable {
             return .none
         }
         reroute()
-        return enrolled ? .restartCycleAndCheck : .restartCycle
+        return restartAction
     }
 
     mutating func sessionEnded() -> PreferenceAction {
         guard restartQueued else { return .none }
         restartQueued = false
         reroute()
-        return settings.enrolled ? .restartCycleAndCheck : .restartCycle
+        return restartAction
     }
+
+    private var restartAction: PreferenceAction { settings.enrolled ? .restartCycleAndCheck : .restartCycle }
+    private var preferredState: UpdaterState { .of(enrolled: settings.enrolled, running: running.channel) }
 
     // Sparkle asks for the feed and channels before the next check starts (resetUpdateCycle
     // compares them with the last check's), so they follow the preference at once.
     private mutating func reroute() {
-        route = UpdateRoute.make(state: .of(enrolled: settings.enrolled, running: running.channel),
-                                 settings: settings, betaFeedFailed: false)
+        route = UpdateRoute.make(state: preferredState, settings: settings, betaFeedFailed: false)
     }
 
     func prediction(enrolled: Bool) -> UpdatePrediction {
@@ -383,7 +388,7 @@ struct UpdateRouting: Equatable, Sendable {
     }
 
     private func outsideState(_ item: FeedItem) -> String? {
-        let state = UpdaterState.of(enrolled: settings.enrolled, running: running.channel)
+        let state = preferredState
         guard let channel = item.channel, !state.allowedChannels.contains(channel) else { return nil }
         return "\(item.described), which the \(state.rawValue) state does not allow; Sparkle installs it anyway"
     }
