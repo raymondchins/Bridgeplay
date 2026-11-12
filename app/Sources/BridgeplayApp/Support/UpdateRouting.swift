@@ -344,6 +344,11 @@ struct UpdateRouting: Equatable, Sendable {
         pending = PendingUpdate(item: item, stage: .downloading)
     }
 
+    // The download finished. Sparkle keeps it whether it installs now, on quit or after a reminder.
+    mutating func downloaded(_ item: FeedItem) {
+        pending = PendingUpdate(item: item, stage: .resumable)
+    }
+
     mutating func waitingForQuit(_ item: FeedItem) {
         pending = PendingUpdate(item: item, stage: .waitingForQuit)
     }

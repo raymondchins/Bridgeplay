@@ -427,6 +427,12 @@ struct PendingUpdateTests {
         finished.waitingForQuit(beta(83))
         #expect(finished.pending == PendingUpdate(item: beta(83), stage: .waitingForQuit))
 
+        // It finished and the user chose later: Sparkle keeps it for a reminder.
+        var kept = routing
+        kept.downloaded(beta(83))
+        _ = kept.finished(error: nil, feedFailed: false, feedURL: nil)
+        #expect(kept.pending == PendingUpdate(item: beta(83), stage: .resumable))
+
         // It stopped (failed, or quit first): nothing is pending.
         _ = routing.finished(error: "SUSparkleErrorDomain 2001", feedFailed: false, feedURL: nil)
         #expect(routing.pending == nil)

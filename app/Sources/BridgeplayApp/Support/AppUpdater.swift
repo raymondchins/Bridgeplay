@@ -93,6 +93,11 @@ final class AppUpdater {
         guard enrolled != betaEnrolled else { return }
         betaEnrolled = enrolled
         leavingNothingFound = false
+        // Back in the beta: "back on stable" no longer holds.
+        if enrolled, backOnStable != nil {
+            BetaCatchUp.acknowledge(.standard)
+            backOnStable = nil
+        }
         AppLog.note("update: beta updates \(enrolled ? "on" : "off")")
         let action = finder.routing.preferenceChanged(enrolled: enrolled,
                                                       sessionInProgress: controller.updater.sessionInProgress)
@@ -223,6 +228,7 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
     }
 
     func updater(_ updater: SPUUpdater, willExtractUpdate item: SUAppcastItem) {
+        routing.downloaded(FeedItem(item))
         report?(.preparing(version: item.displayVersionString))
     }
 
