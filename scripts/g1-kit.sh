@@ -100,6 +100,16 @@ is_running() { pgrep -f "$installed/Contents/MacOS/" >/dev/null 2>&1; }
 
 # --- client: build the app's Swift package at a ref -------------------------------------------
 
+# head_source: the tree id of app/ as it is in the working tree, uncommitted and untracked files
+# included. Built in a copy of the index, so the real one is untouched.
+head_source() {
+	mkdir -p "$kit/run"
+	_idx=$kit/run/source-index
+	cp "$(git -C "$repo" rev-parse --path-format=absolute --git-path index)" "$_idx"
+	GIT_INDEX_FILE=$_idx git -C "$repo" add -A -- app || die "can't read the working tree of app/"
+	GIT_INDEX_FILE=$_idx git -C "$repo" write-tree
+}
+
 cmd_client() {
 	ref=""
 	while [ $# -gt 0 ]; do
@@ -112,6 +122,7 @@ cmd_client() {
 	if [ -z "$ref" ]; then
 		name="head"
 		pkg=$repo/app
+		source=$(head_source)
 	else
 		name=$(printf '%s' "$ref" | tr -c 'A-Za-z0-9._-\n' '_')
 		src=$kit/src/$name
@@ -147,6 +158,7 @@ exec "\$(dirname "\$0")/BridgeplayApp.bin" "\$@"
 EOF
 	chmod 755 "$t/Contents/MacOS/BridgeplayApp"
 	git -C "$repo" rev-parse --short "${ref:-HEAD}" >"$kit/clients/$name/commit"
+	[ -n "$ref" ] || echo "$source" >"$kit/clients/head/source"
 	say "client $name: $t"
 }
 
@@ -418,7 +430,13 @@ EOF
 # client is 0.7.63 (80) from its tag.
 ensure_app() { # BUILD LABEL [CLIENT]
 	c=${3:-head}
-	[ -d "$kit/clients/$c/Bridgeplay.app" ] || cmd_client ${3:+--ref "$3"}
+	if [ "$c" = head ]; then
+		# Rebuilt whenever app/ changed since, committed or not.
+		[ -d "$kit/clients/head/Bridgeplay.app" ] && [ "$(cat "$kit/clients/head/source" 2>/dev/null)" = "$(head_source)" ] \
+			|| cmd_client
+	else
+		[ -d "$kit/clients/$c/Bridgeplay.app" ] || cmd_client --ref "$c"
+	fi
 	# Stamped from this client since it was last built.
 	if [ -f "$kit/apps/$1/info" ] && [ "$(app_field "$1" label)" = "$2" ] && [ "$(app_field "$1" client)" = "$c" ] \
 		&& [ -z "$(find "$kit/clients/$c/commit" -newer "$kit/apps/$1/info")" ]; then return 0; fi
