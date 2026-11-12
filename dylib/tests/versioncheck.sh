@@ -152,8 +152,14 @@ expect_eq "planned empty" "version=0.7.3-beta.1
 build=50
 channel=beta" "$out"
 
-# A planned release not above the committed version fails the build.
-for planned in 0.7.2 0.7.1 0.6.9 0.1.0 0.7 0.7.3.1 0.07.3 v0.8.0 0.7.3-beta.1 0.8.0-beta.1 " 0.8.0" 0.8.x; do
+# The committed version itself: main's bump merged into release/X.Y.Z for a new release candidate.
+expect_ok "planned equal to the committed version" stamp BRIDGEPLAY_BETA=2 BRIDGEPLAY_BETA_BUILD=50 BRIDGEPLAY_BETA_PLANNED=0.7.2 print
+expect_eq "planned equal to the committed version" "version=0.7.2-beta.2
+build=50
+channel=beta" "$out"
+
+# A planned release below the committed version fails the build.
+for planned in 0.7.1 0.6.9 0.1.0 0.7 0.7.3.1 0.07.3 v0.8.0 0.7.3-beta.1 0.8.0-beta.1 " 0.8.0" 0.8.x; do
 	expect_refused "planned '$planned'" stamp BRIDGEPLAY_BETA=1 BRIDGEPLAY_BETA_BUILD=50 BRIDGEPLAY_BETA_PLANNED="$planned" check
 done
 
@@ -247,6 +253,12 @@ bumped 0.8.0 45
 expect_ok "major" bump major
 bumped 1.0.0 45
 expect_eq "upstream stays" 1.2.0 "$(define "$bumpfx/dylib/version.h" NOTPROTON_VERSION)"
+# build keeps the version: a stable that must outrank the release candidate it contains.
+expect_ok "build" bump build --highest-build 50
+bumped 0.7.2 51
+expect_ok "build named for the committed version" bump build --named 0.7.2 --highest-build 50
+bumped 0.7.2 51
+expect_refused "build named elsewhere" bump build --named 0.7.3 --highest-build 50
 
 # The stable that ships a beta outranks every published build, beta ones included.
 expect_ok "highest build" bump patch --highest-build 50

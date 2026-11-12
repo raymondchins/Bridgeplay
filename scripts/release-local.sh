@@ -243,6 +243,7 @@ if [ "$mode" = stable ]; then
 	gate_contains=""
 	gate_promoted=none
 	gate_data=""
+	gate_max_build=0
 	if [ "$resume" -eq 0 ]; then
 		release_published_betas "$work/betas" || die "can't tell which betas are published (above); nothing was claimed or built"
 		previous_commit=""
@@ -252,6 +253,9 @@ if [ "$mode" = stable ]; then
 		fi
 		release_gate "$head" "$previous_commit" "$work/betas" \
 			|| check "this stable may not ship as it is (above)"
+		# A beta app takes only a higher build, so a lower one would never reach its testers.
+		[ "$build" -gt "$gate_max_build" ] \
+			|| check "build $build is not above build $gate_max_build, a beta this stable contains, so that beta's testers would never get it; run scripts/bump-version.sh build, commit, push and release again"
 		echo "==> contains betas: ${gate_contains:-none}; promoted from: $gate_promoted"
 		if [ -n "$gate_data" ]; then
 			echo "==> data changed since $gate_promoted (compat/** may differ from the beta):"
@@ -334,8 +338,9 @@ if [ "$mode" = beta ]; then
 			|| printf '%s\n' "$remote_tags" | awk -v t="refs/tags/v$planned" '$2 == t { f = 1 } END { exit !f }'; then
 			check "v$planned is already a stable release, so betas can't be named after it; rename $source_branch to the next version"
 		fi
-		semver_gt "$planned" "$committed" \
-			|| check "the beta's release $planned is not above the committed version $committed (dylib/version.h)"
+		# Equal once main's bump for this release is merged into its release branch (R4).
+		[ "$planned" = "$committed" ] || semver_gt "$planned" "$committed" \
+			|| check "the beta's release $planned is below the committed version $committed (dylib/version.h)"
 		planned_re=$(printf '%s' "$planned" | sed 's/\./\\./g')
 		n=$({ cut -f1 "$work/releases"; printf '%s\n' "$remote_tags" | awk '{ sub(/^refs\/tags\//, "", $2); sub(/\^\{\}$/, "", $2); print $2 }'; } \
 			| sed -n "s/^v$planned_re-beta\.\([1-9][0-9]*\)\$/\1/p" | sort -n | tail -n 1)

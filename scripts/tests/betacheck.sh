@@ -924,6 +924,47 @@ expect_code "a held lock stops a beta" 1 release --beta --dry-run "- x"
 expect_has "the holder is named" "another release (pid $holder) holds" "$out"
 wait "$holder"
 
+# --- R4: main moved past the release candidate, and the documented recovery -------------------
+
+highest() { (cd "$fx" && sh scripts/build-ledger-real.sh highest -q); }
+checkout develop
+git_in "$fx" checkout -q -b release/0.7.67
+change src/rc.c rc "fix: last one for 0.7.67"
+push release/0.7.67
+expect_code "R4: the release candidate" 0 release --beta "- the release candidate"
+expect_has "R4: its label" "beta 0.7.67-beta.3 from release/0.7.67" "$out"
+checkout main
+merge release/0.7.67
+change src/hotfix9.c hotfix9 "fix: on main only"
+h=$(highest)
+bump 0.7.67 $((h + 1))
+push main
+expect_code "R4: main moved past the candidate" 1 release
+expect_has "R4: refused" "HEAD differs from beta v0.7.67-beta.3" "$out"
+expect_has "R4: the recovery bumps the build" "run scripts/bump-version.sh build" "$out"
+expect_eq "R4: nothing claimed" "" "$(claim_at $((h + 1)))"
+
+# The recovery: main, with its bump to 0.7.67, merged into release/0.7.67.
+checkout release/0.7.67
+merge main
+push release/0.7.67
+expect_code "R4: a candidate named after the committed version" 0 release --beta "- the second release candidate"
+expect_has "R4: its label" "beta 0.7.67-beta.4 from release/0.7.67" "$out"
+rc2=$(ledger_of v0.7.67-beta.4 build)
+checkout main
+merge release/0.7.67
+push main
+expect_code "R4: a stable below the candidate it contains" 1 release
+expect_has "R4: refused below it" "build $((h + 1)) is not above build $rc2, a beta this stable contains" "$out"
+expect_eq "R4: still nothing claimed" "" "$(claim_at $((h + 1)))"
+h=$(highest)
+bump 0.7.67 $((h + 1))
+push main
+expect_code "R4: released after the build bump" 0 release
+expect_has "R4: promoted" "promoted from: v0.7.67-beta.4" "$out"
+expect_eq "R4: Latest" v0.7.67 "$(latest)"
+expect_eq "R4: above the candidate" 1 "$([ "$(ledger_of v0.7.67 build)" -gt "$rc2" ] && echo 1)"
+
 if [ "$failures" -ne 0 ]; then
 	echo "==> betacheck: $failures of $checks checks failed" >&2
 	exit 1

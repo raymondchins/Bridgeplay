@@ -1,10 +1,12 @@
 #!/bin/sh
 # Bump Bridgeplay's version in dylib/version.h before a release.
 #
-#   scripts/bump-version.sh patch|minor|major|set X.Y.Z [--upstream "NotProton X.Y.Z"] [--highest-build N] [--named X.Y.Z]
+#   scripts/bump-version.sh patch|minor|major|build|set X.Y.Z [--upstream "NotProton X.Y.Z"] [--highest-build N] [--named X.Y.Z]
 #
 # Almost always patch (fixes, features, upstream merges); minor and major are rare, see
-# docs/RELEASING.md. set picks any X.Y.Z above the committed one (0.7.3 -> 0.7.31). BRIDGEPLAY_BUILD goes up by one every time, since Sparkle orders updates by it.
+# docs/RELEASING.md. set picks any X.Y.Z above the committed one (0.7.3 -> 0.7.31). build keeps
+# the version, for a stable that must outrank a beta it contains. BRIDGEPLAY_BUILD goes up by one
+# every time, since Sparkle orders updates by it.
 # --upstream records the NotProton release this build is based on (NOTPROTON_VERSION);
 # a clean upstream merge already brings upstream's value, so it is rarely needed.
 # --highest-build N (or BRIDGEPLAY_HIGHEST_BUILD) is H, the highest build ever published, claimed
@@ -31,7 +33,7 @@ usage() {
 part=${1:-}
 target=""
 case "$part" in
-	patch|minor|major) shift ;;
+	patch|minor|major|build) shift ;;
 	set)
 		[ $# -ge 2 ] || usage
 		is_semver "$2" || { echo "==> set wants X.Y.Z, got '$2'" >&2; exit 1; }
@@ -85,6 +87,8 @@ fi
 if [ -n "$target" ]; then
 	semver_gt "$target" "$version" || die "set $target is not above the committed $version"
 	next=$target
+elif [ "$part" = build ]; then
+	next=$version
 else
 	next=$(semver_next "$part" "$version")
 fi

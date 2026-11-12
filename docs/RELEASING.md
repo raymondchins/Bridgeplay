@@ -56,7 +56,7 @@ BRIDGEPLAY_BETA=2 BRIDGEPLAY_BETA_BUILD=47 BRIDGEPLAY_BETA_PLANNED=0.8.0 make ap
 |---|---|
 | `BRIDGEPLAY_BETA` | The beta number N, a positive integer. Setting it at all asks for a beta; anything but a positive integer fails the build, and so does setting the two below without it |
 | `BRIDGEPLAY_BETA_BUILD` | The build number: H plus one (see Build numbers below), claimed before the build. Required, and above the committed build, so the beta orders above the stable it branched from |
-| `BRIDGEPLAY_BETA_PLANNED` | The release the beta is named after. Defaults to the next patch of the committed version; name a milestone minor (`0.8.0`) to override it. Must be above the committed version |
+| `BRIDGEPLAY_BETA_PLANNED` | The release the beta is named after. Defaults to the next patch of the committed version; name a milestone minor (`0.8.0`) to override it. Must not be below the committed version |
 
 A beta built from committed `0.7.2` therefore reads `0.7.3-beta.1` by default (`CFBundleShortVersionString`,
 shown in About, Status and game reports), carries the build it was given (`CFBundleVersion`) and
@@ -99,8 +99,10 @@ Only the version header (`BRIDGEPLAY_VERSION` and `BRIDGEPLAY_BUILD` in `dylib/v
 `compat/**`, where the weekly compat bot commits, may differ. The changed `compat/**` paths are
 printed and listed in the release body under "Data changed since the beta". Anything else stops
 the release with the paths that differ: merge `main` into the release branch, publish a new
-release-candidate beta from it, merge the release branch into `main` with a merge commit and
-release again. A stable that contains no new beta is a hotfix or a plain stable and is not gated
+release-candidate beta from it, merge the release branch into `main` with a merge commit, run
+`scripts/bump-version.sh build` (same version, a build above that beta's) and release again. A
+beta named after the committed version is allowed for this. Every stable must also take a higher
+build than each beta it contains, or those testers would never get it; the release stops otherwise. A stable that contains no new beta is a hotfix or a plain stable and is not gated
 (`promoted-from: none`), unless its tree, outside the version header and `compat/**`, equals a
 published beta it does not contain: the release branch was squashed or rebased into `main`, and
 the release stops.
@@ -208,7 +210,7 @@ only after the user confirms. Without the key, that section appears only while t
    release falls back to an older run of the same sources or runs the checks here.
 1. Bump and commit:
    ```sh
-   scripts/bump-version.sh patch        # or minor / major, or set X.Y.Z
+   scripts/bump-version.sh patch        # or minor / major, or set X.Y.Z; build keeps the version
    git commit -m "chore(release): Bridgeplay X.Y.Z" dylib/version.h
    ```
    `set X.Y.Z` takes any version above the committed one, such as `0.7.31` after `0.7.3` for a

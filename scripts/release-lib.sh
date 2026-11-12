@@ -164,6 +164,7 @@ release_gate() {
 	gate_contains=""
 	gate_promoted=none
 	gate_data=""
+	gate_max_build=0
 	_contained=""
 	_new=""
 	_others=""
@@ -172,6 +173,7 @@ release_gate() {
 		if git merge-base --is-ancestor "$_c" "$1" 2>/dev/null; then
 			_contained="$_contained$_b
 "
+			[ "$_b" -le "$gate_max_build" ] || gate_max_build=$_b
 			if [ -z "$2" ] || ! git merge-base --is-ancestor "$_c" "$2" 2>/dev/null; then
 				_new="$_b $_t $_c $_s"
 			fi
@@ -222,7 +224,7 @@ release_gate() {
 		echo "    header, so this stable would ship code no beta tested:" >&2
 		printf '%s\n' "$_other" | sed 's/^/      /' >&2
 		echo "    Merge main into $_branch, publish a new release-candidate beta from it, merge" >&2
-		echo "    $_branch into main and release again." >&2
+		echo "    $_branch into main, run scripts/bump-version.sh build, commit, push and release again." >&2
 		return 1
 	fi
 	gate_promoted=$_tag
