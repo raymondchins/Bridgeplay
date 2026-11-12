@@ -333,8 +333,19 @@ WITHDRAWN_LINE='Withdrawn from the beta feed:'
 
 is_stable_tag() { printf '%s\n' "$1" | grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+'; }
 is_beta_tag() { printf '%s\n' "$1" | grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+-beta\.[1-9][0-9]*'; }
-# is_build_list TEXT: beta builds as release_ranges prints them (81-85,87), or empty.
-is_build_list() { printf '%s\n' "$1" | grep -Eqx '([0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*)?'; }
+# is_build_list TEXT: beta builds as release_ranges prints them (81-85,87), or empty: each range
+# low to high, in ascending order without overlaps, as the app's CatchUpList reads them.
+is_build_list() {
+	printf '%s\n' "$1" | grep -Eqx '([0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*)?' || return 1
+	printf '%s\n' "$1" | awk -F, '{
+		prev = -1
+		for (i = 1; i <= NF; i++) {
+			n = split($i, r, "-"); lo = r[1] + 0; hi = r[n] + 0
+			if (lo > hi || lo <= prev) exit 1
+			prev = hi
+		}
+	}'
+}
 
 # feed_signature_problem FILE: what is wrong with FILE's feed signature, or nothing.
 feed_signature_problem() {

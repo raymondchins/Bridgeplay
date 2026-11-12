@@ -85,6 +85,13 @@ expect_eq "no betas" "" "$(printf '' | release_ranges)"
 expect_eq "one beta" 81 "$(ranges 81)"
 expect_eq "runs" "81-85,87" "$(ranges 81 82 83 84 85 87)"
 expect_eq "unsorted with repeats" "79,81-83,90-91" "$(ranges 90 81 83 82 91 79 81)"
+# is_build_list takes what release_ranges prints and only what the app's CatchUpList reads.
+for l in "" 81 81-85,87 79,81-83,90-91 0-0; do
+	if is_build_list "$l"; then pass; else fail "build list '$l' refused"; fi
+done
+for l in 81-80 82,81 81,81 81-83,83 81-85,84-90 "81," ",81" 81--82 a 81-82-83; do
+	if is_build_list "$l"; then fail "build list '$l' taken"; else pass; fi
+done
 
 # --- the I-6 guard -------------------------------------------------------------------------
 
