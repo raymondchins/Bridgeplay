@@ -280,6 +280,7 @@ struct UpdateRouting: Equatable, Sendable {
     private var logged = false
     private var choiceNotes: [String] = []
     private var choiceReason: String?
+    private var downloadedNow = false
 
     init(running: RunningBuild, settings: UpdateSettings) {
         self.running = running
@@ -302,6 +303,7 @@ struct UpdateRouting: Equatable, Sendable {
         logged = false
         choiceNotes = []
         choiceReason = nil
+        downloadedNow = false
     }
 
     mutating func feedDidLoad() {
@@ -331,10 +333,13 @@ struct UpdateRouting: Equatable, Sendable {
 
     // The cycle ended. Returns the log line if the check ended without one, as a failed one does.
     // A beta feed that could not be fetched or read sends the next check to the stable feed.
-    mutating func finished(error: String?, feedFailed: Bool, feedURL: String?) -> String? {
+    // authorizeLater: the user put off authorizing the install, so Sparkle keeps the download.
+    mutating func finished(error: String?, feedFailed: Bool, authorizeLater: Bool = false, feedURL: String?) -> String? {
         if error != nil, feedFailed, !feedLoaded, route.feed == .beta { betaFeedFailed = true }
         // A download that finished is waiting for quit or kept to resume by now: this one stopped.
         if pending?.stage == .downloading { pending = nil }
+        // Any other error after this check's download finished (extracting it, say): Sparkle drops it.
+        if downloadedNow, error != nil, !authorizeLater, pending?.stage == .resumable { pending = nil }
         let outcome = error.map { "chosen=none (check failed: \($0))" } ?? "chosen=none (no result)"
         return line(feedURL: feedURL, outcome: outcome, resumed: false)
     }
@@ -347,6 +352,7 @@ struct UpdateRouting: Equatable, Sendable {
     // The download finished. Sparkle keeps it whether it installs now, on quit or after a reminder.
     mutating func downloaded(_ item: FeedItem) {
         pending = PendingUpdate(item: item, stage: .resumable)
+        downloadedNow = true
     }
 
     mutating func waitingForQuit(_ item: FeedItem) {

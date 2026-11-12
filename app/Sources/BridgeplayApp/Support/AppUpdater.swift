@@ -245,7 +245,10 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
     func updater(_ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: (any Error)?) {
         let error = error as NSError?
         let feedError = error.map { $0.domain == SUSparkleErrorDomain && Self.feedErrors.contains(Int($0.code)) } ?? false
+        let authorizeLater = error.map { $0.domain == SUSparkleErrorDomain
+            && $0.code == Int(SUError.installationAuthorizeLaterError.rawValue) } ?? false
         UpdateLog.note(routing.finished(error: error.map { "\($0.domain) \($0.code)" }, feedFailed: feedError,
+                                        authorizeLater: authorizeLater,
                                         feedURL: updater.feedURL?.absoluteString))
         report?(.cycleFinished)
     }

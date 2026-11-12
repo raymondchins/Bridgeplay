@@ -430,8 +430,25 @@ struct PendingUpdateTests {
         // It finished and the user chose later: Sparkle keeps it for a reminder.
         var kept = routing
         kept.downloaded(beta(83))
+        var authorizeLater = kept
         _ = kept.finished(error: nil, feedFailed: false, feedURL: nil)
         #expect(kept.pending == PendingUpdate(item: beta(83), stage: .resumable))
+
+        // Authorizing the install was put off: Sparkle keeps it too.
+        _ = authorizeLater.finished(error: "SUSparkleErrorDomain 4008", feedFailed: false, authorizeLater: true, feedURL: nil)
+        #expect(authorizeLater.pending == PendingUpdate(item: beta(83), stage: .resumable))
+
+        // Extracting it failed: Sparkle drops it.
+        var dropped = routing
+        dropped.downloaded(beta(83))
+        _ = dropped.finished(error: "SUSparkleErrorDomain 3000", feedFailed: false, feedURL: nil)
+        #expect(dropped.pending == nil)
+
+        // A download resumed from an earlier run is not this check's: an error leaves it to notFound.
+        var earlier = checking(running(79, .stable), enrolled: true)
+        _ = earlier.found(beta(83), feedURL: BetaUpdates.betaFeedURL)
+        _ = earlier.finished(error: "SUSparkleErrorDomain 3000", feedFailed: false, feedURL: nil)
+        #expect(earlier.pending == PendingUpdate(item: beta(83), stage: .resumable))
 
         // It stopped (failed, or quit first): nothing is pending.
         _ = routing.finished(error: "SUSparkleErrorDomain 2001", feedFailed: false, feedURL: nil)
