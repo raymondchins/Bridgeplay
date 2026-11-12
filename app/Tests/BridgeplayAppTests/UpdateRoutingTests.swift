@@ -411,6 +411,28 @@ struct PendingUpdateTests {
                                           installsPending: true, pendingOutsideState: true))
     }
 
+    @Test("A beta downloading, then opting out: it is pending until the download ends")
+    func downloadingBetaOptOut() {
+        var routing = checking(running(79, .stable), enrolled: true)
+        routing.feedDidLoad()
+        _ = routing.found(beta(83), feedURL: BetaUpdates.betaFeedURL)
+        routing.downloading(beta(83))
+        #expect(routing.preferenceChanged(enrolled: false, sessionInProgress: true) == .none)
+        #expect(routing.prediction(enrolled: false)
+            == UpdatePrediction(label: "0.7.83-beta.1", build: "83", channel: .beta, state: .leaving,
+                                installsPending: true, pendingOutsideState: true))
+
+        // It finished: Sparkle installs it on quit.
+        var finished = routing
+        finished.waitingForQuit(beta(83))
+        #expect(finished.pending == PendingUpdate(item: beta(83), stage: .waitingForQuit))
+
+        // It stopped (failed, or quit first): nothing is pending.
+        _ = routing.finished(error: "SUSparkleErrorDomain 2001", feedFailed: false, feedURL: nil)
+        #expect(routing.pending == nil)
+        #expect(routing.prediction(enrolled: false).installsPending == false)
+    }
+
     @Test("A resumable beta, then opting out: Sparkle resumes it, the app logs it and predicts it")
     func resumableBetaOptOut() {
         var routing = checking(running(82, .beta), enrolled: true)

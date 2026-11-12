@@ -3271,6 +3271,28 @@
         }
       }
     },
+    "Bridgeplay %@ is downloading. If it finishes before you quit, it installs when you quit." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ è in download. Se finisce prima che chiudi l'app, verrà installato quando la chiudi."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ загружается. Если загрузка завершится до выхода из программы, он установится при выходе."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ 正在下载。如果在你退出前下载完成，会在你退出时安装。"
+          }
+        }
+      }
+    },
     "Bridgeplay %@ is ready to install" : {
       "localizations" : {
         "it" : {

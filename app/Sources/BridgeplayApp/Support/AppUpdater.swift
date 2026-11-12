@@ -19,7 +19,7 @@ final class AppUpdater {
     // The hidden switch, the one-time "back on stable" notice, and a Check for Updates that
     // found no stable release for a build leaving the beta.
     private(set) var betaUIShown = BetaUpdatesUI.shown(.standard)
-    private(set) var backOnStable = BetaCatchUp.take(running: .current, defaults: .standard)
+    private(set) var backOnStable = BetaCatchUp.notice(running: .current, defaults: .standard)
     private(set) var leavingNothingFound = false
 
     @ObservationIgnored private let controller: SPUStandardUpdaterController
@@ -46,13 +46,10 @@ final class AppUpdater {
         finder.report = { [weak self] in self?.flow.apply($0) }
         finder.installerReady = { [weak self] in self?.installNow = $0 }
         finder.pendingChanged = { [weak self] in self?.pending = $0 }
-        finder.checked = { [weak self] found, byUser, state in
+        finder.checked = { [weak self] found, byUser, unsupported, state in
             guard let self else { return }
-            if found || state != .leaving {
-                leavingNothingFound = false
-            } else if byUser {
-                leavingNothingFound = true
-            }
+            leavingNothingFound = BetaUpdatesUI.leavingNothingFound(found: found, byUser: byUser, unsupported: unsupported,
+                                                                    state: state, before: leavingNothingFound)
         }
         whatsNew = LatestRelease.takeWhatsNew(
             build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
@@ -81,6 +78,7 @@ final class AppUpdater {
     var state: UpdaterState { .of(enrolled: betaEnrolled, running: running.channel) }
 
     func dismissBackOnStable() {
+        BetaCatchUp.acknowledge(.standard)
         backOnStable = nil
     }
 
@@ -177,8 +175,9 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
     var report: ((UpdateEvent) -> Void)?
     var installerReady: ((@escaping () -> Void) -> Void)?
     var pendingChanged: ((PendingUpdate?) -> Void)?
-    // Found or not, whether the user asked, and the state the check ran in.
-    var checked: ((Bool, Bool, UpdaterState) -> Void)?
+    // Found or not, whether the user asked, whether the newest item needs another macOS or Mac,
+    // and the state the check ran in.
+    var checked: ((Bool, Bool, Bool, UpdaterState) -> Void)?
     private var userCheck = false
     var routing = UpdateRouting(running: .current, settings: .read(.standard))
 
@@ -212,7 +211,7 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
                              state: routing.state)
         UpdateLog.note(routing.found(FeedItem(item), feedURL: updater.feedURL?.absoluteString))
         pendingChanged?(routing.pending)
-        checked?(true, userCheck, routing.state)
+        checked?(true, userCheck, false, routing.state)
         report?(.found(version: item.displayVersionString))
     }
 
@@ -221,10 +220,13 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
             .flatMap { SPUNoUpdateFoundReason(rawValue: $0.int32Value) }
         UpdateLog.note(routing.notFound(reason: Self.describe(reason), feedURL: updater.feedURL?.absoluteString))
         pendingChanged?(routing.pending)
-        checked?(false, userCheck, routing.state)
+        let unsupported = [.systemIsTooOld, .systemIsTooNew, .hardwareDoesNotSupportARM64].contains(reason)
+        checked?(false, userCheck, unsupported, routing.state)
     }
 
     func updater(_ updater: SPUUpdater, willDownloadUpdate item: SUAppcastItem, with request: NSMutableURLRequest) {
+        routing.downloading(FeedItem(item))
+        pendingChanged?(routing.pending)
         report?(.downloading(version: item.displayVersionString))
     }
 
@@ -248,6 +250,7 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
         let feedError = error.map { $0.domain == SUSparkleErrorDomain && Self.feedErrors.contains(Int($0.code)) } ?? false
         UpdateLog.note(routing.finished(error: error.map { "\($0.domain) \($0.code)" }, feedFailed: feedError,
                                         feedURL: updater.feedURL?.absoluteString))
+        pendingChanged?(routing.pending)
         report?(.cycleFinished)
     }
 

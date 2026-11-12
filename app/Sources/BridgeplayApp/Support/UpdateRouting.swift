@@ -209,7 +209,7 @@ struct ItemChoice: Equatable, Sendable {
 
 // An update Sparkle has downloaded: waiting for quit, or kept to resume.
 struct PendingUpdate: Equatable, Sendable {
-    enum Stage: String, Equatable, Sendable { case waitingForQuit = "waiting for quit", resumable }
+    enum Stage: String, Equatable, Sendable { case downloading, waitingForQuit = "waiting for quit", resumable }
 
     var item: FeedItem
     var stage: Stage
@@ -330,8 +330,15 @@ struct UpdateRouting: Equatable, Sendable {
     // A beta feed that could not be fetched or read sends the next check to the stable feed.
     mutating func finished(error: String?, feedFailed: Bool, feedURL: String?) -> String? {
         if error != nil, feedFailed, !feedLoaded, route.feed == .beta { betaFeedFailed = true }
+        // A download that finished is waiting for quit or kept to resume by now: this one stopped.
+        if pending?.stage == .downloading { pending = nil }
         let outcome = error.map { "chosen=none (check failed: \($0))" } ?? "chosen=none (no result)"
         return line(feedURL: feedURL, outcome: outcome, resumed: false)
+    }
+
+    // Sparkle can't stop a download it started, and installs it on quit once it finishes.
+    mutating func downloading(_ item: FeedItem) {
+        pending = PendingUpdate(item: item, stage: .downloading)
     }
 
     mutating func waitingForQuit(_ item: FeedItem) {

@@ -14,7 +14,7 @@ struct BetaUpdatesUITests {
     func hiddenByDefault() {
         let defaults = scratchDefaults()
         let state = UpdaterState.of(enrolled: BetaUpdates.enrolled(defaults), running: stableBuild.channel)
-        let back = BetaCatchUp.take(running: stableBuild, defaults: defaults)
+        let back = BetaCatchUp.notice(running: stableBuild, defaults: defaults)
         #expect(!BetaUpdatesUI.shown(defaults))
         #expect(back == nil)
         #expect(BetaStatus.make(state: state, running: stableBuild, preferenceSet: BetaUpdatesUI.preferenceSet(defaults)) == nil)
@@ -89,6 +89,13 @@ struct BetaUpdatesUITests {
         #expect(message.hasSuffix("Bridgeplay 0.7.70-beta.2 (build 92) is already downloaded and installs when you quit. After that, Bridgeplay waits for a stable release that includes build 92."))
     }
 
+    @Test("Pending update, opting out while a beta downloads: it installs on quit if it finishes first")
+    func pendingOptOutDownloading() {
+        let pending = PendingUpdate(item: nextBeta, stage: .downloading)
+        let message = BetaCopy.confirmation(.optOut, running: betaBuild, pending: pending).message
+        #expect(message.hasSuffix("Bridgeplay 0.7.70-beta.2 (build 92) is downloading. If it finishes before you quit, it installs when you quit. After that, Bridgeplay waits for a stable release that includes build 92."))
+    }
+
     @Test("Pending update, opting in with a stable waiting for quit: betas after that")
     func pendingOptInStable() {
         let item = FeedItem(label: "0.7.70", build: "93", channel: nil)
@@ -131,20 +138,40 @@ struct BetaUpdatesUITests {
         #expect(nothing.detail == "No stable release includes your beta yet. Bridgeplay stays on build 91 and checks again later.")
     }
 
-    @Test("Back on stable shows once, after a beta build, only when not enrolled")
+    @Test("Back on stable shows after a beta build until acknowledged, only when not enrolled")
     func backOnStable() {
         let defaults = scratchDefaults()
-        #expect(BetaCatchUp.take(running: betaBuild, defaults: defaults) == nil)
+        #expect(BetaCatchUp.notice(running: betaBuild, defaults: defaults) == nil)
         #expect(defaults.string(forKey: "BetaBuildSeen") == "91")
-        #expect(BetaCatchUp.take(running: stableBuild, defaults: defaults) == stableBuild)
-        #expect(BetaCatchUp.take(running: stableBuild, defaults: defaults) == nil)
+        #expect(BetaCatchUp.notice(running: stableBuild, defaults: defaults) == stableBuild)
+        // Quit before pressing OK: the next launch shows it again.
+        #expect(BetaCatchUp.notice(running: stableBuild, defaults: defaults) == stableBuild)
+        BetaCatchUp.acknowledge(defaults)
+        #expect(BetaCatchUp.notice(running: stableBuild, defaults: defaults) == nil)
         #expect(BetaCopy.backOnStable(stableBuild) == .init(title: "You're back on stable updates", value: "0.7.69 (build 90)"))
 
         // Still enrolled: a stable build is part of the beta, not a return to stable.
-        _ = BetaCatchUp.take(running: betaBuild, defaults: defaults)
+        _ = BetaCatchUp.notice(running: betaBuild, defaults: defaults)
         BetaUpdates.set(enrolled: true, defaults: defaults)
-        #expect(BetaCatchUp.take(running: stableBuild, defaults: defaults) == nil)
+        #expect(BetaCatchUp.notice(running: stableBuild, defaults: defaults) == nil)
         #expect(defaults.object(forKey: "BetaBuildSeen") == nil)
+    }
+
+    @Test("No stable release found: shown only after a check the user asked for that found nothing it could run")
+    func leavingNothingFound() {
+        func after(found: Bool = false, byUser: Bool = true, unsupported: Bool = false,
+                   state: UpdaterState = .leaving, before: Bool = false) -> Bool {
+            BetaUpdatesUI.leavingNothingFound(found: found, byUser: byUser, unsupported: unsupported,
+                                              state: state, before: before)
+        }
+        #expect(after())
+        #expect(!after(unsupported: true), "a release that needs another macOS exists")
+        #expect(!after(unsupported: true, before: true))
+        #expect(!after(found: true, before: true))
+        #expect(!after(state: .beta, before: true))
+        #expect(!after(state: .stable, before: true))
+        #expect(after(byUser: false, before: true), "a background check leaves it")
+        #expect(!after(byUser: false, before: false))
     }
 
     @Test("A build without a number is named by its label")

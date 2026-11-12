@@ -20,22 +20,38 @@ enum BetaUpdatesUI {
     static func visible(shown: Bool, state: UpdaterState, backOnStable: RunningBuild?) -> Bool {
         shown || state != .stable || backOnStable != nil
     }
+
+    // Whether "No stable release includes your beta yet" shows after a check. A background check
+    // leaves it as it was. A release this Mac can't run is not a missing one; Sparkle says why.
+    static func leavingNothingFound(found: Bool, byUser: Bool, unsupported: Bool, state: UpdaterState,
+                                    before: Bool) -> Bool {
+        guard !found, state == .leaving else { return false }
+        return byUser ? !unsupported : before
+    }
 }
 
-// The one-time "back on stable" notice. A beta build notes itself for this account; the first
-// stable build this account runs afterwards takes the note.
+// The "back on stable" notice. A beta build notes itself for this account; every stable build
+// this account runs afterwards shows the notice until its OK acknowledges it.
 enum BetaCatchUp {
     static let seenKey = "BetaBuildSeen"
 
-    static func take(running: RunningBuild, defaults: UserDefaults) -> RunningBuild? {
+    static func notice(running: RunningBuild, defaults: UserDefaults) -> RunningBuild? {
         if running.channel == .beta {
             let value = running.build ?? running.label
             if defaults.string(forKey: seenKey) != value { defaults.set(value, forKey: seenKey) }
             return nil
         }
         guard defaults.object(forKey: seenKey) != nil else { return nil }
+        // Still enrolled: a stable build is part of the beta, not a return to stable.
+        guard !BetaUpdates.enrolled(defaults) else {
+            acknowledge(defaults)
+            return nil
+        }
+        return running
+    }
+
+    static func acknowledge(_ defaults: UserDefaults) {
         defaults.removeObject(forKey: seenKey)
-        return BetaUpdates.enrolled(defaults) ? nil : running
     }
 }
 
@@ -116,11 +132,12 @@ enum BetaCopy {
         return BetaConfirmation(title: title, message: parts.joined(separator: " "), button: button)
     }
 
-    // A downloaded update installs whatever the switch says, so the change waits for it.
+    // A downloaded update, or one downloading, installs whatever the switch says, so the change waits for it.
     static func pendingNote(_ pending: PendingUpdate?, prediction: UpdatePrediction) -> String? {
         guard let pending, prediction.installsPending else { return nil }
         let name = named(pending.item.label, pending.item.build)
         let installs = switch pending.stage {
+        case .downloading: String(localized: "Bridgeplay \(name) is downloading. If it finishes before you quit, it installs when you quit.")
         case .waitingForQuit: String(localized: "Bridgeplay \(name) is already downloaded and installs when you quit.")
         case .resumable: String(localized: "Bridgeplay \(name) is already downloaded and installs the next time Bridgeplay updates.")
         }
