@@ -23,7 +23,7 @@ fi
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/np-betacheck.XXXXXX")
 trap 'rm -rf "$work"' EXIT
-unset BRIDGEPLAY_LEDGER_REMOTE_URL SPARKLE_KEY_FILE GH_STUB_FAIL GH_STUB_FAIL_LATEST GH_STUB_CORRUPT GH_STUB_BREAK_CREATE \
+unset BRIDGEPLAY_LEDGER_REMOTE_URL SPARKLE_KEY_FILE GH_STUB_FAIL GH_STUB_FAIL_LATEST GH_STUB_CORRUPT GH_STUB_BREAK_CREATE GH_STUB_WITHDRAW_ON_RENAME \
 	GH_STUB_FAIL_UPLOAD BRIDGEPLAY_SIGN_IDENTITY BRIDGEPLAY_NOTARY_PROFILE CX_ROOT BRIDGEPLAY_BETA \
 	BRIDGEPLAY_BETA_BUILD BRIDGEPLAY_BETA_PLANNED BRIDGEPLAY_HIGHEST_BUILD BETACHECK_RACE
 
@@ -206,6 +206,7 @@ cat >"$stub/bin/gh" <<'EOF'
 # GH_STUB_FAIL=1: no network. GH_STUB_CORRUPT=NAME: that asset is stored damaged on upload.
 # GH_STUB_BREAK_CREATE=NAME: release create breaks off before uploading that asset, leaving a draft.
 # GH_STUB_FAIL_UPLOAD=NAME: uploading that asset to an existing release fails.
+# GH_STUB_WITHDRAW_ON_RENAME=TAG: TAG is marked withdrawn as a new appcast.xml is renamed into place.
 set -eu
 printf '%s\n' "$*" >>"$GH_STUB/log"
 die() { echo "gh stub: $*" >&2; exit 1; }
@@ -289,6 +290,11 @@ case "$cmd $sub" in
 					jq --argjson id "$id" --arg n "${field#name=}" \
 						'map(.assets = [.assets[] | if .id == $id then .name = $n else . end])' "$st" >"$st.new"
 					save
+					if [ -n "${GH_STUB_WITHDRAW_ON_RENAME:-}" ] && [ "${field#name=}" = appcast.xml ]; then
+						jq --arg t "$GH_STUB_WITHDRAW_ON_RENAME" --arg w "Withdrawn from the beta feed: elsewhere" \
+							'map(if .tag_name == $t then .body = ($w + "\n\n" + .body) else . end)' "$st" >"$st.new"
+						save
+					fi
 				else
 					[ -n "$accept" ] || die "an asset without Accept"
 					cat "$GH_STUB/assets/$id"
@@ -987,6 +993,15 @@ bump 0.7.69 $((h + 1))
 push main
 expect_code "unexposed: a stable with code the candidate lacks" 1 release
 expect_has "unexposed: checked against the delivered stable" "HEAD differs from beta v0.7.68-beta.1" "$out"
+
+# --- a beta withdrawn by another clone while this run swaps in its feed ------------------------
+
+expect_eq "race: the feed offers the candidate" 1 "$(items "$(feed)" | grep -c '^0.7.68-beta.1:')"
+expect_code "race: withdrawn while the feed goes up" 1 with GH_STUB_WITHDRAW_ON_RENAME=v0.7.68-beta.1 --beta --rebuild-feeds
+expect_has "race: said" "v0.7.68-beta.1 was withdrawn while this run made the beta feed, which still offers it" "$out"
+expect_has "race: the recovery" "run scripts/release-local.sh --beta --rebuild-feeds" "$out"
+expect_code "race: rebuilt" 0 release --beta --rebuild-feeds
+expect_eq "race: the withdrawn beta is gone" 0 "$(items "$(feed)" | grep -c '^0.7.68-beta.1:' || true)"
 
 if [ "$failures" -ne 0 ]; then
 	echo "==> betacheck: $failures of $checks checks failed" >&2

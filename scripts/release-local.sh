@@ -712,6 +712,17 @@ expose_beta_feed() {
 		"$sparkle/sign_update" --verify $key_args "$_chk/Bridgeplay.zip" "$_sig" >/dev/null 2>&1 \
 			|| { echo "==> the beta feed's signature for build $3 does not match $4's zip" >&2; return 1; }
 	fi
+	# The lock is this clone's only. A run elsewhere marks a beta withdrawn before it swaps in its
+	# feed, so a beta this feed still offers that is withdrawn now means this swap undid that one.
+	for _l in $(beta_feed_labels "$_chk/appcast.xml"); do
+		_wb=$(gh release view "v$_l" -R "$slug" --json body -q .body 2>/dev/null) \
+			|| { echo "==> can't read v$_l back" >&2; return 1; }
+		if printf '%s\n' "$_wb" | is_withdrawn; then
+			echo "==> v$_l was withdrawn while this run made the beta feed, which still offers it;" >&2
+			echo "    run scripts/release-local.sh --beta --rebuild-feeds" >&2
+			return 1
+		fi
+	done
 	echo "==> the published beta feed was read back and checked"
 }
 

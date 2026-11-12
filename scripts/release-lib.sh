@@ -660,6 +660,18 @@ beta_feed_guard() {
 	return "$_bad"
 }
 
+# beta_feed_labels FILE: the label of each beta item (one with a sparkle:channel), one per line.
+beta_feed_labels() {
+	_n=$(xp "$1" "count(//*[local-name()='item'])")
+	_i=0
+	while [ "$_i" -lt "$_n" ]; do
+		_i=$((_i + 1))
+		_it="(//*[local-name()='item'])[$_i]"
+		[ -n "$(xp "$1" "string($_it/*[local-name()='channel'])")" ] || continue
+		printf '%s\n' "$(xp "$1" "string($_it/*[local-name()='shortVersionString'])")"
+	done
+}
+
 # beta_feed_item FILE BUILD ATTR: the enclosure's url, length or edSignature of the item with BUILD.
 beta_feed_item() {
 	_it="//*[local-name()='item'][*[local-name()='version' and namespace-uri()='$SPARKLE_NS'] = '$2']"
