@@ -965,6 +965,29 @@ expect_has "R4: promoted" "promoted from: v0.7.67-beta.4" "$out"
 expect_eq "R4: Latest" v0.7.67 "$(latest)"
 expect_eq "R4: above the candidate" 1 "$([ "$(ledger_of v0.7.67 build)" -gt "$rc2" ] && echo 1)"
 
+# --- the previous stable is the Latest one: a release a stopped run never exposed is not it ------
+
+checkout develop
+merge main
+git_in "$fx" checkout -q -b release/0.7.68
+change src/rc8.c rc8 "fix: last one for 0.7.68"
+push release/0.7.68
+expect_code "unexposed: the release candidate" 0 release --beta "- the release candidate"
+checkout main
+merge release/0.7.68
+h=$(highest)
+bump 0.7.68 $((h + 1))
+push main
+expect_code "unexposed: marking it Latest fails" 1 with GH_STUB_FAIL_LATEST=1
+expect_eq "unexposed: it exists" v0.7.68 "$(jq -r 'map(select(.tag_name == "v0.7.68"))[0].tag_name' "$rel")"
+expect_eq "unexposed: Latest is still the delivered stable" v0.7.67 "$(latest)"
+change src/late.c late "feat: after the candidate"
+h=$(highest)
+bump 0.7.69 $((h + 1))
+push main
+expect_code "unexposed: a stable with code the candidate lacks" 1 release
+expect_has "unexposed: checked against the delivered stable" "HEAD differs from beta v0.7.68-beta.1" "$out"
+
 if [ "$failures" -ne 0 ]; then
 	echo "==> betacheck: $failures of $checks checks failed" >&2
 	exit 1

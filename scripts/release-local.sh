@@ -240,15 +240,17 @@ if [ "$mode" = stable ]; then
 	# Betas: which published ones this stable contains (the feed's containsBetas and the ledger)
 	# and, when it contains one the previous stable did not, whether it ships that release
 	# candidate's tree (R4). Skipped on a resume, which publishes what the first run checked.
+	# The previous stable is the Latest one, which installed apps have: a newer release that a
+	# stopped run never marked Latest reached nobody, so its betas still count as new.
 	gate_contains=""
 	gate_promoted=none
 	gate_data=""
 	if [ "$resume" -eq 0 ]; then
 		release_published_betas "$work/betas" || die "can't tell which betas are published (above); nothing was claimed or built"
 		previous_commit=""
-		if [ -s "$work/betas" ] && is_stable_tag "$previous"; then
-			previous_commit=$(release_tag_commit "$previous") \
-				|| die "can't find the commit of the previous stable $previous on $remote ($remote_url)"
+		if [ -s "$work/betas" ] && is_stable_tag "$latest_tag"; then
+			previous_commit=$(release_tag_commit "$latest_tag") \
+				|| die "can't find the commit of the previous stable $latest_tag on $remote ($remote_url)"
 		fi
 		release_gate "$head" "$previous_commit" "$work/betas" "$build" \
 			|| check "this stable may not ship as it is (above)"

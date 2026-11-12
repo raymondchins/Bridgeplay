@@ -93,7 +93,9 @@ can't be read. The stable lists the betas whose commit HEAD contains in its feed
 with runs folded into ranges, `82-83,86`, empty for none. A beta app takes a stable only if its own
 build is in that list.
 
-A stable that contains a beta the previous stable did not is a promotion of the newest such beta,
+The previous stable is the Latest release, the one installed apps have; a newer release that a
+stopped run never marked Latest reached nobody and doesn't count. A stable that contains a beta the
+previous stable did not is a promotion of the newest such beta,
 which must have been built from a `release/*` branch, and HEAD must have exactly that beta's tree.
 Only the version header (`BRIDGEPLAY_VERSION` and `BRIDGEPLAY_BUILD` in `dylib/version.h`) and
 `compat/**`, where the weekly compat bot commits, may differ. The changed `compat/**` paths are
