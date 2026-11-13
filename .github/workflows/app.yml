@@ -1,13 +1,13 @@
 name: app
 
-# Starts on every PR and every push to main and dev, so the "app gate" job below always
-# reports: it is the check a branch rule can require. The scope job decides whether the
+# Starts on every PR and every push to main, develop, dev and release/**, so the "app gate"
+# job below always reports: it is the check a branch rule can require. The scope job decides whether the
 # change is docs-only (.github/docs-only-paths); if so the build and checks jobs are
 # skipped and the gate passes. scripts/build-local.sh reuses a run for a release only when
-# those two jobs ran and succeeded (scripts/ci-run-passed.sh), so keep their names.
+# those two jobs ran and succeeded on a push run (scripts/ci-run-passed.sh), so keep their names.
 on:
   push:
-    branches: [main, dev]
+    branches: [main, develop, dev, 'release/**']
   pull_request:
   workflow_dispatch:
 

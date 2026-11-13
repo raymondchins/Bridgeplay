@@ -13,6 +13,14 @@ final class AppUpdater {
     private(set) var flow = UpdateFlow()
     // What the running build brought, until it is dismissed.
     private(set) var whatsNew: WhatsNew?
+    // An update downloaded and waiting for quit, or kept to resume, and the beta preference.
+    private(set) var pending: PendingUpdate?
+    private(set) var betaEnrolled = BetaUpdates.enrolled(.standard)
+    // The hidden switch, the one-time "back on stable" notice, and a Check for Updates that
+    // found no stable release for a build leaving the beta.
+    private(set) var betaUIShown = BetaUpdatesUI.shown(.standard)
+    private(set) var backOnStable = BetaCatchUp.notice(running: .current, defaults: .standard)
+    private(set) var leavingNothingFound = false
 
     @ObservationIgnored private let controller: SPUStandardUpdaterController
     // Sparkle holds its delegates weakly.
@@ -20,6 +28,8 @@ final class AppUpdater {
     @ObservationIgnored private var sessionObservation: NSKeyValueObservation?
     // Sparkle's own install-and-relaunch for an update waiting for quit.
     @ObservationIgnored private var installNow: (() -> Void)?
+    @ObservationIgnored private var preferenceWatch: DefaultsWatch?
+    @ObservationIgnored private var uiWatch: DefaultsWatch?
 
     init() {
         #if DEBUG
@@ -35,14 +45,77 @@ final class AppUpdater {
         )
         finder.report = { [weak self] in self?.flow.apply($0) }
         finder.installerReady = { [weak self] in self?.installNow = $0 }
+        finder.pendingChanged = { [weak self] in self?.pending = $0 }
+        finder.checked = { [weak self] result, byUser, state in
+            guard let self else { return }
+            leavingNothingFound = BetaUpdatesUI.leavingNothingFound(result: result, byUser: byUser, state: state,
+                                                                    before: leavingNothingFound)
+        }
         whatsNew = LatestRelease.takeWhatsNew(
             build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
         // Async because Sparkle changes this mid-way through closing a session.
         sessionObservation = controller.updater.observe(\.canCheckForUpdates) { [weak self] _, _ in
             DispatchQueue.main.async {
-                MainActor.assumeIsolated { self?.runQueuedCheck() }
+                MainActor.assumeIsolated {
+                    self?.runQueuedCheck()
+                    self?.restartIfQueued()
+                }
             }
         }
+        preferenceWatch = DefaultsWatch(key: BetaUpdates.enrolledKey) { [weak self] in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.betaPreferenceChanged() }
+            }
+        }
+        uiWatch = DefaultsWatch(key: BetaUpdatesUI.shownKey) { [weak self] in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.betaUIShown = BetaUpdatesUI.shown(.standard) }
+            }
+        }
+    }
+
+    var running: RunningBuild { finder.routing.running }
+    var state: UpdaterState { .of(enrolled: betaEnrolled, running: running.channel) }
+
+    func dismissBackOnStable() {
+        BetaCatchUp.acknowledge(.standard)
+        backOnStable = nil
+    }
+
+    // Always allowed, and takes effect at once; a pending update still installs.
+    func setBetaUpdates(_ enrolled: Bool) {
+        BetaUpdates.set(enrolled: enrolled)
+        betaPreferenceChanged()
+    }
+
+    private func betaPreferenceChanged() {
+        let enrolled = BetaUpdates.enrolled(.standard)
+        guard enrolled != betaEnrolled else { return }
+        betaEnrolled = enrolled
+        leavingNothingFound = false
+        // Back in the beta: "back on stable" no longer holds.
+        if enrolled, backOnStable != nil { dismissBackOnStable() }
+        AppLog.note("update: beta updates \(enrolled ? "on" : "off")")
+        let action = finder.routing.preferenceChanged(enrolled: enrolled,
+                                                      sessionInProgress: controller.updater.sessionInProgress)
+        apply(action)
+    }
+
+    private func restartIfQueued() {
+        guard !controller.updater.sessionInProgress else { return }
+        apply(finder.routing.sessionEnded())
+    }
+
+    private func apply(_ action: UpdateRouting.PreferenceAction) {
+        #if !DEBUG
+        let updater = controller.updater
+        for call in action.calls {
+            switch call {
+            case .resetUpdateCycle: updater.resetUpdateCycle()
+            case .checkInBackground: updater.checkForUpdatesInBackground()
+            }
+        }
+        #endif
     }
 
     // Sparkle ignores checkForUpdates during a session, and a download started in the
@@ -97,21 +170,62 @@ final class AppUpdater {
 private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUStandardUserDriverDelegate {
     var report: ((UpdateEvent) -> Void)?
     var installerReady: ((@escaping () -> Void) -> Void)?
+    var pendingChanged: ((PendingUpdate?) -> Void)?
+    // What the check found, whether the user asked, and the state it ran in.
+    var checked: ((CheckResult, Bool, UpdaterState) -> Void)?
+    private var userCheck = false
+    var routing = UpdateRouting(running: .current, settings: .read(.standard)) {
+        didSet { if routing.pending != oldValue.pending { pendingChanged?(routing.pending) } }
+    }
 
     func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
+        routing.startCheck(settings: .read(.standard))
+        userCheck = updateCheck == .updates
         report?(.cycleStarted(byUser: updateCheck == .updates))
     }
 
+    // nil keeps SUFeedURL, so the stable state requests the feed exactly as before.
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        routing.route.feedURL
+    }
+
+    func allowedChannels(for updater: SPUUpdater) -> Set<String> {
+        routing.route.allowedChannels
+    }
+
+    func updater(_ updater: SPUUpdater, didFinishLoading appcast: SUAppcast) {
+        routing.feedDidLoad()
+    }
+
+    func bestValidUpdate(in appcast: SUAppcast, for updater: SPUUpdater) -> SUAppcastItem? {
+        let items = appcast.items
+        guard let choice = routing.choose(items.map(FeedItem.init)) else { return nil }
+        return choice.map { items[$0] } ?? SUAppcastItem.empty()
+    }
+
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
-        LatestRelease.record(build: item.versionString, version: item.displayVersionString, notes: item.itemDescription)
+        LatestRelease.record(build: item.versionString, version: item.displayVersionString, notes: item.itemDescription,
+                             state: routing.state)
+        UpdateLog.note(routing.found(FeedItem(item), feedURL: updater.feedURL?.absoluteString))
+        checked?(.found, userCheck, routing.state)
         report?(.found(version: item.displayVersionString))
     }
 
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
+        let reason = ((error as NSError).userInfo[SPUNoUpdateFoundReasonKey] as? NSNumber)
+            .flatMap { SPUNoUpdateFoundReason(rawValue: $0.int32Value) }
+        let (text, result) = Self.describe(reason)
+        UpdateLog.note(routing.notFound(reason: text, feedURL: updater.feedURL?.absoluteString))
+        checked?(result, userCheck, routing.state)
+    }
+
     func updater(_ updater: SPUUpdater, willDownloadUpdate item: SUAppcastItem, with request: NSMutableURLRequest) {
+        routing.downloading(FeedItem(item))
         report?(.downloading(version: item.displayVersionString))
     }
 
     func updater(_ updater: SPUUpdater, willExtractUpdate item: SUAppcastItem) {
+        routing.downloaded(FeedItem(item))
         report?(.preparing(version: item.displayVersionString))
     }
 
@@ -119,13 +233,39 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
     // until quit, so no more checks run; Sparkle still installs on quit.
     func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem,
                  immediateInstallationBlock immediateInstallHandler: @escaping () -> Void) -> Bool {
+        routing.waitingForQuit(FeedItem(item))
         installerReady?(immediateInstallHandler)
         report?(.ready(version: item.displayVersionString))
         return true
     }
 
     func updater(_ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: (any Error)?) {
+        UpdateLog.note(routing.finished(error: (error as NSError?).map(Self.classify),
+                                        feedURL: updater.feedURL?.absoluteString))
         report?(.cycleFinished)
+    }
+
+    // The feed could not be fetched or read.
+    private static let feedErrors: Set<Int> = [Int(SUError.appcastParseError.rawValue), Int(SUError.appcastError.rawValue),
+                                               Int(SUError.downloadError.rawValue)]
+
+    private static func classify(_ error: NSError) -> CycleError {
+        let text = "\(error.domain) \(error.code)"
+        guard error.domain == SUSparkleErrorDomain else { return .other(text) }
+        if feedErrors.contains(error.code) { return .feed(text) }
+        if error.code == Int(SUError.installationAuthorizeLaterError.rawValue) { return .authorizeLater(text) }
+        return .other(text)
+    }
+
+    private static func describe(_ reason: SPUNoUpdateFoundReason?) -> (String, CheckResult) {
+        switch reason {
+        case .onLatestVersion: ("up to date", .nothing)
+        case .onNewerThanLatestVersion: ("newer than the feed", .nothing)
+        case .systemIsTooOld: ("macOS too old for the newest item", .unsupported)
+        case .systemIsTooNew: ("macOS too new for the newest item", .unsupported)
+        case .hardwareDoesNotSupportARM64: ("hardware unsupported", .unsupported)
+        default: ("no update", .nothing)
+        }
     }
 
     var supportsGentleScheduledUpdateReminders: Bool { true }
@@ -138,12 +278,68 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
 
     func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem,
                                                    state: SPUUserUpdateState) {
+        if state.stage != .notDownloaded {
+            UpdateLog.note(routing.resuming(FeedItem(update)))
+        }
         guard !state.userInitiated else { return }
         report?(.reminder(version: update.displayVersionString, downloaded: state.stage != .notDownloaded))
     }
 
     func standardUserDriverWillFinishUpdateSession() {
         report?(.updateClosed)
+    }
+}
+
+extension FeedItem {
+    init(_ item: SUAppcastItem) {
+        self.init(label: item.displayVersionString, build: item.versionString, channel: item.channel,
+                  containsBetas: item.propertiesDictionary[BetaUpdates.containsBetasElement] as? String)
+    }
+}
+
+// F0.9 lines go to bridgeplay.log, beside the dylib's own lines, and to the app's log.
+enum UpdateLog {
+    static var file: URL { SupportPaths.support.appending(path: "bridgeplay.log") }
+
+    private static let queue = DispatchQueue(label: "bridgeplay.updatelog")
+
+    static func note(_ line: String?) {
+        guard let line else { return }
+        AppLog.note(line)
+        let text = "\(Date().ISO8601Format()) [app] \(line)\n"
+        queue.async { append(text, to: file) }
+    }
+
+    // O_APPEND, so lines from Steam's dylib and from here never overwrite each other. The folder
+    // is never created here: the dylib picks the legacy folder only while this one is missing.
+    static func append(_ text: String, to file: URL) {
+        let fd = open(file.path(percentEncoded: false), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0o644)
+        guard fd >= 0 else { return }
+        defer { close(fd) }
+        let bytes = Array(text.utf8)
+        _ = bytes.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
+    }
+}
+
+// Calls back when one key of the standard defaults changes, in this process or another.
+private final class DefaultsWatch: NSObject, @unchecked Sendable {
+    private let key: String
+    private let changed: @Sendable () -> Void
+
+    init(key: String, changed: @escaping @Sendable () -> Void) {
+        self.key = key
+        self.changed = changed
+        super.init()
+        UserDefaults.standard.addObserver(self, forKeyPath: key, options: [.new], context: nil)
+    }
+
+    deinit {
+        UserDefaults.standard.removeObserver(self, forKeyPath: key)
+    }
+
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?,
+                               change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
+        changed()
     }
 }
 
@@ -262,11 +458,19 @@ enum LatestRelease {
     static let versionKey = "LatestReleaseVersion"
     static let notesKey = "LatestReleaseNotes"
     static let whatsNewShownKey = "WhatsNewShownBuild"
+    // The updater state that found it; absent means stable, so the stable state writes nothing new.
+    static let stateKey = "LatestReleaseState"
 
-    static func record(build: String, version: String, notes: String? = nil, defaults: UserDefaults = .standard) {
+    static func record(build: String, version: String, notes: String? = nil, state: UpdaterState = .stable,
+                       defaults: UserDefaults = .standard) {
         defaults.set(build, forKey: buildKey)
         defaults.set(version, forKey: versionKey)
         defaults.set(notes, forKey: notesKey)
+        if state != .stable {
+            defaults.set(state.rawValue, forKey: stateKey)
+        } else if defaults.object(forKey: stateKey) != nil {
+            defaults.removeObject(forKey: stateKey)
+        }
     }
 
     // The build before this one recorded the notes when it found the update, so a first
@@ -297,9 +501,11 @@ enum LatestRelease {
     }
 
     // "0.7.38 (55)" when the release found is newer than `build`; releases are ordered by
-    // build, never by the version label.
-    static func newer(than build: String?, defaults: UserDefaults = .standard) -> String? {
-        guard let found = defaults.string(forKey: buildKey), let foundBuild = Int(found),
+    // build, never by the version label. Only a release found in `state` counts, so a beta the
+    // beta feed offered doesn't make a stable player behind.
+    static func newer(than build: String?, state: UpdaterState = .stable, defaults: UserDefaults = .standard) -> String? {
+        guard (defaults.string(forKey: stateKey) ?? UpdaterState.stable.rawValue) == state.rawValue,
+              let found = defaults.string(forKey: buildKey), let foundBuild = Int(found),
               let build = build.flatMap({ Int($0) }), foundBuild > build else { return nil }
         let version = defaults.string(forKey: versionKey) ?? ""
         return version.isEmpty ? "build \(found)" : "\(version) (\(found))"

@@ -28,6 +28,9 @@ struct ReportPayload: Codable, Equatable, Sendable {
     var setup: [String: String]?
     var log: String?
     var wineLog: String?
+    // The updater state and the build's channel. Older endpoints ignore both.
+    var updateState: String? = nil
+    var buildChannel: String? = nil
 
     // Newest lines kept. These count characters, not bytes, so encoded() is what keeps the
     // JSON under the endpoint's 1 MB cap.
@@ -82,7 +85,8 @@ struct ReportPayload: Codable, Equatable, Sendable {
             model: machine.model,
             setup: machine.setup.isEmpty ? nil : machine.setup,
             log: log.map { String(GameReport.redacted($0).suffix(logLimit)) },
-            wineLog: wineLog.map { GameReport.wineTail(GameReport.redacted($0), limit: wineLogLimit) })
+            wineLog: wineLog.map { GameReport.wineTail(GameReport.redacted($0), limit: wineLogLimit) },
+            updateState: machine.updateState, buildChannel: machine.buildChannel)
     }
 }
 

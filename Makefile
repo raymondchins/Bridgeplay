@@ -88,7 +88,7 @@ DEPS := $(OBJS:.o=.d)
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
         compatsvc-check prefixstate-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck \
-        gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck cicheck compat-reported-check FORCE
+        gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
 
@@ -116,9 +116,36 @@ runcheck:
 	shellcheck dylib/feats/compat_run.sh && sh -n dylib/feats/compat_run.sh && \
 	echo "==> runcheck: the run script lints and parses clean"
 
+ledgercheck:
+	@if [ ! -f scripts/tests/ledgercheck.sh ]; then $(call SKIP,ledgercheck,scripts/tests/ledgercheck.sh); exit 0; fi; \
+	sh scripts/tests/ledgercheck.sh
+
+# Needs Sparkle's tools from the app build (app/.build/artifacts), or SPARKLE_BIN.
+stablecheck:
+	@if [ ! -f scripts/tests/stablecheck.sh ]; then $(call SKIP,stablecheck,scripts/tests/stablecheck.sh); exit 0; fi; \
+	sh scripts/tests/stablecheck.sh
+
+# The beta release mode; needs Sparkle's tools like stablecheck.
+betacheck:
+	@if [ ! -f scripts/tests/betacheck.sh ]; then $(call SKIP,betacheck,scripts/tests/betacheck.sh); exit 0; fi; \
+	sh scripts/tests/betacheck.sh
+
 cicheck:
 	@if [ ! -f scripts/tests/cicheck.sh ]; then $(call SKIP,cicheck,scripts/tests/cicheck.sh); exit 0; fi; \
 	sh scripts/tests/cicheck.sh
+
+# Gate G1's script fixtures (R1, R4, R6, I-6, X-14 to X-18; see docs/G1.md) in one run. A suite
+# that prints a skip line fails here: G1 needs every one to have run.
+G1_CHECKS := ledgercheck stablecheck betacheck versioncheck cicheck native-installercheck
+g1check:
+	@failed=""; for c in $(G1_CHECKS); do \
+		echo "==> g1check: $$c"; \
+		log=$$($(MAKE) -s $$c 2>&1); rc=$$?; printf '%s\n' "$$log" | tail -n 2; \
+		if [ $$rc -ne 0 ]; then failed="$$failed $$c"; \
+		elif printf '%s\n' "$$log" | grep -q '^==> [A-Za-z0-9_-]*: .*skipped'; then failed="$$failed $$c(skipped)"; fi; \
+	done; \
+	if [ -n "$$failed" ]; then echo "==> g1check: FAILED:$$failed" >&2; exit 1; fi; \
+	echo "==> g1check: all $(words $(G1_CHECKS)) fixture suites ran and passed"
 
 # Validate batch exit statuses without starting games.
 .PHONY: np-test-batch-check
@@ -945,12 +972,13 @@ CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck launchercheck \
-	seedcheck gamefixescheck versioncheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
+	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
 	app-tests native-installercheck
 
 # app.yml runs the checks that need the built app in its build job and the rest in a
-# parallel job; both lists together are CI_CHECKS.
-CI_CHECKS_BUILT := mincheck l10ncheck app-tests
+# parallel job; both lists together are CI_CHECKS. stablecheck and betacheck need the build's
+# Sparkle tools.
+CI_CHECKS_BUILT := mincheck l10ncheck app-tests stablecheck betacheck
 CI_CHECKS_SOURCE := $(filter-out $(CI_CHECKS_BUILT),$(CI_CHECKS))
 
 .PHONY: ci-checks ci-checks-built ci-checks-source

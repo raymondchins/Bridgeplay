@@ -47,6 +47,9 @@ semver_gt() {
 	[ "$3" -gt "$6" ]
 }
 
+# semver_ge A B: A is B or above it.
+semver_ge() { [ "$1" = "$2" ] || semver_gt "$1" "$2"; }
+
 # semver_next PART VERSION: the next patch, minor or major of VERSION.
 semver_next() {
 	_old_ifs=$IFS

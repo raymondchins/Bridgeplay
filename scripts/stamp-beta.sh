@@ -4,10 +4,10 @@
 #   BRIDGEPLAY_BETA=N BRIDGEPLAY_BETA_BUILD=B [BRIDGEPLAY_BETA_PLANNED=X.Y.Z] make app
 #   scripts/stamp-beta.sh check | print | apply Info.plist
 #
-# dylib/version.h always holds the plain X.Y.Z, on main and on dev. A beta build is named
+# dylib/version.h always holds the plain X.Y.Z, on main and on develop. A beta build is named
 # after the release it leads to: label X.Y.Z-beta.N with X.Y.Z the planned release, which
 # defaults to the next patch of the committed version; name a milestone minor to override it.
-# It must be above the committed version. The build number B is "the highest build ever
+# It must not be below the committed version. The build number B is "the highest build ever
 # published, stable or beta, plus one", so it is higher than every build before it; it must be
 # above the committed build. N is a positive integer. Anything else fails the build.
 #
@@ -56,8 +56,8 @@ if [ -n "${BRIDGEPLAY_BETA+set}" ]; then
 		planned=$(semver_next patch "$committed")
 	else
 		is_semver "$planned" || die "BRIDGEPLAY_BETA_PLANNED '$planned' is not X.Y.Z"
-		semver_gt "$planned" "$committed" \
-			|| die "BRIDGEPLAY_BETA_PLANNED $planned is not above the committed version $committed"
+		semver_ge "$planned" "$committed" \
+			|| die "BRIDGEPLAY_BETA_PLANNED $planned is below the committed version $committed"
 	fi
 	version=$planned-beta.$BRIDGEPLAY_BETA
 	build=$beta_build

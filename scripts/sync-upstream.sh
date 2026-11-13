@@ -10,7 +10,7 @@
 # resolved automatically is dylib/version.h: Bridgeplay's lines are kept and
 # NOTPROTON_VERSION takes upstream's value. Any other conflict aborts that merge and
 # leaves the tree untouched. After a merge on main, scripts/bump-version.sh patch is committed;
-# on dev (BRIDGEPLAY_BETA_BRANCH, default dev), where betas are built, nothing is bumped.
+# on develop (BRIDGEPLAY_BETA_BRANCH, default develop), where betas are built, nothing is bumped.
 
 set -eu
 
@@ -56,6 +56,17 @@ fi
 echo "==> new upstream commits:$pending"
 [ "$check_only" -eq 0 ] || exit 2
 
+# A merge on main is bumped below, and the bump needs the highest build. Read it before merging,
+# so being offline stops the sync instead of leaving a merge without its bump.
+branch=$(git symbolic-ref -q --short HEAD || true)
+if [ "$branch" != "${BRIDGEPLAY_BETA_BRANCH:-develop}" ] && [ -z "${BRIDGEPLAY_HIGHEST_BUILD:-}" ]; then
+	BRIDGEPLAY_HIGHEST_BUILD=$(sh scripts/build-ledger.sh highest -q) || {
+		echo "==> can't read the highest build online; set BRIDGEPLAY_HIGHEST_BUILD and run again" >&2
+		exit 1
+	}
+	export BRIDGEPLAY_HIGHEST_BUILD
+fi
+
 ours_before=$(product_of <dylib/version.h)
 for entry in $pending; do
 	ref=${entry%%:*}
@@ -88,11 +99,10 @@ for entry in $pending; do
 	echo "==> kept Bridgeplay's version.h, NotProton $theirs"
 done
 
-# On dev nothing is bumped: the committed version stays X.Y.Z there, and the stable that
+# On develop nothing is bumped: the committed version stays X.Y.Z there, and the stable that
 # ships the beta takes the bump. On main (a security or crash hotfix from upstream) an upstream
 # merge is a patch: versions move slowly, see docs/RELEASING.md.
-branch=$(git symbolic-ref -q --short HEAD || true)
-if [ "$branch" = "${BRIDGEPLAY_BETA_BRANCH:-dev}" ]; then
+if [ "$branch" = "${BRIDGEPLAY_BETA_BRANCH:-develop}" ]; then
 	echo "==> on $branch: no version bump committed; the stable that ships this beta gets it"
 elif [ "$(product_of <dylib/version.h)" = "$ours_before" ]; then
 	scripts/bump-version.sh patch

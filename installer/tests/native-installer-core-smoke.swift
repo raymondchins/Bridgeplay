@@ -92,6 +92,66 @@ struct NativeInstallerCoreSmoke {
         try expectInstallerError("oversized feed") {
             _ = try InstallerRelease.parse(appcast: Data(repeating: 0x20, count: 256_001))
         }
+        try testChannelItems(signature: signature)
+        try testSignedAndCatchUpFeeds()
+    }
+
+    /// A channel item, whatever its value, is never installed; the stable item after it is.
+    private static func testChannelItems(signature: String) throws {
+        let beta = channelItem(channel: "beta", build: "90", version: "3.6.0", signature: signature)
+        for channel in ["beta", "beta-critical", "", "other"] {
+            let first = channelItem(channel: channel, build: "90", version: "3.6.0", signature: signature)
+            let release = try InstallerRelease.parse(appcast: appcast(signature: signature, preceding: first))
+            try require(release.build == 35 && release.shortVersion == "3.5.0", "stable item after a '\(channel)' item")
+        }
+        let twoBetas = try InstallerRelease.parse(appcast: appcast(signature: signature, preceding: beta + beta))
+        try require(twoBetas.build == 35, "stable item after two channel items")
+        try expectInstallerError("only channel items") {
+            _ = try InstallerRelease.parse(appcast: appcast(signature: signature, channel: "beta"))
+        }
+        try expectInstallerError("invalid stable item after a channel item") {
+            _ = try InstallerRelease.parse(appcast: appcast(signature: signature, version: "3.release", preceding: beta))
+        }
+        try expectInstallerError("x86_64 stable item after a channel item") {
+            _ = try InstallerRelease.parse(appcast: appcast(signature: signature, hardware: "x86_64", preceding: beta))
+        }
+        print("PASS channel items are skipped; a feed with only channel items is refused")
+    }
+
+    /// Feeds signed by Sparkle's generate_appcast (throwaway key), with and without the
+    /// bridgeplay:containsBetas element.
+    private static func testSignedAndCatchUpFeeds() throws {
+        let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appending(path: "fixtures/appcast")
+        for name in ["signed.xml", "signed-betas-empty.xml", "signed-betas-list.xml"] {
+            let data = try Data(contentsOf: folder.appending(path: name))
+            try require(String(decoding: data, as: UTF8.self).contains("sparkle-signatures"), "\(name) is signed")
+            let release = try InstallerRelease.parse(appcast: data)
+            try require(release.build == 35 && release.shortVersion == "3.5.0" && release.minimumOS == "26.0",
+                        "\(name) fields")
+            try require(release.archiveURL == archiveURL && release.signature.count == 64, "\(name) enclosure")
+        }
+        for text in ["", "81-85,87"] {
+            let xml = String(decoding: appcast(signature: Data(repeating: 0xA5, count: 64).base64EncodedString()), as: UTF8.self)
+                .replacingOccurrences(of: "<enclosure", with: "<bridgeplay:containsBetas>\(text)</bridgeplay:containsBetas><enclosure")
+                .replacingOccurrences(of: "<rss ", with: "<rss xmlns:bridgeplay=\"https://bridgeplay.dev/ns/appcast/1\" ")
+            try require(try InstallerRelease.parse(appcast: Data(xml.utf8)).build == 35, "containsBetas '\(text)'")
+        }
+        print("PASS Sparkle-signed feeds and the containsBetas element parse as before")
+    }
+
+    private static func channelItem(channel: String, build: String, version: String, signature: String) -> String {
+        """
+        <item>
+            <sparkle:channel>\(channel)</sparkle:channel>
+            <sparkle:version>\(build)</sparkle:version>
+            <sparkle:shortVersionString>\(version)</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/raymondchins/Bridgeplay/releases/download/v\(version)/Bridgeplay.zip"
+                       length="512" type="application/octet-stream" sparkle:edSignature="\(signature)" />
+        </item>
+
+        """
     }
 
     private static func appcast(
@@ -100,13 +160,17 @@ struct NativeInstallerCoreSmoke {
         archive: String = "https://github.com/raymondchins/Bridgeplay/releases/download/v3.5.0/Bridgeplay.zip",
         length: String = "512",
         version: String = "3.5.0",
-        hardware: String? = "arm64"
+        hardware: String? = "arm64",
+        channel: String? = nil,
+        preceding: String = ""
     ) -> Data {
+        let channelElement = channel.map { "<sparkle:channel>\($0)</sparkle:channel>" } ?? ""
         let hardwareElement = hardware.map { "<sparkle:hardwareRequirements>\($0)</sparkle:hardwareRequirements>" } ?? ""
         let xml = """
         <?xml version="1.0" standalone="yes"?>
         <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
-          <channel><item>
+          <channel>\(preceding)<item>
+            \(channelElement)
             <sparkle:version>35</sparkle:version>
             <sparkle:shortVersionString>\(version)</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>\(minimumOS)</sparkle:minimumSystemVersion>

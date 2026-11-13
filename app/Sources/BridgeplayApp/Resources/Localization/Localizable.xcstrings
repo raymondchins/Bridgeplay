@@ -45,6 +45,28 @@
         }
       }
     },
+    "%@ (build %@)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (build %2$@)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (сборка %2$@)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@（版本号 %2$@）"
+          }
+        }
+      }
+    },
     "%@ and %@ both come from %@ but pin different hashes." : {
       "localizations" : {
         "it" : {
@@ -2102,6 +2124,28 @@
         }
       }
     },
+    "After that, Bridgeplay waits for a stable release that includes build %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dopo, Bridgeplay attende una versione stabile che includa la build %@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "После этого Bridgeplay ждёт стабильный выпуск, в который входит сборка %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "之后，Bridgeplay 会等待包含版本号 %@ 的稳定版。"
+          }
+        }
+      }
+    },
     "All %lld backups will also be permanently deleted." : {
       "localizations" : {
         "it" : {
@@ -2208,6 +2252,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "即将就绪"
+          }
+        }
+      }
+    },
+    "Another account on this Mac installed a beta. Bridgeplay %@ stays until a stable release includes build %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un altro account su questo Mac ha installato una beta. Bridgeplay %1$@ resta finché una versione stabile non include la build %2$@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Другая учётная запись на этом Mac установила бету. Bridgeplay %1$@ останется, пока сборка %2$@ не войдёт в стабильный выпуск."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 上的另一个账户安装了测试版。Bridgeplay %1$@ 会一直保留，直到某个稳定版包含版本号 %2$@。"
           }
         }
       }
@@ -2916,6 +2982,72 @@
         }
       }
     },
+    "Beta updates on" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiornamenti beta attivi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бета-обновления включены"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试版更新已开启"
+          }
+        }
+      }
+    },
+    "Beta updates start after that." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dopo, iniziano gli aggiornamenti beta."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "После этого начнутся бета-обновления."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "之后开始接收测试版更新。"
+          }
+        }
+      }
+    },
+    "Betas get new changes first and may have bugs. Your games, saves and settings carry over." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le beta ricevono per prime le novità e possono contenere bug. Giochi, salvataggi e impostazioni restano."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Беты получают изменения первыми и могут содержать ошибки. Игры, сохранения и настройки сохраняются."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试版会最先获得新改动，可能有错误。你的游戏、存档和设置都会保留。"
+          }
+        }
+      }
+    },
     "Block Client Updates" : {
       "localizations" : {
         "it" : {
@@ -3073,6 +3205,50 @@
     "Bridgeplay" : {
       "shouldTranslate" : false
     },
+    "Bridgeplay %@ is already downloaded and installs the next time Bridgeplay updates." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ è già scaricato e verrà installato al prossimo aggiornamento di Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ уже загружен и установится при следующем обновлении Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ 已下载，会在 Bridgeplay 下次更新时安装。"
+          }
+        }
+      }
+    },
+    "Bridgeplay %@ is already downloaded and installs when you quit." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ è già scaricato e verrà installato quando chiudi l'app."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ уже загружен и установится при выходе из программы."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ 已下载，会在你退出时安装。"
+          }
+        }
+      }
+    },
     "Bridgeplay %@ is available" : {
       "localizations" : {
         "it" : {
@@ -3091,6 +3267,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay %@ 现已可用"
+          }
+        }
+      }
+    },
+    "Bridgeplay %@ is downloading. If it finishes before you quit, it installs when you quit." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ è in download. Se finisce prima che chiudi l'app, verrà installato quando la chiudi."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ загружается. Если загрузка завершится до выхода из программы, он установится при выходе."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay %@ 正在下载。如果在你退出前下载完成，会在你退出时安装。"
           }
         }
       }
@@ -3179,6 +3377,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 会将自己添加到 Steam，配置 WineCX 引擎并将其设为 Steam 的默认引擎。Steam 会短暂关闭。"
+          }
+        }
+      }
+    },
+    "Bridgeplay and its Steam patch are shared by every account on this Mac, so a beta you install is the version every account runs." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay e la sua patch di Steam sono condivisi da tutti gli account su questo Mac, quindi una beta che installi è la versione usata da ogni account."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay и его патч для Steam общие для всех учётных записей на этом Mac, поэтому установленная вами бета станет версией для всех учётных записей."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 及其 Steam 补丁由这台 Mac 上的所有账户共用，所以你安装的测试版就是每个账户运行的版本。"
           }
         }
       }
@@ -3421,6 +3641,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 无法在 Intel 版 Mac 上运行。"
+          }
+        }
+      }
+    },
+    "Bridgeplay goes back to stable updates only." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay torna a ricevere solo aggiornamenti stabili."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay снова будет получать только стабильные обновления."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 将恢复为只接收稳定版更新。"
           }
         }
       }
@@ -7454,6 +7696,28 @@
         }
       }
     },
+    "Get Betas" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricevi beta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Получать беты"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接收测试版"
+          }
+        }
+      }
+    },
     "Get CrossOver" : {
       "localizations" : {
         "it" : {
@@ -7472,6 +7736,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "获取 CrossOver"
+          }
+        }
+      }
+    },
+    "Get beta updates" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricevi aggiornamenti beta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Получать бета-обновления"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接收测试版更新"
+          }
+        }
+      }
+    },
+    "Get beta updates?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricevere aggiornamenti beta?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Получать бета-обновления?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要接收测试版更新吗？"
           }
         }
       }
@@ -8774,6 +9082,28 @@
         }
       }
     },
+    "Leaving the beta" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uscita dalla beta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выход из беты"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在退出测试版"
+          }
+        }
+      }
+    },
     "Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)" : {
       "localizations" : {
         "it" : {
@@ -9672,6 +10002,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已卸载"
+          }
+        }
+      }
+    },
+    "No stable release includes your beta yet. Bridgeplay stays on build %@ and checks again later." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna versione stabile include ancora la tua beta. Bridgeplay resta sulla build %@ e controllerà di nuovo più tardi."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ни один стабильный выпуск пока не включает вашу бету. Bridgeplay остаётся на сборке %@ и проверит снова позже."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前还没有稳定版包含你的测试版。Bridgeplay 会继续使用版本号 %@，稍后再检查。"
           }
         }
       }
@@ -13614,6 +13966,28 @@
         }
       }
     },
+    "Stable updates continue after that." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dopo, continuano gli aggiornamenti stabili."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "После этого продолжатся стабильные обновления."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "之后继续接收稳定版更新。"
+          }
+        }
+      }
+    },
     "Staging components" : {
       "localizations" : {
         "it" : {
@@ -14603,6 +14977,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "仍在启动…"
+          }
+        }
+      }
+    },
+    "Stop Betas" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompi beta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отказаться от бет"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止测试版"
+          }
+        }
+      }
+    },
+    "Stop getting beta updates?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smettere di ricevere aggiornamenti beta?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Больше не получать бета-обновления?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要停止接收测试版更新吗？"
           }
         }
       }
@@ -15751,6 +16169,28 @@
         }
       }
     },
+    "This Mac runs the beta Bridgeplay %@. Bridgeplay never goes back to an older version: it stays on this build and moves to the next stable release that includes it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo Mac usa la beta Bridgeplay %@. Bridgeplay non torna mai a una versione precedente: resta su questa build e passa alla prossima versione stabile che la include."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На этом Mac работает бета Bridgeplay %@. Bridgeplay никогда не возвращается к более старой версии: он остаётся на этой сборке и перейдёт на следующий стабильный выпуск, который её включает."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 运行的是测试版 Bridgeplay %@。Bridgeplay 不会退回旧版本：它会保留这个版本，并在下一个包含它的稳定版发布后更新过去。"
+          }
+        }
+      }
+    },
     "This app includes newer files than those installed for Steam." : {
       "localizations" : {
         "it" : {
@@ -16697,6 +17137,28 @@
         }
       }
     },
+    "Waiting for a stable release that includes build %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In attesa di una versione stabile che includa la build %@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ожидание стабильного выпуска, в который входит сборка %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待包含版本号 %@ 的稳定版。"
+          }
+        }
+      }
+    },
     "Waiting for the game to open…" : {
       "localizations" : {
         "it" : {
@@ -17205,6 +17667,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一切就绪"
+          }
+        }
+      }
+    },
+    "You're back on stable updates" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Di nuovo sugli aggiornamenti stabili"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вы снова получаете стабильные обновления"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已恢复为稳定版更新"
           }
         }
       }
