@@ -998,7 +998,7 @@ expect_has "unexposed: checked against the delivered stable" "HEAD differs from 
 
 expect_eq "race: the feed offers the candidate" 1 "$(items "$(feed)" | grep -c '^0.7.68-beta.1:')"
 expect_code "race: withdrawn while the feed goes up" 1 with GH_STUB_WITHDRAW_ON_RENAME=v0.7.68-beta.1 --beta --rebuild-feeds
-expect_has "race: said" "v0.7.68-beta.1 was withdrawn while this run made the beta feed, which still offers it" "$out"
+expect_has "race: said" "the releases changed while this run made the beta feed" "$out"
 expect_has "race: the recovery" "run scripts/release-local.sh --beta --rebuild-feeds" "$out"
 expect_code "race: rebuilt" 0 release --beta --rebuild-feeds
 expect_eq "race: the withdrawn beta is gone" 0 "$(items "$(feed)" | grep -c '^0.7.68-beta.1:' || true)"

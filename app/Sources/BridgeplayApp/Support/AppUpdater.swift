@@ -94,10 +94,7 @@ final class AppUpdater {
         betaEnrolled = enrolled
         leavingNothingFound = false
         // Back in the beta: "back on stable" no longer holds.
-        if enrolled, backOnStable != nil {
-            BetaCatchUp.acknowledge(.standard)
-            backOnStable = nil
-        }
+        if enrolled, backOnStable != nil { dismissBackOnStable() }
         AppLog.note("update: beta updates \(enrolled ? "on" : "off")")
         let action = finder.routing.preferenceChanged(enrolled: enrolled,
                                                       sessionInProgress: controller.updater.sessionInProgress)
@@ -243,12 +240,7 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
     }
 
     func updater(_ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: (any Error)?) {
-        let error = error as NSError?
-        let feedError = error.map { $0.domain == SUSparkleErrorDomain && Self.feedErrors.contains(Int($0.code)) } ?? false
-        let authorizeLater = error.map { $0.domain == SUSparkleErrorDomain
-            && $0.code == Int(SUError.installationAuthorizeLaterError.rawValue) } ?? false
-        UpdateLog.note(routing.finished(error: error.map { "\($0.domain) \($0.code)" }, feedFailed: feedError,
-                                        authorizeLater: authorizeLater,
+        UpdateLog.note(routing.finished(error: (error as NSError?).map(Self.classify),
                                         feedURL: updater.feedURL?.absoluteString))
         report?(.cycleFinished)
     }
@@ -256,6 +248,14 @@ private final class ReleaseFinder: NSObject, SPUUpdaterDelegate, @MainActor SPUS
     // The feed could not be fetched or read.
     private static let feedErrors: Set<Int> = [Int(SUError.appcastParseError.rawValue), Int(SUError.appcastError.rawValue),
                                                Int(SUError.downloadError.rawValue)]
+
+    private static func classify(_ error: NSError) -> CycleError {
+        let text = "\(error.domain) \(error.code)"
+        guard error.domain == SUSparkleErrorDomain else { return .other(text) }
+        if feedErrors.contains(error.code) { return .feed(text) }
+        if error.code == Int(SUError.installationAuthorizeLaterError.rawValue) { return .authorizeLater(text) }
+        return .other(text)
+    }
 
     private static func describe(_ reason: SPUNoUpdateFoundReason?) -> (String, CheckResult) {
         switch reason {

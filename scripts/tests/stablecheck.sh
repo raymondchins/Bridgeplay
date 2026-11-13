@@ -89,7 +89,7 @@ expect_eq "unsorted with repeats" "79,81-83,90-91" "$(ranges 90 81 83 82 91 79 8
 for l in "" 81 81-85,87 79,81-83,90-91 0-0; do
 	if is_build_list "$l"; then pass; else fail "build list '$l' refused"; fi
 done
-for l in 81-80 82,81 81,81 81-83,83 81-85,84-90 "81," ",81" 81--82 a 81-82-83; do
+for l in 81-80 82,81 81,81 81-83,83 81-85,84-90 "81," ",81" 81--82 a 81-82-83 "$(printf '81\n82')"; do
 	if is_build_list "$l"; then fail "build list '$l' taken"; else pass; fi
 done
 

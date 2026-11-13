@@ -133,7 +133,7 @@ enum BetaCopy {
 
     // A downloaded update, or one downloading, installs whatever the switch says, so the change waits for it.
     static func pendingNote(_ pending: PendingUpdate?, prediction: UpdatePrediction) -> String? {
-        guard let pending, prediction.installsPending else { return nil }
+        guard let pending else { return nil }
         let name = named(pending.item.label, pending.item.build)
         let installs = switch pending.stage {
         case .downloading: String(localized: "Bridgeplay \(name) is downloading. If it finishes before you quit, it installs when you quit.")

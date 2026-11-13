@@ -336,8 +336,8 @@ is_beta_tag() { printf '%s\n' "$1" | grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+-beta\.[1
 # is_build_list TEXT: beta builds as release_ranges prints them (81-85,87), or empty: each range
 # low to high, in ascending order without overlaps, as the app's CatchUpList reads them.
 is_build_list() {
-	printf '%s\n' "$1" | grep -Eqx '([0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*)?' || return 1
-	printf '%s\n' "$1" | awk -F, '{
+	printf '%s\n' "$1" | awk -F, 'NR > 1 || !/^([0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*)?$/ { exit 1 }
+	{
 		prev = -1
 		for (i = 1; i <= NF; i++) {
 			n = split($i, r, "-"); lo = r[1] + 0; hi = r[n] + 0
@@ -669,18 +669,6 @@ beta_feed_guard() {
 	_p=$(feed_signature_problem "$_f")
 	[ -z "$_p" ] || _no "$_p"
 	return "$_bad"
-}
-
-# beta_feed_labels FILE: the label of each beta item (one with a sparkle:channel), one per line.
-beta_feed_labels() {
-	_n=$(xp "$1" "count(//*[local-name()='item'])")
-	_i=0
-	while [ "$_i" -lt "$_n" ]; do
-		_i=$((_i + 1))
-		_it="(//*[local-name()='item'])[$_i]"
-		[ -n "$(xp "$1" "string($_it/*[local-name()='channel'])")" ] || continue
-		printf '%s\n' "$(xp "$1" "string($_it/*[local-name()='shortVersionString'])")"
-	done
 }
 
 # beta_feed_item FILE BUILD ATTR: the enclosure's url, length or edSignature of the item with BUILD.

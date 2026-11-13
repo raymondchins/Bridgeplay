@@ -653,21 +653,26 @@ carrier_state() {
 	echo ok
 }
 
-# make_beta_feed DIR [EXTRA [BUILD]]: regenerates the beta feed into DIR/appcast.xml from the
-# releases (F0.5) plus EXTRA's records (a dry run's unpublished release), signs it after that
-# last edit and checks it; BUILD must be in it. Returns 1 with the reason on stderr.
+# feed_items OUT [EXTRA]: the beta feed's records into OUT, from the releases as they are now
+# (F0.5) plus EXTRA's records (a dry run's unpublished release). Sets feed_stable.
+feed_items() {
+	release_list "$work/feed-releases" || return 1
+	feed_stable=$(release_newest_stable "$work/feed-releases") || return 1
+	beta_feed_items "$work/feed-releases" "$feed_stable" "$withdraw" "$1" "${2:-}"
+}
+
+# make_beta_feed DIR [EXTRA [BUILD]]: regenerates the beta feed into DIR/appcast.xml from
+# feed_items' records, kept in DIR/items, signs it after that last edit and checks it; BUILD
+# must be in it. Returns 1 with the reason on stderr.
 make_beta_feed() {
 	rm -rf "$1"
 	mkdir -p "$1"
-	release_list "$work/feed-releases" || return 1
-	feed_stable=$(release_newest_stable "$work/feed-releases") || return 1
-	beta_feed_items "$work/feed-releases" "$feed_stable" "$withdraw" "$1/items" "${2:-}" || return 1
+	feed_items "$1/items" "${2:-}" || return 1
 	beta_feed_render "$1/items" "$1/appcast.xml" "$min_macos"
 	# shellcheck disable=SC2086 # key_args is empty or two words
 	"$sparkle/sign_update" $key_args "$1/appcast.xml" >/dev/null || { echo "==> could not sign the beta feed" >&2; return 1; }
 	echo "==> beta feed:"
 	awk -F '\t' '{ printf "    %s (build %s), %s\n", $3, $2, ($1 == "stable" ? "stable, contains betas " ($8 == "-" ? "none" : $8) : $5) }' "$1/items"
-	rm -f "$1/items"
 	beta_feed_guard "$1/appcast.xml" "$min_macos" "${3:-}" || return 1
 	echo "==> beta feed signed and checked"
 }
@@ -698,9 +703,9 @@ expose_beta_feed() {
 	mkdir -p "$_chk"
 	gh release download "$BETA_FEED_TAG" -R "$slug" -p appcast.xml -D "$_chk" --clobber >/dev/null 2>&1 \
 		|| { echo "==> can't download the published beta feed back" >&2; return 1; }
+	# The same bytes make_beta_feed checked.
 	cmp -s "$_chk/appcast.xml" "$1/appcast.xml" \
 		|| { echo "==> the published beta feed is not the one uploaded" >&2; return 1; }
-	beta_feed_guard "$_chk/appcast.xml" "$min_macos" "${3:-}" || return 1
 	if [ -n "${3:-}" ]; then
 		gh release download "$4" -R "$slug" -p Bridgeplay.zip -D "$_chk" --clobber >/dev/null 2>&1 \
 			|| { echo "==> can't download $4's Bridgeplay.zip back" >&2; return 1; }
@@ -712,17 +717,15 @@ expose_beta_feed() {
 		"$sparkle/sign_update" --verify $key_args "$_chk/Bridgeplay.zip" "$_sig" >/dev/null 2>&1 \
 			|| { echo "==> the beta feed's signature for build $3 does not match $4's zip" >&2; return 1; }
 	fi
-	# The lock is this clone's only. A run elsewhere marks a beta withdrawn before it swaps in its
-	# feed, so a beta this feed still offers that is withdrawn now means this swap undid that one.
-	for _l in $(beta_feed_labels "$_chk/appcast.xml"); do
-		_wb=$(gh release view "v$_l" -R "$slug" --json body -q .body 2>/dev/null) \
-			|| { echo "==> can't read v$_l back" >&2; return 1; }
-		if printf '%s\n' "$_wb" | is_withdrawn; then
-			echo "==> v$_l was withdrawn while this run made the beta feed, which still offers it;" >&2
-			echo "    run scripts/release-local.sh --beta --rebuild-feeds" >&2
-			return 1
-		fi
-	done
+	# The lock is this clone's only. A run elsewhere changes the releases (withdraws or publishes a
+	# beta, say) before it swaps in its feed, so releases that now give other items mean this swap
+	# may have undone that one.
+	feed_items "$_chk/items" || return 1
+	if ! cmp -s "$_chk/items" "$1/items"; then
+		echo "==> the releases changed while this run made the beta feed: it offers $(cut -f3 "$1/items" | paste -sd ' ' -)," >&2
+		echo "    the releases now give $(cut -f3 "$_chk/items" | paste -sd ' ' -); run scripts/release-local.sh --beta --rebuild-feeds" >&2
+		return 1
+	fi
 	echo "==> the published beta feed was read back and checked"
 }
 

@@ -83,7 +83,7 @@ struct BetaOffTests {
         let found = items[0]
         LatestRelease.record(build: found.build, version: found.label, notes: nil, state: routing.state, defaults: defaults)
         if let line = routing.found(found, feedURL: stableFeed) { lines.append(line) }
-        if let line = routing.finished(error: nil, feedFailed: false, feedURL: stableFeed) { lines.append(line) }
+        if let line = routing.finished(error: nil, feedURL: stableFeed) { lines.append(line) }
         return (routing.route, choice, lines)
     }
 
@@ -179,8 +179,8 @@ struct UpdateRoutingTests {
         let item = stable(86, contains: "81-85")
         #expect(picked(&routing, [beta(85), item]) == .some(item))
         routing.waitingForQuit(item)
-        let after = routing.prediction(enrolled: false)
-        #expect(after.build == "86" && after.channel == .stable && after.state == .stable && after.installsPending)
+        let after = UpdatePrediction.make(running: routing.running, enrolled: false, pending: routing.pending)
+        #expect(after.build == "86" && after.channel == .stable && after.state == .stable && routing.pending != nil)
 
         let installed = checking(running(86, .stable), enrolled: false)
         #expect(installed.state == .stable)
@@ -281,7 +281,7 @@ struct UpdateFeedTests {
     @Test("A failed beta-feed check sends the next check to the stable feed, under the same rules")
     func fallback() {
         var routing = checking(running(82, .beta), enrolled: true)
-        let failed = routing.finished(error: "SUSparkleErrorDomain 2001", feedFailed: true, feedURL: BetaUpdates.betaFeedURL)
+        let failed = routing.finished(error: .feed("SUSparkleErrorDomain 2001"), feedURL: BetaUpdates.betaFeedURL)
         #expect(failed?.contains("chosen=none (check failed: SUSparkleErrorDomain 2001)") == true)
 
         routing.startCheck(settings: UpdateSettings(enrolled: true))
@@ -301,17 +301,17 @@ struct UpdateFeedTests {
     func noFallback() {
         var loaded = checking(running(82, .beta), enrolled: true)
         loaded.feedDidLoad()
-        _ = loaded.finished(error: "SUSparkleErrorDomain 1000", feedFailed: true, feedURL: nil)
+        _ = loaded.finished(error: .feed("SUSparkleErrorDomain 1000"), feedURL: nil)
         loaded.startCheck(settings: UpdateSettings(enrolled: true))
         #expect(loaded.route.feed == .beta)
 
         var other = checking(running(82, .beta), enrolled: true)
-        _ = other.finished(error: "SUSparkleErrorDomain 4007", feedFailed: false, feedURL: nil)
+        _ = other.finished(error: .other("SUSparkleErrorDomain 4007"), feedURL: nil)
         other.startCheck(settings: UpdateSettings(enrolled: true))
         #expect(other.route.feed == .beta)
 
         var offline = checking(running(79, .stable), enrolled: false)
-        _ = offline.finished(error: "SUSparkleErrorDomain 2001", feedFailed: true, feedURL: stableFeed)
+        _ = offline.finished(error: .feed("SUSparkleErrorDomain 2001"), feedURL: stableFeed)
         offline.startCheck(settings: UpdateSettings())
         #expect(!offline.route.fallback && offline.route.feedURL == nil)
     }
@@ -363,7 +363,7 @@ struct UpdateEdgeTests {
     func offline() {
         var routing = checking(running(79, .stable), enrolled: false)
         let route = routing.route
-        let line = routing.finished(error: "SUSparkleErrorDomain 2001", feedFailed: true, feedURL: stableFeed)
+        let line = routing.finished(error: .feed("SUSparkleErrorDomain 2001"), feedURL: stableFeed)
         #expect(line == "update check: state=stable feed=\(stableFeed) running=79 (stable) chosen=none (check failed: SUSparkleErrorDomain 2001) pending=none")
         routing.startCheck(settings: UpdateSettings())
         #expect(routing.route == route && routing.pending == nil)
@@ -385,14 +385,14 @@ struct UpdateEdgeTests {
         routing.feedDidLoad()
         #expect(routing.found(beta(84, critical: true), feedURL: BetaUpdates.betaFeedURL)
             == "update check: state=beta feed=\(BetaUpdates.betaFeedURL) running=82 (beta) chosen=84 (beta-critical) pending=none")
-        #expect(routing.finished(error: nil, feedFailed: false, feedURL: nil) == nil)
+        #expect(routing.finished(error: nil, feedURL: nil) == nil)
 
         routing.startCheck(settings: UpdateSettings(enrolled: true))
         routing.feedDidLoad()
         _ = routing.choose([beta(81)])
         #expect(routing.notFound(reason: "up to date", feedURL: BetaUpdates.betaFeedURL)?
             .contains("chosen=none (no allowed item above 82)") == true)
-        #expect(routing.finished(error: "SUSparkleErrorDomain 1001", feedFailed: false, feedURL: nil) == nil)
+        #expect(routing.finished(error: .other("SUSparkleErrorDomain 1001"), feedURL: nil) == nil)
     }
 }
 
@@ -406,9 +406,8 @@ struct PendingUpdateTests {
         _ = routing.found(beta(83), feedURL: BetaUpdates.betaFeedURL)
         routing.waitingForQuit(beta(83))
         _ = routing.preferenceChanged(enrolled: false, sessionInProgress: true)
-        let after = routing.prediction(enrolled: false)
-        #expect(after == UpdatePrediction(label: "0.7.83-beta.1", build: "83", channel: .beta, state: .leaving,
-                                          installsPending: true, pendingOutsideState: true))
+        let after = UpdatePrediction.make(running: routing.running, enrolled: false, pending: routing.pending)
+        #expect(after == UpdatePrediction(label: "0.7.83-beta.1", build: "83", channel: .beta, state: .leaving))
     }
 
     @Test("A beta downloading, then opting out: it is pending until the download ends")
@@ -418,9 +417,8 @@ struct PendingUpdateTests {
         _ = routing.found(beta(83), feedURL: BetaUpdates.betaFeedURL)
         routing.downloading(beta(83))
         #expect(routing.preferenceChanged(enrolled: false, sessionInProgress: true) == .none)
-        #expect(routing.prediction(enrolled: false)
-            == UpdatePrediction(label: "0.7.83-beta.1", build: "83", channel: .beta, state: .leaving,
-                                installsPending: true, pendingOutsideState: true))
+        #expect(UpdatePrediction.make(running: routing.running, enrolled: false, pending: routing.pending)
+            == UpdatePrediction(label: "0.7.83-beta.1", build: "83", channel: .beta, state: .leaving))
 
         // It finished: Sparkle installs it on quit.
         var finished = routing
@@ -431,29 +429,28 @@ struct PendingUpdateTests {
         var kept = routing
         kept.downloaded(beta(83))
         var authorizeLater = kept
-        _ = kept.finished(error: nil, feedFailed: false, feedURL: nil)
+        _ = kept.finished(error: nil, feedURL: nil)
         #expect(kept.pending == PendingUpdate(item: beta(83), stage: .resumable))
 
         // Authorizing the install was put off: Sparkle keeps it too.
-        _ = authorizeLater.finished(error: "SUSparkleErrorDomain 4008", feedFailed: false, authorizeLater: true, feedURL: nil)
+        _ = authorizeLater.finished(error: .authorizeLater("SUSparkleErrorDomain 4008"), feedURL: nil)
         #expect(authorizeLater.pending == PendingUpdate(item: beta(83), stage: .resumable))
 
         // Extracting it failed: Sparkle drops it.
         var dropped = routing
         dropped.downloaded(beta(83))
-        _ = dropped.finished(error: "SUSparkleErrorDomain 3000", feedFailed: false, feedURL: nil)
+        _ = dropped.finished(error: .other("SUSparkleErrorDomain 3000"), feedURL: nil)
         #expect(dropped.pending == nil)
 
         // A download resumed from an earlier run is not this check's: an error leaves it to notFound.
         var earlier = checking(running(79, .stable), enrolled: true)
         _ = earlier.found(beta(83), feedURL: BetaUpdates.betaFeedURL)
-        _ = earlier.finished(error: "SUSparkleErrorDomain 3000", feedFailed: false, feedURL: nil)
+        _ = earlier.finished(error: .other("SUSparkleErrorDomain 3000"), feedURL: nil)
         #expect(earlier.pending == PendingUpdate(item: beta(83), stage: .resumable))
 
         // It stopped (failed, or quit first): nothing is pending.
-        _ = routing.finished(error: "SUSparkleErrorDomain 2001", feedFailed: false, feedURL: nil)
+        _ = routing.finished(error: .other("SUSparkleErrorDomain 2001"), feedURL: nil)
         #expect(routing.pending == nil)
-        #expect(routing.prediction(enrolled: false).installsPending == false)
     }
 
     @Test("A resumable beta, then opting out: Sparkle resumes it, the app logs it and predicts it")
@@ -468,9 +465,8 @@ struct PendingUpdateTests {
         _ = routing.preferenceChanged(enrolled: false, sessionInProgress: false)
         #expect(routing.resuming(beta(83))
             == "update: resuming 83 (beta), which the leaving state does not allow; Sparkle installs it anyway")
-        let after = routing.prediction(enrolled: false)
-        #expect(after == UpdatePrediction(label: "0.7.83-beta.1", build: "83", channel: .beta, state: .leaving,
-                                          installsPending: true, pendingOutsideState: true))
+        let after = UpdatePrediction.make(running: routing.running, enrolled: false, pending: routing.pending)
+        #expect(after == UpdatePrediction(label: "0.7.83-beta.1", build: "83", channel: .beta, state: .leaving))
     }
 
     @Test("Opting in while a stable is pending: the stable installs and the player is enrolled")
@@ -480,17 +476,15 @@ struct PendingUpdateTests {
         _ = routing.found(stable(80), feedURL: stableFeed)
         routing.waitingForQuit(stable(80))
         _ = routing.preferenceChanged(enrolled: true, sessionInProgress: true)
-        let after = routing.prediction(enrolled: true)
-        #expect(after == UpdatePrediction(label: "0.7.80", build: "80", channel: .stable, state: .beta,
-                                          installsPending: true, pendingOutsideState: false))
+        let after = UpdatePrediction.make(running: routing.running, enrolled: true, pending: routing.pending)
+        #expect(after == UpdatePrediction(label: "0.7.80", build: "80", channel: .stable, state: .beta))
     }
 
     @Test("Nothing pending: the running build, in the state the preference gives it")
     func nothingPending() {
         let routing = UpdateRouting(running: running(82, .beta), settings: UpdateSettings(enrolled: true))
-        #expect(routing.prediction(enrolled: false)
-            == UpdatePrediction(label: "0.7.82-beta.1", build: "82", channel: .beta, state: .leaving,
-                                installsPending: false, pendingOutsideState: false))
+        #expect(UpdatePrediction.make(running: routing.running, enrolled: false, pending: routing.pending)
+            == UpdatePrediction(label: "0.7.82-beta.1", build: "82", channel: .beta, state: .leaving))
     }
 }
 

@@ -96,13 +96,14 @@ struct UpdateRoute: Equatable, Sendable {
     var feed: Feed
     // What feedURLStringForUpdater returns; nil leaves Sparkle on SUFeedURL, as today.
     var feedURL: String?
-    var fallback = false
     // Notes the check's log line carries: overrides used or ignored, the fallback.
     var notes: [String] = []
 
     var allowedChannels: Set<String> { state.allowedChannels }
     // In the stable state Sparkle's own choice is untouched.
     var choosesItems: Bool { state != .stable }
+    // The beta or leaving state, sent to the stable feed after a failed beta-feed check.
+    var fallback: Bool { state != .stable && feed == .stable }
 
     static func make(state: UpdaterState, settings: UpdateSettings, betaFeedFailed: Bool) -> UpdateRoute {
         var notes: [String] = []
@@ -120,9 +121,8 @@ struct UpdateRoute: Equatable, Sendable {
         case .stable: overridden(settings.stableFeedOverride, key: BetaUpdates.stableFeedOverrideKey)
         case .beta: overridden(settings.betaFeedOverride, key: BetaUpdates.betaFeedOverrideKey) ?? BetaUpdates.betaFeedURL
         }
-        let fallback = state != .stable && betaFeedFailed
-        if fallback { notes.append("stable feed after a failed beta-feed check") }
-        return UpdateRoute(state: state, feed: feed, feedURL: url, fallback: fallback, notes: notes)
+        if state != .stable && betaFeedFailed { notes.append("stable feed after a failed beta-feed check") }
+        return UpdateRoute(state: state, feed: feed, feedURL: url, notes: notes)
     }
 }
 
@@ -207,10 +207,23 @@ struct ItemChoice: Equatable, Sendable {
     }
 }
 
-// An update Sparkle has downloaded: waiting for quit, or kept to resume.
 // What a check ended with. Unsupported: the newest item needs another macOS or Mac.
 enum CheckResult: Equatable, Sendable { case found, nothing, unsupported }
 
+// How a check failed, with the error as the log line gives it.
+enum CycleError: Equatable, Sendable {
+    // The feed could not be fetched or read.
+    case feed(String)
+    // The user put off authorizing the install, so Sparkle keeps the download.
+    case authorizeLater(String)
+    case other(String)
+
+    var text: String {
+        switch self { case .feed(let text), .authorizeLater(let text), .other(let text): text }
+    }
+}
+
+// An update Sparkle has downloaded or is downloading: waiting for quit, or kept to resume.
 struct PendingUpdate: Equatable, Sendable {
     enum Stage: String, Equatable, Sendable { case downloading, waitingForQuit = "waiting for quit", resumable }
 
@@ -224,23 +237,13 @@ struct UpdatePrediction: Equatable, Sendable {
     var build: String?
     var channel: ProductVersion.Channel
     var state: UpdaterState
-    // A pending update installs whatever the preference now says; Sparkle can't cancel it.
-    var installsPending: Bool
-    // That pending update is on a channel the current state no longer allows.
-    var pendingOutsideState: Bool
 
+    // A pending update installs whatever the preference now says; Sparkle can't cancel it.
     static func make(running: RunningBuild, enrolled: Bool, pending: PendingUpdate?) -> UpdatePrediction {
-        guard let pending else {
-            return UpdatePrediction(label: running.label, build: running.build, channel: running.channel,
-                                    state: .of(enrolled: enrolled, running: running.channel),
-                                    installsPending: false, pendingOutsideState: false)
-        }
-        let now = UpdaterState.of(enrolled: enrolled, running: running.channel)
-        let outside = pending.item.channel.map { !now.allowedChannels.contains($0) } ?? false
-        let channel = pending.item.buildChannel
-        return UpdatePrediction(label: pending.item.label, build: pending.item.build, channel: channel,
-                                state: .of(enrolled: enrolled, running: channel),
-                                installsPending: true, pendingOutsideState: outside)
+        let item = pending?.item
+        let channel = item?.buildChannel ?? running.channel
+        return UpdatePrediction(label: item?.label ?? running.label, build: item.map(\.build) ?? running.build,
+                                channel: channel, state: .of(enrolled: enrolled, running: channel))
     }
 }
 
@@ -295,9 +298,7 @@ struct UpdateRouting: Equatable, Sendable {
     mutating func startCheck(settings: UpdateSettings) {
         if settings.enrolled != self.settings.enrolled { betaFeedFailed = false }
         self.settings = settings
-        let state = UpdaterState.of(enrolled: settings.enrolled, running: running.channel)
-        if state == .stable { betaFeedFailed = false }
-        route = UpdateRoute.make(state: state, settings: settings, betaFeedFailed: betaFeedFailed)
+        route = UpdateRoute.make(state: preferredState, settings: settings, betaFeedFailed: betaFeedFailed)
         betaFeedFailed = false
         feedLoaded = false
         logged = false
@@ -322,7 +323,7 @@ struct UpdateRouting: Equatable, Sendable {
     // Sparkle found an update, from the feed or by resuming one it downloaded before.
     mutating func found(_ item: FeedItem, feedURL: String?) -> String? {
         let resumed = !feedLoaded
-        if resumed, pending?.item != item { pending = PendingUpdate(item: item, stage: .resumable) }
+        if resumed { adoptResumable(item) }
         return line(feedURL: feedURL, outcome: "chosen=\(item.described)", resumed: resumed)
     }
 
@@ -333,14 +334,17 @@ struct UpdateRouting: Equatable, Sendable {
 
     // The cycle ended. Returns the log line if the check ended without one, as a failed one does.
     // A beta feed that could not be fetched or read sends the next check to the stable feed.
-    // authorizeLater: the user put off authorizing the install, so Sparkle keeps the download.
-    mutating func finished(error: String?, feedFailed: Bool, authorizeLater: Bool = false, feedURL: String?) -> String? {
-        if error != nil, feedFailed, !feedLoaded, route.feed == .beta { betaFeedFailed = true }
+    mutating func finished(error: CycleError?, feedURL: String?) -> String? {
+        if case .feed = error, !feedLoaded, route.feed == .beta { betaFeedFailed = true }
         // A download that finished is waiting for quit or kept to resume by now: this one stopped.
         if pending?.stage == .downloading { pending = nil }
-        // Any other error after this check's download finished (extracting it, say): Sparkle drops it.
-        if downloadedNow, error != nil, !authorizeLater, pending?.stage == .resumable { pending = nil }
-        let outcome = error.map { "chosen=none (check failed: \($0))" } ?? "chosen=none (no result)"
+        // Any error but authorize-later after this check's download finished (extracting it, say):
+        // Sparkle drops it.
+        switch error {
+        case nil, .authorizeLater: break
+        case .feed, .other: if downloadedNow, pending?.stage == .resumable { pending = nil }
+        }
+        let outcome = error.map { "chosen=none (check failed: \($0.text))" } ?? "chosen=none (no result)"
         return line(feedURL: feedURL, outcome: outcome, resumed: false)
     }
 
@@ -361,8 +365,12 @@ struct UpdateRouting: Equatable, Sendable {
 
     // Sparkle shows a downloaded update again. Logs one the current state no longer allows.
     mutating func resuming(_ item: FeedItem) -> String? {
-        if pending?.item != item { pending = PendingUpdate(item: item, stage: .resumable) }
+        adoptResumable(item)
         return outsideState(item).map { "update: resuming \($0)" }
+    }
+
+    private mutating func adoptResumable(_ item: FeedItem) {
+        if pending?.item != item { pending = PendingUpdate(item: item, stage: .resumable) }
     }
 
     // The preference changed. The cycle restarts now, or once the session in progress ends.
@@ -392,10 +400,6 @@ struct UpdateRouting: Equatable, Sendable {
     // compares them with the last check's), so they follow the preference at once.
     private mutating func reroute() {
         route = UpdateRoute.make(state: preferredState, settings: settings, betaFeedFailed: false)
-    }
-
-    func prediction(enrolled: Bool) -> UpdatePrediction {
-        .make(running: running, enrolled: enrolled, pending: pending)
     }
 
     private func outsideState(_ item: FeedItem) -> String? {

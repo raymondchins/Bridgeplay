@@ -162,7 +162,7 @@ the top of its release body), so this and every later feed leave it out.
 A rerun on a HEAD that is already published as a beta checks that release against its ledger and
 this run's options, uploads nothing, and only exposes it; anything different stops, and no
 published asset is overwritten. A beta whose upload doesn't match, or whose upload broke off and
-left a draft, is deleted, so the next run starts clean. The beta mode takes the same lock as the stable mode. The lock covers one clone: if another clone withdraws a beta while this run makes the beta feed, the run reads each beta back after the swap and stops, saying to run `--rebuild-feeds`. `make betacheck` runs all of
+left a draft, is deleted, so the next run starts clean. The beta mode takes the same lock as the stable mode. The lock covers one clone: if another clone withdraws or publishes a beta while this run makes the beta feed, the run, which works the feed's items out from the releases again after the swap, finds they differ and stops, saying to run `--rebuild-feeds`. `make betacheck` runs all of
 this through a scripted history with a local repository, a stub `gh`, a throwaway key and
 Sparkle's own tools.
 
