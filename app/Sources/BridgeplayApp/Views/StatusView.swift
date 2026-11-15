@@ -107,7 +107,7 @@ struct StatusRow: View {
             }
             if let toggle {
                 Toggle(title, isOn: toggle)
-                    .toggleStyle(.brandSwitch)
+                    .toggleStyle(.switch)
                     .labelsHidden()
             }
             if let secondaryAction {
@@ -374,6 +374,9 @@ struct StatusView: View {
         }
         .formStyle(.grouped)
         .safeAreaInset(edge: .top, spacing: 0) { StatusHero(snapshot: snapshot) }
+        // The same readable column as Game Defaults and the Guide
+        .frame(maxWidth: BP.pageWidth, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // The 3.0 folder move: a failure blocks installing until it is tried again or skipped,

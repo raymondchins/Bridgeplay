@@ -1398,28 +1398,6 @@
         }
       }
     },
-    "A fork of [NotProton](https://github.com/NotProtonNot/NotProton), running on [CodeWeavers](https://www.codeweavers.com)' open-source Wine and Apple's Game Porting Toolkit." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un fork di [NotProton](https://github.com/NotProtonNot/NotProton), che usa il Wine open source di [CodeWeavers](https://www.codeweavers.com) e il Game Porting Toolkit di Apple."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Форк [NotProton](https://github.com/NotProtonNot/NotProton) на открытом Wine от [CodeWeavers](https://www.codeweavers.com) и Game Porting Toolkit от Apple."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "[NotProton](https://github.com/NotProtonNot/NotProton) 的分支，基于 [CodeWeavers](https://www.codeweavers.com) 的开源 Wine 和 Apple 的 Game Porting Toolkit 运行。"
-          }
-        }
-      }
-    },
     "A game is running, so Bridgeplay won't restart. The update installs when you quit." : {
       "localizations" : {
         "it" : {
@@ -7278,6 +7256,28 @@
         }
       }
     },
+    "Fork of [NotProton](https://github.com/NotProtonNot/NotProton)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fork di [NotProton](https://github.com/NotProtonNot/NotProton)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Форк [NotProton](https://github.com/NotProtonNot/NotProton)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[NotProton](https://github.com/NotProtonNot/NotProton) 的分支"
+          }
+        }
+      }
+    },
     "Found. Set it up in Status to play on it." : {
       "localizations" : {
         "it" : {
@@ -7538,6 +7538,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Game Porting Toolkit"
+          }
+        }
+      }
+    },
+    "Game Porting Toolkit by Apple" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Porting Toolkit di Apple"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Porting Toolkit от Apple"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Porting Toolkit 由 Apple 提供"
           }
         }
       }
@@ -8132,28 +8154,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "如果 Bridgeplay 安装在那里，它将保持安装状态。仍要继续吗？"
-          }
-        }
-      }
-    },
-    "If CrossOver works for you,\n[buy it](https://www.codeweavers.com/crossover) to support Wine." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se CrossOver fa al caso tuo,\n[acquistalo](https://www.codeweavers.com/crossover) per sostenere Wine."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Если CrossOver вам подходит,\n[купите его](https://www.codeweavers.com/crossover), чтобы поддержать Wine."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "如果 CrossOver 适合你，\n[购买它](https://www.codeweavers.com/crossover)来支持 Wine。"
           }
         }
       }
@@ -17401,6 +17401,28 @@
         }
       }
     },
+    "Wine by [CodeWeavers](https://www.codeweavers.com)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine di [CodeWeavers](https://www.codeweavers.com)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine от [CodeWeavers](https://www.codeweavers.com)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine 由 [CodeWeavers](https://www.codeweavers.com) 提供"
+          }
+        }
+      }
+    },
     "Wine could not build a complete new prefix. The prefix has been left as it was and nothing has been lost. Try again, or use Set Up Compatibility Tool first." : {
       "localizations" : {
         "it" : {
@@ -17755,6 +17777,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你自己的游戏修复已保留在 %@ 中。"
+          }
+        }
+      }
+    },
+    "[Buy CrossOver](https://www.codeweavers.com/crossover) to support Wine." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[Acquista CrossOver](https://www.codeweavers.com/crossover) per sostenere Wine."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[Купите CrossOver](https://www.codeweavers.com/crossover), чтобы поддержать Wine."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[购买 CrossOver](https://www.codeweavers.com/crossover) 以支持 Wine。"
           }
         }
       }

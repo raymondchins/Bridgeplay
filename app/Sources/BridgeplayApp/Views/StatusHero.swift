@@ -31,8 +31,8 @@ struct StatusHero: View {
                             .foregroundStyle(BP.fg2)
                             .lineLimit(2)
                         HStack(spacing: 6) {
-                            ForEach(chips, id: \.self) { chip in
-                                HeroChip(text: chip)
+                            ForEach(Array(chips.enumerated()), id: \.element) { index, chip in
+                                HeroChip(text: chip, index: index)
                             }
                         }
                     }
@@ -43,7 +43,7 @@ struct StatusHero: View {
         .frame(height: 148)
         .clipShape(RoundedRectangle(cornerRadius: BP.radius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: BP.radius, style: .continuous).strokeBorder(BP.line, lineWidth: 1))
-        .padding(.horizontal, 20)
+        .padding(.horizontal, BP.pageMargin)
         .padding(.top, 14)
         .padding(.bottom, 4)
         .background(BP.bg)
@@ -108,17 +108,26 @@ struct StatusHero: View {
     }
 }
 
-// A fact under a hero headline, as the brand guidelines draw a chip: Geist 11 semibold in
-// near-white on a white 10% capsule.
+// A fact under a hero headline: near-white text on a quiet pill, with the colour kept to a
+// small dot in one of the brand's three hues.
 struct HeroChip: View {
     let text: String
+    let index: Int
 
     var body: some View {
-        Text(text)
-            .font(BP.sans(11, .semibold))
-            .foregroundStyle(BP.fg)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 3)
-            .background(.white.opacity(0.1), in: Capsule())
+        let hue = [BP.violet, BP.blue, BP.pink][index % 3]
+        HStack(spacing: 6) {
+            Circle()
+                .fill(hue)
+                .frame(width: 6, height: 6)
+            Text(text)
+                .font(BP.sans(12, .medium))
+                .foregroundStyle(BP.fg)
+        }
+        .padding(.leading, 9)
+        .padding(.trailing, 11)
+        .padding(.vertical, 5)
+        .background(Color.white.opacity(0.07), in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
     }
 }

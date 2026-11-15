@@ -87,7 +87,7 @@ struct GameDefaultsView: View {
             DefaultsHero(customized: GameDefaults.resettingAll(in: user) != user, chips: heroChips)
         }
         // One readable column: on a wide window the controls stay near their labels.
-        .frame(maxWidth: 680, maxHeight: .infinity)
+        .frame(maxWidth: BP.pageWidth, maxHeight: .infinity)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Game Defaults")
         .toolbar {
@@ -177,7 +177,7 @@ struct GameDefaultsView: View {
         row(setting) {
             Toggle(Self.title(setting), isOn: Binding(get: { resolved(setting).value == "1" },
                                                       set: { save(setting, $0 ? "1" : "0") }))
-                .toggleStyle(.brandSwitch)
+                .toggleStyle(.switch)
                 .labelsHidden()
         }
     }
@@ -214,24 +214,24 @@ struct GameDefaultsView: View {
                         .foregroundStyle(.secondary)
                 }
                 Toggle(Self.title(.frameLimitOff), isOn: Binding(get: { !limitOff }, set: { setLimitOff(!$0) }))
-                    .toggleStyle(.brandSwitch)
+                    .toggleStyle(.switch)
                     .labelsHidden()
             }
             if !limitOff {
-                HStack(spacing: 10) {
+                // Whole numbers come from rounding, not step:, which draws a tick for every one of them
+                Slider(value: Binding(get: { limitDraft ?? Double(limitValue) }, set: { limitDraft = $0.rounded() }),
+                       in: Double(GameDefaults.minFrameLimit)...Double(maxFPS)) {
+                    Text(Self.title(.frameLimit))
+                } minimumValueLabel: {
                     Text(verbatim: "\(GameDefaults.minFrameLimit)")
-                    BrandSlider(value: Binding(get: { limitDraft ?? Double(limitValue) },
-                                               set: { limitDraft = $0.rounded() }),
-                                range: Double(GameDefaults.minFrameLimit)...Double(maxFPS),
-                                label: Self.title(.frameLimit)) {
-                        guard let draft = limitDraft else { return }
-                        limitDraft = nil
-                        save(.frameLimit, String(Int(draft)))
-                    }
+                } maximumValueLabel: {
                     Text(verbatim: "\(maxFPS)")
+                } onEditingChanged: { editing in
+                    guard !editing, let draft = limitDraft else { return }
+                    limitDraft = nil
+                    save(.frameLimit, String(Int(draft)))
                 }
-                .font(BP.sans(11))
-                .monospacedDigit()
+                .labelsHidden()
                 .foregroundStyle(BP.fg3)
             }
         }
@@ -584,8 +584,8 @@ private struct DefaultsHero: View {
                         .foregroundStyle(BP.fg2)
                         .lineLimit(2)
                     HStack(spacing: 6) {
-                        ForEach(chips, id: \.self) { chip in
-                            HeroChip(text: chip)
+                        ForEach(Array(chips.enumerated()), id: \.element) { index, chip in
+                            HeroChip(text: chip, index: index)
                         }
                     }
                 }
@@ -594,7 +594,7 @@ private struct DefaultsHero: View {
         .frame(height: 148)
         .clipShape(RoundedRectangle(cornerRadius: BP.radius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: BP.radius, style: .continuous).strokeBorder(BP.line, lineWidth: 1))
-        .padding(.horizontal, 20)
+        .padding(.horizontal, BP.pageMargin)
         .padding(.top, 14)
         .padding(.bottom, 4)
         .background(BP.bg)
@@ -617,61 +617,5 @@ private struct ResetButton: View {
         .buttonStyle(.borderless)
         .onHover { hovered = $0 }
         .help(String(localized: "Reset to Bridgeplay's Default"))
-    }
-}
-
-// A value along a range in the brand's progress style: a 4 pt raise-2 track, the gradient up
-// to the value and a white knob. Steps by one with the arrow keys; VoiceOver gets a slider.
-private struct BrandSlider: View {
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let label: String
-    let onCommit: () -> Void
-
-    @State private var dragging = false
-    private let knob: CGFloat = 16
-
-    var body: some View {
-        GeometryReader { proxy in
-            let width = max(proxy.size.width - knob, 1)
-            let fraction = (value - range.lowerBound) / max(range.upperBound - range.lowerBound, 1)
-            let x = CGFloat(min(max(fraction, 0), 1)) * width
-            ZStack(alignment: .leading) {
-                Capsule().fill(BP.raise2).frame(height: 4)
-                Capsule().fill(BP.iridescent).frame(width: x + knob / 2, height: 4)
-                Circle()
-                    .fill(.white)
-                    .frame(width: knob, height: knob)
-                    .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
-                    .scaleEffect(dragging ? 1.1 : 1)
-                    .offset(x: x)
-            }
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { drag in
-                    dragging = true
-                    let f = min(max((drag.location.x - knob / 2) / width, 0), 1)
-                    value = range.lowerBound + Double(f) * (range.upperBound - range.lowerBound)
-                }
-                .onEnded { _ in
-                    dragging = false
-                    onCommit()
-                })
-            .animation(.easeOut(duration: 0.18), value: dragging)
-        }
-        .frame(height: 20)
-        .focusable()
-        .onKeyPress(.leftArrow) { step(-1) }
-        .onKeyPress(.rightArrow) { step(1) }
-        .accessibilityRepresentation {
-            Slider(value: $value, in: range) { Text(label) } onEditingChanged: { if !$0 { onCommit() } }
-        }
-    }
-
-    private func step(_ by: Double) -> KeyPress.Result {
-        value = min(max(value.rounded() + by, range.lowerBound), range.upperBound)
-        onCommit()
-        return .handled
     }
 }

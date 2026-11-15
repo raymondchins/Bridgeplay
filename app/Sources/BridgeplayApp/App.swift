@@ -101,6 +101,12 @@ struct BridgeplayApp: App {
             Divider()
         }
 
+        // Help › Guide (⌘?) opens the Guide page
+        CommandGroup(replacing: .help) {
+            Button("Guide") { pane = .guide }
+                .keyboardShortcut("?", modifiers: .command)
+        }
+
         CommandMenu("Setup") {
             Button("Setup Assistant…") { showsSetup = true }
                 .disabled(!status.isIdle || MigrationLaunch.shared.pending)

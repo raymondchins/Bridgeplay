@@ -1,3 +1,4 @@
+import AppKit
 import CoreText
 import SwiftUI
 
@@ -5,16 +6,22 @@ import SwiftUI
 // near-white type in Geist, hairline borders, small radii, and the violet-blue-pink
 // gradient kept for emphasis only (progress, the last step, one word of a headline).
 public enum BP {
-    public static let bg = Color(hex: 0x000000)
-    public static let raise = Color(hex: 0x0D0D0F)
-    public static let raise2 = Color(hex: 0x161618)
+    // Layered near-blacks, never pure black: each step up (page, card, control) is a little
+    // lighter, as Dark Mode draws elevation. The sidebar is the system's glass over these.
+    public static let bg = Color(hex: 0x111113)
+    public static let raise = Color(hex: 0x1A1A1D)
+    public static let raise2 = Color(hex: 0x242428)
     public static let fg = Color(hex: 0xF5F5F7)
-    public static let fg2 = Color(hex: 0xA1A1A6)
-    public static let fg3 = Color(hex: 0x86868B)
-    public static let line = Color.white.opacity(0.08)
-    public static let lineStrong = Color.white.opacity(0.18)
+    // Brighter with Increase Contrast on (System Settings › Accessibility › Display)
+    public static let fg2 = adaptive(0xA1A1A6, highContrast: 0xC7C7CC)
+    public static let fg3 = adaptive(0x86868B, highContrast: 0xAEAEB2)
+    public static let line = adaptive(white: 0.08, highContrast: 0.24)
+    public static let lineStrong = adaptive(white: 0.18, highContrast: 0.42)
     public static let violet = Color(hex: 0x8B7BFF)
     public static let blue = Color(hex: 0x4FB3FF)
+    // Controls and selection (switches, sliders, the chosen sidebar item): a fuller blue than
+    // the gradient's sky blue, which reads soft on a small control.
+    public static let accent = Color(hex: 0x1F75FE)
     public static let pink = Color(hex: 0xFF7AC6)
     public static let green = Color(hex: 0x30D158)
     public static let orange = Color(hex: 0xFF9F0A)
@@ -24,6 +31,28 @@ public enum BP {
     public static let iridescentDiagonal = LinearGradient(colors: [violet, blue, pink], startPoint: .topLeading, endPoint: .bottomTrailing)
 
     public static let radius: CGFloat = 12
+    // Every page: a 20 pt side margin (the grouped Form's own inset) and one column width
+    public static let pageMargin: CGFloat = 20
+    public static let pageWidth: CGFloat = 720
+
+    private static func adaptive(_ hex: UInt32, highContrast: UInt32) -> Color {
+        Color(nsColor: NSColor(name: nil) { isHighContrast($0) ? nsColor(highContrast) : nsColor(hex) })
+    }
+
+    private static func adaptive(white: CGFloat, highContrast: CGFloat) -> Color {
+        Color(nsColor: NSColor(name: nil) { NSColor(white: 1, alpha: isHighContrast($0) ? highContrast : white) })
+    }
+
+    private static func isHighContrast(_ appearance: NSAppearance) -> Bool {
+        let match = appearance.bestMatch(from: [.darkAqua, .aqua, .accessibilityHighContrastDarkAqua,
+                                                .accessibilityHighContrastAqua])
+        return match == .accessibilityHighContrastDarkAqua || match == .accessibilityHighContrastAqua
+    }
+
+    private static func nsColor(_ hex: UInt32) -> NSColor {
+        NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+    }
 
     public static func sans(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         registerFonts()
@@ -180,16 +209,20 @@ public struct BridgeShape: Shape {
 // The mark drawn flat on its black tile, as in the nav bar and favicon.
 public struct BridgeplayMark: View {
     public var size: CGFloat = 22
+    // false draws the strokes alone, without the black tile and its hairline
+    public var tile = true
 
-    public init(size: CGFloat = 22) {
+    public init(size: CGFloat = 22, tile: Bool = true) {
         self.size = size
+        self.tile = tile
     }
 
     public var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * 0.25, style: .continuous)
         BridgeStrokes(size: size)
             .frame(width: size, height: size)
-            .background(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous).fill(.black))
-            .overlay(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous).strokeBorder(BP.lineStrong, lineWidth: 1))
+            .background(shape.fill(tile ? Color.black : .clear))
+            .overlay(shape.strokeBorder(tile ? BP.lineStrong : .clear, lineWidth: 1))
             .accessibilityHidden(true)
     }
 }
