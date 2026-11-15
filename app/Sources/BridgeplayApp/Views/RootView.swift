@@ -233,28 +233,30 @@ private struct SidebarItem: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        HStack(spacing: 9) {
-            Image(systemName: item.symbol)
-                .font(.system(size: 13, weight: .medium))
-                .frame(width: 18)
-                .foregroundStyle(selected ? BP.accent : BP.fg3)
-            Text(item.label)
-                .font(BP.sans(13, selected ? .semibold : .regular))
-                .foregroundStyle(selected ? BP.fg : BP.fg2)
-            Spacer(minLength: 0)
+        // The Button gives Tab focus, Space and VoiceOver; the gesture picks the page earlier
+        Button(action: select) {
+            HStack(spacing: 9) {
+                Image(systemName: item.symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 18)
+                    .foregroundStyle(selected ? BP.accent : BP.fg3)
+                Text(item.label)
+                    .font(BP.sans(13, selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? BP.fg : BP.fg2)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 32)
+            .background(shape.fill(Color.white.opacity(selected ? 0.09 : (hovered ? 0.04 : 0))))
+            .overlay(shape.strokeBorder(selected ? BP.line : .clear, lineWidth: 1))
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 10)
-        .frame(height: 32)
-        .background(shape.fill(Color.white.opacity(selected ? 0.09 : (hovered ? 0.04 : 0))))
-        .overlay(shape.strokeBorder(selected ? BP.line : .clear, lineWidth: 1))
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
         // Picks the page on mouse down, as Finder's and Mail's sidebars do. A Button acts on
         // mouse up, and drops the click when the page redraws between down and up.
-        .gesture(DragGesture(minimumDistance: 0).onChanged { _ in if !selected { select() } })
+        .simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { _ in if !selected { select() } })
         .onHover { hovered = $0 }
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityAction { select() }
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

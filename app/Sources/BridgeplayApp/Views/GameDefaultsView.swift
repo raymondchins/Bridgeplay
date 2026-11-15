@@ -17,6 +17,7 @@ struct GameDefaultsView: View {
     @State private var clearing: GameDefaults.Override?
     // The frame rate limit while its slider is dragged; written when the drag ends
     @State private var limitDraft: Double?
+    @State private var limitDragging = false
     @State private var showsAdvanced = false
     // Steam's small library icon per app id, for the per-game list
     @State private var icons: [String: NSImage] = [:]
@@ -219,22 +220,32 @@ struct GameDefaultsView: View {
             }
             if !limitOff {
                 // Whole numbers come from rounding, not step:, which draws a tick for every one of them
-                Slider(value: Binding(get: { limitDraft ?? Double(limitValue) }, set: { limitDraft = $0.rounded() }),
-                       in: Double(GameDefaults.minFrameLimit)...Double(maxFPS)) {
+                Slider(value: Binding(get: { limitDraft ?? Double(limitValue) }, set: { value in
+                    let rounded = value.rounded()
+                    guard rounded != (limitDraft ?? Double(limitValue)) else { return }
+                    limitDraft = rounded
+                    // Arrow keys and VoiceOver change the value without a drag to end
+                    if !limitDragging { commitLimit() }
+                }), in: Double(GameDefaults.minFrameLimit)...Double(maxFPS)) {
                     Text(Self.title(.frameLimit))
                 } minimumValueLabel: {
                     Text(verbatim: "\(GameDefaults.minFrameLimit)")
                 } maximumValueLabel: {
                     Text(verbatim: "\(maxFPS)")
                 } onEditingChanged: { editing in
-                    guard !editing, let draft = limitDraft else { return }
-                    limitDraft = nil
-                    save(.frameLimit, String(Int(draft)))
+                    limitDragging = editing
+                    if !editing { commitLimit() }
                 }
                 .labelsHidden()
                 .foregroundStyle(BP.fg3)
             }
         }
+    }
+
+    private func commitLimit() {
+        guard let draft = limitDraft else { return }
+        limitDraft = nil
+        save(.frameLimit, String(Int(draft)))
     }
 
     // On with no value set takes the slider's, the display's rate.
