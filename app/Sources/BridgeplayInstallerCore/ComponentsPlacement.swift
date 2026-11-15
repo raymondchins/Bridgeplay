@@ -135,7 +135,9 @@ enum ValveSteam {
     /// The trust chain, Valve's Team ID and Steam's bundle identifier, checked as one requirement.
     static let requirement = #"=anchor apple generic and certificate leaf[subject.OU] = "MXGJJ98X76" and identifier "com.valvesoftware.steam""#
 
-    static let notWritableMessage = "This macOS account can't add apps to Applications. Ask an administrator to install Steam from https://store.steampowered.com/about/, or run Setup from an administrator account, then try again."
+    // Only the account that owns Steam.app can set it up for Bridgeplay; other accounts can
+    // use it once it is, so the administrator runs Setup first.
+    static let notWritableMessage = "This macOS account can't add apps to Applications. Ask an administrator to install Steam from https://store.steampowered.com/about/ and run Bridgeplay's Setup from their account, then run Setup again from this account."
 
     static func install(into applications: URL, download: @escaping @Sendable (InstallerDownloadProgress) -> Void,
                         log: @escaping (String) -> Void = { InstallerLog.write($0) }) throws {
@@ -182,8 +184,8 @@ enum ValveSteam {
             try ComponentsPlacement.put(steam, at: applications.appending(path: "Steam.app"), replacing: false)
         } catch {
             log("Copying Steam failed: \(error)")
-            let denied = "\(error)".contains("Permission denied")
-            throw InstallerError.componentsFailure(denied ? notWritableMessage : "Steam could not be copied to Applications.")
+            let writable = fm.isWritableFile(atPath: applications.path)
+            throw InstallerError.componentsFailure(writable ? "Steam could not be copied to Applications." : notWritableMessage)
         }
     }
 

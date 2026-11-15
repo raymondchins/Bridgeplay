@@ -108,7 +108,9 @@ struct ComponentsPlacementTests {
         #expect(lines.all == ["Copying Steam failed: ditto: Permission denied"])
     }
 
-    @Test("Steam is not downloaded when this account can't write to Applications")
+    // Root ignores the mode bits, and a writable folder would download Steam for real.
+    @Test("Steam is not downloaded when this account can't write to Applications",
+          .disabled(if: getuid() == 0, "root can write to a read-only folder"))
     func steamApplicationsNotWritable() throws {
         let f = try fixture(steam: false)
         defer {
@@ -116,6 +118,7 @@ struct ComponentsPlacementTests {
             try? FileManager.default.removeItem(at: f.root)
         }
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: f.applications.path)
+        try #require(!FileManager.default.isWritableFile(atPath: f.applications.path))
         let lines = Lines()
         let downloads = Lines()
         let failure = try #require(throws: InstallerError.self) {
