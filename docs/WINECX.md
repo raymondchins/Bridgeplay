@@ -271,7 +271,9 @@ real to gather for.
 `d3dx9-patch/winecx-gather-fragments.patch`, whose five functions set both output buffers to
 `NULL` and return `E_NOTIMPL`. The patch covers all eighteen spec files; only `d3dx9_41` (the
 report) and `d3dx9_36` (the most used version, bug 54196) are rebuilt and shipped. The pins are
-the release's `d3dx`, with the runtime's own as fallbacks.
+the release's `d3dx`. Unlike the d3dx11 ones they have no fallbacks yet: an engine set up
+before they shipped holds the runtime's own, which would match a fallback and keep it from
+being updated, so with none it shows "Update & Set Up" once.
 
 Built in the same tree and the same way as the D3DX11 thread pump:
 `make dlls/d3dx9_{41,36}/{x86_64,i386}-windows/d3dx9_{41,36}.dll`, then

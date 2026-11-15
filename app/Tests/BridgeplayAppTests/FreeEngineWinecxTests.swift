@@ -777,14 +777,16 @@ struct FreeEngineWinecxTests {
         return lines.sorted()
     }
 
-    // #2688: an antivirus quarantined the app's d3dx11 and setup stopped. The d3dx DLLs may
-    // fall back to the runtime's own; every other bundled file stays required.
-    @Test("Only the d3dx DLLs may fall back to the runtime's own", arguments: FreeEngineWinecx.releases.map(\.build))
+    // #2688: an antivirus quarantined the app's d3dx11 and setup stopped. The d3dx11 DLLs may
+    // fall back to the runtime's own; every other bundled file stays required. The d3dx9 ones
+    // have none yet, so engines set up before they shipped are updated to them.
+    @Test("Only the d3dx11 DLLs may fall back to the runtime's own", arguments: FreeEngineWinecx.releases.map(\.build))
     func fallbacksAreD3dxOnly(id: String) throws {
         let release = try #require(FreeEngineWinecx.release(build: id))
         let fallbacks = FreeEngineWinecx.fallbackFiles(release)
-        #expect(Set(fallbacks.keys) == Set(release.d3dx.map(\.path)))
-        for file in release.d3dx {
+        let d3dx11 = release.d3dx.filter { $0.path.contains("/d3dx11_") }
+        #expect(Set(fallbacks.keys) == Set(d3dx11.map(\.path)))
+        for file in d3dx11 {
             let fallback = try #require(file.fallback)
             #expect(fallback.count == 64 && fallback != file.sha256, "\(file.path)")
         }
