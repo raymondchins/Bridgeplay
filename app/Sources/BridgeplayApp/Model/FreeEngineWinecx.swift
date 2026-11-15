@@ -72,8 +72,9 @@ struct WinecxRelease: Sendable {
     // (winecoreaudio-patch/). Empty where the runtime's own is kept.
     let audio: [WinecxBundledFile]
     // d3dx11_43 and d3dx11_42 rebuilt to export D3DX11CreateThreadPump, which games such as
-    // Persona 4 Golden import and Wine leaves as a stub (d3dx11-patch/). Empty where the
-    // runtime's own are kept.
+    // Persona 4 Golden import and Wine leaves as a stub (d3dx11-patch/), and d3dx9_41 and
+    // d3dx9_36 rebuilt so D3DXGatherFragments fails instead of aborting, as Granado Espada
+    // needs (d3dx9-patch/). Empty where the runtime's own are kept.
     let d3dx: [WinecxBundledFile]
     // kernel32 and kernelbase rebuilt so GetProcAddress can hide ntdll's wine_* exports from
     // games that turn features off under Wine (hide-wine-exports-patch/,
@@ -233,6 +234,23 @@ enum FreeEngineWinecx {
                               path: "lib/wine/i386-windows/d3dx11_42.dll",
                               sha256: "85075f8b4f30f1a993238a0d6ab772a3a3df6c031e87ee9401c4367a527cd57c",
                               fallback: "f4d8b1310cea5f7b51aa62c87fcd685ce6fde7f1901fda1bcf1236bb8a942d2f"),
+            // d3dx9_41.dll, d3dx9_36.dll: the same, with d3dx9-patch/winecx-gather-fragments.patch.
+            WinecxBundledFile(resource: "d3dx9_41-winecx-11.17", ext: "dll",
+                              path: "lib/wine/x86_64-windows/d3dx9_41.dll",
+                              sha256: "87f2d91e518bdb30d6fd279068124ee80f2b38ec1a145a10d3199bcb64fd6624",
+                              fallback: "6e604893df8bb2c06be5309d35220d06717c75f83035171f2715da948f9c4ab1"),
+            WinecxBundledFile(resource: "d3dx9_41-winecx-11.17-i386", ext: "dll",
+                              path: "lib/wine/i386-windows/d3dx9_41.dll",
+                              sha256: "9bb3846af7815be2ac6790ec574aeac62419b60436e74029656019a557418565",
+                              fallback: "057fff1ece3beb8397eed5fec681e8f9f8484c819af97549649722e26a6085ca"),
+            WinecxBundledFile(resource: "d3dx9_36-winecx-11.17", ext: "dll",
+                              path: "lib/wine/x86_64-windows/d3dx9_36.dll",
+                              sha256: "18b3fb3952581976a0ba4ff94ea899995d128c7677ed4ba72988868b63949415",
+                              fallback: "6ba3381050794050f4e7114bac86614a0185de59f6a2e445d8e83e58cada4bc7"),
+            WinecxBundledFile(resource: "d3dx9_36-winecx-11.17-i386", ext: "dll",
+                              path: "lib/wine/i386-windows/d3dx9_36.dll",
+                              sha256: "5eec69a49afa6debbc8e5020bab5f44e2d0c2897e393be40c33d9cbd766dd893",
+                              fallback: "472113e2696570c4b97fd965748e561fd27a9f6cd8a8f57b9195aa3af95c6fc4"),
         ],
         // kernel32.dll, kernelbase.dll: winecx e0aa380's PE halves with
         // hide-wine-exports-patch/winecx-hide-wine-exports.patch.
