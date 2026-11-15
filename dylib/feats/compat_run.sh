@@ -415,7 +415,7 @@ gamefix_reason() {
   case "$1" in
     BACKEND)
       case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
-    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK|ROCKSTAR_SHIM|FPS_LIMIT_OFF)
+    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|GAME_MODE|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK|ROCKSTAR_SHIM|FPS_LIMIT_OFF)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     FRAMEGEN)
       # 1 is the 2x of the first release.
@@ -471,7 +471,7 @@ gamefix_read() {
     fi
     # The keys that set a BRIDGEPLAY_ variable also take its full name: BRIDGEPLAY_RETINA=1 is RETINA=1.
     case "$key" in
-      BRIDGEPLAY_STDOUT_NULL|BRIDGEPLAY_VSYNC|BRIDGEPLAY_HIDE_WINE_EXPORTS|BRIDGEPLAY_RETINA|BRIDGEPLAY_FRAMEGEN|BRIDGEPLAY_FRAMEGEN_?*|BRIDGEPLAY_PERF_OVERLAY|BRIDGEPLAY_FPS_LIMIT|BRIDGEPLAY_FPS_LIMIT_OFF|BRIDGEPLAY_SCALING_FILTER)
+      BRIDGEPLAY_STDOUT_NULL|BRIDGEPLAY_VSYNC|BRIDGEPLAY_GAME_MODE|BRIDGEPLAY_HIDE_WINE_EXPORTS|BRIDGEPLAY_RETINA|BRIDGEPLAY_FRAMEGEN|BRIDGEPLAY_FRAMEGEN_?*|BRIDGEPLAY_PERF_OVERLAY|BRIDGEPLAY_FPS_LIMIT|BRIDGEPLAY_FPS_LIMIT_OFF|BRIDGEPLAY_SCALING_FILTER)
         key=${key#BRIDGEPLAY_} ;;
     esac
     value=${line#*=}
@@ -518,6 +518,7 @@ load_gamefixes() {
       ROCKSTAR_SHIM) gamefix_rockstar_shim=$value; gamefix_log "ROCKSTAR_SHIM=$value from the $from conf" ;;
       STDOUT_NULL) gamefix_apply_env NOTPROTON_STDOUT_NULL "$value" "$from" ;;
       VSYNC) gamefix_apply_env NOTPROTON_VSYNC "$value" "$from" ;;
+      GAME_MODE) gamefix_apply_env NOTPROTON_GAME_MODE "$value" "$from" ;;
       HIDE_WINE_EXPORTS) gamefix_apply_env NOTPROTON_HIDE_WINE_EXPORTS "$value" "$from" ;;
       ARGS)
         if [ "$verb" = waitforexitandrun ]; then
@@ -3393,6 +3394,12 @@ if [ "${NOTPROTON_HIDE_LAUNCHER_TILE:-0}" = "1" ]; then
   uielement_arg="  <key>LSUIElement</key><true/>"
   echo "launcher tile hidden by BRIDGEPLAY_HIDE_LAUNCHER_TILE" >> "$log" 2>&1 || true
 fi
+# macOS turns Game Mode on for a games-category app in full screen; LSSupportsGameMode=false opts out.
+gamemode_arg=""
+if [ "${NOTPROTON_GAME_MODE:-1}" = "0" ]; then
+  gamemode_arg="  <key>LSSupportsGameMode</key><false/>"
+  echo "Game Mode off by BRIDGEPLAY_GAME_MODE=0" >> "$log" 2>&1 || true
+fi
 cat > "$loader_contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -3411,6 +3418,7 @@ cat > "$loader_contents/Info.plist" <<PLIST
   <key>NSCameraUsageDescription</key><string>This game would like to access your camera.</string>
   <key>NSLocalNetworkUsageDescription</key><string>This game would like to access devices on your local network.</string>
 $uielement_arg
+$gamemode_arg
 $icon_arg
 </dict>
 </plist>
