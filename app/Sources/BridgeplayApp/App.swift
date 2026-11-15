@@ -8,6 +8,7 @@ struct BridgeplayApp: App {
     @State private var prefixes = PrefixesModel()
     @State private var pane: Pane = .status
     @State private var showsSetup = false
+    @Environment(\.openWindow) private var openWindow
     private let updater = AppUpdater.shared
 
     var body: some Scene {
@@ -99,6 +100,15 @@ struct BridgeplayApp: App {
             .disabled(pane == .status || pane == .guide || pane == .gameDefaults ? !status.isIdle : prefixes.isLoading)
 
             Divider()
+        }
+
+        // Help › Guide (⌘?) opens the Guide page, and the window if it was closed
+        CommandGroup(replacing: .help) {
+            Button("Guide") {
+                pane = .guide
+                openWindow(id: "main")
+            }
+                .keyboardShortcut("?", modifiers: .command)
         }
 
         CommandMenu("Setup") {

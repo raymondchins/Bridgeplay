@@ -149,7 +149,9 @@ private struct WhatsNewSheet: View {
             .frame(maxHeight: 280)
             HStack {
                 Spacer()
-                Button("Done") { dismiss() }.buttonStyle(.pillSecondary)
+                Button("Done") { dismiss() }
+                    .buttonStyle(.pill)
+                    .keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)

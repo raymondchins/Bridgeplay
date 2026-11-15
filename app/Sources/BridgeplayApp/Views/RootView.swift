@@ -62,29 +62,34 @@ struct RootView: View {
                 // system's accent fill or its grey inactive one.
                 // Plain buttons, not List rows: a table view takes the click first, which made
                 // a page change feel like it hadn't registered.
-                VStack(alignment: .leading, spacing: 4) {
+                // No gaps between rows: each row's 2 pt margins are part of its click area
+                VStack(alignment: .leading, spacing: 0) {
                     ForEach(Pane.allCases) { item in
                         SidebarItem(item: item, selected: pane == item) { pane = item }
                     }
                     Spacer(minLength: 0)
                 }
+                // The click that brings the window forward also picks the page, as in a
+                // system sidebar, instead of only activating the window
+                .allowsWindowActivationEvents(true)
                 // 16 + the item's 10 puts the icons under the logo mark (leading 26)
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .background(BP.bg)
+                // No background of its own: the sidebar floats as Liquid Glass over the
+                // window, which sets it apart from the opaque page (HIG: Sidebars)
                 .safeAreaInset(edge: .top, spacing: 0) {
-                    // The brand lockup: the mark on its tile, a gap of 20% of the tile, the
-                    // gradient wordmark. The tile is centred over the menu's 18 pt icon column
-                    // (SidebarItem: 16 inset + 10 padding).
-                    HStack(spacing: 4.4) {
-                        BridgeplayMark(size: 22)
+                    // The mark centred over the menu's icons, the wordmark over their labels
+                    // (SidebarItem: 16 inset + 10 padding, an 18 wide icon, 9 spacing)
+                    HStack(spacing: 9) {
+                        BridgeplayMark(size: 26, tile: false)
+                            .frame(width: 18)
                         Text(verbatim: "Bridgeplay")
-                            .font(BP.display(13))
-                            .foregroundStyle(BP.iridescent)
+                            .font(BP.display(14))
+                            .foregroundStyle(BP.fg)
                         Spacer()
                     }
-                    .padding(.leading, 24)
+                    .padding(.leading, 26)
                     .padding(.trailing, 12)
                     .padding(.top, 6)
                     .padding(.bottom, 10)
@@ -98,21 +103,12 @@ struct RootView: View {
                             .foregroundStyle(BP.fg3)
                             .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 2)
+                            .padding(.horizontal, 6)
                     }
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
                 }
-                // A hairline between the sidebar and the page, full height under the toolbar too
-                .overlay(alignment: .trailing) {
-                    Rectangle()
-                        .fill(BP.line)
-                        .frame(width: 1)
-                        .ignoresSafeArea()
-                }
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
-                // The sidebar always shows; no button to hide it
-                .toolbar(removing: .sidebarToggle)
             } detail: {
                 Group {
                     switch pane {
@@ -144,8 +140,8 @@ struct RootView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
+                // The toolbar keeps the system's glass and scroll edge effect (HIG: Toolbars)
                 .background(BP.bg)
-                .toolbarBackground(BP.bg, for: .windowToolbar)
             }
         }
         // While Report Your Games… is open, it presents the consent sheet itself.
@@ -158,7 +154,7 @@ struct RootView: View {
             BulkReportSheet()
         }
         .font(BP.sans(13))
-        .tint(BP.blue)
+        .tint(BP.accent)
         .preferredColorScheme(.dark)
         // The window closed: a Later for the star card, which stays away this run.
         .onDisappear { StarPrompt.shared.later() }
@@ -166,17 +162,20 @@ struct RootView: View {
 
     private var credits: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("A fork of [NotProton](https://github.com/NotProtonNot/NotProton), running on [CodeWeavers](https://www.codeweavers.com)' open-source Wine and Apple's Game Porting Toolkit.")
-            Text("If CrossOver works for you,\n[buy it](https://www.codeweavers.com/crossover) to support Wine.")
+            // One credit per line, each short enough not to wrap in the sidebar
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Fork of [NotProton](https://github.com/NotProtonNot/NotProton)")
+                Text("Wine by [CodeWeavers](https://www.codeweavers.com)")
+                Text("Game Porting Toolkit by Apple")
+            }
+            Text("[Buy CrossOver](https://www.codeweavers.com/crossover) to support Wine.")
         }
         .font(BP.sans(11))
         .lineSpacing(2)
         .foregroundStyle(BP.fg3)
         .tint(BP.fg)
-        // The card's full width, so the credit wraps at word groups instead of leaving one word
-        // ("Toolkit.", "it") on a line of its own
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 2)
+        .padding(.horizontal, 6)
     }
 
     private var libraryCard: some View {
@@ -234,24 +233,29 @@ private struct SidebarItem: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        let tone = selected || hovered ? BP.fg : BP.fg3
+        // The Button gives Tab focus, Space and VoiceOver; the gesture picks the page earlier
         Button(action: select) {
             HStack(spacing: 9) {
                 Image(systemName: item.symbol)
                     .font(.system(size: 13, weight: .medium))
                     .frame(width: 18)
+                    .foregroundStyle(selected ? BP.accent : BP.fg3)
                 Text(item.label)
                     .font(BP.sans(13, selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? BP.fg : BP.fg2)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(tone)
             .padding(.horizontal, 10)
             .frame(height: 32)
-            // As the brand guidelines' navigation: selected on raise 2, hover on raise
-            .background(shape.fill(selected ? BP.raise2 : (hovered ? BP.raise : .clear)))
-            .contentShape(shape)
+            .background(shape.fill(Color.white.opacity(selected ? 0.09 : (hovered ? 0.04 : 0))))
+            .overlay(shape.strokeBorder(selected ? BP.line : .clear, lineWidth: 1))
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // Picks the page on mouse down, as Finder's and Mail's sidebars do. A Button acts on
+        // mouse up, and drops the click when the page redraws between down and up.
+        .simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { _ in if !selected { select() } })
         .onHover { hovered = $0 }
         .accessibilityAddTraits(selected ? .isSelected : [])
     }

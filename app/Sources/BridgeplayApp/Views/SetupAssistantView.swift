@@ -52,7 +52,7 @@ struct SetupAssistantView: View {
         .background(BP.bg)
         .foregroundStyle(BP.fg)
         .environment(\.colorScheme, .dark)
-        .tint(BP.blue)
+        .tint(BP.accent)
         .task(id: model.step) { await wave() }
     }
 
@@ -642,8 +642,9 @@ private struct WizardRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             if let toggle = row.toggle {
                 Toggle(row.title, isOn: toggle)
-                    .toggleStyle(.brandSwitch)
+                    .toggleStyle(.switch)
                     .labelsHidden()
+                    .tint(BP.accent)
             }
             if row.secondaryAction != nil || row.action != nil {
                 HStack(spacing: 8) {

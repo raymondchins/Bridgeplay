@@ -24,9 +24,11 @@ struct GuideView: View {
                 compatibilityPage
                 tips
             }
-            .padding(.horizontal, 32)
-            .padding(.vertical, 28)
-            .frame(maxWidth: 820, alignment: .leading)
+            // The Form pages' margins: 20 at the sides, the heroes' 14 at the top
+            .padding(.horizontal, BP.pageMargin)
+            .padding(.top, 14)
+            .padding(.bottom, 28)
+            .frame(maxWidth: BP.pageWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .navigationTitle("Guide")

@@ -54,7 +54,7 @@ struct InstallerView: View {
         }
         .frame(width: 780, height: 580)
         .background(BP.bg).foregroundStyle(BP.fg)
-        .environment(\.colorScheme, .dark).tint(BP.blue)
+        .environment(\.colorScheme, .dark).tint(BP.accent)
         .onChange(of: model.stage) {
             for window in NSApplication.shared.windows {
                 window.standardWindowButton(.closeButton)?.isEnabled = model.stage != .installing
@@ -156,8 +156,8 @@ struct InstallerView: View {
                     }
                     if model.stage == .downloading {
                         if let value = model.progress {
-                            ProgressView(value: min(max(value, 0), 1)).tint(BP.blue)
-                        } else { ProgressView().progressViewStyle(.linear).tint(BP.blue) }
+                            ProgressView(value: min(max(value, 0), 1)).tint(BP.accent)
+                        } else { ProgressView().progressViewStyle(.linear).tint(BP.accent) }
                         HStack(spacing: 12) {
                             Text(DownloadRate.amount(received: model.received, total: model.total, speed: model.paused ? nil : model.speed))
                                 .font(BP.sans(12)).monospacedDigit().foregroundStyle(BP.fg2)
@@ -167,8 +167,8 @@ struct InstallerView: View {
                         }
                     } else if let meter = model.scriptDownload {
                         if let total = meter.total {
-                            ProgressView(value: min(max(Double(meter.received) / Double(total), 0), 1)).tint(BP.blue)
-                        } else { ProgressView().progressViewStyle(.linear).tint(BP.blue) }
+                            ProgressView(value: min(max(Double(meter.received) / Double(total), 0), 1)).tint(BP.accent)
+                        } else { ProgressView().progressViewStyle(.linear).tint(BP.accent) }
                         Text(DownloadRate.amount(received: meter.received, total: meter.total, speed: meter.speed))
                             .font(BP.sans(12)).monospacedDigit().foregroundStyle(BP.fg2)
                     }
