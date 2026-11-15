@@ -263,7 +263,9 @@ final class SetupAssistant {
             meter.clear()
             gptkProgress = String(localized: "Installing the Game Porting Toolkit")
             try await Task.detached(priority: .userInitiated) {
-                try InstallerComponents.install(archive: archive, work: work, status: { AppLog.note("setup: components: \($0)") })
+                // The failure's reason also goes to app.log, which the error report includes.
+                try InstallerComponents.install(archive: archive, work: work, status: { AppLog.note("setup: components: \($0)") },
+                                                log: { InstallerLog.write($0); AppLog.note("setup: components: \($0)") })
             }.value
         } catch {
             AppLog.note("setup: components failed: \(error.localizedDescription)")

@@ -121,16 +121,20 @@ public struct InstallerComponents: Sendable, Equatable {
     }
 
     /// Unpack the verified archive and put Steam, GPTK, the engine archives and the configs in
-    /// place (ComponentsPlacement). `status` gets each step as it starts.
+    /// place (ComponentsPlacement). `status` gets each step as it starts; `log` gets the
+    /// underlying reason when a step fails.
     public static func install(archive: URL, work: URL, status: @escaping @Sendable (String) -> Void = { _ in },
-                               download: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in }) throws {
+                               download: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in },
+                               log: @escaping @Sendable (String) -> Void = { InstallerLog.write($0) }) throws {
         let unpacked = work.appending(path: "components")
         try? FileManager.default.removeItem(at: unpacked)
         try FileManager.default.createDirectory(at: unpacked, withIntermediateDirectories: true)
         try run("/usr/bin/ditto", ["-x", "-k", archive.path, unpacked.path])
         let source = unpacked.appending(path: "Bridgeplay")
         try verifyAppleSigned(gptk: source.appending(path: "gptk"))
-        try ComponentsPlacement(source: source).place(status: status, download: download)
+        var placement = ComponentsPlacement(source: source)
+        placement.log = log
+        try placement.place(status: status, download: download)
     }
 
     /// GPTK ships unmodified: D3DMetal.framework and every other Mach-O file must carry Apple's

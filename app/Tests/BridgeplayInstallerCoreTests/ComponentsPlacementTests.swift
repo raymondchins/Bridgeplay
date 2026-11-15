@@ -52,7 +52,7 @@ struct ComponentsPlacementTests {
         var placement = ComponentsPlacement(source: f.source)
         placement.home = f.home
         placement.applications = f.applications
-        placement.installSteam = { applications, _ in calls.steam.append(applications) }
+        placement.installSteam = { applications, _, _ in calls.steam.append(applications) }
         placement.resetSetupAssistant = { calls.resets += 1 }
         return placement
     }
@@ -96,9 +96,42 @@ struct ComponentsPlacementTests {
         let f = try fixture(steam: false)
         defer { try? FileManager.default.removeItem(at: f.root) }
         var placement = placement(f, Calls())
-        placement.installSteam = { _, _ in throw InstallerError.componentsFailure("no Steam") }
+        let lines = Lines()
+        placement.log = { lines.add($0) }
+        placement.installSteam = { _, _, log in
+            log("Copying Steam failed: ditto: Permission denied")
+            throw InstallerError.componentsFailure("no Steam")
+        }
         #expect(throws: InstallerError.self) { try placement.place() }
         #expect(!FileManager.default.fileExists(atPath: f.support.appending(path: "gptk").path))
+        // The reason reaches the placement's log, which the app mirrors into its report.
+        #expect(lines.all == ["Copying Steam failed: ditto: Permission denied"])
+    }
+
+    // Root ignores the mode bits, and a writable folder would download Steam for real.
+    @Test("Steam is not downloaded when this account can't write to Applications",
+          .disabled(if: getuid() == 0, "root can write to a read-only folder"))
+    func steamApplicationsNotWritable() throws {
+        let f = try fixture(steam: false)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: f.applications.path)
+            try? FileManager.default.removeItem(at: f.root)
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: f.applications.path)
+        try #require(!FileManager.default.isWritableFile(atPath: f.applications.path))
+        let lines = Lines()
+        let downloads = Lines()
+        let failure = try #require(throws: InstallerError.self) {
+            try ValveSteam.install(into: f.applications, download: { _ in downloads.add("progress") }, log: { lines.add($0) })
+        }
+        guard case .componentsFailure(let message) = failure else {
+            Issue.record("Unexpected error: \(failure)")
+            return
+        }
+        #expect(message == ValveSteam.notWritableMessage)
+        #expect(downloads.all.isEmpty)
+        #expect(lines.all.count == 1)
+        #expect(lines.all.first?.contains("not writable") == true)
     }
 
     @Test("A failed copy logs the tool's reason and shows the plain message")
