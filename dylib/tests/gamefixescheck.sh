@@ -127,7 +127,7 @@ launch() {
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
 				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE NOTPROTON_PERF_OVERLAY NOTPROTON_FPS_LIMIT NOTPROTON_FPS_LIMIT_OFF NOTPROTON_SCALING_FILTER CX_GRAPHICS_BACKEND \
-				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS NOTPROTON_ROCKSTAR_DXGI CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
+				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_GAME_MODE NOTPROTON_HIDE_WINE_EXPORTS NOTPROTON_ROCKSTAR_DXGI CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
 		' launch "$target" > "$case_dir/out" 2>&1 || bad "the launch sequence ran to the end" "exit 0" "exit $? $(tail -1 "$case_dir/out")"
@@ -434,6 +434,9 @@ is "DLSS_FG=1 reports hardware scheduling for DLSS frame generation" "d3dmetal" 
 user_conf 'VSYNC=1'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "VSYNC=1 asks the overlay shim to keep the layer on display sync" "1" "$(got NOTPROTON_VSYNC)"
+user_conf 'BRIDGEPLAY_GAME_MODE=0'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "BRIDGEPLAY_GAME_MODE=0 opts the launcher out of macOS Game Mode" "0" "$(got NOTPROTON_GAME_MODE)"
 user_conf 'HIDE_WINE_EXPORTS=1'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "HIDE_WINE_EXPORTS=1 hides ntdll's wine_* exports from GetProcAddress" "1" "$(got NOTPROTON_HIDE_WINE_EXPORTS)"
