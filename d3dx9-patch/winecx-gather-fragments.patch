@@ -1,0 +1,453 @@
+diff --git a/dlls/d3dx9_24/d3dx9_24.spec b/dlls/d3dx9_24/d3dx9_24.spec
+--- a/dlls/d3dx9_24/d3dx9_24.spec
++++ b/dlls/d3dx9_24/d3dx9_24.spec
+@@ -136,11 +136,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_25/d3dx9_25.spec b/dlls/d3dx9_25/d3dx9_25.spec
+--- a/dlls/d3dx9_25/d3dx9_25.spec
++++ b/dlls/d3dx9_25/d3dx9_25.spec
+@@ -136,11 +136,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_26/d3dx9_26.spec b/dlls/d3dx9_26/d3dx9_26.spec
+--- a/dlls/d3dx9_26/d3dx9_26.spec
++++ b/dlls/d3dx9_26/d3dx9_26.spec
+@@ -140,11 +140,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_27/d3dx9_27.spec b/dlls/d3dx9_27/d3dx9_27.spec
+--- a/dlls/d3dx9_27/d3dx9_27.spec
++++ b/dlls/d3dx9_27/d3dx9_27.spec
+@@ -140,11 +140,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_28/d3dx9_28.spec b/dlls/d3dx9_28/d3dx9_28.spec
+--- a/dlls/d3dx9_28/d3dx9_28.spec
++++ b/dlls/d3dx9_28/d3dx9_28.spec
+@@ -140,11 +140,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_29/d3dx9_29.spec b/dlls/d3dx9_29/d3dx9_29.spec
+--- a/dlls/d3dx9_29/d3dx9_29.spec
++++ b/dlls/d3dx9_29/d3dx9_29.spec
+@@ -140,11 +140,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_30/d3dx9_30.spec b/dlls/d3dx9_30/d3dx9_30.spec
+--- a/dlls/d3dx9_30/d3dx9_30.spec
++++ b/dlls/d3dx9_30/d3dx9_30.spec
+@@ -140,11 +140,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_31/d3dx9_31.spec b/dlls/d3dx9_31/d3dx9_31.spec
+--- a/dlls/d3dx9_31/d3dx9_31.spec
++++ b/dlls/d3dx9_31/d3dx9_31.spec
+@@ -139,11 +139,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_32/d3dx9_32.spec b/dlls/d3dx9_32/d3dx9_32.spec
+--- a/dlls/d3dx9_32/d3dx9_32.spec
++++ b/dlls/d3dx9_32/d3dx9_32.spec
+@@ -139,11 +139,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_33/d3dx9_33.spec b/dlls/d3dx9_33/d3dx9_33.spec
+--- a/dlls/d3dx9_33/d3dx9_33.spec
++++ b/dlls/d3dx9_33/d3dx9_33.spec
+@@ -139,11 +139,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_34/d3dx9_34.spec b/dlls/d3dx9_34/d3dx9_34.spec
+--- a/dlls/d3dx9_34/d3dx9_34.spec
++++ b/dlls/d3dx9_34/d3dx9_34.spec
+@@ -139,11 +139,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_35/d3dx9_35.spec b/dlls/d3dx9_35/d3dx9_35.spec
+--- a/dlls/d3dx9_35/d3dx9_35.spec
++++ b/dlls/d3dx9_35/d3dx9_35.spec
+@@ -139,11 +139,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_36/d3dx9_36.spec b/dlls/d3dx9_36/d3dx9_36.spec
+--- a/dlls/d3dx9_36/d3dx9_36.spec
++++ b/dlls/d3dx9_36/d3dx9_36.spec
+@@ -140,11 +140,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_36/shader.c b/dlls/d3dx9_36/shader.c
+--- a/dlls/d3dx9_36/shader.c
++++ b/dlls/d3dx9_36/shader.c
+@@ -3013,4 +3013,64 @@
+     TRACE("byte_code %p, semantics %p, count %p.\n", byte_code, semantics, count);
+ 
+     return get_shader_semantics(byte_code, semantics, count, TRUE);
++}
++
++#if D3DX_SDK_VERSION <= 41
++/* d3dx9_42 dropped the fragment linker's gather functions. The linker's own methods are
++ * stubs, so fail here instead of aborting in a spec stub. */
++static HRESULT gather_fragments_stub(ID3DXBuffer **fragments, ID3DXBuffer **errors)
++{
++    if (fragments)
++        *fragments = NULL;
++    if (errors)
++        *errors = NULL;
++    return E_NOTIMPL;
++}
++
++HRESULT WINAPI D3DXGatherFragments(const char *data, UINT data_len, const D3DXMACRO *defines,
++        ID3DXInclude *include, DWORD flags, ID3DXBuffer **fragments, ID3DXBuffer **errors)
++{
++    FIXME("data %p, data_len %u, defines %p, include %p, flags %#lx, fragments %p, errors %p stub!\n",
++            data, data_len, defines, include, flags, fragments, errors);
++
++    return gather_fragments_stub(fragments, errors);
++}
++
++HRESULT WINAPI D3DXGatherFragmentsFromFileA(const char *filename, const D3DXMACRO *defines,
++        ID3DXInclude *include, DWORD flags, ID3DXBuffer **fragments, ID3DXBuffer **errors)
++{
++    FIXME("filename %s, defines %p, include %p, flags %#lx, fragments %p, errors %p stub!\n",
++            debugstr_a(filename), defines, include, flags, fragments, errors);
++
++    return gather_fragments_stub(fragments, errors);
++}
++
++HRESULT WINAPI D3DXGatherFragmentsFromFileW(const WCHAR *filename, const D3DXMACRO *defines,
++        ID3DXInclude *include, DWORD flags, ID3DXBuffer **fragments, ID3DXBuffer **errors)
++{
++    FIXME("filename %s, defines %p, include %p, flags %#lx, fragments %p, errors %p stub!\n",
++            debugstr_w(filename), defines, include, flags, fragments, errors);
++
++    return gather_fragments_stub(fragments, errors);
+ }
++
++HRESULT WINAPI D3DXGatherFragmentsFromResourceA(HMODULE module, const char *resource,
++        const D3DXMACRO *defines, ID3DXInclude *include, DWORD flags, ID3DXBuffer **fragments,
++        ID3DXBuffer **errors)
++{
++    FIXME("module %p, resource %s, defines %p, include %p, flags %#lx, fragments %p, errors %p stub!\n",
++            module, debugstr_a(resource), defines, include, flags, fragments, errors);
++
++    return gather_fragments_stub(fragments, errors);
++}
++
++HRESULT WINAPI D3DXGatherFragmentsFromResourceW(HMODULE module, const WCHAR *resource,
++        const D3DXMACRO *defines, ID3DXInclude *include, DWORD flags, ID3DXBuffer **fragments,
++        ID3DXBuffer **errors)
++{
++    FIXME("module %p, resource %s, defines %p, include %p, flags %#lx, fragments %p, errors %p stub!\n",
++            module, debugstr_w(resource), defines, include, flags, fragments, errors);
++
++    return gather_fragments_stub(fragments, errors);
++}
++#endif
+diff --git a/dlls/d3dx9_37/d3dx9_37.spec b/dlls/d3dx9_37/d3dx9_37.spec
+--- a/dlls/d3dx9_37/d3dx9_37.spec
++++ b/dlls/d3dx9_37/d3dx9_37.spec
+@@ -140,11 +140,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_38/d3dx9_38.spec b/dlls/d3dx9_38/d3dx9_38.spec
+--- a/dlls/d3dx9_38/d3dx9_38.spec
++++ b/dlls/d3dx9_38/d3dx9_38.spec
+@@ -140,11 +140,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_39/d3dx9_39.spec b/dlls/d3dx9_39/d3dx9_39.spec
+--- a/dlls/d3dx9_39/d3dx9_39.spec
++++ b/dlls/d3dx9_39/d3dx9_39.spec
+@@ -140,11 +140,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_40/d3dx9_40.spec b/dlls/d3dx9_40/d3dx9_40.spec
+--- a/dlls/d3dx9_40/d3dx9_40.spec
++++ b/dlls/d3dx9_40/d3dx9_40.spec
+@@ -140,11 +140,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/dlls/d3dx9_41/d3dx9_41.spec b/dlls/d3dx9_41/d3dx9_41.spec
+--- a/dlls/d3dx9_41/d3dx9_41.spec
++++ b/dlls/d3dx9_41/d3dx9_41.spec
+@@ -140,11 +140,11 @@
+ @ stub D3DXFrameNumNamedMatrices(ptr)
+ @ stub D3DXFrameRegisterNamedMatrices(ptr ptr)
+ @ stdcall D3DXFresnelTerm(float float)
+-@ stub D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileA(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromFileW(ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceA(long ptr ptr ptr long ptr ptr)
+-@ stub D3DXGatherFragmentsFromResourceW(long ptr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragments(ptr long ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileA(str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromFileW(wstr ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceA(ptr str ptr ptr long ptr ptr)
++@ stdcall D3DXGatherFragmentsFromResourceW(ptr wstr ptr ptr long ptr ptr)
+ @ stub D3DXGenerateOutputDecl(ptr ptr)
+ @ stub D3DXGeneratePMesh(ptr ptr ptr ptr long long ptr)
+ @ stdcall D3DXGetDeclLength(ptr)
+diff --git a/include/d3dx9shader.h b/include/d3dx9shader.h
+--- a/include/d3dx9shader.h
++++ b/include/d3dx9shader.h
+@@ -417,6 +417,21 @@
+ HRESULT WINAPI D3DXCreateFragmentLinker(IDirect3DDevice9 *device, UINT size, ID3DXFragmentLinker **linker);
+ HRESULT WINAPI D3DXCreateFragmentLinkerEx(IDirect3DDevice9 *device, UINT size, DWORD flags, ID3DXFragmentLinker **linker);
+ 
++HRESULT WINAPI D3DXGatherFragments(const char *data, UINT data_len, const D3DXMACRO *defines,
++        ID3DXInclude *include, DWORD flags, ID3DXBuffer **fragments, ID3DXBuffer **errors);
++HRESULT WINAPI D3DXGatherFragmentsFromFileA(const char *filename, const D3DXMACRO *defines,
++        ID3DXInclude *include, DWORD flags, ID3DXBuffer **fragments, ID3DXBuffer **errors);
++HRESULT WINAPI D3DXGatherFragmentsFromFileW(const WCHAR *filename, const D3DXMACRO *defines,
++        ID3DXInclude *include, DWORD flags, ID3DXBuffer **fragments, ID3DXBuffer **errors);
++#define D3DXGatherFragmentsFromFile WINELIB_NAME_AW(D3DXGatherFragmentsFromFile)
++HRESULT WINAPI D3DXGatherFragmentsFromResourceA(HMODULE module, const char *resource,
++        const D3DXMACRO *defines, ID3DXInclude *include, DWORD flags, ID3DXBuffer **fragments,
++        ID3DXBuffer **errors);
++HRESULT WINAPI D3DXGatherFragmentsFromResourceW(HMODULE module, const WCHAR *resource,
++        const D3DXMACRO *defines, ID3DXInclude *include, DWORD flags, ID3DXBuffer **fragments,
++        ID3DXBuffer **errors);
++#define D3DXGatherFragmentsFromResource WINELIB_NAME_AW(D3DXGatherFragmentsFromResource)
++
+ #ifdef __cplusplus
+ }
+ #endif

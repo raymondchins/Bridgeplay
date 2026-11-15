@@ -71,6 +71,10 @@ below for the current archive's name and sha256).
     d3dx11_43-winecx-11.17-i386.dll  (same patch)
     d3dx11_42-winecx-11.17.dll    (same patch)
     d3dx11_42-winecx-11.17-i386.dll  (same patch)
+    d3dx9_41-winecx-11.17.dll     d3dx9-patch/winecx-gather-fragments.patch
+    d3dx9_41-winecx-11.17-i386.dll   (same patch)
+    d3dx9_36-winecx-11.17.dll     (same patch)
+    d3dx9_36-winecx-11.17-i386.dll   (same patch)
     crypt32-winecx-11.17.dll      ngx-signer-patch/winecx-ngx-signer.patch
     wintrust-winecx-11.17.dll     ngx-signer-patch/winecx-ngx-signer.patch
     kernel32-winecx-11.17.dll     hide-wine-exports-patch/winecx-hide-wine-exports.patch

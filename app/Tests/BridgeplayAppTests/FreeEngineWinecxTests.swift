@@ -258,14 +258,17 @@ struct FreeEngineWinecxTests {
         }
     }
 
-    // d3dx11-patch: 11.17 ships d3dx11_43 and d3dx11_42 exporting D3DX11CreateThreadPump.
-    @Test("The patched d3dx11 DLLs ship with the app and are pinned for 11.17",
+    // d3dx11-patch: 11.17 ships d3dx11_43 and d3dx11_42 exporting D3DX11CreateThreadPump;
+    // d3dx9-patch: d3dx9_41 and d3dx9_36 whose D3DXGatherFragments fails instead of aborting.
+    @Test("The patched d3dx DLLs ship with the app and are pinned for 11.17",
           arguments: FreeEngineWinecx.releases.map(\.build))
     func d3dx(id: String) throws {
         let release = try #require(FreeEngineWinecx.release(build: id))
         let expected: Set<String> = release.build == "winecx-11.17"
             ? ["lib/wine/x86_64-windows/d3dx11_43.dll", "lib/wine/i386-windows/d3dx11_43.dll",
-               "lib/wine/x86_64-windows/d3dx11_42.dll", "lib/wine/i386-windows/d3dx11_42.dll"] : []
+               "lib/wine/x86_64-windows/d3dx11_42.dll", "lib/wine/i386-windows/d3dx11_42.dll",
+               "lib/wine/x86_64-windows/d3dx9_41.dll", "lib/wine/i386-windows/d3dx9_41.dll",
+               "lib/wine/x86_64-windows/d3dx9_36.dll", "lib/wine/i386-windows/d3dx9_36.dll"] : []
         #expect(Set(release.d3dx.map(\.path)) == expected)
         let table = FreeEngineWinecx.expectedFiles(release)
         for file in release.d3dx {
@@ -774,14 +777,16 @@ struct FreeEngineWinecxTests {
         return lines.sorted()
     }
 
-    // #2688: an antivirus quarantined the app's d3dx11 and setup stopped. Those four may fall
-    // back to the runtime's own; every other bundled file stays required.
+    // #2688: an antivirus quarantined the app's d3dx11 and setup stopped. The d3dx11 DLLs may
+    // fall back to the runtime's own; every other bundled file stays required. The d3dx9 ones
+    // have none yet, so engines set up before they shipped are updated to them.
     @Test("Only the d3dx11 DLLs may fall back to the runtime's own", arguments: FreeEngineWinecx.releases.map(\.build))
     func fallbacksAreD3dxOnly(id: String) throws {
         let release = try #require(FreeEngineWinecx.release(build: id))
         let fallbacks = FreeEngineWinecx.fallbackFiles(release)
-        #expect(Set(fallbacks.keys) == Set(release.d3dx.map(\.path)))
-        for file in release.d3dx {
+        let d3dx11 = release.d3dx.filter { $0.path.contains("/d3dx11_") }
+        #expect(Set(fallbacks.keys) == Set(d3dx11.map(\.path)))
+        for file in d3dx11 {
             let fallback = try #require(file.fallback)
             #expect(fallback.count == 64 && fallback != file.sha256, "\(file.path)")
         }

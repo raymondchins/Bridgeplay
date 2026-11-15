@@ -102,6 +102,7 @@ lib/wine/x86_64-windows/winebus.sys               11.17 only: map-key fix, repla
 lib/wine/x86_64-windows/ws2_32.dll                11.17 only: own host name without loopback, replacing the archive's (Own host name)
 lib/wine/x86_64-windows/kernel{32,base}.dll       11.17 only: GetProcAddress can hide ntdll's wine_* exports, replacing the archive's (Hidden Wine exports)
 lib/wine/{x86_64,i386}-windows/d3dx11_4{2,3}.dll  11.17 only: D3DX11CreateThreadPump stub, replacing the archive's (D3DX11 thread pump)
+lib/wine/{x86_64,i386}-windows/d3dx9_{36,41}.dll   11.17 only: D3DXGatherFragments fails, replacing the archive's (D3DX9 fragment gathering)
 lib/wine/x86_64-windows/{crypt32,wintrust}.dll    11.17 only: NGX signer (ngx-signer-patch/)
 lib/wine/x86_64-unix/win32u.so                    11.17 only: NVIDIA driver version (win32u-patch/)
 lib/wine/x86_64-windows/wined3d.dll               11.17 only: driver version (wined3d-patch/)
@@ -251,6 +252,31 @@ pins are the release's `d3dx`.
 Built in a tree configured as in `winemac-patch/README.md` but with
 `--enable-archs=i386,x86_64` (mingw-w64 gcc 16.2 for both), brew's bison on `PATH` for `make`
 too, `make dlls/d3dx11_4{3,2}/{x86_64,i386}-windows/d3dx11_4{3,2}.dll`, then
+`{x86_64,i686}-w64-mingw32-strip --strip-debug`. Built without the patch, every section of
+all four is byte-identical to the runtime's; only the build id differs and the runtime's
+`.eh_frame` name is cut to `.eh_fram`. 11.15 keeps the runtime's own.
+
+## D3DX9 fragment gathering
+
+Wine's `d3dx9_24` to `d3dx9_41` declare `D3DXGatherFragments` and its `FromFile`/`FromResource`
+variants as spec stubs (`d3dx9_42` and `d3dx9_43` don't export them, like Microsoft's), so a
+game that calls one (Granado Espada, Discussion #3728) dies with
+`unimplemented function d3dx9_41.dll.D3DXGatherFragments`. Wine bug 54196 (the same abort in
+`d3dx9_36`) was closed as abandoned with no patch, and Wine master still has the stubs (checked
+2026-11-15). Wine's fragment linker returns `E_NOTIMPL` from every method, so there is nothing
+real to gather for.
+
+11.17 ships `d3dx9_41-winecx-11.17{,-i386}.dll` and `d3dx9_36-winecx-11.17{,-i386}.dll` as
+`lib/wine/{x86_64,i386}-windows/d3dx9_{41,36}.dll`: winecx `e0aa380`'s PE halves with
+`d3dx9-patch/winecx-gather-fragments.patch`, whose five functions set both output buffers to
+`NULL` and return `E_NOTIMPL`. The patch covers all eighteen spec files; only `d3dx9_41` (the
+report) and `d3dx9_36` (the most used version, bug 54196) are rebuilt and shipped. The pins are
+the release's `d3dx`. Unlike the d3dx11 ones they have no fallbacks yet: an engine set up
+before they shipped holds the runtime's own, which would match a fallback and keep it from
+being updated, so with none it shows "Update & Set Up" once.
+
+Built in the same tree and the same way as the D3DX11 thread pump:
+`make dlls/d3dx9_{41,36}/{x86_64,i386}-windows/d3dx9_{41,36}.dll`, then
 `{x86_64,i686}-w64-mingw32-strip --strip-debug`. Built without the patch, every section of
 all four is byte-identical to the runtime's; only the build id differs and the runtime's
 `.eh_frame` name is cut to `.eh_fram`. 11.15 keeps the runtime's own.
@@ -459,6 +485,10 @@ rebuilt Mach-O file needs its line there updated too; `SignedPinTests` fails unt
 | `d3dx11_43-winecx-11.17-i386.dll` | `d3dx11-patch/` | `dd4dd351f2a5880c9848d5ccf4944a0b5e7622bb7fb196544115b1f9c92d749c` | `FreeEngineWinecx.v1117.d3dx` |
 | `d3dx11_42-winecx-11.17.dll` | `d3dx11-patch/` | `3d97e1de9000a78e27eb5c90d0ab9b36d54fd350760063da27226d22c90c8e1b` | `FreeEngineWinecx.v1117.d3dx` |
 | `d3dx11_42-winecx-11.17-i386.dll` | `d3dx11-patch/` | `85075f8b4f30f1a993238a0d6ab772a3a3df6c031e87ee9401c4367a527cd57c` | `FreeEngineWinecx.v1117.d3dx` |
+| `d3dx9_41-winecx-11.17.dll` | `d3dx9-patch/` | `87f2d91e518bdb30d6fd279068124ee80f2b38ec1a145a10d3199bcb64fd6624` | `FreeEngineWinecx.v1117.d3dx` |
+| `d3dx9_41-winecx-11.17-i386.dll` | `d3dx9-patch/` | `9bb3846af7815be2ac6790ec574aeac62419b60436e74029656019a557418565` | `FreeEngineWinecx.v1117.d3dx` |
+| `d3dx9_36-winecx-11.17.dll` | `d3dx9-patch/` | `18b3fb3952581976a0ba4ff94ea899995d128c7677ed4ba72988868b63949415` | `FreeEngineWinecx.v1117.d3dx` |
+| `d3dx9_36-winecx-11.17-i386.dll` | `d3dx9-patch/` | `5eec69a49afa6debbc8e5020bab5f44e2d0c2897e393be40c33d9cbd766dd893` | `FreeEngineWinecx.v1117.d3dx` |
 | `version-rockstar-shim.dll` | `rockstar-shim/` | `deedb5d799330a3e274fe5cc7f569536280a2420543ef12145fcaa8fcbb7f6d4` | `FreeEngineWinecx.v1117.rockstar` |
 | `dxgi-dxvk-macos-1.10.3.dll` | DXVK-macOS v1.10.3-20230507 `x64/dxgi.dll`, unmodified | `e74f5c985fe98f38f1a096258ef35d62e03a64df7096837965c7383e3cfe153d` | `FreeEngineWinecx.v1117.rockstar` |
 | `d3d12-stub.dll` | `d3d12-stub/` | `d802d04ae9fb18a3dda90984bb11def0bda89b4d929b6297fe026b6cf883d1db` | `FreeEngineWinecx.v1117.dxmt` |

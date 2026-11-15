@@ -13,7 +13,7 @@ each folder is, which process it ends up in, and where new code belongs.
 | `signatures/macos.arm64/` | Data the dylib reads to find Steam functions | Copied to Application Support; the highest-numbered file wins |
 | `lsteamclient/`, `steam-shim/` | Wine: the steamclient bridge and the Windows `steam.exe` | Built against the Wine tree in `bridge/`, shipped in the app payload, put into runners |
 | `ntdll-patch/` | Detours patched into the engine's `ntdll.dll` | Prebuilt `detour*.bin` in the app's Resources, applied by `NtdllPatcher.swift` |
-| `win32u-patch/`, `winemac-patch/`, `winebus-patch/`, `winecoreaudio-patch/`, `wined3d-patch/`, `ws2_32-patch/`, `ngx-signer-patch/`, `d3dx11-patch/`, `hide-wine-exports-patch/` | Replacement Wine files inside the engine | Rebuilt binaries are committed in the app's Resources and copied over the engine at setup |
+| `win32u-patch/`, `winemac-patch/`, `winebus-patch/`, `winecoreaudio-patch/`, `wined3d-patch/`, `ws2_32-patch/`, `ngx-signer-patch/`, `d3dx11-patch/`, `d3dx9-patch/`, `hide-wine-exports-patch/` | Replacement Wine files inside the engine | Rebuilt binaries are committed in the app's Resources and copied over the engine at setup |
 | `nvapi-shim/` | Windows `nvapi64.dll` in the game, in front of Apple's nvapi: reports a newer NVIDIA driver so games offer DLSS | Prebuilt in the app's Resources |
 | `rockstar-shim/` | Windows `version.dll` for the Rockstar Games Launcher and GTA (`ROCKSTAR_SHIM=1`, see its README) | Prebuilt in the app's Resources |
 | `d3d12-stub/` | Windows `d3d12.dll` in the game under DXMT on a D3DMetal engine (creates no device, so games fall back to D3D11) | Prebuilt in the app's Resources |

@@ -27,7 +27,7 @@ case "${1:-}" in
 esac
 
 # Keep this list in step with the "Patched Wine (WineCX) binaries" section of NOTICE.
-patch_dirs="win32u-patch winemac-patch winebus-patch winecoreaudio-patch wined3d-patch ws2_32-patch d3dx11-patch ngx-signer-patch hide-wine-exports-patch ntdll-patch"
+patch_dirs="win32u-patch winemac-patch winebus-patch winecoreaudio-patch wined3d-patch ws2_32-patch d3dx11-patch d3dx9-patch ngx-signer-patch hide-wine-exports-patch ntdll-patch"
 for d in $patch_dirs; do
 	[ -d "$d" ] || die "missing $d; update patch_dirs in $0 to match NOTICE"
 done
