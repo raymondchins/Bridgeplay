@@ -10,7 +10,8 @@ struct ComponentsPlacement {
     let source: URL
     var home = FileManager.default.homeDirectoryForCurrentUser
     var applications = URL(fileURLWithPath: "/Applications")
-    var installSteam: (_ applications: URL, _ download: @escaping @Sendable (InstallerDownloadProgress) -> Void) throws -> Void = ValveSteam.install
+    var installSteam: (_ applications: URL, _ download: @escaping @Sendable (InstallerDownloadProgress) -> Void,
+                       _ log: @escaping (String) -> Void) throws -> Void = ValveSteam.install
     /// Shows the Setup Assistant again even if an earlier Bridgeplay was dismissed.
     var resetSetupAssistant: () -> Void = {
         _ = try? InstallerComponents.run("/usr/bin/defaults", ["delete", "com.bridgeplay.Bridgeplay", "setupAssistantFinished"])
@@ -35,7 +36,7 @@ struct ComponentsPlacement {
         let fm = FileManager.default
         if !fm.fileExists(atPath: applications.appending(path: "Steam.app").path) {
             status(Self.steamStatus)
-            try installSteam(applications, download)
+            try installSteam(applications, download, log)
         }
 
         status(Self.copyStatus)
@@ -134,8 +135,16 @@ enum ValveSteam {
     /// The trust chain, Valve's Team ID and Steam's bundle identifier, checked as one requirement.
     static let requirement = #"=anchor apple generic and certificate leaf[subject.OU] = "MXGJJ98X76" and identifier "com.valvesoftware.steam""#
 
-    static func install(into applications: URL, download: @escaping @Sendable (InstallerDownloadProgress) -> Void) throws {
+    static let notWritableMessage = "This macOS account can't add apps to Applications. Ask an administrator to install Steam from https://store.steampowered.com/about/, or run Setup from an administrator account, then try again."
+
+    static func install(into applications: URL, download: @escaping @Sendable (InstallerDownloadProgress) -> Void,
+                        log: @escaping (String) -> Void = { InstallerLog.write($0) }) throws {
         let fm = FileManager.default
+        // Steam stays in the shared Applications folder, so a standard account can't place it.
+        guard fm.isWritableFile(atPath: applications.path) else {
+            log("Steam not installed: \(applications.path) is not writable for this account")
+            throw InstallerError.componentsFailure(notWritableMessage)
+        }
         let work = fm.temporaryDirectory.appending(path: "bridgeplay-steam-\(UUID().uuidString)")
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: work) }
@@ -147,7 +156,7 @@ enum ValveSteam {
                 if let meter = InstallerDownloadProgress(curlMeter: line) { download(meter) }
             }
         } catch {
-            InstallerLog.write("Steam download failed: \(error)")
+            log("Steam download failed: \(error)")
             throw InstallerError.componentsFailure("Steam could not be downloaded. Check the internet connection and try again.")
         }
         // A UDIF disk image ends with a 512-byte trailer that starts with "koly".
@@ -159,7 +168,7 @@ enum ValveSteam {
             try InstallerComponents.run("/usr/bin/hdiutil", ["attach", "-nobrowse", "-readonly", "-noautoopen", "-quiet",
                                                              "-mountpoint", mount.path, dmg.path])
         } catch {
-            InstallerLog.write("Opening the Steam installer failed: \(error)")
+            log("Opening the Steam installer failed: \(error)")
             throw InstallerError.componentsFailure("The Steam installer could not be opened.")
         }
         defer { _ = try? InstallerComponents.run("/usr/bin/hdiutil", ["detach", "-quiet", mount.path]) }
@@ -172,8 +181,9 @@ enum ValveSteam {
         do {
             try ComponentsPlacement.put(steam, at: applications.appending(path: "Steam.app"), replacing: false)
         } catch {
-            InstallerLog.write("Copying Steam failed: \(error)")
-            throw InstallerError.componentsFailure("Steam could not be copied to Applications.")
+            log("Copying Steam failed: \(error)")
+            let denied = "\(error)".contains("Permission denied")
+            throw InstallerError.componentsFailure(denied ? notWritableMessage : "Steam could not be copied to Applications.")
         }
     }
 
