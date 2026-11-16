@@ -17,7 +17,7 @@ let package = Package(
     defaultLocalization: "en",
     platforms: [.macOS("15.0")],
     dependencies: [
-        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.1"),
     ],
     targets: [
         .executableTarget(
