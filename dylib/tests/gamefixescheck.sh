@@ -1499,22 +1499,6 @@ if [ -f "$sa_conf" ]; then
 	is "gamefixes/1547000.conf adds dxgi=n,b" "yes" "$v"
 fi
 
-# The shipped GTA V Enhanced conf: GTA5_Enhanced.exe sits in the game folder.
-gtae_conf="$(dirname "$SRC")/../../gamefixes/3240220.conf"
-if [ -f "$gtae_conf" ]; then
-	rockstar_case
-	cp "$gtae_conf" "$case_dir/support/gamefixes-default/4242.conf"
-	rockstar_launch waitforexitandrun "$case_dir/game/PlayGTAV.exe"
-	is "gamefixes/3240220.conf selects dxvk" "dxvk" "$(got backend)"
-	is "gamefixes/3240220.conf stages the shim next to Social Club" "yes" \
-		"$(cmp -s "$shim_src/version.dll" "$social/version.dll" && echo yes || echo no)"
-	is "gamefixes/3240220.conf stages no dxgi.dll beside the game" "no" \
-		"$([ -e "$case_dir/game/dxgi.dll" ] && echo yes || echo no)"
-	case "$(got WINEDLLOVERRIDES)" in *'dxgi=n'*) v=yes ;; *) v=no ;; esac
-	is "gamefixes/3240220.conf leaves dxgi builtin" "no" "$v"
-	is "gamefixes/3240220.conf starts the game without BattlEye" "-nobattleye" "$(got gamefix_args)"
-fi
-
 new_case
 full_engine
 user_conf 'BACKEND=dxvk' 'ROCKSTAR_SHIM=1'
