@@ -458,6 +458,17 @@ is "beside Apple's nvapi as the nvapi.dll placeholder it loads" "apple nvapi64" 
 user_conf 'NVAPI=0'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "NVAPI=0 disables it again" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
+# The shipped Diablo IV conf over the shipped NVAPI=1 for every game.
+d4_conf="$(dirname "$SRC")/../../gamefixes/2344520.conf"
+if [ -f "$d4_conf" ]; then
+	user_conf ''
+	cp "$(dirname "$SRC")/../../gamefixes/default.conf" "$case_dir/support/gamefixes-default/default.conf"
+	cp "$d4_conf" "$case_dir/support/gamefixes-default/4242.conf"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	is "gamefixes/2344520.conf turns nvapi off over the shipped default" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
+	is "gamefixes/2344520.conf keeps Apple's adapter" "<unset>" "$(got D3DM_VENDOR_ID)"
+	rm -f "$case_dir/support/gamefixes-default/default.conf" "$case_dir/support/gamefixes-default/4242.conf"
+fi
 new_case
 engine d3dmetal-linked empty
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt

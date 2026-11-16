@@ -298,5 +298,108 @@ is "exit game does not wait out the shim" yes "$([ $(($(date +%s) - start)) -lt 
 is "exit game tears the prefix down" yes "$(grep -q kill "$T/session.ev" && echo yes || echo no)"
 is "exit game is summed up as stopped from Steam" "summary 143 1" "$(grep summary "$T/session.ev")"
 
+echo "== game mode: the bundle hosts the loader and ntdll =="
+stage_func=$(sed -n '/^stage_loader() {$/,/^}$/p' "$SRC")
+block_func=$(sed -n '/^block_loader_links() {$/,/^}$/p' "$SRC")
+[ -n "$stage_func" ] && [ -n "$block_func" ] || { echo "FAIL: game mode functions not found"; exit 1; }
+eval "$stage_func"
+eval "$block_func"
+cx="$T/cx"
+wine_unix="$cx/lib/wine/x86_64-unix"
+mkdir -p "$wine_unix" "$cx/lib/wine/x86_64-windows" "$cx/lib/wine/i386-windows" "$cx/share/wine" "$cx/bin"
+printf 'loader' > "$wine_unix/wine"
+printf 'ntdll' > "$wine_unix/ntdll.so"
+printf 'mac' > "$wine_unix/winemac.so"
+chmod 755 "$wine_unix/wine"
+gm_stage() {
+  loader_root="$T/gm"
+  rm -rf "$loader_root"
+  mkdir -p "$loader_root"
+  stage Game
+  rm -f "$loader_stage/Contents/MacOS/x.so"
+  loader_macos="$loader_stage/Contents/MacOS"
+  stage_loader
+}
+same() { if [ "$1" -ef "$2" ]; then echo yes; else echo no; fi; }
+WINELOADER="$wine_unix/wine"
+gm_stage
+is "hosted" 1 "$loader_hosts_ntdll"
+is "loader is a copy" "loader" "$(cat "$loader_macos/wine")"
+is "loader has its own inode" no "$(same "$loader_macos/wine" "$wine_unix/wine")"
+is "loader runs" yes "$([ -x "$loader_macos/wine" ] && echo yes || echo no)"
+is "ntdll.so is the engine's file" yes "$(same "$loader_macos/ntdll.so" "$wine_unix/ntdll.so")"
+is "ntdll.so is no symlink" no "$([ -L "$loader_macos/ntdll.so" ] && echo yes || echo no)"
+is "other unix libraries are symlinks" "$wine_unix/winemac.so" "$(readlink "$loader_macos/winemac.so")"
+is "x86_64-unix next to ntdll" "$wine_unix" "$(readlink "$loader_macos/x86_64-unix")"
+is "x86_64-windows next to ntdll" "$cx/lib/wine/x86_64-windows" "$(readlink "$loader_macos/x86_64-windows")"
+is "i386-windows next to ntdll" "$cx/lib/wine/i386-windows" "$(readlink "$loader_macos/i386-windows")"
+is "share two levels up" "$cx/share" "$(readlink "$loader_stage/share")"
+is "bin two levels up" "$cx/bin" "$(readlink "$loader_stage/bin")"
+is "no temporary link left" no "$([ -e "$loader_macos/.ntdll.so" ] && echo yes || echo no)"
+install_bundle
+is "hosted bundle installed" "launcher bundle updated" "$(cat "$log")"
+installed_loader=$(stat -f %i "$loader_app/Contents/MacOS/wine")
+stage Game
+rm -f "$loader_stage/Contents/MacOS/x.so"
+loader_macos="$loader_stage/Contents/MacOS"
+stage_loader
+install_bundle
+is "same engine keeps the bundle" "launcher bundle unchanged" "$(cat "$log")"
+is "and its loader inode" "$installed_loader" "$(stat -f %i "$loader_app/Contents/MacOS/wine")"
+mv "$wine_unix/ntdll.so" "$T/old-ntdll.so"
+printf 'ntdll' > "$wine_unix/ntdll.so"
+stage Game
+rm -f "$loader_stage/Contents/MacOS/x.so"
+loader_macos="$loader_stage/Contents/MacOS"
+stage_loader
+install_bundle
+is "an engine reinstalled with equal bytes replaces it" "launcher bundle updated" "$(cat "$log")"
+is "with the new ntdll.so" yes "$(same "$loader_app/Contents/MacOS/ntdll.so" "$wine_unix/ntdll.so")"
+
+rm -rf "$cx/share/wine"
+gm_stage
+is "no data folder: not hosted" 0 "$loader_hosts_ntdll"
+is "no data folder: loader hard link" yes "$(same "$loader_macos/wine" "$wine_unix/wine")"
+is "no data folder: ntdll.so symlink" "$wine_unix/ntdll.so" "$(readlink "$loader_macos/ntdll.so")"
+is "no data folder: no share link" no "$([ -L "$loader_stage/share" ] && echo yes || echo no)"
+mkdir -p "$cx/share/wine"
+WINELOADER="$wine_unix/wine.app/Contents/MacOS/wine"
+mkdir -p "${WINELOADER%/*}"
+printf 'app loader' > "$WINELOADER"
+gm_stage
+is "wine.app loader: not hosted" 0 "$loader_hosts_ntdll"
+is "wine.app loader: copied as before" "app loader" "$(cat "$loader_macos/wine")"
+is "wine.app loader: ntdll.so symlink" "$wine_unix/ntdll.so" "$(readlink "$loader_macos/ntdll.so")"
+rm -rf "$wine_unix/wine.app"
+WINELOADER="$wine_unix/wine"
+
+echo "== game mode: winetemp links blocked =="
+# shellcheck disable=SC2329 # block_loader_links calls it
+getconf() { printf '%s/\n' "$T/tmp"; }
+mkdir -p "$T/tmp"
+gm_loader="$T/gm-loader"
+printf 'loader' > "$gm_loader"
+touch -d 2026-01-02T03:04:05.012345678 "$gm_loader"
+gm_dir="$T/tmp/winetemp-$(stat -f '%i-%z-%m' "$gm_loader")-12345678"
+: > "$log"
+block_loader_links "$gm_loader"
+is "folder named as ntdll names it" yes "$([ -d "$gm_dir" ] && echo yes || echo no)"
+is "folder read-only" 500 "$(stat -f %Lp "$gm_dir")"
+is "logged" "loader links blocked in $gm_dir" "$(cat "$log")"
+chmod 700 "$gm_dir"
+ln "$gm_loader" "$gm_dir/Game"
+ln -s "$gm_loader" "$gm_dir/.hidden"
+block_loader_links "$gm_loader"
+is "links made earlier are removed" "" "$(ls -A "$gm_dir")"
+is "and the folder is read-only again" 500 "$(stat -f %Lp "$gm_dir")"
+touch -d 2026-01-02T03:04:05 "$gm_loader"
+block_loader_links "$gm_loader"
+is "whole seconds end in 0" yes "$([ -d "$T/tmp/winetemp-$(stat -f '%i-%z-%m' "$gm_loader")-0" ] && echo yes || echo no)"
+touch -d 2026-01-02T03:04:05.000000500 "$gm_loader"
+block_loader_links "$gm_loader"
+is "leading zeros of the nanoseconds dropped" yes "$([ -d "$T/tmp/winetemp-$(stat -f '%i-%z-%m' "$gm_loader")-500" ] && echo yes || echo no)"
+chmod -R 700 "$T/tmp"
+unset -f getconf
+
 [ "$fails" -eq 0 ] || { echo "launchercheck: $fails failed"; exit 1; }
 echo "launchercheck: all passed"

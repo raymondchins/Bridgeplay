@@ -3424,16 +3424,39 @@ $icon_arg
 </plist>
 PLIST
 
-# Invokes macOS Game Mode
-for f in "$wine_unix"/*; do
-  [ -e "$f" ] || continue
-  base=${f##*/}
-  case "$base" in
-    wine|wine.app) continue ;;
-  esac
-  ln -sfn "$f" "$loader_macos/$base"
-done
-ln "$WINELOADER" "$loader_macos/wine" 2>/dev/null || cp "$WINELOADER" "$loader_macos/wine"
+# macOS Game Mode reads the Info.plist of the bundle holding a process's executable. Wine starts
+# every child process from "<folder of ntdll.so>/wine", so the bundle gets its own APFS clone of
+# the loader and a hard link of ntdll.so (dyld matches the unix libraries' @rpath/ntdll.so to it
+# by inode), plus the folders ntdll looks for next to itself and two levels up. A hard-linked
+# loader shared its inode with the engine's and with ntdll's winetemp links, so the path macOS
+# saw was whichever name was used last.
+stage_loader() {
+  loader_hosts_ntdll=0
+  for f in "$wine_unix"/*; do
+    [ -e "$f" ] || continue
+    base=${f##*/}
+    case "$base" in
+      wine|wine.app) continue ;;
+    esac
+    ln -sfn "$f" "$loader_macos/$base"
+  done
+  wine_root=${wine_unix%/*/*/*}
+  if [ "$WINELOADER" = "$wine_unix/wine" ] && [ -f "$wine_unix/ntdll.so" ] && [ -d "$wine_root/share/wine" ] &&
+     ln "$wine_unix/ntdll.so" "$loader_macos/.ntdll.so" 2>/dev/null &&
+     { cp -c "$WINELOADER" "$loader_macos/wine" 2>/dev/null || cp -p "$WINELOADER" "$loader_macos/wine"; } &&
+     mv -f "$loader_macos/.ntdll.so" "$loader_macos/ntdll.so"; then
+    for d in "${wine_unix%/*}"/*-unix "${wine_unix%/*}"/*-windows; do
+      [ ! -d "$d" ] || ln -sfn "$d" "$loader_macos/${d##*/}"
+    done
+    ln -sfn "$wine_root/share" "$loader_stage/share"
+    ln -sfn "$wine_root/bin" "$loader_stage/bin"
+    loader_hosts_ntdll=1
+  else
+    rm -f "$loader_macos/.ntdll.so" "$loader_macos/wine"
+    ln "$WINELOADER" "$loader_macos/wine" 2>/dev/null || cp "$WINELOADER" "$loader_macos/wine"
+  fi
+}
+stage_loader
 original_loader=$WINELOADER
 if [ -x "$loader_macos/wine" ]; then
   WINELOADER="$loader_app/Contents/MacOS/wine"
@@ -3442,7 +3465,10 @@ if [ -x "$loader_macos/wine" ]; then
   # so it runs where it is.
   if /usr/bin/codesign -d --entitlements - "$loader_macos/wine" 2>/dev/null | grep -q 'com\.apple\.developer\.'; then
     WINELOADER=$original_loader
+    loader_hosts_ntdll=0
     echo "loader needs its own wine.app; running the engine's own loader" >> "$log" 2>&1 || true
+  elif [ "$loader_hosts_ntdll" = 1 ]; then
+    echo "loader and ntdll staged in bundle for game mode" >> "$log" 2>&1 || true
   else
     echo "loader staged in bundle for game mode" >> "$log" 2>&1 || true
   fi
@@ -3494,8 +3520,12 @@ install_bundle() (
   /usr/bin/lockf -s -t 30 7 || exit 1
   same=""
   for b in "$loader_root"/*.app; do
+    # The same ntdll.so file too: an engine reinstalled with equal bytes has new inodes, and a
+    # bundle still linked to the old one would load two ntdlls.
     if [ "$b" = "$loader_app" ] && [ -d "$b" ] && [ ! -L "$b" ] &&
-       [ "$(bundle_listing "$b")" = "$(bundle_listing "$loader_stage")" ]; then
+       [ "$(bundle_listing "$b")" = "$(bundle_listing "$loader_stage")" ] &&
+       { [ ! -e "$loader_stage/Contents/MacOS/ntdll.so" ] ||
+         [ "$b/Contents/MacOS/ntdll.so" -ef "$loader_stage/Contents/MacOS/ntdll.so" ]; }; then
       same=1
     fi
   done
@@ -3540,6 +3570,27 @@ install_bundle() (
   rm -rf "$loader_work" || true
 )
 install_bundle
+
+# CrossOver's ntdll (CW HACK 22144) starts each process from a hard link to the loader in
+# winetemp-<inode>-<size>-<mtime s>-<mtime ns>/<exe>, outside the bundle, when WINEDLLPATH is
+# set. When it can't write that folder it starts the loader itself, so the folder for the
+# bundle's own loader is made read-only and empty.
+block_loader_links() {
+  bl_tmp=$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null) && [ -n "$bl_tmp" ] || return 0
+  bl_stamp=$(stat -f '%i-%z-%m' "$1" 2>/dev/null) && bl_ns=$(stat -f '%.9Fm' "$1" 2>/dev/null) || return 0
+  bl_ns=$(printf '%s' "${bl_ns##*.}" | sed 's/^0*//')
+  bl_dir="${bl_tmp%/}/winetemp-$bl_stamp-${bl_ns:-0}"
+  [ ! -L "$bl_dir" ] || return 0
+  if [ -d "$bl_dir" ]; then
+    chmod 700 "$bl_dir" && rm -f "$bl_dir"/* "$bl_dir"/.[!.]* 2>/dev/null
+  fi
+  if mkdir -p "$bl_dir" && chmod 500 "$bl_dir"; then
+    echo "loader links blocked in $bl_dir" >> "$log" 2>&1 || true
+  fi
+}
+if [ "$loader_hosts_ntdll" = 1 ] && [ "$WINELOADER" = "$loader_app/Contents/MacOS/wine" ]; then
+  block_loader_links "$WINELOADER"
+fi
 
 kill_wine_prefix() {
   "$WINESERVER" -k >> "$log" 2>&1 || true
