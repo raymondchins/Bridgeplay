@@ -29,7 +29,7 @@ Dobby (https://github.com/jmpews/Dobby, commit 5dfc8546), the hooking library
 linked into notproton.dylib, is licensed under the Apache License 2.0. Full
 text: LICENSE.dobby. Dobby has no NOTICE file to reproduce.
 
-Sparkle 2.10.0 (https://github.com/sparkle-project/Sparkle), embedded in the app
+Sparkle 2.10.1 (https://github.com/sparkle-project/Sparkle), embedded in the app
 as Sparkle.framework for updates, is licensed under the MIT license together
 with the external licenses it lists. Full text: LICENSE.sparkle.
 
@@ -212,7 +212,7 @@ LGPL-V2, respectively.
 
 The app bundle embeds Sparkle, which checks for and installs updates. Sparkle is
 MIT licensed, see
-https://github.com/sparkle-project/Sparkle/blob/2.10.0/LICENSE
+https://github.com/sparkle-project/Sparkle/blob/2.10.1/LICENSE
 
 The app's interface uses the Geist and Unbounded typefaces, bundled in
 app/Sources/BridgeplayUI/Resources/Fonts/ under the SIL Open Font License 1.1
