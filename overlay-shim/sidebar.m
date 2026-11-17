@@ -31,8 +31,8 @@ enum { sb_overlay, sb_limit, sb_limit_on, sb_filter, sb_rows };
 
 static const char *const sb_keys[sb_rows] = { "BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_FPS_LIMIT",
 	                                      "BRIDGEPLAY_FPS_LIMIT_OFF", "BRIDGEPLAY_SCALING_FILTER" };
-static const char *const sb_titles[sb_rows] = { "Performance overlay", "Frame rate limit", "Enable frame limit",
-	                                        "Scaling filter" };
+static const char *const sb_titles[sb_rows] = { "Performance Overlay", "Frame Rate Limit", "Enable Frame Limit",
+	                                        "Scaling Filter" };
 // The stepped and named choices; the limit's value is a number and its switch 0 or 1
 static const char *const sb_values[sb_rows][4] = {
 	{ "0", "fps", "summary", "detailed" },
@@ -285,42 +285,48 @@ static CGColorRef sb_gray(double alpha);
 
 // MARK: Drawing
 //
-// Control kinds chosen by what the choices are. The overlay level is ordered steps, so it is a
-// stepped slider whose position means something: more detail to the right. The frame rate limit
-// is a number, so a continuous slider in whole frames per second, with a switch under it that
-// turns it off and dims it. The scaling filters are not an order, so they stay a selector that
-// shows every name. Text is placed by centring its capitals on the line it belongs to
-// (ph_centred), so labels and values of different sizes share one optical centre.
+// The app's grouped settings page in small (docs/DESIGN.md): the page grey, the settings on
+// cards, and controls drawn to look like the Mac's own switch, slider and segmented control,
+// in the app's accent blue. Control kinds are chosen by what the choices are. The overlay level is
+// ordered steps, so it is a stepped slider whose position means something: more detail to the
+// right. The frame rate limit is a number, so a continuous slider in whole frames per second, with
+// a switch under it that turns it off and dims it. The scaling filters are not an order, so they
+// stay a segmented control that shows every name. Text is placed by centring its capitals on the
+// line it belongs to (ph_centred), so labels and values of different sizes share one optical centre.
 
 // Layout, in points from the panel's top-left
-#define sb_pad 22.0
-#define sb_head_mid 38.0     // title line
-#define sb_power_mid 76.0    // battery line
-#define sb_power_bar 92.0    // battery gauge
-#define sb_rows_top 118.0    // the first row's card
-#define sb_tint_inset 10.0   // the focus tint's inset from the panel's sides
-// A row is a card (the focus tint, the click target) with sb_card_pad inside it on every side,
-// measured to the text's capitals, the same as the inset its text has from the card's sides
-// (sb_pad - sb_tint_inset). Offsets below are from the card's top.
-#define sb_card_pad 12.0
-#define sb_title_mid 17.0    // a row's title line
-#define sb_track_mid 40.0    // slider track centre
-#define sb_stops_mid 60.0    // slider stop and range labels
+#define sb_pad 20.0          // the app's page margin: the cards' sides, and text outside them
+#define sb_text 32.0         // text and controls on a card: 12 in from its side
+#define sb_head_mid 32.0     // title line
+#define sb_power_mid 62.0    // battery line
+#define sb_power_bar 76.0    // battery gauge
+#define sb_rows_top 96.0     // the first card
+#define sb_card_gap 12.0     // between cards
+// Offsets below are from a row's top
+#define sb_title_mid 20.0    // a row's title line
+#define sb_track_mid 44.0    // slider track centre
+#define sb_stops_mid 64.0    // a stepped slider's stop labels
 #define sb_hit_above 18.0    // a press this far above the track to below its labels picks a stop
-#define sb_hit_below 32.0
-#define sb_seg_top 32.0      // selector
-#define sb_seg_h 32.0
-#define sb_note_mid 76.0     // the selector's measured note
+#define sb_hit_below 30.0
+#define sb_seg_top 34.0      // segmented control
+#define sb_seg_h 24.0
+#define sb_note_mid 72.0     // the segmented control's measured note
 #define sb_switch_mid 20.0   // a switch row's title and switch
-#define sb_thumb_r 8.0
-#define sb_inset 9.0         // stops start this far in, so the end thumbs stay inside
-#define sb_switch_w 32.0
-#define sb_switch_h 18.0
-#define sb_group_gap 6.0     // between settings; a switch stays with the slider it belongs to
+// The Mac's controls as macOS 26 draws them: a 6 pt track, a 20 x 16 knob, a 36 x 16 switch
+#define sb_track_h 6.0
+#define sb_knob_w 20.0
+#define sb_knob_h 16.0
+#define sb_inset 10.0        // stops start this far in, so the end knobs stay inside
+#define sb_range_label 24.0  // room beside the limit's track for its end values
+#define sb_switch_w 36.0
+#define sb_switch_h 16.0
 
-// Each row's card height, and the gap after it. Together they fit a 480 pt-tall window.
-static const double sb_row_heights[sb_rows] = { 76, 76, 40, 92 };
-static const double sb_row_gaps[sb_rows] = { sb_group_gap, 0, sb_group_gap, 0 };
+// Each row's height and the gap after it: the overlay, the limit and its switch on one card, the
+// scaling filter on another. Together they fit a 480 pt-tall window.
+static const double sb_row_heights[sb_rows] = { 78, 62, 40, 86 };
+static const double sb_row_gaps[sb_rows] = { 0, 0, sb_card_gap, 0 };
+static const int sb_card_first[sb_rows] = { 0, 0, 0, 3 };
+static const int sb_card_last[sb_rows] = { 2, 2, 2, 3 };
 
 static double sb_row_top(int row)
 {
@@ -331,7 +337,7 @@ static double sb_row_top(int row)
 }
 
 struct sb_fonts {
-	CTFontRef title, row, value, stop, stop_on, seg, seg_on, small;
+	CTFontRef title, row, value, stop, stop_on, seg, seg_on, small, caption;
 };
 static struct sb_fonts sb_f;
 
@@ -344,12 +350,13 @@ static void sb_fonts_load(void)
 		return;
 	sb_f.title = ph_font(17, 600);
 	sb_f.row = ph_font(13, 600);
-	sb_f.value = ph_font(13, 500);
+	sb_f.value = ph_font(13, 400);
 	sb_f.stop = ph_font(11, 500);
-	sb_f.stop_on = ph_font(11, 650);
+	sb_f.stop_on = ph_font(11, 600);
 	sb_f.seg = ph_font(12, 500);
-	sb_f.seg_on = ph_font(12, 650);
+	sb_f.seg_on = ph_font(12, 600);
 	sb_f.small = ph_font(11, 400);
+	sb_f.caption = ph_font(12, 400);
 }
 
 // A rectangle given from the top of a box h tall
@@ -368,11 +375,11 @@ static void sb_fill_round(CGContextRef ctx, CGRect r, double radius, double red,
 	CGPathRelease(path);
 }
 
-static void sb_stroke_round(CGContextRef ctx, CGRect r, double radius, double alpha)
+static void sb_stroke_round(CGContextRef ctx, CGRect r, double radius, CGColorRef color)
 {
 	CGPathRef path = CGPathCreateWithRoundedRect(r, radius, radius, NULL);
 	CGContextAddPath(ctx, path);
-	CGContextSetRGBStrokeColor(ctx, 1, 1, 1, alpha);
+	CGContextSetStrokeColorWithColor(ctx, color);
 	CGContextSetLineWidth(ctx, 1);
 	CGContextStrokePath(ctx);
 	CGPathRelease(path);
@@ -380,7 +387,7 @@ static void sb_stroke_round(CGContextRef ctx, CGRect r, double radius, double al
 
 static void sb_hairline(CGContextRef ctx, double h, double x, double y, double w)
 {
-	CGContextSetFillColorWithColor(ctx, ph_style.line);
+	CGContextSetFillColorWithColor(ctx, PH_LINE);
 	CGContextFillRect(ctx, sb_rect(h, x, y, w, 1));
 }
 
@@ -412,7 +419,7 @@ static int sb_position(int row, const int *pick, int n)
 
 static double sb_stop_x(double w, int k, int n)
 {
-	double x0 = sb_pad + sb_inset, x1 = w - sb_pad - sb_inset;
+	double x0 = sb_text + sb_inset, x1 = w - sb_text - sb_inset;
 	return n > 1 ? x0 + (x1 - x0) * k / (n - 1) : x0;
 }
 
@@ -427,80 +434,91 @@ static void sb_readout(int row, char *out, size_t cap)
 	}
 }
 
+// The limit's track runs between its two end values, as the app's slider does
+static void sb_limit_ends(double w, double *x0, double *x1)
+{
+	*x0 = sb_text + sb_range_label + sb_inset;
+	*x1 = w - sb_text - sb_range_label - sb_inset;
+}
+
 // The limit slider's x for a value, and the value under an x, in whole frames per second
 static double sb_limit_x(double w, int v)
 {
-	double x0 = sb_pad + sb_inset, x1 = w - sb_pad - sb_inset;
+	double x0, x1;
+	sb_limit_ends(w, &x0, &x1);
 	int top = framelimit_max();
 	return top > fl_min_fps ? x0 + (x1 - x0) * (v - fl_min_fps) / (top - fl_min_fps) : x1;
 }
 
 static int sb_limit_at(double w, double x)
 {
-	double x0 = sb_pad + sb_inset, x1 = w - sb_pad - sb_inset;
+	double x0, x1;
+	sb_limit_ends(w, &x0, &x1);
 	int top = framelimit_max();
 	double t = x1 > x0 ? (x - x0) / (x1 - x0) : 1;
 	int v = (int)lround(fl_min_fps + t * (top - fl_min_fps));
 	return v < fl_min_fps ? fl_min_fps : v > top ? top : v;
 }
 
-// The thumb, with a soft offset shadow so it sits on the track
+// A track from x0 to x1, filled in the accent up to xp (grey when disabled)
+static void sb_draw_track(CGContextRef ctx, double h, double x0, double x1, double xp, double cy, int disabled)
+{
+	double r = sb_track_h / 2;
+	sb_fill_round(ctx, sb_rect(h, x0 - r, cy - r, x1 - x0 + 2 * r, sb_track_h), r, PH_RGB(0x3A3A3E, 1));
+	if (xp > x0 - 0.5) {
+		CGRect fill = sb_rect(h, x0 - r, cy - r, xp - x0 + 2 * r, sb_track_h);
+		if (disabled)
+			sb_fill_round(ctx, fill, r, PH_RGB(0x5A5A5E, 1));
+		else
+			sb_fill_round(ctx, fill, r, PH_RGB(PH_ACCENT, 1));
+	}
+}
+
+// The knob: a white capsule with a soft shadow, as the Mac's slider draws it
 static void sb_draw_thumb(CGContextRef ctx, double h, double x, double cy, int disabled)
 {
 	CGContextSaveGState(ctx);
-	CGColorRef shadow = sb_gray(0.55);
+	CGColorRef shadow = sb_gray(0.5);
 	CGContextSetShadowWithColor(ctx, CGSizeMake(0, -1), 3, shadow);
 	CGColorRelease(shadow);
+	CGRect knob = sb_rect(h, x - sb_knob_w / 2, cy - sb_knob_h / 2, sb_knob_w, sb_knob_h);
 	if (disabled)
-		CGContextSetRGBFillColor(ctx, PH_RGB(0x6E6E73, 1));
+		sb_fill_round(ctx, knob, sb_knob_h / 2, PH_RGB(0x8E8E93, 1));
 	else
-		CGContextSetRGBFillColor(ctx, PH_RGB(0xF5F5F7, 1));
-	CGContextFillEllipseInRect(ctx, sb_rect(h, x - sb_thumb_r, cy - sb_thumb_r, 2 * sb_thumb_r, 2 * sb_thumb_r));
+		sb_fill_round(ctx, knob, sb_knob_h / 2, 1, 1, 1, 1);
 	CGContextRestoreGState(ctx);
 }
 
-// The frame rate limit: the track filled with the brand gradient up to the value, as the
-// stepped slider is, and the two ends named under it. Switched off, it dims and the fill goes
-// grey, so the value it keeps still shows.
+// The frame rate limit: the track filled with the accent up to the value, its two ends named
+// beside it as the app's slider names them. Switched off, it dims and the fill goes grey, so the
+// value it keeps still shows.
 static void sb_draw_range(CGContextRef ctx, double w, double h, double top, int disabled)
 {
 	int v = framelimit_value(), maxv = framelimit_max();
-	double cy = top + sb_track_mid, x0 = sb_pad + sb_inset, x1 = w - sb_pad - sb_inset, xp = sb_limit_x(w, v);
-	sb_fill_round(ctx, sb_rect(h, x0 - 2, cy - 2, x1 - x0 + 4, 4), 2, PH_RGB(0x2C2C30, 1));
-	CGRect fill = sb_rect(h, x0 - 2, cy - 2, xp - x0 + 4, 4);
-	if (disabled) {
-		sb_fill_round(ctx, fill, 2, PH_RGB(0x48484E, 1));
-	} else {
-		CGContextSaveGState(ctx);
-		CGPathRef path = CGPathCreateWithRoundedRect(fill, 2, 2, NULL);
-		CGContextAddPath(ctx, path);
-		CGContextClip(ctx);
-		ph_gradient(ctx, CGPointMake(x0, 0), CGPointMake(x1, 0));
-		CGContextRestoreGState(ctx);
-		CGPathRelease(path);
-	}
+	double cy = top + sb_track_mid, x0, x1;
+	sb_limit_ends(w, &x0, &x1);
+	double xp = sb_limit_x(w, v);
+	sb_draw_track(ctx, h, x0, x1, xp, cy, disabled);
 	sb_draw_thumb(ctx, h, xp, cy, disabled);
-	// The two ends named under them, where the thumb sits at 15 and at the display's rate
 	char lo[8], hi[8];
 	snprintf(lo, sizeof(lo), "%d", fl_min_fps);
 	snprintf(hi, sizeof(hi), "%d", maxv);
-	double mid = top + sb_stops_mid;
-	ph_text(ctx, h, x0 - ph_width(lo, sb_f.stop, 0) / 2, ph_centred(mid, sb_f.stop), lo, sb_f.stop, ph_style.fg3, 0);
-	ph_text(ctx, h, x1 - ph_width(hi, sb_f.stop, 0) / 2, ph_centred(mid, sb_f.stop), hi, sb_f.stop, ph_style.fg3, 0);
+	ph_text(ctx, h, sb_text, ph_centred(cy, sb_f.stop), lo, sb_f.stop, PH_FG3, 0);
+	sb_text_right(ctx, h, w - sb_text, cy, hi, sb_f.stop, PH_FG3);
 }
 
-// A switch at the row's right, in the app's switch blue when on
+// A switch at the row's right: the accent when on, as the app's switches are
 static void sb_draw_switch(CGContextRef ctx, double w, double h, double mid, int on)
 {
-	double x = w - sb_pad - sb_switch_w, y = mid - sb_switch_h / 2;
+	double x = w - sb_text - sb_switch_w, y = mid - sb_switch_h / 2;
 	CGRect track = sb_rect(h, x, y, sb_switch_w, sb_switch_h);
 	if (on)
-		sb_fill_round(ctx, track, sb_switch_h / 2, PH_RGB(0x4FB3FF, 1));
+		sb_fill_round(ctx, track, sb_switch_h / 2, PH_RGB(PH_ACCENT, 1));
 	else
-		sb_fill_round(ctx, track, sb_switch_h / 2, PH_RGB(0x3A3A3F, 1));
-	double r = sb_switch_h / 2 - 2, kx = on ? x + sb_switch_w - 2 - 2 * r : x + 2;
-	CGContextSetRGBFillColor(ctx, PH_RGB(0xF5F5F7, 1));
-	CGContextFillEllipseInRect(ctx, sb_rect(h, kx, y + 2, 2 * r, 2 * r));
+		sb_fill_round(ctx, track, sb_switch_h / 2, PH_RGB(0x3A3A3E, 1));
+	const double kw = 21, kh = sb_switch_h - 4;
+	double kx = on ? x + sb_switch_w - 2 - kw : x + 2;
+	sb_fill_round(ctx, sb_rect(h, kx, y + 2, kw, kh), kh / 2, 1, 1, 1, 1);
 }
 
 static void sb_draw_slider(CGContextRef ctx, double w, double h, double top, int row, int disabled)
@@ -509,73 +527,60 @@ static void sb_draw_slider(CGContextRef ctx, double w, double h, double top, int
 	int hover = sb_hover_row == row && !disabled ? sb_hover_k : -1;
 	double cy = top + sb_track_mid, x0 = sb_stop_x(w, 0, n), x1 = sb_stop_x(w, n - 1, n);
 
-	// The track, filled with the brand gradient from its start to the choice, as the app's progress
-	// bars are; a notch at each step
-	sb_fill_round(ctx, sb_rect(h, x0 - 2, cy - 2, x1 - x0 + 4, 4), 2, PH_RGB(0x2C2C30, 1));
-	if (pos > 0) {
-		double xp = sb_stop_x(w, pos, n);
-		CGContextSaveGState(ctx);
-		CGPathRef fill = CGPathCreateWithRoundedRect(sb_rect(h, x0 - 2, cy - 2, xp - x0 + 4, 4), 2, 2, NULL);
-		CGContextAddPath(ctx, fill);
-		CGContextClip(ctx);
-		ph_gradient(ctx, CGPointMake(x0, 0), CGPointMake(x1, 0));
-		CGContextRestoreGState(ctx);
-		CGPathRelease(fill);
-	}
+	sb_draw_track(ctx, h, x0, x1, pos >= 0 ? sb_stop_x(w, pos, n) : x0 - 1, cy, disabled);
+	// A tick under the track at each stop, as the Mac's stepped slider has
 	for (int k = 0; k < n; k++) {
-		if (k == pos)
-			continue;
+		CGContextSetFillColorWithColor(ctx, k == hover ? ph_style.fg : PH_FG3);
 		double sx = sb_stop_x(w, k, n);
-		if (k < pos)
-			CGContextSetRGBFillColor(ctx, 1, 1, 1, 0.85);
-		else if (k == hover)
-			CGContextSetRGBFillColor(ctx, PH_RGB(0xA1A1A6, 1));
-		else
-			CGContextSetRGBFillColor(ctx, PH_RGB(0x5A5A60, 1));
-		CGContextFillEllipseInRect(ctx, sb_rect(h, sx - 2, cy - 2, 4, 4));
+		CGContextFillEllipseInRect(ctx, sb_rect(h, sx - 1, cy + sb_knob_h / 2 + 2, 2, 2));
 	}
 	if (pos >= 0)
 		sb_draw_thumb(ctx, h, sb_stop_x(w, pos, n), cy, disabled);
-	// Every stop named under it, centred on its notch
+	// Every stop named under it, centred on its tick
 	double mid = top + sb_stops_mid;
 	for (int k = 0; k < n; k++) {
 		const char *label = sb_labels[row][pick[k]];
 		CTFontRef font = k == pos ? sb_f.stop_on : sb_f.stop;
 		double tw = ph_width(label, font, 0), lx = sb_stop_x(w, k, n) - tw / 2;
 		// Inside the card's padding, as every other label is
-		if (lx < sb_pad)
-			lx = sb_pad;
-		if (lx + tw > w - sb_pad)
-			lx = w - sb_pad - tw;
-		CGColorRef color = disabled ? ph_style.fg3 : k == pos || k == hover ? ph_style.fg : ph_style.fg3;
+		if (lx < sb_text)
+			lx = sb_text;
+		if (lx + tw > w - sb_text)
+			lx = w - sb_text - tw;
+		CGColorRef color = disabled ? PH_FG3 : k == pos || k == hover ? ph_style.fg : PH_FG3;
 		ph_text(ctx, h, lx, ph_centred(mid, font), label, font, color, 0);
 	}
 }
 
 static double sb_seg_width(double w, int row)
 {
-	return (w - 2 * sb_pad - 6) / sb_counts[row];
+	return (w - 2 * sb_text) / sb_counts[row];
 }
 
+// The Mac's segmented control: a grey well, the chosen segment a lighter grey, and a short
+// divider between two segments that are neither chosen nor under the pointer
 static void sb_draw_selector(CGContextRef ctx, double w, double h, double top, int row)
 {
-	int sel = sb_index(row), hover = sb_hover_row == row ? sb_hover_k : -1;
-	CGRect box = sb_rect(h, sb_pad, top + sb_seg_top, w - 2 * sb_pad, sb_seg_h);
-	sb_fill_round(ctx, box, 8, PH_RGB(0x18181B, 1));
+	int sel = sb_index(row), hover = sb_hover_row == row ? sb_hover_k : -1, n = sb_counts[row];
+	CGRect box = sb_rect(h, sb_text, top + sb_seg_top, w - 2 * sb_text, sb_seg_h);
+	sb_fill_round(ctx, box, 7, PH_RGB(0x333337, 1));
 	double segw = sb_seg_width(w, row), mid = top + sb_seg_top + sb_seg_h / 2;
-	for (int i = 0; i < sb_counts[row]; i++) {
-		double x = sb_pad + 3 + i * segw;
+	for (int i = 0; i < n; i++) {
+		double x = sb_text + i * segw;
 		int on = i == sel;
-		CGRect seg = sb_rect(h, x, top + sb_seg_top + 3, segw, sb_seg_h - 6);
+		CGRect seg = sb_rect(h, x, top + sb_seg_top, segw, sb_seg_h);
 		if (on)
-			sb_fill_round(ctx, seg, 6, PH_RGB(0x34343A, 1));
+			sb_fill_round(ctx, seg, 7, PH_RGB(0x58585C, 1));
 		else if (i == hover)
-			sb_fill_round(ctx, seg, 6, PH_RGB(0x1F1F23, 1));
+			sb_fill_round(ctx, seg, 7, PH_RGB(0x404044, 1));
+		if (i > 0 && !on && i - 1 != sel && i != hover && i - 1 != hover) {
+			CGContextSetRGBFillColor(ctx, PH_RGB(0x55555A, 1));
+			CGContextFillRect(ctx, sb_rect(h, x - 0.5, mid - 6, 1, 12));
+		}
 		CTFontRef font = on ? sb_f.seg_on : sb_f.seg;
 		const char *label = sb_labels[row][i];
 		double tw = ph_width(label, font, 0);
-		ph_text(ctx, h, x + (segw - tw) / 2, ph_centred(mid, font), label, font,
-		        on || i == hover ? ph_style.fg : ph_style.fg2, 0);
+		ph_text(ctx, h, x + (segw - tw) / 2, ph_centred(mid, font), label, font, ph_style.fg, 0);
 	}
 	// What the filter has to work with, measured from the game's layer
 	char note[96] = "";
@@ -583,29 +588,46 @@ static void sb_draw_selector(CGContextRef ctx, double w, double h, double top, i
 		CGSize d = sb_host.drawableSize;
 		double scale = atomic_load(&ph_scale), sx = d.width > 0 ? sb_host.bounds.size.width * scale / d.width : 0;
 		if (sx > 1.01)
-			snprintf(note, sizeof(note), "Game draws %.0f × %.0f, shown %.1f× larger", d.width, d.height, sx);
+			snprintf(note, sizeof(note), "Game draws %.0f × %.0f, shown %.1f× larger.", d.width, d.height, sx);
 		else
-			snprintf(note, sizeof(note), "Game draws at full resolution: nothing to scale");
+			snprintf(note, sizeof(note), "Game draws at full resolution: nothing to scale.");
 	}
-	ph_text(ctx, h, sb_pad, ph_centred(top + sb_note_mid, sb_f.small), note, sb_f.small, ph_style.fg3, 0);
+	ph_text(ctx, h, sb_text, ph_centred(top + sb_note_mid, sb_f.small), note, sb_f.small, PH_FG3, 0);
+}
+
+static int sb_disabled(int row)
+{
+	return (row == sb_overlay && ph_hud_locked) || (row == sb_limit && sb_index(sb_limit_on) == 0);
+}
+
+// A card around rows first to last, with the focused row lit as the app's chosen sidebar item is
+// (white 9% and a hairline), and hairlines between the other rows as a grouped list has them
+static void sb_draw_card(CGContextRef ctx, double w, double h, int first, int last)
+{
+	double top = sb_row_top(first), bottom = sb_row_top(last) + sb_row_heights[last];
+	CGRect card = sb_rect(h, sb_pad, top, w - 2 * sb_pad, bottom - top);
+	sb_fill_round(ctx, card, 12, PH_RGB(PH_CARD, 1));
+	sb_stroke_round(ctx, CGRectInset(card, 0.5, 0.5), 11.5, PH_LINE);
+	for (int row = first + 1; row <= last; row++)
+		if (row != sb_row && row - 1 != sb_row)
+			sb_hairline(ctx, h, sb_text, sb_row_top(row), w - 2 * sb_text);
+	if (sb_row >= first && sb_row <= last) {
+		CGRect lit = sb_rect(h, sb_pad + 4, sb_row_top(sb_row) + 4, w - 2 * sb_pad - 8, sb_row_heights[sb_row] - 8);
+		sb_fill_round(ctx, lit, 8, 1, 1, 1, 0.09);
+		sb_stroke_round(ctx, CGRectInset(lit, 0.5, 0.5), 7.5, PH_LINE);
+	}
 }
 
 static void sb_draw_row(CGContextRef ctx, double w, double h, int row)
 {
 	double top = sb_row_top(row);
-	int focused = row == sb_row;
-	int disabled = (row == sb_overlay && ph_hud_locked) || (row == sb_limit && sb_index(sb_limit_on) == 0);
-	// Focus: one tint behind the whole row, the same for every kind of control
-	if (focused)
-		sb_fill_round(ctx, sb_rect(h, sb_tint_inset, top, w - 2 * sb_tint_inset, sb_row_heights[row]), 10,
-		              1, 1, 1, 0.05);
+	int disabled = sb_disabled(row);
 	char readout[48];
 	sb_readout(row, readout, sizeof(readout));
 	double mid = top + (row == sb_limit_on ? sb_switch_mid : sb_title_mid);
-	ph_text(ctx, h, sb_pad, ph_centred(mid, sb_f.row), sb_titles[row], sb_f.row, focused ? ph_style.fg : ph_style.fg2,
-	        -0.1);
+	ph_text(ctx, h, sb_text, ph_centred(mid, sb_f.row), sb_titles[row], sb_f.row, ph_style.fg, -0.1);
 	if (readout[0])
-		sb_text_right(ctx, h, w - sb_pad, mid, readout, sb_f.value, disabled ? ph_style.fg3 : ph_style.fg2);
+		sb_text_right(ctx, h, w - sb_text, mid, readout, sb_f.value, disabled ? PH_FG3 : PH_FG2);
 	if (row == sb_filter) {
 		sb_draw_selector(ctx, w, h, top, row);
 	} else if (row == sb_limit) {
@@ -615,10 +637,10 @@ static void sb_draw_row(CGContextRef ctx, double w, double h, int row)
 	} else if (disabled) {
 		// The Metal HUD is the game's only overlay: say where it is changed instead of a slider
 		// that cannot move
-		ph_text(ctx, h, sb_pad, ph_centred(top + sb_track_mid, sb_f.small), "Apple's Metal HUD is on for this game.",
-		        sb_f.small, ph_style.fg2, 0);
-		ph_text(ctx, h, sb_pad, ph_centred(top + sb_stops_mid, sb_f.small),
-		        "Change it in Steam Properties › Bridgeplay.", sb_f.small, ph_style.fg3, 0);
+		ph_text(ctx, h, sb_text, ph_centred(top + sb_track_mid, sb_f.small), "Apple's Metal HUD is on for this game.",
+		        sb_f.small, PH_FG2, 0);
+		ph_text(ctx, h, sb_text, ph_centred(top + sb_stops_mid, sb_f.small),
+		        "Change it in Steam Properties › Bridgeplay.", sb_f.small, PH_FG3, 0);
 	} else {
 		sb_draw_slider(ctx, w, h, top, row, 0);
 	}
@@ -626,14 +648,14 @@ static void sb_draw_row(CGContextRef ctx, double w, double h, int row)
 
 static void sb_draw(CGContextRef ctx, double w, double h)
 {
-	CGContextSetRGBFillColor(ctx, PH_RGB(0x0B0B0D, 0.97));
+	CGContextSetRGBFillColor(ctx, PH_RGB(PH_PAGE, 0.97));
 	CGContextFillRect(ctx, CGRectMake(0, 0, w, h));
-	CGContextSetFillColorWithColor(ctx, ph_style.line);
+	CGContextSetFillColorWithColor(ctx, PH_LINE);
 	CGContextFillRect(ctx, CGRectMake(0, 0, 1, h));
 
 	// Title, and the shortcut that closes it again as a Mac menu shows one
-	ph_text(ctx, h, sb_pad, ph_centred(sb_head_mid, sb_f.title), "Quick settings", sb_f.title, ph_style.fg, -0.3);
-	sb_text_right(ctx, h, w - sb_pad, sb_head_mid, "⌥⌘P", sb_f.value, ph_style.fg3);
+	ph_text(ctx, h, sb_pad, ph_centred(sb_head_mid, sb_f.title), "Quick Settings", sb_f.title, ph_style.fg, -0.3);
+	sb_text_right(ctx, h, w - sb_pad, sb_head_mid, "⌥⌘P", sb_f.value, PH_FG3);
 
 	// Battery and power, where the Mac reports them: one line of context, not the headline
 	int battery, on_ac, charging, minutes;
@@ -651,38 +673,39 @@ static void sb_draw(CGContextRef ctx, double w, double h)
 			snprintf(text, sizeof(text), "%d%% · %s · %.1f W", battery, state, watts);
 		else
 			snprintf(text, sizeof(text), "%d%% · %s", battery, state);
-		ph_text(ctx, h, sb_pad, ph_centred(sb_power_mid, sb_f.value), "Battery", sb_f.value, ph_style.fg2, 0);
+		ph_text(ctx, h, sb_pad, ph_centred(sb_power_mid, sb_f.value), "Battery", sb_f.value, PH_FG2, 0);
 		sb_text_right(ctx, h, w - sb_pad, sb_power_mid, text, sb_f.value, ph_style.fg);
-		// A thin gauge; amber only when the battery is low and draining
-		CGRect track = sb_rect(h, sb_pad, sb_power_bar, w - 2 * sb_pad, 2);
-		sb_fill_round(ctx, track, 1, PH_RGB(0x222226, 1));
+		// A thin gauge on the control grey; amber only when the battery is low and draining
+		CGRect track = sb_rect(h, sb_pad, sb_power_bar, w - 2 * sb_pad, 4);
+		sb_fill_round(ctx, track, 2, PH_RGB(PH_CONTROL, 1));
 		int low = battery <= 20 && on_ac != 1;
-		CGRect fill = sb_rect(h, sb_pad, sb_power_bar, (w - 2 * sb_pad) * battery / 100.0, 2);
+		CGRect fill = sb_rect(h, sb_pad, sb_power_bar, (w - 2 * sb_pad) * battery / 100.0, 4);
 		if (low)
-			sb_fill_round(ctx, fill, 1, PH_RGB(0xFF9F0A, 1));
+			sb_fill_round(ctx, fill, 2, PH_RGB(PH_ORANGE, 1));
 		else
-			sb_fill_round(ctx, fill, 1, PH_RGB(0x8E8E93, 1));
+			sb_fill_round(ctx, fill, 2, PH_RGB(0x86868B, 1));
 	} else if (watts > 0) {
 		snprintf(text, sizeof(text), "%.1f W", watts);
-		ph_text(ctx, h, sb_pad, ph_centred(sb_power_mid, sb_f.value), "Power drawn", sb_f.value, ph_style.fg2, 0);
+		ph_text(ctx, h, sb_pad, ph_centred(sb_power_mid, sb_f.value), "Power drawn", sb_f.value, PH_FG2, 0);
 		sb_text_right(ctx, h, w - sb_pad, sb_power_mid, text, sb_f.value, ph_style.fg);
 	} else {
-		ph_text(ctx, h, sb_pad, ph_centred(sb_power_mid, sb_f.small), "No battery or power reading on this Mac",
-		        sb_f.small, ph_style.fg3, 0);
+		ph_text(ctx, h, sb_pad, ph_centred(sb_power_mid, sb_f.small), "No battery or power reading on this Mac.",
+		        sb_f.small, PH_FG3, 0);
 	}
-	sb_hairline(ctx, h, sb_pad, sb_rows_top - 8, w - 2 * sb_pad);
 
+	for (int row = 0; row < sb_rows; row++)
+		if (sb_card_first[row] == row)
+			sb_draw_card(ctx, w, h, row, sb_card_last[row]);
 	for (int row = 0; row < sb_rows; row++)
 		sb_draw_row(ctx, w, h, row);
 
 	// Right under the settings, where the eye is after a change
-	double foot = sb_row_top(sb_rows - 1) + sb_row_heights[sb_rows - 1] + 8;
-	sb_hairline(ctx, h, sb_pad, foot, w - 2 * sb_pad);
-	ph_text(ctx, h, sb_pad, ph_centred(foot + 22, sb_f.small),
-	        sb_status[0] ? sb_status : "Changes apply now and are saved for this game.", sb_f.small,
-	        sb_status[0] ? ph_style.fg : ph_style.fg2, 0);
-	ph_text(ctx, h, sb_pad, ph_centred(foot + 42, sb_f.small), "↑↓ setting    ←→ change    esc close",
-	        sb_f.small, ph_style.fg3, 0.2);
+	double foot = sb_row_top(sb_rows - 1) + sb_row_heights[sb_rows - 1];
+	ph_text(ctx, h, sb_pad, ph_centred(foot + 24, sb_f.caption),
+	        sb_status[0] ? sb_status : "Changes apply now and are saved for this game.", sb_f.caption,
+	        sb_status[0] ? ph_style.fg : PH_FG2, 0);
+	ph_text(ctx, h, sb_pad, ph_centred(foot + 44, sb_f.small), "↑↓ setting    ←→ change    esc close",
+	        sb_f.small, PH_FG3, 0.2);
 }
 
 static CGImageRef sb_render(double w, double h, double scale)
@@ -957,9 +980,9 @@ static int sb_hit(double x, double y, int *row_out)
 		return 0;
 	if (row == sb_filter) {
 		double seg_top = top + sb_seg_top;
-		if (y < seg_top || y > seg_top + sb_seg_h || x < sb_pad + 3)
+		if (y < seg_top || y > seg_top + sb_seg_h || x < sb_text)
 			return -1;
-		int i = (int)floor((x - sb_pad - 3) / sb_seg_width(sb_width, row));
+		int i = (int)floor((x - sb_text) / sb_seg_width(sb_width, row));
 		return i >= 0 && i < sb_counts[row] ? i : -1;
 	}
 	if (y < top + sb_track_mid - sb_hit_above || y > top + sb_track_mid + sb_hit_below)
@@ -1110,8 +1133,8 @@ static void sb_maybe_hint(void)
 		return;
 	ph_read_screen(host);
 	sb_fonts_load();
-	const char *keys = "⌥⌘P", *text = "Bridgeplay quick settings";
-	double kw = ph_width(keys, sb_f.row, 0.4), tw = ph_width(text, sb_f.small, 0);
+	const char *keys = "⌥⌘P", *text = "Bridgeplay Quick Settings";
+	double kw = ph_width(keys, sb_f.row, 0.4), tw = ph_width(text, sb_f.caption, 0);
 	double w = 16 + kw + 10 + tw + 16, h = 32, scale = atomic_load(&ph_scale);
 	CGColorSpaceRef srgb = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
 	CGContextRef ctx = CGBitmapContextCreate(NULL, (size_t)ceil(w * scale), (size_t)ceil(h * scale), 8, 0, srgb,
@@ -1120,10 +1143,11 @@ static void sb_maybe_hint(void)
 	if (ctx == NULL)
 		return;
 	CGContextScaleCTM(ctx, scale, scale);
-	sb_fill_round(ctx, CGRectMake(0.5, 0.5, w - 1, h - 1), 8, PH_RGB(0x0D0D0F, 0.9));
-	sb_stroke_round(ctx, CGRectMake(0.5, 0.5, w - 1, h - 1), 8, 0.10);
+	// The performance overlay's floating card
+	sb_fill_round(ctx, CGRectMake(0.5, 0.5, w - 1, h - 1), 8, PH_RGB(PH_CARD, 0.9));
+	sb_stroke_round(ctx, CGRectMake(0.5, 0.5, w - 1, h - 1), 8, PH_LINE_STRONG);
 	ph_text(ctx, h, 16, ph_centred(h / 2, sb_f.row), keys, sb_f.row, ph_style.fg, 0.4);
-	ph_text(ctx, h, 16 + kw + 10, ph_centred(h / 2, sb_f.small), text, sb_f.small, ph_style.fg2, 0);
+	ph_text(ctx, h, 16 + kw + 10, ph_centred(h / 2, sb_f.caption), text, sb_f.caption, PH_FG2, 0);
 	CGImageRef image = CGBitmapContextCreateImage(ctx);
 	CGContextRelease(ctx);
 
