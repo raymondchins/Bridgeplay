@@ -247,7 +247,9 @@ control shapes. Nothing animates, and they have no symbols.
   (`#333337` well, `#58585C` chosen segment, radius 7). Disabled: grey fill and knob.
 - Ordered choices are a stepped slider with a tick under each stop and its name under the tick.
   Unordered choices are a segmented control. A number is a slider with its ends beside it.
-- Footer: what happened in 12 `fg2` (`fg` right after a change), then the keys in 11 `fg3`.
+- Footer: what happened in 11 `fg2` (`fg` right after a change), then the keys in 11 `fg3`.
+- It must fit a 280 pt wide window: text is not wrapped, so a line that might not fit gets a
+  shorter wording (the scaling note does).
 
 **Shortcut hint**: the overlay's floating card, radius 8, "⌥⌘P" 13 semibold and the text 12
 `fg2`. Shows once per Mac, for 8 s, top right.
@@ -258,7 +260,8 @@ and colours. It lives in Steam's page.
 - An option has one name and one order in the Steam tab, the Guide, Game Defaults and quick
   settings. Names are the app's Title Case: Performance Overlay, Frame Rate Limit, Enable Frame
   Limit, Scaling Filter.
-- No game art ships. Covers come from the player's own library.
+- No game art ships. The Setup Assistant's cover wall uses the covers in the player's Steam
+  library cache, and with fewer than six it adds a fixed list from Steam's CDN (`GameCovers`).
 
 ## Copy
 

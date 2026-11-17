@@ -582,15 +582,24 @@ static void sb_draw_selector(CGContextRef ctx, double w, double h, double top, i
 		double tw = ph_width(label, font, 0);
 		ph_text(ctx, h, x + (segw - tw) / 2, ph_centred(mid, font), label, font, ph_style.fg, 0);
 	}
-	// What the filter has to work with, measured from the game's layer
+	// What the filter has to work with, measured from the game's layer; shorter in a narrow window,
+	// where the full sentence would run past the card
 	char note[96] = "";
 	if (sb_host != nil) {
 		CGSize d = sb_host.drawableSize;
 		double scale = atomic_load(&ph_scale), sx = d.width > 0 ? sb_host.bounds.size.width * scale / d.width : 0;
-		if (sx > 1.01)
+		int fits;
+		if (sx > 1.01) {
 			snprintf(note, sizeof(note), "Game draws %.0f × %.0f, shown %.1f× larger.", d.width, d.height, sx);
-		else
+			fits = ph_width(note, sb_f.small, 0) <= w - 2 * sb_text;
+			if (!fits)
+				snprintf(note, sizeof(note), "%.0f × %.0f, shown %.1f× larger.", d.width, d.height, sx);
+		} else {
 			snprintf(note, sizeof(note), "Game draws at full resolution: nothing to scale.");
+			fits = ph_width(note, sb_f.small, 0) <= w - 2 * sb_text;
+			if (!fits)
+				snprintf(note, sizeof(note), "Full resolution: nothing to scale.");
+		}
 	}
 	ph_text(ctx, h, sb_text, ph_centred(top + sb_note_mid, sb_f.small), note, sb_f.small, PH_FG3, 0);
 }
@@ -701,8 +710,9 @@ static void sb_draw(CGContextRef ctx, double w, double h)
 
 	// Right under the settings, where the eye is after a change
 	double foot = sb_row_top(sb_rows - 1) + sb_row_heights[sb_rows - 1];
-	ph_text(ctx, h, sb_pad, ph_centred(foot + 24, sb_f.caption),
-	        sb_status[0] ? sb_status : "Changes apply now and are saved for this game.", sb_f.caption,
+	// 11 pt, so the longest message still fits a window under 300 pt wide
+	ph_text(ctx, h, sb_pad, ph_centred(foot + 24, sb_f.small),
+	        sb_status[0] ? sb_status : "Changes apply now and are saved for this game.", sb_f.small,
 	        sb_status[0] ? ph_style.fg : PH_FG2, 0);
 	ph_text(ctx, h, sb_pad, ph_centred(foot + 44, sb_f.small), "↑↓ setting    ←→ change    esc close",
 	        sb_f.small, PH_FG3, 0.2);
