@@ -77,7 +77,7 @@ Geist via `BP.sans(size, weight)`; default 13. Unbounded (`BP.display`) is the w
 | Section title | 20 semibold, −0.5 | `fg` |
 | Sheet title | 17 semibold | `fg` |
 | Lead | 14 regular | `fg2` |
-| Wordmark | Unbounded 14 | `fg` |
+| Wordmark | Unbounded 14 (sidebar); 13 beside the tiled mark (Setup Assistant, installer) | `fg` in the sidebar; gradient in the other two |
 | Row title | 13 semibold, −0.1 (wizard: 14, −0.2) | `fg` |
 | Sidebar item | 13 regular; semibold when chosen | `fg2`; `fg` when chosen |
 | Body, value | 13 regular | `fg2` |
@@ -134,8 +134,8 @@ There are no spacing tokens. Pick from the values in use.
 - Items are `SidebarItem` buttons: SF Symbol 13 medium in an 18 pt column (`fg3`, accent
   when chosen), label 13. A press picks the page on mouse down, as Finder's does; Tab and Space
   still work.
-- Bottom: the library card, then the credits in 11 `fg3`, one per line: NotProton, CodeWeavers,
-  Apple's Game Porting Toolkit, and "Buy CrossOver". Keep them.
+- Bottom: the credits in 11 `fg3`, one per line (NotProton, CodeWeavers, Apple's Game Porting
+  Toolkit, "Buy CrossOver"), then the library card, then the version. Keep the credits.
 - ⌘1 to ⌘5 and Help › Guide (⌘?) are in `App.swift`.
 
 ## Motion
@@ -151,8 +151,9 @@ There are no spacing tokens. Pick from the values in use.
 | Aurora | ease-in-out 0.9 s, 30 fps | `Aurora` |
 | Skeleton shimmer | linear 1.4 s | `Skeleton.swift` |
 
-- Under `accessibilityReduceMotion`: fades only; shimmer and aurora stop.
-- Ambient motion pauses when `appearsActive` is false.
+- New motion: under `accessibilityReduceMotion`, fades only; shimmer, aurora and art stop.
+- New ambient motion pauses when `appearsActive` is false, as the aurora does. Some older
+  motion doesn't follow these two yet (see Known gaps).
 - Nothing animates in the game.
 
 ## Icons
@@ -343,7 +344,10 @@ Inconsistencies in today's UI. Don't copy them. Fix each in its own PR and remov
 | 14 | Failures titled "Failed" or "Something went wrong"; red in the app, orange in the installer | Status, Setup Assistant, installer |
 | 15 | "Thanks!", "Prefix rebuild failed!", five "Please", one "couldn't" | `Localizable.xcstrings`, `webpatch.c` |
 | 16 | The installer's first step is a lone spinner | `InstallerView` |
-| 17 | No spacing tokens | All views |
+| 17 | Under Reduce Motion, the pill press still scales, and the wizard's art and step bar still use their scale and spring | `PillButtonStyle`, `SetupArt`, `StepBar` |
+| 18 | The Setup Assistant art and the skeleton shimmer keep running while the window is inactive | `SetupArt`, `Skeleton.swift` |
+| 19 | The Setup Assistant and installer still draw the wordmark in the gradient, beside the tiled mark | `SetupAssistantView`, `InstallerView` |
+| 20 | No spacing tokens | All views |
 
 ## Where things live
 
