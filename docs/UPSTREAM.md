@@ -23,7 +23,7 @@ The current developer guide is [DEVELOPING.md](DEVELOPING.md).
 > with this fork [here](https://github.com/raymondchins/Bridgeplay/issues), not upstream.
 >
 > Modified by Leon Seemann, 2026. Like upstream, this fork is licensed under the GPLv3; see
-> [NOTICE](NOTICE) for details.
+> [NOTICE](../NOTICE) for details.
 
 ---
 
