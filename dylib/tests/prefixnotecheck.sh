@@ -6,9 +6,9 @@ set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 [ -f "$SRC" ] || { echo "==> prefixnotecheck: $SRC not present, skipped"; exit 0; }
 
-body=$(sed -n '/^volume_type() {/,/^}/p;/^note_prefix_volume() {/,/^}/p;/^steam_libraries() {/,/^}/p;/^note_other_prefixes() {/,/^}/p;/^refuse_broken_prefix() {/,/^}/p' "$SRC")
+body=$(sed -n '/^volume_type() {/,/^}/p;/^note_prefix_volume() {/,/^}/p;/^steam_libraries() {/,/^}/p;/^note_other_prefixes() {/,/^}/p;/^refuse_broken_prefix() {/,/^}/p;/^missing_core_dll() (/,/^)/p' "$SRC")
 case "$body" in
-  *note_prefix_volume*refuse_broken_prefix*note_other_prefixes*) ;;
+  *note_prefix_volume*refuse_broken_prefix*note_other_prefixes*missing_core_dll*) ;;
   *) echo "FAIL: the prefix notes were not found in $SRC"; exit 1 ;;
 esac
 body="$body"'
@@ -112,8 +112,24 @@ mkdir -p "$pfx/drive_c/windows/system32" "$pfx/dosdevices"
 ln -s ../drive_c "$pfx/dosdevices/c:"
 is "C: without kernel32.dll stops the launch" 1 "$(check_prefix apfs)"
 : > "$pfx/drive_c/windows/system32/kernel32.dll"
+# wineboot cut short by a full disk: the registry and kernel32.dll, no user32.dll (#4025)
+is "a prefix with only kernel32.dll stops the launch" 1 "$(check_prefix apfs)"
+has "the missing DLL is named" 'the prefix has no C:\windows\system32\mspatcha.dll' "$work/log"
+for name in mspatcha ucrtbase user32 version win32u ws2_32; do
+	: > "$pfx/drive_c/windows/system32/$name.dll"
+done
 is "a finished prefix launches" 0 "$(check_prefix apfs)"
 is "a finished prefix says nothing" "" "$(cat "$work/notes" "$work/log")"
+mkdir "$pfx/drive_c/windows/syswow64"
+for name in kernel32 mspatcha ucrtbase user32 version; do
+	: > "$pfx/drive_c/windows/syswow64/$name.dll"
+done
+is "a 32-bit side without win32u.dll stops the launch" 1 "$(check_prefix apfs)"
+has "the 32-bit DLL is named" 'the prefix has no C:\windows\syswow64\win32u.dll' "$work/log"
+has "the player is told to rebuild it" "The game's prefix could not be set up" "$work/notes"
+: > "$pfx/drive_c/windows/syswow64/win32u.dll"
+: > "$pfx/drive_c/windows/syswow64/ws2_32.dll"
+is "a finished 32-bit side launches" 0 "$(check_prefix apfs)"
 rm -rf "$pfx/dosdevices" "$pfx/drive_c"
 
 echo "== the real mount table"

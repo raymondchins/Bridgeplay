@@ -51,6 +51,11 @@ check() {
     fails=$((fails + 1))
   fi
 }
+# The DLLs missing_core_dll looks for.
+core_dlls() {
+  mkdir -p "$1"
+  for name in kernel32 mspatcha ucrtbase user32 version win32u ws2_32; do printf dll > "$1/$name.dll"; done
+}
 fixture() {
   case_root=$(mktemp -d "$work/case.XXXXXX")
   STEAM_COMPAT_DATA_PATH="$case_root/game"
@@ -65,6 +70,7 @@ fixture() {
   printf reg > "$template_dir/pfx/userdef.reg"
   printf timestamp > "$template_dir/pfx/.update-timestamp"
   printf dll > "$template_dir/pfx/drive_c/windows/ntdll.dll"
+  core_dlls "$template_dir/pfx/drive_c/windows/system32"
   lay_out_proton_profile "$template_dir/pfx"
 }
 
@@ -605,6 +611,10 @@ export fake_initializer="in_template_env() (
     printf user > \"\$1/user.reg\"
     printf defaults > \"\$1/userdef.reg\"
     printf dll > \"\$1/drive_c/windows/ntdll.dll\"
+    mkdir -p \"\$1/drive_c/windows/system32\"
+    for name in kernel32 mspatcha ucrtbase user32 version win32u ws2_32; do
+      [ \"\$name\" = \"\${fake_left_out:-}\" ] || printf dll > \"\$1/drive_c/windows/system32/\$name.dll\"
+    done
     if [ -n \"\${ready_pipe:-}\" ]; then
       printf ready > \"\$ready_pipe\"
       read -r proceed < \"\$resume_pipe\"
@@ -625,6 +635,26 @@ export fake_wait_status=1
 check test "$(build_prefix_template && echo accepted || echo refused)" = refused
 check test ! -e "$template_dir/pfx"
 fake_wait_status=0
+# wineboot on a full disk: registry written, later DLLs not copied (#4025).
+export fake_left_out=user32
+check test "$(build_prefix_template && echo accepted || echo refused)" = refused
+check test ! -e "$template_dir/pfx"
+check grep -q "wineboot did not finish the template" "$log"
+fake_left_out=""
+
+# A ready template that lacks a DLL is built again before a game is seeded from it.
+fixture
+seed_prefix_from_template
+check test -f "$template_dir/ready"
+rm "$template_dir/pfx/drive_c/windows/system32/user32.dll"
+: > "$log"
+STEAM_COMPAT_DATA_PATH="$case_root/next-game"
+WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
+mkdir -p "$WINEPREFIX"
+seed_prefix_from_template
+check test -f "$template_dir/pfx/drive_c/windows/system32/user32.dll"
+check test -f "$WINEPREFIX/drive_c/windows/system32/user32.dll"
+check grep -q "building the prefix template" "$log"
 
 fixture
 set -- dosbox.exe -conf '.\base\plutoniam.conf'

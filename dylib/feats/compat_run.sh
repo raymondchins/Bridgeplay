@@ -1838,12 +1838,13 @@ note_prefix_volume() {
 
 # Without C:\windows\system32 Wine stops at "could not load kernel32.dll" and the game quits
 # with no window. exFAT and FAT have no symbolic links, so dosdevices/c: cannot exist there.
+# A prefix with only some DLLs (see missing_core_dll) quits with "Library ... not found".
 # Ends the launch when the prefix is broken.
 refuse_broken_prefix() {
-  [ ! -f "$WINEPREFIX/dosdevices/c:/windows/system32/kernel32.dll" ] || return 0
+  missing=$(missing_core_dll "$WINEPREFIX/dosdevices/c:/windows") || return 0
   vol=$(volume_type "$STEAM_COMPAT_DATA_PATH") || vol=""
   fs=${vol%% *}
-  echo "=== the prefix has no C:\\windows\\system32\\kernel32.dll, Wine did not finish building it ===" \
+  printf '=== the prefix has no C:\\windows\\%s, Wine did not finish building it ===\n' "$missing" \
     >> "$log" 2>&1 || true
   case "$fs" in exfat|msdos|ntfs)
     show_alert "This Steam library cannot hold the game's prefix" "It is formatted $fs, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive."
@@ -2569,6 +2570,20 @@ volume_clones() {
   mount | grep -q "^/dev/$device on .* (apfs[,)]"
 }
 
+# Prints the first of a few core DLLs missing under a Windows folder, as system32\name.dll.
+# wineboot copies the DLLs one by one: on a full disk (error=112) or after a crash it still
+# writes the registry and the early DLLs, and later ones such as user32.dll are missing
+# (#4025, #3927). The 32-bit side is checked when the prefix has one.
+missing_core_dll() (
+  for side in system32 syswow64; do
+    [ "$side" = system32 ] || [ -d "$1/$side" ] || continue
+    for name in kernel32 mspatcha ucrtbase user32 version win32u ws2_32; do
+      [ -f "$1/$side/$name.dll" ] || { printf '%s\\%s.dll' "$side" "$name"; return 0; }
+    done
+  done
+  return 1
+)
+
 # Built in a temporary folder and renamed when the build finishes, so a broken template is never used
 build_prefix_template() {
   sweep_dead_seeds "$template_dir"/pfx.building.*
@@ -2591,8 +2606,9 @@ build_prefix_template() {
   fi
   seed_building=0
   if [ "$initialized" -ne 0 ] || [ ! -s "$seed_scratch/system.reg" ] \
-    || [ ! -s "$seed_scratch/user.reg" ] || [ ! -s "$seed_scratch/userdef.reg" ]; then
-    echo "=== wineboot produced no template, this game gets its own prefix ===" \
+    || [ ! -s "$seed_scratch/user.reg" ] || [ ! -s "$seed_scratch/userdef.reg" ] \
+    || missing_core_dll "$seed_scratch/drive_c/windows" >/dev/null; then
+    echo "=== wineboot did not finish the template, this game gets its own prefix ===" \
       >> "$log" 2>&1 || true
     rm -rf "$seed_scratch" 2>/dev/null || true
     seed_scratch=""
@@ -2881,8 +2897,10 @@ seed_prefix_from_template() {
     trap - TERM INT HUP
     return 0
   fi
+  # A template built before missing_core_dll was checked can lack DLLs: build it again.
   if [ ! -s "$template_dir/pfx/system.reg" ] \
-    || [ "$(cat "$template_dir/ready" 2>/dev/null)" != "$identity" ]; then
+    || [ "$(cat "$template_dir/ready" 2>/dev/null)" != "$identity" ] \
+    || missing_core_dll "$template_dir/pfx/drive_c/windows" >/dev/null; then
     if ! rm -f "$template_dir/ready" || ! rm -rf "$template_dir/pfx"; then
       echo "=== could not invalidate the old prefix template, skipping it ===" >> "$log" 2>&1 || true
       exec 9>&-
