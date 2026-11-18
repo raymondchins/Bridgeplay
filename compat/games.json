@@ -626,5 +626,44 @@
     "last_tested": "2026-10-28",
     "fork_commit": null,
     "tested_on": "M4 · macOS 27.2"
+  },
+  {
+    "appid": 1422450,
+    "name": "Deadlock",
+    "api": "D3D11",
+    "anticheat": "none known",
+    "status": "platinum",
+    "backend": "d3dmetal",
+    "engine": "winecx-11.17",
+    "notes": "Runs out of the box. 1050p, Ultra, 90-120 fps. Bluetooth headphones connected after the game starts get no audio until the game restarts. From a player report (#3862).",
+    "last_tested": "2026-11-16",
+    "fork_commit": null,
+    "tested_on": "M5 Pro · macOS 27.2"
+  },
+  {
+    "appid": 287450,
+    "name": "Rise of Nations: Extended Edition",
+    "api": "D3D11",
+    "anticheat": "none known",
+    "status": "borked",
+    "backend": "wined3d",
+    "engine": "winecx-11.17",
+    "notes": "Stops at \"Could not initialize DirectX! please make sure your system supports DirectX 11 or higher!\". Only wined3d was tried. From a player report (#3491).",
+    "last_tested": "2026-11-12",
+    "fork_commit": null,
+    "tested_on": "M4 Pro · macOS 27.2"
+  },
+  {
+    "appid": 2344520,
+    "name": "Diablo IV",
+    "api": "D3D12",
+    "anticheat": "none known",
+    "status": "gold",
+    "backend": "d3dmetal",
+    "engine": "winecx-11.17",
+    "notes": "Crashed at random with NVAPI on; ran without crashes with NVAPI=0, which its gamefix sets since 0.7.65. With NVAPI off the game offers no DLSS. From a player report (#3559).",
+    "last_tested": "2026-11-13",
+    "fork_commit": null,
+    "tested_on": "M4 · macOS 27.2.1"
   }
 ]
