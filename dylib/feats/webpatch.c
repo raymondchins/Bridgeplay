@@ -1296,7 +1296,7 @@ char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
                     "leaving it alone", f, g_fixes[f].expect, n);
     }
     if (!native_mac_js && (fix_on[NP_NATIVE_MAC_FILTER_FIX] || fix_on[NP_UPDATED_NATIVE_MAC_FILTER_FIX])) {
-        NP_WARN("webpatch: no platform list from appinfo.vdf, the Apple filter stays stock");
+        NP_WARN("webpatch: no platform list from the appinfo cache, the Apple filter stays stock");
         fix_live -= fix_on[NP_NATIVE_MAC_FILTER_FIX] + fix_on[NP_UPDATED_NATIVE_MAC_FILTER_FIX];
         fix_on[NP_NATIVE_MAC_FILTER_FIX] = fix_on[NP_UPDATED_NATIVE_MAC_FILTER_FIX] = 0;
     }

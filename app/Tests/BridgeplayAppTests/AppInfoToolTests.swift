@@ -4,7 +4,7 @@ import Testing
 @testable import BridgeplayApp
 
 // The launcher builds a game's bundle name and icon from what this tool prints, so a parse
-// that reads the wrong key mislabels a bundle. Caches are synthetic: the installed one is v29.
+// that reads the wrong key mislabels a bundle. All caches here are synthetic.
 @Suite("appinfo tool")
 struct AppInfoToolTests {
 
@@ -175,6 +175,68 @@ struct AppInfoToolTests {
             out[String(line[line.startIndex..<split])] = String(line[line.index(after: split)...])
         }
         return out
+    }
+
+    private static func shard(_ index: Int, apps: [UInt32]) -> Data {
+        let keys = index == 0 ? ["appinfo", "common", "name", "oslist"] : ["oslist", "name", "common", "appinfo"]
+        var entries = Cache(), strings = Cache(), blobs = Cache()
+        for key in keys { strings.cstring(key) }
+        for id in apps {
+            let os = index == 0 ? "windows" : "windows,macos"
+            let kv = platformEntry(id, os, table: keys).dropFirst(68)
+            entries.u32(id)
+            entries.u32(UInt32(blobs.bytes.count))
+            entries.u32(UInt32(20 + kv.count))
+            entries.bytes += Array(repeating: 0, count: 50)
+            entries.u32(1)
+            entries.u32(42)
+            entries.u32(4)
+            entries.u32(2)
+            entries.u32(1)
+            entries.bytes.append(0)
+            entries.cstring("JP")
+            blobs.bytes += Array(repeating: 0, count: 20)
+            blobs.bytes += kv
+        }
+        var h = Cache()
+        for word in [0x0756442a, 1, index, 256, apps.count, entries.bytes.count,
+                     keys.count, strings.bytes.count, blobs.bytes.count, 0, 0] { h.u32(UInt32(word)) }
+        return Data(h.bytes + entries.bytes + strings.bytes + blobs.bytes)
+    }
+
+    @Test("Shards use local keys and variable index records, and coexist with the legacy file")
+    func readsShards() throws {
+        let fm = FileManager.default
+        let root = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        let dir = root.appending(path: "appinfo")
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let legacy = root.appending(path: "appinfo.vdf")
+        let tool = try InstallPayload.locate().appinfo
+        func run(_ query: String) throws -> CommandResult {
+            try Shell.run(tool.path, [legacy.path, query])
+        }
+        for i in 0..<256 {
+            let ids: [UInt32] = i == 0 ? [17, 29] : (i == 255 ? [68] : [])
+            try Self.shard(i, apps: ids).write(to: dir.appending(path: String(format: "appinfo_%02x.vdf", i)))
+        }
+        let expected = "mac=68\nwindows=17,29,68\n"
+        #expect(try run("--platforms").stdout == expected)
+        #expect(try run("29").stdout == "name=App 29\n")
+        try Self.v28(appID: 2100).write(to: legacy)
+        try fm.setAttributes([.modificationDate: Date.distantFuture], ofItemAtPath: legacy.path)
+        #expect(try run("2100").status == 0)
+        try fm.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1)], ofItemAtPath: legacy.path)
+        #expect(try run("--platforms").stdout == expected)
+        let last = dir.appending(path: "appinfo_ff.vdf")
+        try Data(Self.shard(255, apps: [68]).dropLast()).write(to: last)
+        let truncated = try run("--platforms")
+        #expect(truncated.status != 0 && truncated.stdout.isEmpty)
+        try fm.removeItem(at: last)
+        #expect(try run("2100").status == 0)
+        try fm.removeItem(at: legacy)
+        let incomplete = try run("--platforms")
+        #expect(incomplete.status != 0 && incomplete.stdout.isEmpty)
     }
 
     @Test("A v29 cache resolves the client icon, which is not the icon we used to guess")

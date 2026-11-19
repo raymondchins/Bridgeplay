@@ -239,7 +239,7 @@ mkdir -p "$np_support" "$T/steam/appcache/librarycache/100"
 printf '#!/bin/sh\nprintf "icon=abc123\\n"\n' > "$np_support/appinfo"
 printf '#!/bin/sh\ncp "$1" "$2"\n' > "$iconmaker"
 chmod 755 "$np_support/appinfo" "$iconmaker"
-: > "$T/steam/appcache/appinfo.vdf"
+mkdir -p "$T/steam/appcache/appinfo"
 printf 'game art' > "$T/steam/appcache/librarycache/100/abc123.jpg"
 app_id=100
 target=""
