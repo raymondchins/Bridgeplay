@@ -448,26 +448,36 @@ final class SystemStatus {
 
     private static let toolsRestartHint = String(localized: "Restart Steam to update its list of compatibility tools.")
 
-    // After an engine update the tool the Steam default names may be gone; point it, and any
-    // per-game choice, at its successor. Steam running only defers it to the next idle launch.
-    nonisolated static func followDefaultTool(
-        installed: [String] = CompatToolList.installed().map(\.name),
-        in file: URL = SteamDefaultTool.config,
-        steamRunning: () -> Bool = { SteamBundle.isRunningForThisUser }
-    ) {
+    @ObservationIgnored private var defaultToolRetryPending = false
+
+    // The caller holds the installation lock while reading the installed tools and config.vdf.
+    nonisolated private static func followDefaultTool() -> SteamDefaultTool.FollowResult {
         do {
-            if try SteamDefaultTool.followSuccessors(installed: installed, in: file, steamRunning: steamRunning) {
+            let result = try SteamDefaultTool.followSuccessors(installed: CompatToolList.installed().map(\.name))
+            if result == .updated {
                 AppLog.note("default tool: pointed Steam's compatibility tool choices at the installed successor")
             }
-        } catch is SteamDefaultTool.SteamRunning {
-            AppLog.note("default tool: Steam is running, so a replaced tool is re-pointed on a later launch")
+            return result
         } catch {
             AppLog.note("default tool: could not follow the updated engine: \(error.localizedDescription)")
+            return .unchanged
         }
     }
 
+    func followDefaultToolWhenIdle() async {
+        guard canInstall, !UserDefaults.standard.bool(forKey: SteamPatchKeeper.pausedKey) else { return }
+        runInFlight = true
+        defer { runInFlight = false }
+        let result = await Task.detached(priority: .utility) { () -> SteamDefaultTool.FollowResult? in
+            guard let lock = try? DeploymentContent.acquireInstallationLock() else { return nil }
+            defer { lock.release() }
+            return Self.followDefaultTool()
+        }.value
+        if let result { defaultToolRetryPending = result == .steamRunning }
+    }
+
     private func runnerOutcome(_ result: RunnerSetup.Outcome) -> String {
-        Self.followDefaultTool()
+        defaultToolRetryPending = Self.followDefaultTool() == .steamRunning
         if result.stagedNothing { return String(localized: "Compatibility tool is already set up.") }
         guard result.toolsChanged, SteamBundle.isRunning else { return String(localized: "Compatibility tool ready.") }
         return String(localized: "Compatibility tool ready. \(Self.toolsRestartHint)")
@@ -777,6 +787,9 @@ final class SystemStatus {
         lastPatchCheck = now
         let version = AppVersion.bundled
         let seen = await Task.detached(priority: .utility) { SteamPatchKeeper.capture(bundledVersion: version) }.value
+        if defaultToolRetryPending, !seen.steamRunning {
+            await followDefaultToolWhenIdle()
+        }
         let decision = SteamPatchKeeper.decide(SteamPatchKeeper.Inputs(
             deployment: seen.deployment,
             previouslyDeployed: seen.previouslyDeployed,
@@ -960,6 +973,7 @@ final class SystemStatus {
 
     func removeEverything() async {
         await perform(from: UninstallPhase.stoppingClient.label) { progress in
+            defaultToolRetryPending = false
             let result = try await Uninstall.run(leftovers: .live) { progress($0.label) }
 
             let summary = result.partialRemoval ?? (result.steamNeedsRedownload

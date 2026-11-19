@@ -128,55 +128,104 @@ enum SteamDefaultTool {
 
     static let step = "Set Steam's default compatibility tool"
 
-    // bridgeplay-proton-winecx-11.17 and bridgeplay-proton-winecx are one family, as are
-    // bridgeplay-proton-fex-41069 and bridgeplay-proton-fex: the build suffix is dropped.
-    static func family(_ name: String) -> String {
-        var parts = name.split(separator: "-", omittingEmptySubsequences: false)
-        if parts.count > 1, let last = parts.last, !last.isEmpty,
-           last.allSatisfy({ $0.isNumber || $0 == "." }) { parts.removeLast() }
-        return parts.joined(separator: "-")
+    static func family(_ name: String) -> (name: Substring, build: Substring)? {
+        let normalized = BrandMigration.migratedToolName(name) ?? name
+        guard normalized.hasPrefix(ToolName.prefix + "-"),
+              let separator = normalized.lastIndex(of: "-") else { return nil }
+        let build = normalized.suffix(from: normalized.index(after: separator))
+        guard !build.isEmpty, build.split(separator: ".", omittingEmptySubsequences: false).allSatisfy({
+            !$0.isEmpty && $0.utf8.allSatisfy { (48...57).contains($0) }
+        }) else { return nil }
+        return (normalized[..<separator], build)
     }
 
-    // The installed tool that replaces a Bridgeplay tool that is gone: same family, first in
-    // preference order. nil when the tool is still installed, is not ours, or has no successor.
-    static func successor(of name: String, installed: [String]) -> String? {
-        guard ToolName.isOurs(name), !installed.contains(name) else { return nil }
-        return installed.first { family($0) == family(name) }
+    static func successor(of name: String, installed: [String], toolExists: (String) -> Bool) -> String? {
+        guard let gone = family(name), !toolExists(name) else { return nil }
+        let candidates = installed.compactMap { tool -> (name: String, build: Substring)? in
+            guard let candidate = family(tool), candidate.name == gone.name,
+                  candidate.build.compare(gone.build, options: .numeric) != .orderedAscending
+            else { return nil }
+            return (tool, candidate.build)
+        }
+        return candidates.max { $0.build.compare($1.build, options: .numeric) == .orderedAscending }?.name
     }
 
     // Re-points the default and every per-game choice that names a Bridgeplay tool which is no
     // longer installed to its successor. A tool still installed, or without a successor, is
     // left as it is. nil when nothing changes.
-    static func followingSuccessors(_ text: String, installed: [String]) -> String? {
-        var lines = text.components(separatedBy: "\n")
+    static func followingSuccessors(
+        _ text: String, installed: [String], toolExists: (String) -> Bool
+    ) -> String? {
+        let lines = text.components(separatedBy: "\n")
         guard let mapping = keyLine(lines, "CompatToolMapping", from: 0),
-              let open = openBrace(lines, after: mapping), let close = closeBrace(lines, open: open)
+              let open = openBrace(lines, after: mapping)
         else { return nil }
-        var changed = false
-        for index in open + 1 ..< close {
-            guard let (key, value, _) = BrandMigration.keyValue(lines[index]), key.lowercased() == "name",
-                  let next = successor(of: value, installed: installed),
-                  let range = lines[index].range(of: "\"\(value)\"", options: .backwards)
-            else { continue }
-            lines[index].replaceSubrange(range, with: "\"\(next)\"")
-            changed = true
+        let body = lines[(open + 1)...].joined(separator: "\n")
+        // Quoted strings and line comments can contain braces. Match them as whole tokens.
+        let tokens = #/"(?:\\.|[^"\\])*"|[/][/][^\r\n]*|[{}]|[^\s"{}/]+|[/]/#
+        var depth = 0
+        var appEntry = false
+        var key: Substring?
+        var cursor = body.startIndex
+        var updated = ""
+        for match in body.matches(of: tokens) {
+            let token = match.output
+            if token.hasPrefix("//") { continue }
+            if token == "{" {
+                if depth == 0 { appEntry = key.flatMap { UInt32($0) } != nil }
+                depth += 1
+                key = nil
+            } else if token == "}" {
+                if depth == 0 {
+                    guard cursor != body.startIndex else { return nil }
+                    return lines[...open].joined(separator: "\n") + "\n" + updated + body[cursor...]
+                }
+                depth -= 1
+                key = nil
+            } else {
+                let quoted = token.hasPrefix("\"")
+                let value = quoted ? token.dropFirst().dropLast() : token
+                guard let field = key else {
+                    key = value
+                    continue
+                }
+                key = nil
+                guard depth == 1, appEntry, quoted, field.lowercased() == "name",
+                      let next = successor(of: String(value), installed: installed, toolExists: toolExists)
+                else { continue }
+                updated += body[cursor ..< value.startIndex] + next
+                cursor = value.endIndex
+            }
         }
-        return changed ? lines.joined(separator: "\n") : nil
+        return nil
     }
 
-    // Writes followingSuccessors() to config.vdf; refused while Steam runs, and only then when
-    // the file would change. Returns whether it wrote.
+    enum FollowResult: Equatable, Sendable {
+        case unchanged, updated, steamRunning
+    }
+
     @discardableResult
     static func followSuccessors(
         installed: [String], in file: URL = config,
+        compatTools: URL = SupportPaths.Steam.compatTools,
         steamRunning: () -> Bool = { SteamBundle.isRunningForThisUser }
-    ) throws -> Bool {
-        guard let text = try? String(contentsOf: file, encoding: .utf8),
-              let result = followingSuccessors(text, installed: installed)
-        else { return false }
-        guard !steamRunning() else { throw SteamRunning() }
+    ) throws -> FollowResult {
+        guard !steamRunning() else { return .steamRunning }
+        func toolExists(_ name: String) -> Bool {
+            guard !name.contains("/") else { return false }
+            var isDirectory: ObjCBool = false
+            return FileManager.default.fileExists(
+                atPath: compatTools.appending(path: name).path(percentEncoded: false), isDirectory: &isDirectory
+            ) && isDirectory.boolValue
+        }
+        let candidates = installed.filter(toolExists)
+        guard !candidates.isEmpty, let text = try? String(contentsOf: file, encoding: .utf8),
+              let result = followingSuccessors(text, installed: candidates, toolExists: toolExists)
+        else { return .unchanged }
+        // Atomic replacement still can't rule out Steam starting between this check and the write.
+        guard !steamRunning() else { return .steamRunning }
         try WriteRefused.catching(file) { try result.write(to: file, atomically: true, encoding: .utf8) }
-        return true
+        return .updated
     }
 
     // Replaces the "0" entry under CompatToolMapping, or adds it (and CompatToolMapping) when
