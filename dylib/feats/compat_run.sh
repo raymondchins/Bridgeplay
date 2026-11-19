@@ -3451,6 +3451,14 @@ stage_loader() {
     ln -sfn "$wine_root/share" "$loader_stage/share"
     ln -sfn "$wine_root/bin" "$loader_stage/bin"
     loader_hosts_ntdll=1
+    # aned (the Neural Engine daemon behind MetalFX upscaling) refuses to compile models for a
+    # process whose code identity is a file path, which an unsigned loader has. The bundle's own
+    # copy is signed ad hoc under the bundle's identifier; ad hoc signatures are deterministic, so
+    # the bundle still compares unchanged. A signed loader keeps its signature and entitlements.
+    if ! /usr/bin/codesign -d "$loader_macos/wine" >/dev/null 2>&1; then
+      /usr/bin/codesign -s - -f -i "com.notproton.launcher.$app_id" "$loader_macos/wine" >/dev/null 2>&1 ||
+        echo "loader could not be signed, MetalFX upscaling may fail" >> "$log" 2>&1 || true
+    fi
   else
     rm -f "$loader_macos/.ntdll.so" "$loader_macos/wine"
     ln "$WINELOADER" "$loader_macos/wine" 2>/dev/null || cp "$WINELOADER" "$loader_macos/wine"
