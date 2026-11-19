@@ -13,6 +13,7 @@
 static uint8_t fake_manager[0x800];
 static uint8_t fake_entries[8 * 0x200];
 static int32_t stub_tool_shift;
+static int32_t stub_head_shift;
 static uint32_t stub_enabled_off_val;
 static uint32_t stub_platforms_val;
 static int stub_would_force_val;
@@ -27,8 +28,14 @@ static const char *last_map_tool;
 void *np_compat_manager(void) { return fake_manager; }
 
 uint32_t np_compat_tool_off(uint32_t ref) {
-    if (ref < 0x58) return ref;
+    if (ref < 0x24) return ref;
+    if (ref < 0x58) return (uint32_t)((int32_t)ref + stub_head_shift);
     return (uint32_t)((int32_t)ref + stub_tool_shift);
+}
+
+const char *np_compat_tool_name(const void *tool) {
+    if (!tool) return NULL;
+    return *(const char *const *)((const uint8_t *)tool + np_compat_tool_off(0x40));
 }
 
 size_t np_compat_tool_stride(void) { return 0x130 + stub_tool_shift; }
@@ -317,6 +324,7 @@ static void reset(void) {
     memset(fake_manager, 0, sizeof fake_manager);
     memset(fake_entries, 0, sizeof fake_entries);
     stub_tool_shift = 0;
+    stub_head_shift = 0;
     stub_enabled_off_val = 0x7B0;
     stub_platforms_val = COMPAT_PLATFORM_WINDOWS;
     stub_would_force_val = 1;
@@ -350,11 +358,11 @@ static void build_tools(const tool_spec_t *specs, int count) {
     memset(fake_entries, 0, sizeof fake_entries);
     for (int i = 0; i < count; i++) {
         uint8_t *e = fake_entries + (size_t)i * stride;
-        *(const char **)(e + COMPAT_TOOL_NAME_OFF) = specs[i].name;
-        *(const char **)(e + COMPAT_TOOL_DISPLAY_OFF) = specs[i].display;
+        *(const char **)(e + np_compat_tool_off(COMPAT_TOOL_NAME_OFF)) = specs[i].name;
+        *(const char **)(e + np_compat_tool_off(COMPAT_TOOL_DISPLAY_OFF)) = specs[i].display;
         *(uint32_t *)(e + np_compat_tool_off(COMPAT_TOOL_PLATFORM_OFF)) = specs[i].platform;
-        *(int32_t *)(e + COMPAT_TOOL_PRIORITY_OFF) = specs[i].priority;
-        *(uint32_t *)(e + COMPAT_TOOL_GATE_FLAGS_OFF) = specs[i].gate_flags;
+        *(int32_t *)(e + np_compat_tool_off(COMPAT_TOOL_PRIORITY_OFF)) = specs[i].priority;
+        *(uint32_t *)(e + np_compat_tool_off(COMPAT_TOOL_GATE_FLAGS_OFF)) = specs[i].gate_flags;
         *(uint32_t *)(e + np_compat_tool_off(COMPAT_TOOL_APPID_OFF)) = specs[i].appid;
     }
 }
@@ -520,8 +528,10 @@ static void none_entry_cases(void) {
     check(!has_none, "the none entry is absent for the global setting");
 }
 
-static void priority_cases(void) {
+static void priority_layout(int32_t head, int32_t tail) {
     reset();
+    stub_head_shift = head;
+    stub_tool_shift = tail;
     tool_spec_t tools[] = {
         { "proton8", "Proton 8", COMPAT_PLATFORM_WINDOWS, 200, 0, 0 },
         { "proton7", "Proton 7", COMPAT_PLATFORM_WINDOWS, 150, 0, 0 },
@@ -546,6 +556,12 @@ static void priority_cases(void) {
     check(p8_incompat == 0, "the tool with the best priority is not incompatible");
     check(p7_incompat == 1, "a tool below the best priority is incompatible");
     check(custom_incompat == 0, "a tool with priority zero opts out of ranking");
+}
+
+static void priority_cases(void) {
+    priority_layout(0, 0);
+    // Beta 1795048523 moved every field from "unlisted" on by 8, and the install dir by 16
+    priority_layout(8, 16);
 }
 
 static void selected_cases(void) {

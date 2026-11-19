@@ -148,7 +148,7 @@ static void pb_tool(np_pb_t *w, uint32_t resp_field,
 static int offered(const uint8_t *tool, uint32_t platforms, int bypass) {
     uint32_t converts_from =
         *(const uint32_t *)(tool + np_compat_tool_off(COMPAT_TOOL_PLATFORM_OFF));
-    uint32_t gate = *(const uint32_t *)(tool + COMPAT_TOOL_GATE_FLAGS_OFF);
+    uint32_t gate = *(const uint32_t *)(tool + np_compat_tool_off(COMPAT_TOOL_GATE_FLAGS_OFF));
 
     if (!(platforms & converts_from)) return 0;
     if ((gate & COMPAT_TOOL_GATE_HIDDEN) && !bypass) return 0;
@@ -156,8 +156,7 @@ static int offered(const uint8_t *tool, uint32_t platforms, int bypass) {
 }
 
 static const char *tool_name(const void *tool) {
-    if (!tool) return NULL;
-    return *(const char *const *)((const uint8_t *)tool + COMPAT_TOOL_NAME_OFF);
+    return np_compat_tool_name(tool);
 }
 
 static int get_compat_tools(uintptr_t request, uintptr_t response) {
@@ -212,7 +211,7 @@ static int get_compat_tools(uintptr_t request, uintptr_t response) {
     int32_t best = 0;
     for (uint32_t i = 0; i < count; i++) {
         int32_t prio = *(const int32_t *)(array + (size_t)i * np_compat_tool_stride()
-                                          + COMPAT_TOOL_PRIORITY_OFF);
+                                          + np_compat_tool_off(COMPAT_TOOL_PRIORITY_OFF));
         if (prio > best) best = prio;
     }
 
@@ -234,9 +233,9 @@ static int get_compat_tools(uintptr_t request, uintptr_t response) {
         const char *name = tool_name(tool);
         if (!name) continue;
 
-        int32_t prio = *(const int32_t *)(tool + COMPAT_TOOL_PRIORITY_OFF);
+        int32_t prio = *(const int32_t *)(tool + np_compat_tool_off(COMPAT_TOOL_PRIORITY_OFF));
         pb_tool(&w, RESP_TOOLS, name,
-                *(const char *const *)(tool + COMPAT_TOOL_DISPLAY_OFF),
+                *(const char *const *)(tool + np_compat_tool_off(COMPAT_TOOL_DISPLAY_OFF)),
                 active && strcmp(active, name) == 0,
                 best != 0 && prio != best && prio > 0);
         if (!w.ok) {

@@ -211,6 +211,65 @@ static void probe_cases(void) {
     check(np_compat_probe_tool_layout(gate, 0) == 0, "a branch landing on no install load is refused");
 }
 
+// YldRegisterTool's prologue as the clients build it: the tool pointer parked in a callee-saved
+// register, x1 reused for a log call's argument, then the name read through a second copy.
+static uint32_t movz_w(uint32_t rd, uint32_t imm) { return 0x52800000u | (imm << 5) | rd; }
+static uint32_t enc_mov(uint32_t rd, uint32_t rm) { return 0xAA0003E0u | (rm << 16) | rd; }
+static uint32_t enc_ldr64_pre(uint32_t base, uint32_t off, uint32_t rt) {
+    return 0xF8400C00u | ((off & 0x1FFu) << 12) | (base << 5) | rt;
+}
+
+static uintptr_t build_yld(uint32_t name_off, int via_x1_after_reuse) {
+    for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
+    code[0] = 0xA9BF7BFDu;                 // stp x29, x30, [sp, #-0x10]!
+    code[1] = enc_mov(20, 1);              // mov x20, x1
+    code[2] = enc_mov(19, 0);              // mov x19, x0
+    code[3] = movz_w(1, 4);                // mov w1, #4: x1 no longer holds the tool
+    code[4] = via_x1_after_reuse ? ldr64(1, 0x40, 8) : NOP;
+    code[5] = enc_mov(21, 20);             // mov x21, x20
+    code[6] = enc_ldr64_pre(21, name_off, 8);  // ldr x8, [x21, #name]!
+    return (uintptr_t)code;
+}
+
+static void head_cases(void) {
+    g_head_shift = 0;
+    check(np_compat_probe_tool_head(build_yld(0x40, 0)) == 1, "the stable prologue probes clean");
+    check(g_head_shift == 0, "a name at the reference offset reports no head shift");
+
+    check(np_compat_probe_tool_head(build_yld(0x48, 0)) == 1, "the beta prologue probes clean");
+    check(g_head_shift == 8, "a name 8 further in reports the head shift");
+
+    check(np_compat_probe_tool_head(build_yld(0x48, 1)) == 1,
+          "a load through x1 after x1 was reused is not the tool");
+    check(g_head_shift == 8, "the name is still read through the parked copy");
+
+    check(np_compat_probe_tool_head(build_yld(0x30, 0)) == 0, "a name below the reference is refused");
+    check(np_compat_probe_tool_head(0) == 0, "no function is refused");
+    for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a body with no tool load is refused");
+
+    // Beta 1795048523: 8 bytes ahead of "unlisted", 16 in all by the install dir.
+    g_head_shift = 8;
+    g_tool_shift = 16;
+    g_head_probed = g_tail_probed = 1;
+    check(np_compat_tool_off(0x20) == 0x20, "a field below the head insertion stays put");
+    check(np_compat_tool_off(COMPAT_TOOL_GATE_FLAGS_OFF) == 0x2c, "unlisted follows the head shift");
+    check(np_compat_tool_off(COMPAT_TOOL_PRIORITY_OFF) == 0x40, "priority follows the head shift");
+    check(np_compat_tool_off(COMPAT_TOOL_NAME_OFF) == 0x48, "the name follows the head shift");
+    check(np_compat_tool_off(COMPAT_TOOL_DISPLAY_OFF) == 0x58, "the display name follows the head shift");
+    check(np_compat_tool_off(COMPAT_TOOL_INSTALL_OFF) == 0x68, "install takes both shifts");
+    check(np_compat_tool_off(COMPAT_TOOL_APPID_OFF) == 0x70, "appid takes both shifts");
+    check(np_compat_tool_stride() == 0x140, "the entry widens by both shifts");
+    check(np_compat_layout_known(), "agreeing probes confirm the layout");
+    g_head_shift = 24;
+    check(!np_compat_layout_known(), "a head shift past the install shift is not a layout");
+    g_head_probed = 0;
+    g_head_shift = 0;
+    check(!np_compat_layout_known(), "an unprobed head leaves the layout unconfirmed");
+    g_tool_shift = 0;
+    g_tail_probed = 0;
+}
+
 static void oslist_cases(void) {
     g_tool_shift = 0;
     check(np_compat_probe_tool_layout(build_gate(0x68, 0x60), build_oslist(0x78, 0x80)) == 1,
@@ -332,6 +391,9 @@ static void stub_register_tool(void *mgr, void *source) {
 static void registration_case(int shift, int mode) {
     tool_entry_t tools[2] = {0};
     g_tool_shift = shift;
+    g_head_shift = 0;
+    g_head_probed = g_tail_probed = 1;
+    if (mode == 7) g_head_probed = 0;   // a client whose layout was not confirmed
     g_tools = tools;
     g_tool_count = mode == 4 ? 0 : 2;
     int existing = mode == 1 ? 2 : mode == 2 ? 1 : 0;
@@ -352,7 +414,7 @@ static void registration_case(int shift, int mode) {
     check(buffer_allocations == 0, "registration waits for a manager and function");
     np_compat_set_register_fn((uintptr_t)stub_register_tool);
     np_compat_register_crossover(manager);
-    int expected = fail_calloc ? 0 : g_tool_count - existing;
+    int expected = fail_calloc || mode == 7 ? 0 : g_tool_count - existing;
     check(registration_calls == expected, "only missing tools are registered");
     check(registration_buffer == NULL, "the temporary entry buffer is freed");
     check(buffer_frees == buffer_successes, "each successful allocation is freed once");
@@ -381,7 +443,7 @@ static void registration_case(int shift, int mode) {
 static void registration_cases(void) {
     const int shifts[] = {0, 8, 64};
     for (size_t i = 0; i < sizeof(shifts) / sizeof(*shifts); i++) {
-        for (int mode = 0; mode < 7; mode++) {
+        for (int mode = 0; mode < 8; mode++) {
             fflush(NULL);
             pid_t child = fork();
             if (child == 0) {
@@ -829,6 +891,7 @@ static void shortcut_exe_cases(void) {
 int main(void) {
     concurrent_fallback_cases();
     probe_cases();
+    head_cases();
     oslist_cases();
     enabled_cases();
     manager_cases();

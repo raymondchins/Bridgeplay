@@ -142,6 +142,8 @@ int np_hooks_install_all(const struct mach_header_64 *mh, intptr_t slide,
         np_lookup_address(resolved, "CCompatManager::FindMapping"),
         np_lookup_address(resolved, "CCompatManager::GetWildcardMapping"));
 
+    np_compat_probe_tool_head(
+        np_lookup_address(resolved, "CCompatManager::YldRegisterTool"));
     np_compat_probe_tool_layout(
         np_lookup_address(resolved, "CCompatManager::ResolveCompatToolForApp.local_redirect"),
         np_lookup_address(resolved, "CCompatManager::GetOSListOverrideForApp.oslist_gate"));

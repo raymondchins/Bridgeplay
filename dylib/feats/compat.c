@@ -93,7 +93,12 @@ static int ensure_dir(const char *path) {
     return mkdir(path, 0755);
 }
 
+// g_tool_shift is how far the install dir moved, which counts the head insertion too;
+// g_head_shift is how far the fields from COMPAT_TOOL_HEAD_OFF up to the install dir moved.
 static int32_t g_tool_shift;
+static int32_t g_head_shift;
+static int     g_head_probed;
+static int     g_tail_probed;
 
 // LDR Wt,[X0,#imm]. Writes the byte offset and destination register.
 static int ldr32_from_x0(uint32_t w, uint32_t *off, uint32_t *rt) {
@@ -168,7 +173,80 @@ static int probe_oslist_offsets(uintptr_t oslist_gate, uint32_t base,
     return 2;
 }
 
+// LDR Xt,[Xn,#imm]! (pre-index). Writes the base register and the signed offset.
+static int ldr64_pre(uint32_t w, uint32_t *rn, int32_t *off) {
+    if ((w & 0xFFE00C00u) != 0xF8400C00u) return 0;
+    int32_t imm = (int32_t)((w >> 12) & 0x1FFu);
+    *off = (imm << 23) >> 23;
+    *rn  = (w >> 5) & 0x1Fu;
+    return 1;
+}
+
+// MOV Xd,Xm (ORR Xd,XZR,Xm). Writes both registers.
+static int mov_reg(uint32_t w, uint32_t *rd, uint32_t *rm) {
+    if ((w & 0xFFE0FFE0u) != 0xAA0003E0u) return 0;
+    *rd = w & 0x1Fu;
+    *rm = (w >> 16) & 0x1Fu;
+    return 1;
+}
+
+int np_compat_probe_tool_head(uintptr_t yld_register_tool) {
+    g_head_probed = 0;
+    if (!yld_register_tool) return 0;
+
+    // YldRegisterTool(manager, tool) copies the tool pointer out of x1 before its first
+    // call and logs the name first, so the first 64-bit load through a copy of x1 is
+    // the name. Only copies made before x1 is reused for a call argument count.
+    uint32_t alias = 1u << 1;
+    for (int i = 0; i < 48; i++) {
+        uint32_t w = *(const uint32_t *)(yld_register_tool + (uintptr_t)i * 4);
+        uint32_t rd, rm, rn, rt, off;
+        int32_t  soff;
+        if (mov_reg(w, &rd, &rm)) {
+            if (alias & (1u << rm)) alias |= 1u << rd;
+            else alias &= ~(1u << rd);
+            continue;
+        }
+        int found = 0;
+        if (ldr64_pre(w, &rn, &soff) && (alias & (1u << rn)) && soff > 0) {
+            off = (uint32_t)soff;
+            found = 1;
+        } else if ((w & 0xFFC00000u) == 0xF9400000u && (alias & (1u << ((w >> 5) & 0x1Fu)))) {
+            off = ((w >> 10) & 0xFFFu) * 8u;
+            found = 1;
+        }
+        if (found) {
+            int32_t head = (int32_t)off - COMPAT_TOOL_NAME_OFF;
+            if (head < 0 || head > 0x20 || (head & 7)) {
+                NP_ERR("np_compat_probe_tool_head: the first tool load is at 0x%x, which is "
+                       "not where a name can sit", off);
+                return 0;
+            }
+            g_head_shift  = head;
+            g_head_probed = 1;
+            if (head)
+                NP_LOG("np_compat_probe_tool_head: tool fields from 0x%x onward are %+d "
+                       "from the baseline (name 0x%x)", COMPAT_TOOL_HEAD_OFF, head, off);
+            return 1;
+        }
+        // Anything else that writes a register drops it from the copies. Loads, moves
+        // and arithmetic all keep their destination in bits 0-4; stores and branches,
+        // which write none, never name an alias there in this prologue.
+        rt = w & 0x1Fu;
+        if ((w & 0x0A000000u) == 0x08000000u && (w & 0x00400000u) == 0) continue; // stores
+        alias &= ~(1u << rt);
+    }
+    NP_ERR("np_compat_probe_tool_head: no load through the tool argument in "
+           "YldRegisterTool at 0x%lx", (unsigned long)yld_register_tool);
+    return 0;
+}
+
+int np_compat_layout_known(void) {
+    return g_head_probed && g_tail_probed && g_head_shift <= g_tool_shift;
+}
+
 int np_compat_probe_tool_layout(uintptr_t appid_gate, uintptr_t oslist_gate) {
+    g_tail_probed = 0;
     if (!appid_gate) return 0;
 
     uint32_t appid_off, rt;
@@ -224,6 +302,7 @@ int np_compat_probe_tool_layout(uintptr_t appid_gate, uintptr_t oslist_gate) {
     }
 
     g_tool_shift = by_appid;
+    g_tail_probed = 1;
     if (g_tool_shift)
         NP_LOG("np_compat_probe_tool_layout: tool fields from install onward are "
                "%+d from the baseline (appid 0x%x, install 0x%x)",
@@ -326,12 +405,22 @@ void *np_compat_user(const void *compat_mgr) {
 }
 
 uint32_t np_compat_tool_off(uint32_t reference_off) {
-    if (reference_off < COMPAT_TOOL_INSTALL_OFF) return reference_off;
+    if (reference_off < COMPAT_TOOL_HEAD_OFF) return reference_off;
+    if (reference_off < COMPAT_TOOL_INSTALL_OFF)
+        return (uint32_t)((int32_t)reference_off + g_head_shift);
     return (uint32_t)((int32_t)reference_off + g_tool_shift);
 }
 
 size_t np_compat_tool_stride(void) {
     return (size_t)((int32_t)COMPAT_TOOL_STRIDE + g_tool_shift);
+}
+
+const char *np_compat_tool_name(const void *tool) {
+    if (!tool) return NULL;
+    const char *name =
+        *(const char *const *)((const uint8_t *)tool + np_compat_tool_off(COMPAT_TOOL_NAME_OFF));
+    // A layout this build reads wrong puts an int or a flag where the name should be.
+    return np_plausible_addr((uint64_t)(uintptr_t)name) ? name : NULL;
 }
 
 // The compatibility tool needs to go in the folder Steam normally (on Linux)
@@ -817,7 +906,7 @@ void *np_compat_manager(void) {
 int np_compat_app_runs_tool(uint32_t appid) {
     const uint8_t *tool = np_compat_tool_for_app(g_manager, appid);
 
-    return tool && is_tool_name(*(const char *const *)(tool + COMPAT_TOOL_NAME_OFF));
+    return tool && is_tool_name(np_compat_tool_name(tool));
 }
 
 static void *find_tool(void *compat_mgr, const char *wanted) {
@@ -836,7 +925,7 @@ static void *find_tool(void *compat_mgr, const char *wanted) {
 
     for (uint32_t i = 0; i < count; i++) {
         uint8_t *entry = array + (size_t)i * np_compat_tool_stride();
-        const char *name = *(const char **)(entry + COMPAT_TOOL_NAME_OFF);
+        const char *name = np_compat_tool_name(entry);
         if (name && strcmp(name, wanted) == 0)
             return entry;
     }
@@ -854,6 +943,13 @@ void np_compat_register_crossover(void *compat_mgr) {
     if (registered || !compat_mgr || !g_yld_register_tool)
         return;
     registered = 1;
+    if (!np_compat_layout_known()) {
+        // Tools Steam read from compatibilitytools.d itself still show; only the
+        // runtime entries, which would be built on a guessed layout, are left out.
+        NP_ERR("np_compat_register_crossover: this client's tool layout was not "
+               "confirmed, so no tool is registered at runtime");
+        return;
+    }
     load_tool_list_once();
 
     // YldRegisterTool copies the entry and its strings. Each buffer carries headroom
@@ -880,9 +976,9 @@ void np_compat_register_crossover(void *compat_mgr) {
 
         uint8_t *tool = buffers[i];
         memset(tool, 0, sizeof(buffers[i]));
-        *(uint32_t *)(tool + COMPAT_TOOL_FLAGS_OFF)      = COMPAT_TOOL_FLAG_NO_APP;
-        *(const char **)(tool + COMPAT_TOOL_NAME_OFF)    = t->name;
-        *(const char **)(tool + COMPAT_TOOL_DISPLAY_OFF) = t->display;
+        *(uint32_t *)(tool + np_compat_tool_off(COMPAT_TOOL_FLAGS_OFF))      = COMPAT_TOOL_FLAG_NO_APP;
+        *(const char **)(tool + np_compat_tool_off(COMPAT_TOOL_NAME_OFF))    = t->name;
+        *(const char **)(tool + np_compat_tool_off(COMPAT_TOOL_DISPLAY_OFF)) = t->display;
         *(const char **)(tool + np_compat_tool_off(COMPAT_TOOL_INSTALL_OFF)) = t->dir;
         *(uint32_t *)(tool + np_compat_tool_off(COMPAT_TOOL_APPID_OFF)) = 0;
         *(const char **)(tool + np_compat_tool_off(COMPAT_TOOL_FROM_OSLIST_OFF)) = from_oslist;
