@@ -7,6 +7,7 @@
 // inferred from the filesystem. Exits non-zero without printing on read
 // failure.
 
+import CryptoKit
 import Foundation
 
 let args = CommandLine.arguments
@@ -23,6 +24,7 @@ enum VDFError: Error {
     case unknownMagic(UInt32)
     case badStringIndex(UInt32)
     case excessiveNesting
+    case checksumMismatch
 }
 
 indirect enum Value {
@@ -148,7 +150,8 @@ func appKeys(_ b: [UInt8], _ start: Int, _ end: Int, _ table: [String]?) throws 
 }
 
 // A false visitor result stops the scan, including all remaining shards.
-func scanShard(_ b: [UInt8], index: Int, visit: Visitor) throws -> Bool {
+// With verify set, checks every payload's SHA-1 and visits nothing.
+func scanShard(_ b: [UInt8], index: Int, verify: Bool = false, visit: Visitor) throws -> Bool {
     var h = Cursor(b: b, p: 0)
     let magic = try h.u32()
     guard magic == 0x0756_442a else { throw VDFError.unknownMagic(magic) }
@@ -178,6 +181,11 @@ func scanShard(_ b: [UInt8], index: Int, visit: Visitor) throws -> Bool {
         try entries.skip(extraIDs * 4 + 13)
         _ = try entries.cstring() // Usually empty, "JP" in the observed cache.
         let start = dataStart + offset
+        if verify {
+            let digest = Insecure.SHA1.hash(data: b[(start + 20)..<(start + size)])
+            guard digest.elementsEqual(b[start..<(start + 20)]) else { throw VDFError.checksumMismatch }
+            continue
+        }
         if try !visit(id, { try appKeys(b, start + 20, start + size, table) }) { return false }
     }
     guard entries.p == entries.end else { throw VDFError.truncated }
@@ -243,10 +251,18 @@ func forEachApp(_ path: URL, _ visit: Visitor) throws {
             shards.append(shard)
         }
         if shards.count == 256 && newest >= (legacyDate ?? .distantPast) {
-            for (index, shard) in shards.enumerated() {
-                if try !scanShard([UInt8](Data(contentsOf: shard)), index: index, visit: visit) { break }
-            }
-            return
+            // Every shard is checked before any app is visited, so a shard Steam left half
+            // written falls back to the legacy file instead of failing or giving partial data.
+            do {
+                let data = try shards.map { [UInt8](try Data(contentsOf: $0)) }
+                for (index, bytes) in data.enumerated() {
+                    _ = try scanShard(bytes, index: index, verify: true) { _, _ in true }
+                }
+                for (index, bytes) in data.enumerated() {
+                    if try !scanShard(bytes, index: index, visit: visit) { break }
+                }
+                return
+            } catch where legacyDate != nil {}
         }
         if legacyDate == nil { throw VDFError.incompleteShardSet }
     }

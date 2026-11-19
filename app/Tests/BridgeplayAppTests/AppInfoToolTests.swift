@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 
@@ -195,7 +196,7 @@ struct AppInfoToolTests {
             entries.u32(1)
             entries.bytes.append(0)
             entries.cstring("JP")
-            blobs.bytes += Array(repeating: 0, count: 20)
+            blobs.bytes += Array(Insecure.SHA1.hash(data: kv))
             blobs.bytes += kv
         }
         var h = Cache()
@@ -230,8 +231,21 @@ struct AppInfoToolTests {
         #expect(try run("--platforms").stdout == expected)
         let last = dir.appending(path: "appinfo_ff.vdf")
         try Data(Self.shard(255, apps: [68]).dropLast()).write(to: last)
+        // A newer shard Steam left half written, or whose payload no longer matches its
+        // SHA-1, falls back to the older legacy file rather than failing.
         let truncated = try run("--platforms")
-        #expect(truncated.status != 0 && truncated.stdout.isEmpty)
+        #expect(truncated.status == 0 && truncated.stdout != expected)
+        #expect(try run("2100").status == 0)
+        var corrupt = [UInt8](Self.shard(255, apps: [68]))
+        corrupt[corrupt.count - 3] ^= 1
+        try Data(corrupt).write(to: last)
+        #expect(try run("68").status != 0)
+        #expect(try run("2100").status == 0)
+        try fm.removeItem(at: legacy)
+        let mismatch = try run("--platforms")
+        #expect(mismatch.status != 0 && mismatch.stdout.isEmpty)
+        try Self.v28(appID: 2100).write(to: legacy)
+        try fm.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1)], ofItemAtPath: legacy.path)
         try fm.removeItem(at: last)
         #expect(try run("2100").status == 0)
         try fm.removeItem(at: legacy)
