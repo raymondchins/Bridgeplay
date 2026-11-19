@@ -2494,6 +2494,20 @@ if [ -z "$np_build" ] || [ ! -d "$CX_ROOT/lib/wine" ]; then
 fi
 echo "runner: build $np_build ($np_display) at $CX_ROOT" >> "$log" 2>&1 || true
 
+# Intel Wine needs Rosetta 2; without it every Wine call fails with "Bad CPU type" and the
+# prefix check misreports it as a broken prefix. macOS updates can drop Rosetta.
+stage_step="rosetta check"
+case "$(/usr/bin/file -b "$CX_ROOT/bin/wineserver" 2>/dev/null)" in
+  *arm64*) ;;
+  *)
+    if ! /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
+      echo "=== Rosetta 2 is not installed, Wine cannot run: softwareupdate --install-rosetta --agree-to-license ===" >> "$log" 2>&1 || true
+      show_alert "Rosetta 2 is not installed" "Windows games need Rosetta 2, and this Mac does not have it (a macOS update can remove it). Install it in Terminal with: softwareupdate --install-rosetta --agree-to-license, then launch the game again."
+      exit 1
+    fi
+    ;;
+esac
+
 # Each CrossOver build needs its own template.
 # FEX builds need two, one for FEX/arm64 Wine and one for Rosetta/AMD64 Wine
 runner_id=""
