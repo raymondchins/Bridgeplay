@@ -229,11 +229,26 @@ int np_compat_probe_tool_head(uintptr_t yld_register_tool) {
                        "from the baseline (name 0x%x)", COMPAT_TOOL_HEAD_OFF, head, off);
             return 1;
         }
-        // Anything else that writes a register drops it from the copies. Loads, moves
-        // and arithmetic all keep their destination in bits 0-4; stores and branches,
-        // which write none, never name an alias there in this prologue.
-        rt = w & 0x1Fu;
+        // A call clobbers the argument and scratch registers x0-x18, so a copy left in
+        // x1 is no longer the tool after one. Other branches and stores write no register;
+        // their low bits are an offset or a source. Anything else that writes one (loads,
+        // moves, arithmetic) keeps the destination in bits 0-4 and drops it from the copies.
+        if ((w & 0x7C000000u) == 0x14000000u && (w & 0x80000000u)) {  // BL
+            alias &= ~0x7FFFFu;
+            continue;
+        }
+        if ((w & 0xFFFFFC1Fu) == 0xD63F0000u) {                       // BLR
+            alias &= ~0x7FFFFu;
+            continue;
+        }
+        if ((w & 0x7C000000u) == 0x14000000u ||                       // B
+            (w & 0xFF000010u) == 0x54000000u ||                       // B.cond
+            (w & 0x7E000000u) == 0x34000000u ||                       // CBZ, CBNZ
+            (w & 0x7E000000u) == 0x36000000u ||                       // TBZ, TBNZ
+            (w & 0xFE000000u) == 0xD6000000u)                         // BR, RET
+            continue;
         if ((w & 0x0A000000u) == 0x08000000u && (w & 0x00400000u) == 0) continue; // stores
+        rt = w & 0x1Fu;
         alias &= ~(1u << rt);
     }
     NP_ERR("np_compat_probe_tool_head: no load through the tool argument in "
@@ -416,7 +431,9 @@ size_t np_compat_tool_stride(void) {
 }
 
 const char *np_compat_tool_name(const void *tool) {
-    if (!tool) return NULL;
+    // Without a confirmed layout no slot is known to hold the name, so nothing is matched
+    // or compared by it.
+    if (!tool || !np_compat_layout_known()) return NULL;
     const char *name =
         *(const char *const *)((const uint8_t *)tool + np_compat_tool_off(COMPAT_TOOL_NAME_OFF));
     // A layout this build reads wrong puts an int or a flag where the name should be.

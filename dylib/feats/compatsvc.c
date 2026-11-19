@@ -181,6 +181,12 @@ static int get_compat_tools(uintptr_t request, uintptr_t response) {
         return RESULT_FAIL;
     }
 
+    if (!np_compat_layout_known()) {
+        NP_ERR("compatsvc: this client's tool layout was not confirmed, so app %u gets "
+               "an empty list", appid);
+        return RESULT_OK;
+    }
+
     int bypass = mgr[np_compat_enabled_off() + 2] != 0;
     if (appid && !bypass) {
         for (uint32_t i = 0; i < count; i++) {

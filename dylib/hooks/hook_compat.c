@@ -152,7 +152,7 @@ static void instrument_oslist_override_gate(void *address, void *ctx_) {
         return;
     ctx->general.x[0] = 1;
     uint64_t tool = ctx->general.x[21];
-    uint32_t appid = (tool && np_plausible_ptr(tool))
+    uint32_t appid = (tool && np_plausible_ptr(tool) && np_compat_layout_known())
                      ? *(uint32_t *)(tool + np_compat_tool_off(COMPAT_TOOL_APPID_OFF)) : 0;
     NP_LOG("instrument_oslist_override_gate: appid=%u install platform forced to tool from_oslist", appid);
 }
@@ -172,6 +172,13 @@ static void instrument_resolver_local_redirect(void *address, void *ctx_) {
     uint64_t tool = ctx->general.x[0];
     if (!tool || !np_plausible_ptr(tool))
         return;
+    if (!np_compat_layout_known()) {
+        static const char once = 0;
+        if (np_log_first_hit(&once, 0))
+            NP_ERR("instrument_resolver_local_redirect: this client's tool layout was not "
+                   "confirmed, so no tool is routed to Bridgeplay");
+        return;
+    }
 
     uint32_t tool_appid = *(uint32_t *)(tool + np_compat_tool_off(COMPAT_TOOL_APPID_OFF));
     if (tool_appid == 0)

@@ -40,6 +40,9 @@ const char *np_compat_tool_name(const void *tool) {
 
 size_t np_compat_tool_stride(void) { return 0x130 + stub_tool_shift; }
 
+static int stub_layout_known = 1;
+int np_compat_layout_known(void) { return stub_layout_known; }
+
 uint32_t np_compat_enabled_off(void) { return stub_enabled_off_val; }
 
 uint32_t np_compat_manager_tools_max(void) { return 40; }
@@ -325,6 +328,7 @@ static void reset(void) {
     memset(fake_entries, 0, sizeof fake_entries);
     stub_tool_shift = 0;
     stub_head_shift = 0;
+    stub_layout_known = 1;
     stub_enabled_off_val = 0x7B0;
     stub_platforms_val = COMPAT_PLATFORM_WINDOWS;
     stub_would_force_val = 1;
@@ -556,6 +560,19 @@ static void priority_layout(int32_t head, int32_t tail) {
     check(p8_incompat == 0, "the tool with the best priority is not incompatible");
     check(p7_incompat == 1, "a tool below the best priority is incompatible");
     check(custom_incompat == 0, "a tool with priority zero opts out of ranking");
+}
+
+static void unknown_layout_cases(void) {
+    reset();
+    tool_spec_t tools[] = {
+        { "crossover", "CrossOver", COMPAT_PLATFORM_WINDOWS, 100, 0, 0 },
+    };
+    build_tools(tools, 1);
+    stub_layout_known = 0;
+    int rc = get_compat_tools(build_request(REQ_HAS_APPID, 7), (uintptr_t)response_buf);
+    reply_t r;
+    decode_reply(&r);
+    check(rc == RESULT_OK && r.count == 0, "an unconfirmed tool layout lists no tools");
 }
 
 static void priority_cases(void) {
@@ -922,6 +939,7 @@ int main(void) {
     is_a_tool_cases();
     none_entry_cases();
     priority_cases();
+    unknown_layout_cases();
     selected_cases();
     fallback_cases();
     active_flag_cases();

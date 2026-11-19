@@ -243,6 +243,19 @@ static void head_cases(void) {
           "a load through x1 after x1 was reused is not the tool");
     check(g_head_shift == 8, "the name is still read through the parked copy");
 
+    // A BL whose displacement ends in x20's number writes no register, while the call
+    // does clobber x1, so a load through x1 after it is not the tool.
+    build_yld(0x48, 0);
+    code[3] = 0x94000000u | 20u;           // bl, low bits 10100
+    code[4] = ldr64(1, 0x40, 8);           // ldr x8, [x1, #0x40]
+    check(np_compat_probe_tool_head((uintptr_t)code) == 1 && g_head_shift == 8,
+          "a call keeps the parked copy and drops x1");
+    build_yld(0x48, 0);
+    code[3] = 0xD63F0100u;                 // blr x8
+    code[4] = ldr64(1, 0x40, 8);
+    check(np_compat_probe_tool_head((uintptr_t)code) == 1 && g_head_shift == 8,
+          "an indirect call drops x1 too");
+
     check(np_compat_probe_tool_head(build_yld(0x30, 0)) == 0, "a name below the reference is refused");
     check(np_compat_probe_tool_head(0) == 0, "no function is refused");
     for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
@@ -261,6 +274,15 @@ static void head_cases(void) {
     check(np_compat_tool_off(COMPAT_TOOL_APPID_OFF) == 0x70, "appid takes both shifts");
     check(np_compat_tool_stride() == 0x140, "the entry widens by both shifts");
     check(np_compat_layout_known(), "agreeing probes confirm the layout");
+    {
+        static uint8_t entry[0x200];
+        static const char tool[] = "bridgeplay-proton-winecx-11.17";
+        *(const char **)(entry + 0x48) = tool;
+        check(np_compat_tool_name(entry) == tool, "the name is read at the probed offset");
+        g_head_probed = 0;
+        check(np_compat_tool_name(entry) == NULL, "an unconfirmed layout reads no name");
+        g_head_probed = 1;
+    }
     g_head_shift = 24;
     check(!np_compat_layout_known(), "a head shift past the install shift is not a layout");
     g_head_probed = 0;
@@ -331,6 +353,8 @@ static void *build_manager(uint32_t count, int named_slot) {
 
 static void manager_cases(void) {
     g_tool_shift = 0;
+    g_head_shift = 0;
+    g_head_probed = g_tail_probed = 1;
 
     void *mgr = build_manager(3, 1);
     void *want = entries + np_compat_tool_stride();
@@ -889,6 +913,7 @@ static void shortcut_exe_cases(void) {
 }
 
 int main(void) {
+    g_head_probed = g_tail_probed = 1;   // the reference layout, unless a case says otherwise
     concurrent_fallback_cases();
     probe_cases();
     head_cases();
