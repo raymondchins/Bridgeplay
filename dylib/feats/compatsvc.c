@@ -173,18 +173,18 @@ static int get_compat_tools(uintptr_t request, uintptr_t response) {
         return RESULT_OK;
     }
 
+    if (!np_compat_layout_known()) {
+        NP_ERR("compatsvc: this client's tool layout was not confirmed, so app %u gets "
+               "an empty list", appid);
+        return RESULT_OK;
+    }
+
     const uint8_t *array = *(const uint8_t **)(mgr + COMPAT_MANAGER_TOOL_ARRAY_OFF);
     uint32_t count       = *(const uint32_t *)(mgr + COMPAT_MANAGER_TOOL_COUNT_OFF);
     if (!array || count > np_compat_manager_tools_max()) {
         NP_ERR("compatsvc: the manager reports %u tool(s) at %p, which is not a list "
                "this reads", count, (const void *)array);
         return RESULT_FAIL;
-    }
-
-    if (!np_compat_layout_known()) {
-        NP_ERR("compatsvc: this client's tool layout was not confirmed, so app %u gets "
-               "an empty list", appid);
-        return RESULT_OK;
     }
 
     int bypass = mgr[np_compat_enabled_off() + 2] != 0;

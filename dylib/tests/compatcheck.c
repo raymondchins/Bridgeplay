@@ -256,6 +256,34 @@ static void head_cases(void) {
     check(np_compat_probe_tool_head((uintptr_t)code) == 1 && g_head_shift == 8,
           "an indirect call drops x1 too");
 
+    // Writes the old scan missed: both registers of a pair load, and a written-back base.
+    build_yld(0x48, 0);
+    code[3] = 0xA9400000u | (2u << 15) | (20u << 10) | (31u << 5) | 8u;   // ldp x8, x20, [sp, #0x10]
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a pair load into the parked copy drops it");
+    build_yld(0x48, 0);
+    code[3] = 0xA9800000u | (0x7Eu << 15) | (30u << 10) | (20u << 5) | 29u; // stp x29, x30, [x20, #-0x10]!
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a pair store writing back the copy drops it");
+    build_yld(0x48, 0);
+    code[3] = 0xF8400400u | (8u << 12) | (20u << 5) | 9u;                   // ldr x9, [x20], #8
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a post-indexed load through the copy drops it");
+
+    // Control flow: a forward branch is taken, so a load it jumps over is never read,
+    // and a return or a backward or far branch ends the walk with no answer.
+    build_yld(0x48, 0);
+    code[3] = 0x14000002u;                 // b over the next word
+    code[4] = ldr64(20, 0x30, 8);          // unreachable; refused if it were read
+    check(np_compat_probe_tool_head((uintptr_t)code) == 1 && g_head_shift == 8,
+          "a load a branch jumps over is not read");
+    build_yld(0x48, 0);
+    code[3] = 0xD65F03C0u;                 // ret
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a return before the name load is refused");
+    build_yld(0x48, 0);
+    code[3] = 0x17FFFFFFu;                 // b back one word
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a backward branch is refused");
+    build_yld(0x48, 0);
+    code[3] = 0x14000000u | (0x200u / 4);  // b past the window
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a branch out of the window is refused");
+
     check(np_compat_probe_tool_head(build_yld(0x30, 0)) == 0, "a name below the reference is refused");
     check(np_compat_probe_tool_head(0) == 0, "no function is refused");
     for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;

@@ -190,20 +190,28 @@ static int mov_reg(uint32_t w, uint32_t *rd, uint32_t *rm) {
     return 1;
 }
 
+// How far an unconditional branch may take the head probe, and how many
+// instructions it reads in all.
+#define TOOL_HEAD_WINDOW 0x200
+#define TOOL_HEAD_STEPS  48
+
 int np_compat_probe_tool_head(uintptr_t yld_register_tool) {
     g_head_probed = 0;
     if (!yld_register_tool) return 0;
 
     // YldRegisterTool(manager, tool) copies the tool pointer out of x1 before its first
     // call and logs the name first, so the first 64-bit load through a copy of x1 is
-    // the name. Only copies made before x1 is reused for a call argument count.
+    // the name. Only copies made before x1 is reused for a call argument count. The
+    // walk follows the path the code takes: forward branches are taken, conditional
+    // ones fall through, and a return or indirect branch ends it with no answer.
     uint32_t alias = 1u << 1;
-    for (int i = 0; i < 48; i++) {
-        uint32_t w = *(const uint32_t *)(yld_register_tool + (uintptr_t)i * 4);
-        uint32_t rd, rm, rn, rt, off;
+    uintptr_t pc = yld_register_tool;
+    for (int i = 0; i < TOOL_HEAD_STEPS; i++, pc += 4) {
+        uint32_t w = *(const uint32_t *)pc;
+        uint32_t rd, rm, rn, off;
         int32_t  soff;
         if (mov_reg(w, &rd, &rm)) {
-            if (alias & (1u << rm)) alias |= 1u << rd;
+            if ((alias & (1u << rm)) && rd != 31) alias |= 1u << rd;
             else alias &= ~(1u << rd);
             continue;
         }
@@ -230,9 +238,7 @@ int np_compat_probe_tool_head(uintptr_t yld_register_tool) {
             return 1;
         }
         // A call clobbers the argument and scratch registers x0-x18, so a copy left in
-        // x1 is no longer the tool after one. Other branches and stores write no register;
-        // their low bits are an offset or a source. Anything else that writes one (loads,
-        // moves, arithmetic) keeps the destination in bits 0-4 and drops it from the copies.
+        // x1 is no longer the tool after one.
         if ((w & 0x7C000000u) == 0x14000000u && (w & 0x80000000u)) {  // BL
             alias &= ~0x7FFFFu;
             continue;
@@ -241,15 +247,42 @@ int np_compat_probe_tool_head(uintptr_t yld_register_tool) {
             alias &= ~0x7FFFFu;
             continue;
         }
-        if ((w & 0x7C000000u) == 0x14000000u ||                       // B
-            (w & 0xFF000010u) == 0x54000000u ||                       // B.cond
-            (w & 0x7E000000u) == 0x34000000u ||                       // CBZ, CBNZ
-            (w & 0x7E000000u) == 0x36000000u ||                       // TBZ, TBNZ
-            (w & 0xFE000000u) == 0xD6000000u)                         // BR, RET
+        if ((w & 0xFC000000u) == 0x14000000u) {                       // B
+            int32_t imm = (int32_t)(w << 6) >> 4;
+            uintptr_t to = pc + (intptr_t)imm;
+            if (imm <= 0 || to >= yld_register_tool + TOOL_HEAD_WINDOW) break;
+            pc = to - 4;
             continue;
-        if ((w & 0x0A000000u) == 0x08000000u && (w & 0x00400000u) == 0) continue; // stores
-        rt = w & 0x1Fu;
-        alias &= ~(1u << rt);
+        }
+        if ((w & 0xFE000000u) == 0xD6000000u) break;                  // BR, RET
+        if ((w & 0xFF000010u) == 0x54000000u ||                       // B.cond
+            (w & 0x7E000000u) == 0x34000000u ||                       // CBZ, CBNZ
+            (w & 0x7E000000u) == 0x36000000u)                         // TBZ, TBNZ
+            continue;
+        // Register pairs: a load writes both, and pre- or post-indexing writes the base.
+        if ((w & 0x38000000u) == 0x28000000u) {
+            if ((w & 0x00400000u) && !(w & 0x04000000u)) {
+                alias &= ~(1u << (w & 0x1Fu));
+                alias &= ~(1u << ((w >> 10) & 0x1Fu));
+            }
+            if (w & 0x00800000u) alias &= ~(1u << ((w >> 5) & 0x1Fu));
+            continue;
+        }
+        // Single registers with pre- or post-indexing write the base as well.
+        if ((w & 0x3B200400u) == 0x38000400u) {
+            alias &= ~(1u << ((w >> 5) & 0x1Fu));
+            if ((w & 0x00C00000u) && !(w & 0x04000000u)) alias &= ~(1u << (w & 0x1Fu));
+            continue;
+        }
+        // Exclusive stores write their status register; other stores write none.
+        if ((w & 0x3F400000u) == 0x08000000u) {
+            alias &= ~(1u << ((w >> 16) & 0x1Fu));
+            continue;
+        }
+        if ((w & 0x0A000000u) == 0x08000000u && (w & 0x00400000u) == 0) continue;
+        // Anything else that writes a register (loads, moves, arithmetic) keeps the
+        // destination in bits 0-4.
+        alias &= ~(1u << (w & 0x1Fu));
     }
     NP_ERR("np_compat_probe_tool_head: no load through the tool argument in "
            "YldRegisterTool at 0x%lx", (unsigned long)yld_register_tool);
