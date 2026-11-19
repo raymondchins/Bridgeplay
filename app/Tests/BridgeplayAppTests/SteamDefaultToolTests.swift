@@ -216,6 +216,17 @@ struct SteamDefaultToolFollowTests {
             == "bridgeplay-proton-fex-41073")
     }
 
+    @Test("The unversioned 40921 preview tools follow their numbered successors")
+    func unversionedPreviewSuccessors() {
+        let tools = ["bridgeplay-proton-preview-41073", "bridgeplay-proton-fex-41073", "bridgeplay-proton-fex-rosetta-41073"]
+        for name in ["bridgeplay-proton-preview", "bridgeplay-proton-fex", "bridgeplay-proton-fex-rosetta"] {
+            #expect(SteamDefaultTool.successor(of: name, installed: tools, toolExists: { _ in false }) == name + "-41073")
+            #expect(SteamDefaultTool.successor(of: name, installed: tools, toolExists: { $0 == name }) == nil)
+        }
+        #expect(SteamDefaultTool.successor(of: "notproton-fex", installed: tools, toolExists: { _ in false })
+            == "bridgeplay-proton-fex-41073")
+    }
+
     @Test("Older builds, different families, and aliases are left alone")
     func incompatibleSuccessors() {
         let tools = ["bridgeplay-proton-winecx-11.9", "bridgeplay-proton-26.3", "bridgeplay-proton-fex-rosetta-41073"]

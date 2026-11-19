@@ -128,8 +128,14 @@ enum SteamDefaultTool {
 
     static let step = "Set Steam's default compatibility tool"
 
+    // The 40921 preview named its tools without the build, so their build is known here.
+    static let unversionedPreviewTools = [
+        "bridgeplay-proton-preview", "bridgeplay-proton-fex", "bridgeplay-proton-fex-rosetta",
+    ]
+
     static func family(_ name: String) -> (name: Substring, build: Substring)? {
         let normalized = BrandMigration.migratedToolName(name) ?? name
+        if unversionedPreviewTools.contains(normalized) { return (normalized[...], "40921") }
         guard normalized.hasPrefix(ToolName.prefix + "-"),
               let separator = normalized.lastIndex(of: "-") else { return nil }
         let build = normalized.suffix(from: normalized.index(after: separator))

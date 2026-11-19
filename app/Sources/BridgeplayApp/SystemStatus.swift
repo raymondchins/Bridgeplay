@@ -464,7 +464,10 @@ final class SystemStatus {
         }
     }
 
+    // Stays pending until a check completes, so an attempt skipped for a run in flight or a
+    // held lock is retried on the next patch check.
     func followDefaultToolWhenIdle() async {
+        defaultToolRetryPending = true
         guard canInstall, !UserDefaults.standard.bool(forKey: SteamPatchKeeper.pausedKey) else { return }
         runInFlight = true
         defer { runInFlight = false }
@@ -787,7 +790,9 @@ final class SystemStatus {
         lastPatchCheck = now
         let version = AppVersion.bundled
         let seen = await Task.detached(priority: .utility) { SteamPatchKeeper.capture(bundledVersion: version) }.value
-        if defaultToolRetryPending, !seen.steamRunning {
+        // Steam open under another macOS account doesn't block this user's config, so the
+        // per-user check inside the follow decides.
+        if defaultToolRetryPending {
             await followDefaultToolWhenIdle()
         }
         let decision = SteamPatchKeeper.decide(SteamPatchKeeper.Inputs(
