@@ -89,9 +89,34 @@ void np_webpatch_set_fex_tools(const char *const *names, size_t count) {
     g_fex_tools[n] = '\0';
 }
 
+// Steam's Vite build imports its dialog components from another chunk under names that
+// change with every build. Each name is read off one use of it in the chunk being patched
+// (g_binds) and stands in a replacement as one of these bytes.
+#define NP_B_CHECKBOX "\016"
+#define NP_B_DROPDOWN "\017"
+#define NP_B_SLIDER   "\020"
+#define NP_B_MACOS    "\027"
+#define NP_BIND_COUNT 4
+#define NP_BIND_TEXT_MAX 64
+
+static _Thread_local char g_bind_text[NP_BIND_COUNT][NP_BIND_TEXT_MAX];
+static _Thread_local unsigned char g_bind_ok[NP_BIND_COUNT];
+
+static int bind_index(char c) {
+    switch (c) {
+    case '\016': return 0;
+    case '\017': return 1;
+    case '\020': return 2;
+    case '\027': return 3;
+    default:      return -1;
+    }
+}
+
 static const char *marker_text(char c) {
     if (c == NP_FALLBACK_TOOL[0]) return g_fallback_tool;
     if (c == NP_FEX_TOOLS[0]) return g_fex_tools;
+    int b = bind_index(c);
+    if (b >= 0) return g_bind_text[b];
     return NULL;
 }
 
@@ -148,7 +173,8 @@ static void mark_start(unsigned char *can_start, const char *find) {
     }
 }
 
-static size_t count_matches(const char *src, size_t len, const char *find) {
+static size_t count_matches_first(const char *src, size_t len, const char *find,
+                                  np_cap_t *first) {
     np_cap_t caps[NP_CAP_MAX];
     size_t n = 0, lit = 0;
     while (find[lit] && cap_index((unsigned char)find[lit]) < 0 && !marker_text(find[lit])) lit++;
@@ -159,9 +185,14 @@ static size_t count_matches(const char *src, size_t len, const char *find) {
             i = (size_t)(at - src);
         }
         size_t used = match_at(src, len, i, find, caps);
+        if (used && !n && first) memcpy(first, caps, sizeof(caps));
         if (used) { n++; i += used; } else i++;
     }
     return n;
+}
+
+static size_t count_matches(const char *src, size_t len, const char *find) {
+    return count_matches_first(src, len, find, NULL);
 }
 
 typedef struct { char *buf; size_t len, cap; } np_out_t;
@@ -468,7 +499,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "lf=x=>{x=(x||\"\").toLowerCase();return x===\"display\"?fm:x===\"half\"?Math.max(15,Math.round(fm/2)):" \
     "/^\\d+$/.test(x)&&+x>=10&&+x<=360?Math.min(fm,Math.max(15,+x)):0}," \
     "SL=globalThis.MSCXSliderField||(globalThis.MSCXSliderField=(()=>{try{return Object.values(" BARREL ")" \
-    ".find(f=>typeof f===\"function\"&&/\"SliderField\"/.test(String(f)))}catch(e){return null}})())," \
+    ".find(f=>typeof f===\"function\"&&/[\"`]SliderField[\"`]/.test(String(f)))}catch(e){return null}})())," \
     "FL=(l,dl)=>{const n=lf(ev(\"BRIDGEPLAY_FPS_LIMIT\")),off=!n||ev(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",v=n||fm," \
     "set=(x,top)=>{x=Math.min(top||fm,Math.max(15,Math.round(+x)));if(!(x>=15))return;const b=dv(\"BRIDGEPLAY_FPS_LIMIT\");" \
     "s([[\"BRIDGEPLAY_FPS_LIMIT\",/^\\d+$/.test(b)&&+b===x?\"\":String(x)]])}," \
@@ -645,12 +676,17 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "MSCXApply=" NP_CX_APPLY ",MSCXTake=" NP_CX_TAKE ",MSCXSync=" NP_CX_SYNC ","
 
 // Valve is testing a new compatibility page UI, this logic relates to supporting that
-#define NP_CX_OPTIONS_STATEMENT \
+#define NP_CX_OPTIONS_STATEMENT_WITH(RT, BARREL) \
     "var MSCXLaunch=" NP_CX_LAUNCH ";" \
     "var MSCXPick=" NP_CX_PICK ";" \
     "var MSCXToolQuery=" NP_CX_TOOL_QUERY ";" \
-    "var MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C3, NP_C4) ";" \
+    "var MSCXOpts=" NP_CX_OPTIONS_CAPTURE(RT, BARREL) ";" \
     "var MSCXApply=" NP_CX_APPLY ";var MSCXTake=" NP_CX_TAKE ";var MSCXSync=" NP_CX_SYNC ";"
+#define NP_CX_OPTIONS_STATEMENT NP_CX_OPTIONS_STATEMENT_WITH(NP_C3, NP_C4)
+
+// The Vite build has no barrel module, so the panel gets one made of the bound components.
+#define NP_VITE_UI(SECTION) \
+    "({XY:" SECTION ",Yh:" NP_B_CHECKBOX ",m:" NP_B_DROPDOWN ",SliderField:" NP_B_SLIDER "})"
 
 // 1.0.x saved CrossOver settings without %command%, this migrates them.
 #define NP_LAUNCH_MIGRATION_RULE \
@@ -778,14 +814,114 @@ static const np_gate_t g_gates_selecttool[] = {
       NP_COMPAT_HINT, 1, 0 },
 };
 
+// The same page from Steam's Vite build: template literals, and imports called as bare names.
+static const np_gate_t g_gates_selecttool_vite[] = {
+    { NP_C1 "()&&" NP_C2 ".push({title:" NP_C3 "(`#AppProperties_CompatibilityPage`)",
+      NP_TAB_REPLACE, 2, 0 },
+    { "Compatibility:{visible:" NP_C1 "&&" NP_C2 "(),title:",
+      "Compatibility:{visible:" NP_C1 "&&true,title:", 1, 0 },
+    { "function " NP_C1 "(" NP_C2 "){return(0," NP_C3 ".jsxs)(" NP_C4 ",{label:" NP_C5
+      "(`#Settings_SteamPlay_SteamPlay`),children:[(0," NP_C3 ".jsx)(" NP_C6 ",{details:" NP_C2 ".details}),"
+      "(0," NP_C3 ".jsx)(" NP_C7 ",{setting:`compat_show_all_tools`,label:" NP_C5
+      "(`#Settings_SteamPlay_ShowAll`),feature:7})]})}",
+      NP_CX_OPTIONS_STATEMENT_WITH(NP_C3, NP_VITE_UI(NP_C4))
+      "function " NP_C1 "(" NP_C2 "){return(0," NP_C3 ".jsxs)(" NP_C3 ".Fragment,{children:["
+      "(0," NP_C3 ".jsxs)(" NP_C4 ",{label:" NP_C5
+      "(`#Settings_SteamPlay_SteamPlay`),children:[(0," NP_C3 ".jsx)(" NP_C6 ",{details:" NP_C2 ".details}),"
+      "(0," NP_C3 ".jsx)(" NP_C7 ",{setting:`compat_show_all_tools`,label:" NP_C5
+      "(`#Settings_SteamPlay_ShowAll`),feature:7})]}),"
+      "(0," NP_C3 ".jsx)(MSCXOpts,{details:" NP_C2 ".details})]})}", 1, 0 },
+    { "[" NP_C1 "," NP_C2 "]=" NP_C3 "(" NP_C4 ");if(" NP_C1 ".isLoading||!" NP_C1
+      ".data?.tools?.length)return null;",
+      "[" NP_C1 "," NP_C2 "]=(typeof MSCXToolQuery==\"function\"?MSCXToolQuery:r=>r)"
+      "(" NP_C3 "(" NP_C4 ")," NP_C4 ");if(" NP_C1
+      ".isLoading||!" NP_C1 ".data?.tools?.length)return null;", 1, 1 },
+    // The arrow's names carry a prefix, since this build names its imports t, r and the like.
+    { NP_C7 "||=" NP_C8 "().GetDefaultTransport(),"
+      NP_C7 "==null?new Promise((" NP_C9 "," NP_C10 ")=>{console.error(`Transport Error: no transport is available for request`),"
+      NP_C10 "(`Transport Error: no transport is available for request`)}):"
+      NP_C7 ".SendMsg(`CompatManager.GetCompatTools#1`," NP_C1 "(" NP_C2 "," NP_C3 ")," NP_C4 ","
+      "{ePrivilege:1,eClientExecutionSite:2})}" NP_C5 ".GetCompatTools=" NP_C6 ";",
+      NP_C7 "||=" NP_C8 "().GetDefaultTransport(),"
+      NP_C7 "==null?new Promise((" NP_C9 "," NP_C10 ")=>{console.error(`Transport Error: no transport is available for request`),"
+      NP_C10 "(`Transport Error: no transport is available for request`)}):"
+      NP_C7 ".SendMsg(`CompatManager.GetCompatTools#1`," NP_C1 "(" NP_C2 "," NP_C3 ")," NP_C4 ","
+      "{ePrivilege:1,eClientExecutionSite:2})}"
+      "globalThis.MSCXRoute=(npR,npId)=>{const npT=" NP_C8 "().GetDefaultTransport();"
+      "return npT?npT.SendMsg(npR," NP_C1 "(" NP_C2 ",{appid:npId})," NP_C4 ",{ePrivilege:1,eClientExecutionSite:2})"
+      ".then(npX=>npX.BSuccess()?npX.Body().toObject().default_tool_identifier||\"\":Promise.reject(\"result \"+npX.GetEResult()))"
+      ":Promise.reject(\"no transport\")};" NP_CX_PREFIX_ROW NP_C5 ".GetCompatTools=" NP_C6 ";", 1, 1 },
+    { "get is_invalid_os_type(){return this.most_available_per_client_data.is_invalid_os_type}",
+      "get is_invalid_os_type(){return false}", 1, 0 },
+    { NP_C1 ".is_invalid_os_type&&(0," NP_C2 ".jsx)(" NP_C3 ",{})",
+      "!" NP_C1 ".local_per_client_data?.installed&&"
+      NP_C1 ".most_available_per_client_data?.is_invalid_os_type&&"
+      "(0," NP_C2 ".jsx)(" NP_C3 ",{})", 1, 0 },
+    { NP_C1 "(`#GameList_Entry_Invalid_OSType2`)",
+      NP_COMPAT_HINT, 1, 0 },
+};
+
+// One use of each component the Vite build imports, its name in capture 1. All must match
+// exactly once, or every replacement naming that component is left out; the slider falls
+// back to null, so the panel's frame limit uses its menu instead.
+typedef struct { char marker; const char *find; const char *fallback; } np_bind_t;
+static const np_bind_t g_binds[NP_BIND_COUNT] = {
+    { '\016', "(0," NP_C2 ".jsx)(" NP_C1 ",{label:" NP_C3 "(`#LaunchOptionsDialog_Remember`),checked:", NULL },
+    { '\017', "(0," NP_C2 ".jsx)(" NP_C1 ",{label:" NP_C3
+              "(`#Settings_ControllerCalibration_TurnOnSound`),rgOptions:", NULL },
+    { '\020', "(0," NP_C2 ".jsx)(" NP_C1 ",{min:0,max:100,label:" NP_C3 "(`#VoiceInputGain`),", "null" },
+    { '\027', "if(" NP_C1 "())return " NP_C2 "(`#FilterElement_ValidPlatform_MacOS`)", NULL },
+};
+
+static void resolve_binds(const char *src, size_t len) {
+    for (size_t b = 0; b < NP_BIND_COUNT; b++) {
+        np_cap_t first[NP_CAP_MAX] = {{0}};
+        size_t n = count_matches_first(src, len, g_binds[b].find, first);
+        const char *text = g_binds[b].fallback;
+        size_t tlen = text ? strlen(text) : 0;
+        if (n == 1 && first[0].at && first[0].len < NP_BIND_TEXT_MAX) {
+            text = first[0].at;
+            tlen = first[0].len;
+        } else if (n) {
+            NP_WARN("webpatch: component %zu used %zu times where one was expected", b, n);
+        }
+        g_bind_ok[b] = text != NULL;
+        memcpy(g_bind_text[b], text ? text : "", tlen);
+        g_bind_text[b][tlen] = '\0';
+    }
+}
+
+static void clear_binds(void) {
+    for (size_t b = 0; b < NP_BIND_COUNT; b++) {
+        g_bind_ok[b] = 0;
+        g_bind_text[b][0] = '\0';
+    }
+}
+
+static int uses_binds(const char *replace) {
+    for (const char *r = replace; *r; r++)
+        if (bind_index(*r) >= 0) return 1;
+    return 0;
+}
+
+// A replacement naming a component no use of which was found cannot be written.
+static int binds_ready(const char *replace) {
+    for (const char *r = replace; *r; r++) {
+        int b = bind_index(*r);
+        if (b >= 0 && !g_bind_ok[b]) return 0;
+    }
+    return 1;
+}
+
 #define NP_PLATFORM_LISTS "window.__NOTPROTON_NATIVE_PLATFORM__"
 #define NP_MAC_64(APP) \
     "(" NP_PLATFORM_LISTS ".mac.has(" APP ".appid)&&!" APP ".most_available_per_client_data?.is_invalid_os_type)"
-#define NP_MAC_CHECK(OS, APP) \
-    "(0," OS ".Pr)()&&" NP_PLATFORM_LISTS ".mac.has(" APP ".appid)?!" APP \
-    ".most_available_per_client_data?.is_invalid_os_type:(0," OS ".Pr)()&&" \
-    NP_WINDOWS(APP) "?!1:(0," OS ".Pr)()?" \
+#define NP_MAC_CHECK_CALL(PR, APP) \
+    PR "&&" NP_PLATFORM_LISTS ".mac.has(" APP ".appid)?!" APP \
+    ".most_available_per_client_data?.is_invalid_os_type:" PR "&&" \
+    NP_WINDOWS(APP) "?!1:" PR "?" \
     APP ".is_available_on_current_platform&&!" APP ".most_available_per_client_data?.is_invalid_os_type:"
+#define NP_MAC_CHECK(OS, APP) NP_MAC_CHECK_CALL("(0," OS ".Pr)()", APP)
 // .exe shortcuts = Windows
 #define NP_RUNS_EXE "window.__NOTPROTON_RUNS_EXE__"
 #define NP_RUNS_EXE_JS \
@@ -794,6 +930,8 @@ static const np_gate_t g_gates_selecttool[] = {
     "return/\\.exe\"?$/i.test(e?.details?.strShortcutExe??\"\")};\n"
 #define NP_WINDOWS(APP) \
     "(" NP_PLATFORM_LISTS ".windows.has(" APP ".appid)||" NP_RUNS_EXE "(" APP "))"
+#define NP_WINDOWS_ONLY_CASE_CALL(PR, APP) \
+    "case\"notprotonWindows\":return " PR "&&" NP_WINDOWS(APP) "&&!" NP_MAC_64(APP) ";"
 #define NP_WINDOWS_ONLY_CASE(OS, APP) \
     "case\"notprotonWindows\":return(0," OS ".Pr)()&&" NP_WINDOWS(APP) "&&!" \
     NP_MAC_64(APP) ";"
@@ -825,6 +963,12 @@ static const np_gate_t g_fixes[] = {
       1, 0 },
     { "this.m_bServicesInitialized=!0,SteamClient.UI.NotifyAppInitialized()",
       "this.m_bServicesInitialized=!0," NP_LAUNCH_MIGRATION ",SteamClient.UI.NotifyAppInitialized()", 1, 0 },
+    // The first two again, as the Vite build writes them.
+    { "(`#AddNonSteam_Filter_Exe_MacOS`),rFilePatterns:[`*.app`]",
+      "(`#AddNonSteam_Filter_Exe_MacOS`),rFilePatterns:[`*.app`,`*.exe`]", 1, 0 },
+    { "{strFileTypeName:`Image Files (*.tga,*.png)`,rFilePatterns:[`*.tga`,`*.png`]}",
+      "{strFileTypeName:" NP_IMAGE_FILES_LABEL ","
+      "rFilePatterns:[`*.tga`,`*.png`,`*.exe`]}", 1, 0 },
     // Pr means macOS, td means Windows.
     // Steam Play makes every game count as available, so the Apple filter goes by oslist.
     // Games missing from appinfo.vdf, and other platforms, keep Steam's check.
@@ -839,11 +983,20 @@ static const np_gate_t g_fixes[] = {
       NP_WINDOWS_ONLY_CASE(NP_C3, NP_C5) "case " NP_C1 "." NP_C2 ":return " NP_MAC_CHECK(NP_C3, NP_C5)
       "(0," NP_C3 ".CI)()&&!(0," NP_C3 ".mP)()?" NP_C4 "(" NP_C5 "):(0,"
       NP_C3 ".td)()?!0:" NP_C5 ".is_available_on_current_platform&&!" NP_C5 ".is_invalid_os_type;", 1, 0 },
+    // The Vite build inlines the enum and calls CI, mP and td by bare names; Pr is bound.
+    { "case 5:return " NP_C1 "()&&!" NP_C2 "()?" NP_C4 "(" NP_C5 "):" NP_C3 "()?!0:" NP_C5
+      ".is_available_on_current_platform&&!" NP_C5 ".is_invalid_os_type;",
+      NP_WINDOWS_ONLY_CASE_CALL(NP_B_MACOS "()", NP_C5) "case 5:return "
+      NP_MAC_CHECK_CALL(NP_B_MACOS "()", NP_C5) NP_C1 "()&&!" NP_C2 "()?" NP_C4 "(" NP_C5 "):"
+      NP_C3 "()?!0:" NP_C5 ".is_available_on_current_platform&&!" NP_C5 ".is_invalid_os_type;", 1, 0 },
 };
 #define NP_FIX_COUNT (sizeof(g_fixes) / sizeof(g_fixes[0]))
 
-#define NP_NATIVE_MAC_FILTER_FIX (NP_FIX_COUNT - 2)
-#define NP_UPDATED_NATIVE_MAC_FILTER_FIX (NP_FIX_COUNT - 1)
+// The Apple filter fixes come last: at most one of them matches a given client.
+#define NP_NATIVE_MAC_FILTER_FIX (NP_FIX_COUNT - 3)
+#define NP_UPDATED_NATIVE_MAC_FILTER_FIX (NP_FIX_COUNT - 2)
+#define NP_VITE_NATIVE_MAC_FILTER_FIX (NP_FIX_COUNT - 1)
+#define NP_IS_MAC_FILTER_FIX(f) ((f) >= NP_NATIVE_MAC_FILTER_FIX)
 
 #define NP_PLATFORM_TIP "\"#GameList_View_Platform_Linux\":\"#GameList_View_Platform_Apple\""
 #define NP_LOCALIZED_PLATFORM_TIP "(0," NP_C12 ".we)(\"#GameList_View_Platform_Linux\"):(0," NP_C12 \
@@ -914,8 +1067,10 @@ typedef struct {
 static const np_ui_shape_t g_shapes[] = {
     { NP_SHAPE_FORCETOOL,  "#AppProperties_CompatilibityForceTool",
       g_gates_forcetool,  sizeof(g_gates_forcetool) / sizeof(g_gates_forcetool[0]) },
-    { NP_SHAPE_SELECTTOOL, "#AppProperties_Compat_SelectTool",
+    { NP_SHAPE_SELECTTOOL, "\"#AppProperties_Compat_SelectTool\"",
       g_gates_selecttool, sizeof(g_gates_selecttool) / sizeof(g_gates_selecttool[0]) },
+    { NP_SHAPE_SELECTTOOL_VITE, "`#AppProperties_Compat_SelectTool`",
+      g_gates_selecttool_vite, sizeof(g_gates_selecttool_vite) / sizeof(g_gates_selecttool_vite[0]) },
 };
 #define NP_SHAPE_COUNT (sizeof(g_shapes) / sizeof(g_shapes[0]))
 _Static_assert(sizeof(g_gates_forcetool) / sizeof(np_gate_t) <= NP_GATE_MAX, "gate table too long");
@@ -1282,25 +1437,37 @@ char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
     }
     int    fix_on[NP_FIX_COUNT];
     size_t fix_live = 0;
-    char *native_mac_js = NULL;
+    int    need_binds = shape != NULL;
     for (size_t f = 0; f < NP_FIX_COUNT; f++) {
         size_t n = count_matches(s, src_len, g_fixes[f].find);
         fix_on[f] = n == (size_t)g_fixes[f].expect;
-        if ((f == NP_NATIVE_MAC_FILTER_FIX || f == NP_UPDATED_NATIVE_MAC_FILTER_FIX) && fix_on[f]) {
-            free(native_mac_js);
-            native_mac_js = np_nativeplatform_javascript();
-        }
-        if (fix_on[f]) { fix_live++; continue; }
-        if (n)
+        need_binds |= fix_on[f] && uses_binds(g_fixes[f].replace);
+        if (!fix_on[f] && n)
             NP_WARN("webpatch: fix %zu expected %d occurrence(s), found %zu; "
                     "leaving it alone", f, g_fixes[f].expect, n);
     }
-    if (!native_mac_js && (fix_on[NP_NATIVE_MAC_FILTER_FIX] || fix_on[NP_UPDATED_NATIVE_MAC_FILTER_FIX])) {
-        NP_WARN("webpatch: no platform list from appinfo.vdf, the Apple filter stays stock");
-        fix_live -= fix_on[NP_NATIVE_MAC_FILTER_FIX] + fix_on[NP_UPDATED_NATIVE_MAC_FILTER_FIX];
-        fix_on[NP_NATIVE_MAC_FILTER_FIX] = fix_on[NP_UPDATED_NATIVE_MAC_FILTER_FIX] = 0;
+    if (need_binds) resolve_binds(s, src_len);
+    else clear_binds();
+    int mac_filter = 0;
+    for (size_t f = 0; f < NP_FIX_COUNT; f++) {
+        if (fix_on[f] && !binds_ready(g_fixes[f].replace)) {
+            NP_WARN("webpatch: fix %zu names a component this chunk never uses; "
+                    "leaving it alone", f);
+            fix_on[f] = 0;
+        }
+        fix_live += fix_on[f];
+        if (NP_IS_MAC_FILTER_FIX(f)) mac_filter |= fix_on[f];
     }
-    int library_filter = fix_on[NP_NATIVE_MAC_FILTER_FIX] || fix_on[NP_UPDATED_NATIVE_MAC_FILTER_FIX];
+    char *native_mac_js = mac_filter ? np_nativeplatform_javascript() : NULL;
+    if (!native_mac_js && mac_filter) {
+        NP_WARN("webpatch: no platform list from appinfo.vdf, the Apple filter stays stock");
+        for (size_t f = NP_NATIVE_MAC_FILTER_FIX; f < NP_FIX_COUNT; f++) {
+            fix_live -= fix_on[f];
+            fix_on[f] = 0;
+        }
+        mac_filter = 0;
+    }
+    int library_filter = mac_filter;
     int library_on[NP_LIBRARY_FILTER_COUNT] = {0};
     for (size_t g = 0; library_filter && g < NP_LIBRARY_FILTER_COUNT; g++) {
         size_t n = count_matches(s, src_len, g_library_filters[g].find);
@@ -1332,6 +1499,12 @@ char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
         for (size_t g = 0; g < shape->count; g++) {
             size_t n = count_matches(s, src_len, shape->gates[g].find);
             gate_on[g] = n == (size_t)shape->gates[g].expect;
+            if (gate_on[g] && !binds_ready(shape->gates[g].replace)) {
+                NP_WARN("webpatch: [%s] gate %zu names a component this chunk never uses",
+                        shape->name, g);
+                gate_on[g] = 0;
+                n = 0;
+            }
             if (gate_on[g]) { gate_live++; continue; }
             if (shape->gates[g].optional) {
                 NP_WARN("webpatch: [%s] optional gate %zu expected %d occurrence(s), "

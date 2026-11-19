@@ -224,6 +224,13 @@ static void selfcheck(void) {
                 wrong("fix %zu and library anchor %zu share an anchor", f, g);
     }
 
+    for (size_t b = 0; b < NP_BIND_COUNT; b++) {
+        if (bind_index(g_binds[b].marker) != (int)b)
+            wrong("component %zu is read through the wrong marker", b);
+        if (!g_binds[b].find || !strchr(g_binds[b].find, NP_C1[0]))
+            wrong("component %zu has no capture 1 to read its name from", b);
+    }
+
     printf("%zu shapes, %zu gates, %zu fixes, %zu library anchors checked\n",
            NP_SHAPE_COUNT, total, NP_FIX_COUNT, NP_LIBRARY_FILTER_COUNT);
     check_paths();
@@ -330,6 +337,21 @@ static int extract(const char *chunk, const char *out_path) {
             return 1;
         }
     }
+    // The components a replacement names are read off uses of them elsewhere in the chunk.
+    for (size_t b = 0; b < NP_BIND_COUNT; b++) {
+        int named = 0;
+        for (size_t g = 0; g < S->count; g++)
+            named |= strchr(S->gates[g].replace, g_binds[b].marker) != NULL;
+        for (size_t i = 0; named && i < len; ) {
+            size_t used = match_at((const char *)buf, len, i, g_binds[b].find, caps);
+            if (!used) { i++; continue; }
+            size_t from = i > pad ? i - pad : 0;
+            size_t to   = i + used + pad < len ? i + used + pad : len;
+            fwrite(buf + from, 1, to - from, o);
+            fputs("\n", o);
+            i += used;
+        }
+    }
     fclose(o);
     free(buf);
     printf("extracted fixture to %s\n", out_path);
@@ -340,7 +362,7 @@ static const np_gate_t *library_anchor(size_t i) {
     return i < NP_LIBRARY_FILTER_COUNT ? &g_library_filters[i]
                                        : &g_fixes[NP_NATIVE_MAC_FILTER_FIX + i - NP_LIBRARY_FILTER_COUNT];
 }
-#define NP_LIBRARY_ANCHORS (NP_LIBRARY_FILTER_COUNT + 2)
+#define NP_LIBRARY_ANCHORS (NP_LIBRARY_FILTER_COUNT + NP_FIX_COUNT - NP_NATIVE_MAC_FILTER_FIX)
 
 static int extract_library(const char *chunk, const char *out_path) {
     size_t len = 0;
@@ -408,6 +430,38 @@ static void check_optional_drift(const np_ui_shape_t *S, size_t g, const uint8_t
         wrong("[%s] drift in optional gate %zu left the whole shape unpatched", S->name, g);
     }
     free(copy);
+}
+
+// A component the shape names but the chunk never uses: without a fallback the shape is
+// refused, with one the gate still applies and names the fallback.
+static void check_unbound(const np_ui_shape_t *S, const uint8_t *buf, size_t len) {
+    for (size_t b = 0; b < NP_BIND_COUNT; b++) {
+        int named = 0;
+        for (size_t g = 0; g < S->count; g++)
+            named |= !S->gates[g].optional && strchr(S->gates[g].replace, g_binds[b].marker) != NULL;
+        if (!named) continue;
+        char *copy = malloc(len + 1);
+        if (!copy) { wrong("out of memory"); return; }
+        memcpy(copy, buf, len + 1);
+        np_cap_t caps[NP_CAP_MAX];
+        for (size_t i = 0; i < len; ) {
+            size_t used = match_at(copy, len, i, g_binds[b].find, caps);
+            if (!used) { i++; continue; }
+            copy[i + used - 1] = '\x01';
+            i += used;
+        }
+        int saved = np_log_level;
+        np_log_level = -1;
+        size_t out_len = 0;
+        char *out = np_webpatch_transform((const uint8_t *)copy, len, &out_len, NULL);
+        np_log_level = saved;
+        if (!g_binds[b].fallback && out)
+            wrong("[%s] patched without component %zu", S->name, b);
+        if (g_binds[b].fallback && !out)
+            wrong("[%s] refused without component %zu, which has a fallback", S->name, b);
+        free(out);
+        free(copy);
+    }
 }
 
 static const char g_test_lists[] =
@@ -565,6 +619,7 @@ int main(int argc, char **argv) {
             for (size_t g = 0; S && g < S->count; g++)
                 if (S->gates[g].optional && applied[g])
                     check_optional_drift(S, g, buf, len, applied);
+            if (S) check_unbound(S, buf, len);
         } else {
             printf("REJECTED %s\n", argv[i]);
         }

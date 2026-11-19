@@ -19,9 +19,11 @@ void np_webpatch_set_fex_tools(const char *const *names, size_t count);
 
 // The compat UIs, named so a caller can compare against the table rather than a literal
 // of its own that a rename would leave behind. forcetool calls SpecifyCompatTool straight
-// out; selecttool reads its list from the CompatManager routes.
-#define NP_SHAPE_FORCETOOL  "forcetool"
-#define NP_SHAPE_SELECTTOOL "selecttool"
+// out; selecttool reads its list from the CompatManager routes. selecttool-vite is the
+// selecttool page as Steam's Vite build writes it.
+#define NP_SHAPE_FORCETOOL       "forcetool"
+#define NP_SHAPE_SELECTTOOL      "selecttool"
+#define NP_SHAPE_SELECTTOOL_VITE "selecttool-vite"
 
 // `out_shape` is optional and names the compat UI the chunk carried, so a caller can tell
 // which page it just served without probing the bytes a second time. It is set whenever a

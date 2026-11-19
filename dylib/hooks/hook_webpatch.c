@@ -133,7 +133,8 @@ static int open_patched(const char *path) {
 
     // Only this page pays for an unregistered service, and only here is it known that the
     // page arrived. UNTRIED is not a miss: the chunk can precede the first route lookup.
-    if (shape && strcmp(shape, NP_SHAPE_SELECTTOOL) == 0 &&
+    if (shape && (strcmp(shape, NP_SHAPE_SELECTTOOL) == 0 ||
+                  strcmp(shape, NP_SHAPE_SELECTTOOL_VITE) == 0) &&
         np_compatsvc_routes() == NP_COMPATSVC_ABSENT)
         NP_ERR("webpatch: the compat page sources its tools from CompatManager and this "
                "client cannot answer, so the list will be empty");
