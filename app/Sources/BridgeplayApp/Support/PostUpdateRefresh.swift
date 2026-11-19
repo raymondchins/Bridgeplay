@@ -83,5 +83,7 @@ enum PostUpdateRefresh {
         }
         // Engines whose files this build rebuilt or re-pinned follow, under the same rule.
         if decision != .wait { await status.updateEverything(includingSteamPatch: false) }
+        // A default left naming a replaced tool (Steam was open when the engine updated).
+        await Task.detached(priority: .utility) { SystemStatus.followDefaultTool() }.value
     }
 }

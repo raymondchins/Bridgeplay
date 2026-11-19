@@ -128,6 +128,57 @@ enum SteamDefaultTool {
 
     static let step = "Set Steam's default compatibility tool"
 
+    // bridgeplay-proton-winecx-11.17 and bridgeplay-proton-winecx are one family, as are
+    // bridgeplay-proton-fex-41069 and bridgeplay-proton-fex: the build suffix is dropped.
+    static func family(_ name: String) -> String {
+        var parts = name.split(separator: "-", omittingEmptySubsequences: false)
+        if parts.count > 1, let last = parts.last, !last.isEmpty,
+           last.allSatisfy({ $0.isNumber || $0 == "." }) { parts.removeLast() }
+        return parts.joined(separator: "-")
+    }
+
+    // The installed tool that replaces a Bridgeplay tool that is gone: same family, first in
+    // preference order. nil when the tool is still installed, is not ours, or has no successor.
+    static func successor(of name: String, installed: [String]) -> String? {
+        guard ToolName.isOurs(name), !installed.contains(name) else { return nil }
+        return installed.first { family($0) == family(name) }
+    }
+
+    // Re-points the default and every per-game choice that names a Bridgeplay tool which is no
+    // longer installed to its successor. A tool still installed, or without a successor, is
+    // left as it is. nil when nothing changes.
+    static func followingSuccessors(_ text: String, installed: [String]) -> String? {
+        var lines = text.components(separatedBy: "\n")
+        guard let mapping = keyLine(lines, "CompatToolMapping", from: 0),
+              let open = openBrace(lines, after: mapping), let close = closeBrace(lines, open: open)
+        else { return nil }
+        var changed = false
+        for index in open + 1 ..< close {
+            guard let (key, value, _) = BrandMigration.keyValue(lines[index]), key.lowercased() == "name",
+                  let next = successor(of: value, installed: installed),
+                  let range = lines[index].range(of: "\"\(value)\"", options: .backwards)
+            else { continue }
+            lines[index].replaceSubrange(range, with: "\"\(next)\"")
+            changed = true
+        }
+        return changed ? lines.joined(separator: "\n") : nil
+    }
+
+    // Writes followingSuccessors() to config.vdf; refused while Steam runs, and only then when
+    // the file would change. Returns whether it wrote.
+    @discardableResult
+    static func followSuccessors(
+        installed: [String], in file: URL = config,
+        steamRunning: () -> Bool = { SteamBundle.isRunningForThisUser }
+    ) throws -> Bool {
+        guard let text = try? String(contentsOf: file, encoding: .utf8),
+              let result = followingSuccessors(text, installed: installed)
+        else { return false }
+        guard !steamRunning() else { throw SteamRunning() }
+        try WriteRefused.catching(file) { try result.write(to: file, atomically: true, encoding: .utf8) }
+        return true
+    }
+
     // Replaces the "0" entry under CompatToolMapping, or adds it (and CompatToolMapping) when
     // missing. nil when the file has no Valve > Steam section to put it in.
     static func updated(_ text: String, tool: String) -> String? {

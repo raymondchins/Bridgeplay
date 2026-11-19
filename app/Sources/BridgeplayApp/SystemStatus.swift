@@ -448,7 +448,26 @@ final class SystemStatus {
 
     private static let toolsRestartHint = String(localized: "Restart Steam to update its list of compatibility tools.")
 
+    // After an engine update the tool the Steam default names may be gone; point it, and any
+    // per-game choice, at its successor. Steam running only defers it to the next idle launch.
+    nonisolated static func followDefaultTool(
+        installed: [String] = CompatToolList.installed().map(\.name),
+        in file: URL = SteamDefaultTool.config,
+        steamRunning: () -> Bool = { SteamBundle.isRunningForThisUser }
+    ) {
+        do {
+            if try SteamDefaultTool.followSuccessors(installed: installed, in: file, steamRunning: steamRunning) {
+                AppLog.note("default tool: pointed Steam's compatibility tool choices at the installed successor")
+            }
+        } catch is SteamDefaultTool.SteamRunning {
+            AppLog.note("default tool: Steam is running, so a replaced tool is re-pointed on a later launch")
+        } catch {
+            AppLog.note("default tool: could not follow the updated engine: \(error.localizedDescription)")
+        }
+    }
+
     private func runnerOutcome(_ result: RunnerSetup.Outcome) -> String {
+        Self.followDefaultTool()
         if result.stagedNothing { return String(localized: "Compatibility tool is already set up.") }
         guard result.toolsChanged, SteamBundle.isRunning else { return String(localized: "Compatibility tool ready.") }
         return String(localized: "Compatibility tool ready. \(Self.toolsRestartHint)")

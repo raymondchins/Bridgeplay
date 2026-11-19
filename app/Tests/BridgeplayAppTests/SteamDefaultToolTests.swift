@@ -194,3 +194,49 @@ struct SteamGameEntriesTests {
         #expect(try String(contentsOf: file, encoding: .utf8) == Self.vdf([]))
     }
 }
+
+@Suite("Steam default follows engine updates")
+struct SteamDefaultFollowTests {
+    private func vdf(_ names: [(String, String)]) -> String {
+        let entries = names.map { id, name in
+            "\t\t\t\t\t\"\(id)\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"name\"\t\t\"\(name)\"\n\t\t\t\t\t\t\"config\"\t\t\"\"\n\t\t\t\t\t\t\"priority\"\t\t\"75\"\n\t\t\t\t\t}"
+        }.joined(separator: "\n")
+        return "\"InstallConfigStore\"\n{\n\t\"Software\"\n\t{\n\t\t\"valve\"\n\t\t{\n\t\t\t\"Steam\"\n\t\t\t{\n\t\t\t\t\"CompatToolMapping\"\n\t\t\t\t{\n\(entries)\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}"
+    }
+
+    @Test("Family drops the build suffix")
+    func family() {
+        #expect(SteamDefaultTool.family("bridgeplay-proton-winecx-11.17") == "bridgeplay-proton-winecx")
+        #expect(SteamDefaultTool.family("bridgeplay-proton-fex-41069") == "bridgeplay-proton-fex")
+        #expect(SteamDefaultTool.family("bridgeplay-proton-fex-rosetta") == "bridgeplay-proton-fex-rosetta")
+    }
+
+    @Test("A default naming a replaced tool moves to its successor")
+    func repoints() throws {
+        let text = vdf([("0", "bridgeplay-proton-winecx-11.17"), ("10", "bridgeplay-proton-winecx-11.17"), ("20", "proton_9")])
+        let out = try #require(SteamDefaultTool.followingSuccessors(text, installed: ["bridgeplay-proton-winecx-11.18", "bridgeplay-proton-winehq"]))
+        #expect(out == vdf([("0", "bridgeplay-proton-winecx-11.18"), ("10", "bridgeplay-proton-winecx-11.18"), ("20", "proton_9")]))
+    }
+
+    @Test("A tool still installed, another family, or not ours is left alone")
+    func leavesAlone() {
+        let text = vdf([("0", "bridgeplay-proton-winecx-11.17"), ("10", "proton_9")])
+        #expect(SteamDefaultTool.followingSuccessors(text, installed: ["bridgeplay-proton-winecx-11.17", "bridgeplay-proton-winecx-11.18"]) == nil)
+        #expect(SteamDefaultTool.followingSuccessors(text, installed: ["bridgeplay-proton-winehq"]) == nil)
+        #expect(SteamDefaultTool.followingSuccessors(vdf([("0", "proton_9")]), installed: ["proton_10"]) == nil)
+    }
+
+    @Test("Refused while Steam runs, written when closed")
+    func steamGuard() throws {
+        let file = FileManager.default.temporaryDirectory.appending(path: "bp-follow-\(UUID().uuidString).vdf")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let text = vdf([("0", "bridgeplay-proton-winecx")])
+        try text.write(to: file, atomically: true, encoding: .utf8)
+        #expect(throws: SteamDefaultTool.SteamRunning.self) {
+            try SteamDefaultTool.followSuccessors(installed: ["bridgeplay-proton-winecx-11.17"], in: file, steamRunning: { true })
+        }
+        #expect(try String(contentsOf: file, encoding: .utf8) == text)
+        #expect(try SteamDefaultTool.followSuccessors(installed: ["bridgeplay-proton-winecx-11.17"], in: file, steamRunning: { false }))
+        #expect(try String(contentsOf: file, encoding: .utf8) == vdf([("0", "bridgeplay-proton-winecx-11.17")]))
+    }
+}
