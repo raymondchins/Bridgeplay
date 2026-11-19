@@ -150,7 +150,7 @@ static uint32_t cbz(int32_t words, uint32_t rt) {
 
 // The gate the probe is handed: the appid load, a branch past it, and the install load
 // the branch lands near. Laid out in a fresh buffer so one case cannot feed the next.
-#define CODE_WORDS 64
+#define CODE_WORDS 160
 #define GATE_IDX   32
 static uint32_t code[CODE_WORDS];
 
@@ -211,9 +211,18 @@ static void probe_cases(void) {
     check(np_compat_probe_tool_layout(gate, 0) == 0, "a branch landing on no install load is refused");
 }
 
+// The layout both probes agree on, for cases that set the shifts by hand.
+static void confirm_layout(void) {
+    g_head_probed = g_tail_probed = 1;
+    g_head_appid_off = (uint32_t)((int32_t)COMPAT_TOOL_APPID_OFF + g_tool_shift);
+}
+
 // YldRegisterTool's prologue as the clients build it: the tool pointer parked in a callee-saved
 // register, x1 reused for a log call's argument, then the name read through a second copy.
 static uint32_t movz_w(uint32_t rd, uint32_t imm) { return 0x52800000u | (imm << 5) | rd; }
+static uint32_t ldr32(uint32_t base, uint32_t off, uint32_t rt) {
+    return 0xB9400000u | ((off / 4) << 10) | (base << 5) | rt;
+}
 static uint32_t enc_mov(uint32_t rd, uint32_t rm) { return 0xAA0003E0u | (rm << 16) | rd; }
 static uint32_t enc_ldr64_pre(uint32_t base, uint32_t off, uint32_t rt) {
     return 0xF8400C00u | ((off & 0x1FFu) << 12) | (base << 5) | rt;
@@ -228,13 +237,15 @@ static uintptr_t build_yld(uint32_t name_off, int via_x1_after_reuse) {
     code[4] = via_x1_after_reuse ? ldr64(1, 0x40, 8) : NOP;
     code[5] = enc_mov(21, 20);             // mov x21, x20
     code[6] = enc_ldr64_pre(21, name_off, 8);  // ldr x8, [x21, #name]!
+    code[7] = ldr32(21, 0x28, 9);          // ldr w9, [x21, #0x28]: the appid, name + 0x28
+    code[8] = 0xD65F03C0u;                 // ret
     return (uintptr_t)code;
 }
 
 static void head_cases(void) {
     g_head_shift = 0;
     check(np_compat_probe_tool_head(build_yld(0x40, 0)) == 1, "the stable prologue probes clean");
-    check(g_head_shift == 0, "a name at the reference offset reports no head shift");
+    check(g_head_shift == 0 && g_head_appid_off == 0x68, "a name at the reference offset reports no head shift");
 
     check(np_compat_probe_tool_head(build_yld(0x48, 0)) == 1, "the beta prologue probes clean");
     check(g_head_shift == 8, "a name 8 further in reports the head shift");
@@ -284,6 +295,62 @@ static void head_cases(void) {
     code[3] = 0x14000000u | (0x200u / 4);  // b past the window
     check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a branch out of the window is refused");
 
+    // Anything the walk does not model is refused rather than guessed past.
+    static const uint32_t unmodelled[] = {
+        0x58000041u,                       // ldr x1, literal
+        0x0CDF7000u | (20u << 5),          // ld1 {v0.8b}, [x20], #8
+        0xC87F0000u | (20u << 10) | 8u,    // ldxp x8, x20, [x0]
+        0xC8E0FC00u | (2u << 16) | 20u,    // casal x2, x20, [x0]
+        0xF8228000u | 20u,                 // swp x2, x20, [x0]
+        0x91000000u | (0x48u << 10) | (20u << 5) | 9u,  // add x9, x20, #0x48
+    };
+    for (size_t i = 0; i < sizeof unmodelled / sizeof *unmodelled; i++) {
+        build_yld(0x48, 0);
+        code[3] = unmodelled[i];
+        check(np_compat_probe_tool_head((uintptr_t)code) == 0, "an unmodelled instruction is refused");
+    }
+
+    // Both sides of a conditional branch are read and must agree.
+    for (int agree = 0; agree < 2; agree++) {
+        for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
+        code[0] = enc_mov(20, 1);
+        code[1] = 0x34000000u | (4u << 5) | 2u;    // cbz w2, +4 words
+        code[2] = ldr64(20, agree ? 0x48 : 0x40, 8);
+        code[3] = ldr32(20, agree ? 0x70 : 0x68, 9);
+        code[4] = 0xD65F03C0u;
+        code[5] = ldr64(20, 0x48, 8);
+        code[6] = ldr32(20, 0x70, 9);
+        code[7] = 0xD65F03C0u;
+        check(np_compat_probe_tool_head((uintptr_t)code) == agree,
+              agree ? "paths that agree probe clean" : "paths that disagree are refused");
+    }
+    check(g_head_shift == 8 && g_head_appid_off == 0x70, "an unscaled name load keeps its own appid");
+
+    // A call writes the link register too, so a copy parked there is gone after it.
+    for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
+    code[0] = enc_mov(30, 1);
+    code[1] = movz_w(1, 4);
+    code[2] = 0x94000040u;                 // bl
+    code[3] = ldr64(30, 0x40, 8);
+    code[4] = ldr32(30, 0x68, 9);
+    code[5] = 0xD65F03C0u;
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a copy in the link register is lost to a call");
+
+    // The appid read after the name ties the head to the tail probe.
+    build_yld(0x48, 0);
+    code[7] = NOP;
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a name with no appid after it is refused");
+    build_yld(0x48, 0);
+    code[7] = ldr32(21, 0x20, 9);          // appid at 0x68, which the beta tail does not have
+    check(np_compat_probe_tool_head((uintptr_t)code) == 1, "the head probe itself reads a mismatched appid");
+    g_tool_shift = 16;
+    g_tail_probed = 1;
+    check(!np_compat_layout_known(), "an appid the tail probe disagrees with leaves the layout unconfirmed");
+    check(np_compat_probe_tool_head(build_yld(0x48, 0)) == 1 && g_head_appid_off == 0x70 &&
+          np_compat_layout_known(), "the beta prologue agrees with the beta tail");
+    g_tool_shift = 0;
+    g_tail_probed = 0;
+
     check(np_compat_probe_tool_head(build_yld(0x30, 0)) == 0, "a name below the reference is refused");
     check(np_compat_probe_tool_head(0) == 0, "no function is refused");
     for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
@@ -292,7 +359,7 @@ static void head_cases(void) {
     // Beta 1795048523: 8 bytes ahead of "unlisted", 16 in all by the install dir.
     g_head_shift = 8;
     g_tool_shift = 16;
-    g_head_probed = g_tail_probed = 1;
+    confirm_layout();
     check(np_compat_tool_off(0x20) == 0x20, "a field below the head insertion stays put");
     check(np_compat_tool_off(COMPAT_TOOL_GATE_FLAGS_OFF) == 0x2c, "unlisted follows the head shift");
     check(np_compat_tool_off(COMPAT_TOOL_PRIORITY_OFF) == 0x40, "priority follows the head shift");
@@ -382,7 +449,7 @@ static void *build_manager(uint32_t count, int named_slot) {
 static void manager_cases(void) {
     g_tool_shift = 0;
     g_head_shift = 0;
-    g_head_probed = g_tail_probed = 1;
+    confirm_layout();
 
     void *mgr = build_manager(3, 1);
     void *want = entries + np_compat_tool_stride();
@@ -407,6 +474,7 @@ static void manager_cases(void) {
 
     // The walk steps by the live stride, so an entry that grew is still found.
     g_tool_shift = 8;
+    confirm_layout();
     mgr = build_manager(3, 2);
     check(np_compat_registered_tool(mgr) == entries + 2 * np_compat_tool_stride(),
           "the walk steps by the live stride rather than the baseline");
@@ -444,7 +512,7 @@ static void registration_case(int shift, int mode) {
     tool_entry_t tools[2] = {0};
     g_tool_shift = shift;
     g_head_shift = 0;
-    g_head_probed = g_tail_probed = 1;
+    confirm_layout();
     if (mode == 7) g_head_probed = 0;   // a client whose layout was not confirmed
     g_tools = tools;
     g_tool_count = mode == 4 ? 0 : 2;
@@ -513,6 +581,7 @@ static void registration_cases(void) {
 }
 
 static void tool_list_cases(void) {
+    confirm_layout();
     static const char path[] = "out/compatcheck-tools";
     FILE *f = fopen(path, "w");
     if (!f) {
@@ -941,7 +1010,7 @@ static void shortcut_exe_cases(void) {
 }
 
 int main(void) {
-    g_head_probed = g_tail_probed = 1;   // the reference layout, unless a case says otherwise
+    confirm_layout();   // the reference layout, unless a case says otherwise
     concurrent_fallback_cases();
     probe_cases();
     head_cases();

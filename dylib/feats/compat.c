@@ -99,6 +99,9 @@ static int32_t g_tool_shift;
 static int32_t g_head_shift;
 static int     g_head_probed;
 static int     g_tail_probed;
+// Where YldRegisterTool reads the appid right after the name. It must agree with the
+// appid the tail probe found, which ties the head probe to an independent reading.
+static uint32_t g_head_appid_off;
 
 // LDR Wt,[X0,#imm]. Writes the byte offset and destination register.
 static int ldr32_from_x0(uint32_t w, uint32_t *off, uint32_t *rt) {
@@ -173,124 +176,165 @@ static int probe_oslist_offsets(uintptr_t oslist_gate, uint32_t base,
     return 2;
 }
 
-// LDR Xt,[Xn,#imm]! (pre-index). Writes the base register and the signed offset.
-static int ldr64_pre(uint32_t w, uint32_t *rn, int32_t *off) {
-    if ((w & 0xFFE00C00u) != 0xF8400C00u) return 0;
-    int32_t imm = (int32_t)((w >> 12) & 0x1FFu);
-    *off = (imm << 23) >> 23;
-    *rn  = (w >> 5) & 0x1Fu;
-    return 1;
-}
-
-// MOV Xd,Xm (ORR Xd,XZR,Xm). Writes both registers.
-static int mov_reg(uint32_t w, uint32_t *rd, uint32_t *rm) {
-    if ((w & 0xFFE0FFE0u) != 0xAA0003E0u) return 0;
-    *rd = w & 0x1Fu;
-    *rm = (w >> 16) & 0x1Fu;
-    return 1;
-}
-
-// How far an unconditional branch may take the head probe, and how many
-// instructions it reads in all.
+// The head probe reads at most this far into YldRegisterTool, and this many
+// instructions over every path it walks.
 #define TOOL_HEAD_WINDOW 0x200
-#define TOOL_HEAD_STEPS  48
+#define TOOL_HEAD_BUDGET 256
+
+struct head_hit {
+    uint32_t name_off;
+    uint32_t appid_off;
+};
+
+#define REG_BIT(r) (1u << ((r) & 0x1Fu))
+#define RD(w) ((w) & 0x1Fu)
+#define RN(w) (((w) >> 5) & 0x1Fu)
+
+// After the name load: the appid is the next 32-bit load through the same base, with
+// only instructions in between that leave that base alone.
+static int head_appid(uintptr_t pc, uintptr_t end, uint32_t base, uint32_t delta, uint32_t *appid_off) {
+    for (int i = 0; i < 8 && pc + 4 <= end; i++, pc += 4) {
+        uint32_t w = *(const uint32_t *)pc;
+        if ((w & 0xFFC00000u) == 0xB9400000u && RN(w) == base) {      // LDR Wt,[Xn,#imm]
+            *appid_off = delta + ((w >> 10) & 0xFFFu) * 4u;
+            return 1;
+        }
+        int store = (w & 0x3FC00000u) == 0x39000000u;                // STR (unsigned offset)
+        int ok = store
+              || (w & 0x1F000000u) == 0x10000000u                    // ADR, ADRP
+              || (w & 0x1F000000u) == 0x11000000u                    // ADD/SUB/CMP immediate
+              || (w & 0x1F800000u) == 0x12800000u                    // MOVZ/MOVN/MOVK
+              || (w & 0x7FE00C00u) == 0x1A800000u;                   // CSEL
+        if (!ok || (!store && RD(w) == base)) return 0;
+    }
+    return 0;
+}
+
+// Walks one path. Anything it does not model ends the walk with no answer, and both
+// sides of a conditional branch must give the same answer.
+static int head_walk(uintptr_t start, uintptr_t pc, uint32_t alias, int *budget,
+                     struct head_hit *hit) {
+    const uintptr_t end = start + TOOL_HEAD_WINDOW;
+    for (;; pc += 4) {
+        if (pc < start || pc + 4 > end || --*budget < 0) return 0;
+        uint32_t w = *(const uint32_t *)pc;
+
+        if ((w & 0xFFFFF01Fu) == 0xD503201Fu) continue;              // NOP and other hints
+        if ((w & 0xFFE0FFE0u) == 0xAA0003E0u) {                      // MOV Xd,Xm
+            uint32_t rd = RD(w), rm = (w >> 16) & 0x1Fu;
+            if ((alias & REG_BIT(rm)) && rd != 31) alias |= REG_BIT(rd);
+            else alias &= ~REG_BIT(rd);
+            continue;
+        }
+        if ((w & 0xFFE0FFE0u) == 0x2A0003E0u ||                      // MOV Wd,Wm
+            (w & 0x1F000000u) == 0x10000000u ||                      // ADR, ADRP
+            (w & 0x1F800000u) == 0x12800000u) {                      // MOVZ/MOVN/MOVK
+            alias &= ~REG_BIT(RD(w));
+            continue;
+        }
+        if ((w & 0x1F000000u) == 0x11000000u) {                      // ADD/SUB immediate
+            // An address formed from the tool is a field this does not follow.
+            if (alias & REG_BIT(RN(w))) return 0;
+            if (!((w & 0x20000000u) && RD(w) == 31)) alias &= ~REG_BIT(RD(w));
+            continue;
+        }
+        if ((w & 0x3C000000u) == 0x28000000u) {                      // integer LDP/STP
+            uint32_t mode = (w >> 23) & 3u, rt2 = (w >> 10) & 0x1Fu;
+            if (mode == 0 || (mode != 2 && RN(w) != 31)) return 0;
+            if (w & 0x00400000u) {
+                if (alias & REG_BIT(RN(w))) return 0;
+                alias &= ~(REG_BIT(RD(w)) | REG_BIT(rt2));
+            }
+            continue;
+        }
+        if ((w & 0x3F000000u) == 0x39000000u) {                      // integer LDR/STR, unsigned offset
+            uint32_t size = w >> 30, opc = (w >> 22) & 3u;
+            if (opc == 0) continue;                                  // store
+            if (alias & REG_BIT(RN(w))) {
+                if (size != 3 || opc != 1) return 0;
+                hit->name_off = ((w >> 10) & 0xFFFu) * 8u;
+                return head_appid(pc + 4, end, RN(w), 0, &hit->appid_off);
+            }
+            alias &= ~REG_BIT(RD(w));
+            continue;
+        }
+        if ((w & 0x3F200000u) == 0x38000000u) {                      // integer LDR/STR, pre/post/unscaled
+            uint32_t size = w >> 30, opc = (w >> 22) & 3u, idx = (w >> 10) & 3u;
+            if (idx == 2) return 0;                                  // unprivileged
+            int load = opc != 0;
+            if (alias & REG_BIT(RN(w))) {
+                // Only the 64-bit pre-indexed load is the name; it leaves the base on it.
+                if (idx != 3 || !load || size != 3 || opc != 1 || RD(w) == RN(w)) return 0;
+                int32_t imm = (int32_t)(((w >> 12) & 0x1FFu) << 23) >> 23;
+                if (imm <= 0) return 0;
+                hit->name_off = (uint32_t)imm;
+                return head_appid(pc + 4, end, RN(w), (uint32_t)imm, &hit->appid_off);
+            }
+            if (idx != 0 && RN(w) != 31) alias &= ~REG_BIT(RN(w));
+            if (load) alias &= ~REG_BIT(RD(w));
+            continue;
+        }
+        // A call clobbers x0-x18 and the link register.
+        if ((w & 0xFC000000u) == 0x94000000u || (w & 0xFFFFFC1Fu) == 0xD63F0000u) {
+            alias &= ~(0x7FFFFu | REG_BIT(30));
+            continue;
+        }
+        if ((w & 0xFC000000u) == 0x14000000u) {                      // B
+            int32_t imm = (int32_t)(w << 6) >> 4;
+            if (imm <= 0) return 0;
+            pc += (intptr_t)imm - 4;
+            continue;
+        }
+        int32_t disp;
+        if ((w & 0xFF000010u) == 0x54000000u || (w & 0x7E000000u) == 0x34000000u)
+            disp = (int32_t)(((w >> 5) & 0x7FFFFu) << 13) >> 11;     // B.cond, CBZ, CBNZ
+        else if ((w & 0x7E000000u) == 0x36000000u)
+            disp = (int32_t)(((w >> 5) & 0x3FFFu) << 18) >> 16;      // TBZ, TBNZ
+        else
+            return 0;
+        if (disp <= 0) return 0;
+        struct head_hit taken, through;
+        if (!head_walk(start, pc + (intptr_t)disp, alias, budget, &taken) ||
+            !head_walk(start, pc + 4, alias, budget, &through) ||
+            taken.name_off != through.name_off || taken.appid_off != through.appid_off)
+            return 0;
+        *hit = taken;
+        return 1;
+    }
+}
 
 int np_compat_probe_tool_head(uintptr_t yld_register_tool) {
     g_head_probed = 0;
     if (!yld_register_tool) return 0;
 
-    // YldRegisterTool(manager, tool) copies the tool pointer out of x1 before its first
-    // call and logs the name first, so the first 64-bit load through a copy of x1 is
-    // the name. Only copies made before x1 is reused for a call argument count. The
-    // walk follows the path the code takes: forward branches are taken, conditional
-    // ones fall through, and a return or indirect branch ends it with no answer.
-    uint32_t alias = 1u << 1;
-    uintptr_t pc = yld_register_tool;
-    for (int i = 0; i < TOOL_HEAD_STEPS; i++, pc += 4) {
-        uint32_t w = *(const uint32_t *)pc;
-        uint32_t rd, rm, rn, off;
-        int32_t  soff;
-        if (mov_reg(w, &rd, &rm)) {
-            if ((alias & (1u << rm)) && rd != 31) alias |= 1u << rd;
-            else alias &= ~(1u << rd);
-            continue;
-        }
-        int found = 0;
-        if (ldr64_pre(w, &rn, &soff) && (alias & (1u << rn)) && soff > 0) {
-            off = (uint32_t)soff;
-            found = 1;
-        } else if ((w & 0xFFC00000u) == 0xF9400000u && (alias & (1u << ((w >> 5) & 0x1Fu)))) {
-            off = ((w >> 10) & 0xFFFu) * 8u;
-            found = 1;
-        }
-        if (found) {
-            int32_t head = (int32_t)off - COMPAT_TOOL_NAME_OFF;
-            if (head < 0 || head > 0x20 || (head & 7)) {
-                NP_ERR("np_compat_probe_tool_head: the first tool load is at 0x%x, which is "
-                       "not where a name can sit", off);
-                return 0;
-            }
-            g_head_shift  = head;
-            g_head_probed = 1;
-            if (head)
-                NP_LOG("np_compat_probe_tool_head: tool fields from 0x%x onward are %+d "
-                       "from the baseline (name 0x%x)", COMPAT_TOOL_HEAD_OFF, head, off);
-            return 1;
-        }
-        // A call clobbers the argument and scratch registers x0-x18, so a copy left in
-        // x1 is no longer the tool after one.
-        if ((w & 0x7C000000u) == 0x14000000u && (w & 0x80000000u)) {  // BL
-            alias &= ~0x7FFFFu;
-            continue;
-        }
-        if ((w & 0xFFFFFC1Fu) == 0xD63F0000u) {                       // BLR
-            alias &= ~0x7FFFFu;
-            continue;
-        }
-        if ((w & 0xFC000000u) == 0x14000000u) {                       // B
-            int32_t imm = (int32_t)(w << 6) >> 4;
-            uintptr_t to = pc + (intptr_t)imm;
-            if (imm <= 0 || to >= yld_register_tool + TOOL_HEAD_WINDOW) break;
-            pc = to - 4;
-            continue;
-        }
-        if ((w & 0xFE000000u) == 0xD6000000u) break;                  // BR, RET
-        if ((w & 0xFF000010u) == 0x54000000u ||                       // B.cond
-            (w & 0x7E000000u) == 0x34000000u ||                       // CBZ, CBNZ
-            (w & 0x7E000000u) == 0x36000000u)                         // TBZ, TBNZ
-            continue;
-        // Register pairs: a load writes both, and pre- or post-indexing writes the base.
-        if ((w & 0x38000000u) == 0x28000000u) {
-            if ((w & 0x00400000u) && !(w & 0x04000000u)) {
-                alias &= ~(1u << (w & 0x1Fu));
-                alias &= ~(1u << ((w >> 10) & 0x1Fu));
-            }
-            if (w & 0x00800000u) alias &= ~(1u << ((w >> 5) & 0x1Fu));
-            continue;
-        }
-        // Single registers with pre- or post-indexing write the base as well.
-        if ((w & 0x3B200400u) == 0x38000400u) {
-            alias &= ~(1u << ((w >> 5) & 0x1Fu));
-            if ((w & 0x00C00000u) && !(w & 0x04000000u)) alias &= ~(1u << (w & 0x1Fu));
-            continue;
-        }
-        // Exclusive stores write their status register; other stores write none.
-        if ((w & 0x3F400000u) == 0x08000000u) {
-            alias &= ~(1u << ((w >> 16) & 0x1Fu));
-            continue;
-        }
-        if ((w & 0x0A000000u) == 0x08000000u && (w & 0x00400000u) == 0) continue;
-        // Anything else that writes a register (loads, moves, arithmetic) keeps the
-        // destination in bits 0-4.
-        alias &= ~(1u << (w & 0x1Fu));
+    // YldRegisterTool(manager, tool) parks the tool pointer from x1 before its first
+    // call, then reads the name through it and the appid right after.
+    int budget = TOOL_HEAD_BUDGET;
+    struct head_hit hit;
+    if (!head_walk(yld_register_tool, yld_register_tool, REG_BIT(1), &budget, &hit)) {
+        NP_ERR("np_compat_probe_tool_head: no unambiguous name load through the tool "
+               "argument in YldRegisterTool at 0x%lx", (unsigned long)yld_register_tool);
+        return 0;
     }
-    NP_ERR("np_compat_probe_tool_head: no load through the tool argument in "
-           "YldRegisterTool at 0x%lx", (unsigned long)yld_register_tool);
-    return 0;
+    int32_t head = (int32_t)hit.name_off - COMPAT_TOOL_NAME_OFF;
+    if (head < 0 || head > 0x20 || (head & 7)) {
+        NP_ERR("np_compat_probe_tool_head: the first tool load is at 0x%x, which is "
+               "not where a name can sit", hit.name_off);
+        return 0;
+    }
+    g_head_shift     = head;
+    g_head_appid_off = hit.appid_off;
+    g_head_probed    = 1;
+    if (head)
+        NP_LOG("np_compat_probe_tool_head: tool fields from 0x%x onward are %+d "
+               "from the baseline (name 0x%x, appid 0x%x)",
+               COMPAT_TOOL_HEAD_OFF, head, hit.name_off, hit.appid_off);
+    return 1;
 }
 
 int np_compat_layout_known(void) {
-    return g_head_probed && g_tail_probed && g_head_shift <= g_tool_shift;
+    return g_head_probed && g_tail_probed && g_head_shift <= g_tool_shift &&
+           g_head_appid_off == (uint32_t)((int32_t)COMPAT_TOOL_APPID_OFF + g_tool_shift);
 }
 
 int np_compat_probe_tool_layout(uintptr_t appid_gate, uintptr_t oslist_gate) {

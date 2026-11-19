@@ -573,6 +573,14 @@ static void unknown_layout_cases(void) {
     reply_t r;
     decode_reply(&r);
     check(rc == RESULT_OK && r.count == 0, "an unconfirmed tool layout lists no tools");
+
+    reset();
+    build_tools(tools, 1);
+    *(uint8_t **)(fake_manager + COMPAT_MANAGER_TOOL_ARRAY_OFF) = NULL;
+    stub_layout_known = 0;
+    rc = get_compat_tools(build_request(REQ_HAS_APPID, 7), (uintptr_t)response_buf);
+    decode_reply(&r);
+    check(rc == RESULT_OK && r.count == 0, "an unconfirmed layout answers before reading the manager");
 }
 
 static void priority_cases(void) {
