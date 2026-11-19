@@ -178,10 +178,13 @@ struct AppInfoToolTests {
         return out
     }
 
-    private static func shard(_ index: Int, apps: [UInt32]) -> Data {
+    // shortTable drops the last key, so the payloads keep valid hashes but name a key
+    // the table does not have.
+    private static func shard(_ index: Int, apps: [UInt32], shortTable: Bool = false) -> Data {
         let keys = index == 0 ? ["appinfo", "common", "name", "oslist"] : ["oslist", "name", "common", "appinfo"]
+        let written = shortTable ? Array(keys.dropLast()) : keys
         var entries = Cache(), strings = Cache(), blobs = Cache()
-        for key in keys { strings.cstring(key) }
+        for key in written { strings.cstring(key) }
         for id in apps {
             let os = index == 0 ? "windows" : "windows,macos"
             let kv = platformEntry(id, os, table: keys).dropFirst(68)
@@ -201,7 +204,7 @@ struct AppInfoToolTests {
         }
         var h = Cache()
         for word in [0x0756442a, 1, index, 256, apps.count, entries.bytes.count,
-                     keys.count, strings.bytes.count, blobs.bytes.count, 0, 0] { h.u32(UInt32(word)) }
+                     written.count, strings.bytes.count, blobs.bytes.count, 0, 0] { h.u32(UInt32(word)) }
         return Data(h.bytes + entries.bytes + strings.bytes + blobs.bytes)
     }
 
@@ -241,6 +244,12 @@ struct AppInfoToolTests {
         try Data(corrupt).write(to: last)
         #expect(try run("68").status != 0)
         #expect(try run("2100").status == 0)
+        // A shard that only fails while its apps are decoded still falls back cleanly, with
+        // nothing the earlier shards gave mixed into the legacy answer.
+        try Self.shard(255, apps: [68], shortTable: true).write(to: last)
+        let decoded = try run("--platforms")
+        #expect(decoded.status == 0 && decoded.stdout == truncated.stdout)
+        try Data(corrupt).write(to: last)
         try fm.removeItem(at: legacy)
         let mismatch = try run("--platforms")
         #expect(mismatch.status != 0 && mismatch.stdout.isEmpty)

@@ -235,7 +235,9 @@ func scanLegacy(_ b: [UInt8], _ visit: Visitor) throws {
     throw VDFError.truncated
 }
 
-func forEachApp(_ path: URL, _ visit: Visitor) throws {
+// restart runs before a fallback to the legacy file, so a visitor can drop what the
+// shards already gave it.
+func forEachApp(_ path: URL, restart: () -> Void = {}, _ visit: Visitor) throws {
     let files = FileManager.default
     let direct = path.hasDirectoryPath
     let dir = direct ? path : path.deletingPathExtension()
@@ -262,7 +264,9 @@ func forEachApp(_ path: URL, _ visit: Visitor) throws {
                     if try !scanShard(bytes, index: index, visit: visit) { break }
                 }
                 return
-            } catch where legacyDate != nil {}
+            } catch where legacyDate != nil {
+                restart()
+            }
         }
         if legacyDate == nil { throw VDFError.incompleteShardSet }
     }
@@ -271,7 +275,7 @@ func forEachApp(_ path: URL, _ visit: Visitor) throws {
 
 func findApp(_ path: URL, _ appID: UInt32) throws -> [String: Value]? {
     var found: [String: Value]?
-    try forEachApp(path) { id, keys in
+    try forEachApp(path, restart: { found = nil }) { id, keys in
         guard id == appID else { return true }
         found = try keys()
         return false
@@ -284,7 +288,7 @@ func findApp(_ path: URL, _ appID: UInt32) throws -> [String: Value]? {
 func printPlatforms(_ path: URL) throws {
     var mac: [UInt32] = []
     var windows: [UInt32] = []
-    try forEachApp(path) { id, keys in
+    try forEachApp(path, restart: { mac = []; windows = [] }) { id, keys in
         guard case .section(let common)? = try keys()["common"] else { return true }
         guard case .string(let oslist)? = common["oslist"] else {
             windows.append(id)
