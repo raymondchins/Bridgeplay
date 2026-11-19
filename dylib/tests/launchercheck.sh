@@ -356,6 +356,23 @@ install_bundle
 is "an engine reinstalled with equal bytes replaces it" "launcher bundle updated" "$(cat "$log")"
 is "with the new ntdll.so" yes "$(same "$loader_app/Contents/MacOS/ntdll.so" "$wine_unix/ntdll.so")"
 
+echo "== game mode: the bundle's loader is signed ad hoc =="
+signed_id() { /usr/bin/codesign -dv "$1" 2>&1 | sed -n 's/^Identifier=//p'; }
+cp /usr/bin/true "$wine_unix/wine"
+/usr/bin/codesign --remove-signature "$wine_unix/wine"
+gm_stage
+is "unsigned loader: signed under the bundle's identifier" "com.notproton.launcher.$app_id" "$(signed_id "$loader_macos/wine")"
+is "unsigned loader: the engine's file stays unsigned" no "$(/usr/bin/codesign -d "$wine_unix/wine" >/dev/null 2>&1 && echo yes || echo no)"
+is "unsigned loader: nothing logged" "" "$(cat "$log")"
+signed_sum=$(cksum < "$loader_macos/wine")
+gm_stage
+is "unsigned loader: the same bytes each launch" "$signed_sum" "$(cksum < "$loader_macos/wine")"
+cp /usr/bin/true "$wine_unix/wine"
+gm_stage
+is "signed loader: keeps its own signature" "$(signed_id /usr/bin/true)" "$(signed_id "$loader_macos/wine")"
+printf 'loader' > "$wine_unix/wine"
+chmod 755 "$wine_unix/wine"
+
 rm -rf "$cx/share/wine"
 gm_stage
 is "no data folder: not hosted" 0 "$loader_hosts_ntdll"
