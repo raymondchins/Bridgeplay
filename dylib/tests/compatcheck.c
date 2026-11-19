@@ -220,6 +220,8 @@ static void confirm_layout(void) {
 // YldRegisterTool's prologue as the clients build it: the tool pointer parked in a callee-saved
 // register, x1 reused for a log call's argument, then the name read through a second copy.
 static uint32_t movz_w(uint32_t rd, uint32_t imm) { return 0x52800000u | (imm << 5) | rd; }
+#define CMP_X8_0 (0xF100001Fu | (8u << 5))
+#define CSEL_X8  (0x9A800000u | (8u << 16) | (26u << 5) | 8u)
 static uint32_t ldr32(uint32_t base, uint32_t off, uint32_t rt) {
     return 0xB9400000u | ((off / 4) << 10) | (base << 5) | rt;
 }
@@ -237,8 +239,11 @@ static uintptr_t build_yld(uint32_t name_off, int via_x1_after_reuse) {
     code[4] = via_x1_after_reuse ? ldr64(1, 0x40, 8) : NOP;
     code[5] = enc_mov(21, 20);             // mov x21, x20
     code[6] = enc_ldr64_pre(21, name_off, 8);  // ldr x8, [x21, #name]!
-    code[7] = ldr32(21, 0x28, 9);          // ldr w9, [x21, #0x28]: the appid, name + 0x28
-    code[8] = 0xD65F03C0u;                 // ret
+    code[7] = 0xF90017E0u;                 // str x0, [sp, #0x28]
+    code[8] = CMP_X8_0;                    // cmp x8, #0
+    code[9] = CSEL_X8;                     // csel x8, x26, x8, eq: the default name
+    code[10] = ldr32(21, 0x28, 9);         // ldr w9, [x21, #0x28]: the appid, name + 0x28
+    code[11] = 0xD65F03C0u;                // ret
     return (uintptr_t)code;
 }
 
@@ -314,13 +319,17 @@ static void head_cases(void) {
     for (int agree = 0; agree < 2; agree++) {
         for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
         code[0] = enc_mov(20, 1);
-        code[1] = 0x34000000u | (4u << 5) | 2u;    // cbz w2, +4 words
+        code[1] = 0x34000000u | (6u << 5) | 2u;    // cbz w2, +6 words
         code[2] = ldr64(20, agree ? 0x48 : 0x40, 8);
-        code[3] = ldr32(20, agree ? 0x70 : 0x68, 9);
-        code[4] = 0xD65F03C0u;
-        code[5] = ldr64(20, 0x48, 8);
-        code[6] = ldr32(20, 0x70, 9);
-        code[7] = 0xD65F03C0u;
+        code[3] = CMP_X8_0;
+        code[4] = CSEL_X8;
+        code[5] = ldr32(20, agree ? 0x70 : 0x68, 9);
+        code[6] = 0xD65F03C0u;
+        code[7] = ldr64(20, 0x48, 8);
+        code[8] = CMP_X8_0;
+        code[9] = CSEL_X8;
+        code[10] = ldr32(20, 0x70, 9);
+        code[11] = 0xD65F03C0u;
         check(np_compat_probe_tool_head((uintptr_t)code) == agree,
               agree ? "paths that agree probe clean" : "paths that disagree are refused");
     }
@@ -338,16 +347,67 @@ static void head_cases(void) {
 
     // The appid read after the name ties the head to the tail probe.
     build_yld(0x48, 0);
-    code[7] = NOP;
+    code[10] = 0xD65F03C0u;
     check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a name with no appid after it is refused");
     build_yld(0x48, 0);
-    code[7] = ldr32(21, 0x20, 9);          // appid at 0x68, which the beta tail does not have
+    code[10] = ldr32(21, 0x20, 9);         // appid at 0x68, which the beta tail does not have
     check(np_compat_probe_tool_head((uintptr_t)code) == 1, "the head probe itself reads a mismatched appid");
     g_tool_shift = 16;
     g_tail_probed = 1;
     check(!np_compat_layout_known(), "an appid the tail probe disagrees with leaves the layout unconfirmed");
     check(np_compat_probe_tool_head(build_yld(0x48, 0)) == 1 && g_head_appid_off == 0x70 &&
           np_compat_layout_known(), "the beta prologue agrees with the beta tail");
+    // A field that is not null-checked into a default string is not the name, even
+    // when the real appid follows it.
+    for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
+    code[0] = ldr64(1, 0x40, 8);           // beta priority slot
+    code[1] = ldr32(1, 0x70, 9);           // the genuine beta appid
+    code[2] = ldr64(1, 0x48, 10);
+    code[3] = 0xD65F03C0u;
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a load with no name check is not the name");
+    build_yld(0x48, 0);
+    code[8] = NOP;
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a name check without the compare is refused");
+    build_yld(0x48, 0);
+    code[9] = 0x9A800000u | (27u << 16) | (26u << 5) | 8u;  // csel x8, x26, x27, eq
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a select that ignores the load is refused");
+
+    // Decoder cases: a load replacing its own base, register arithmetic that only
+    // resembles a pair, and a hint that writes x17.
+    for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
+    code[0] = enc_mov(20, 1);
+    code[1] = ldr64(20, 0x48, 20);         // ldr x20, [x20, #0x48]
+    code[2] = 0xF100001Fu | (20u << 5);
+    code[3] = 0x9A800000u | (20u << 16) | (26u << 5) | 8u;
+    code[4] = ldr32(20, 0x70, 9);
+    code[5] = 0xD65F03C0u;
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a load that replaces its base is refused");
+    build_yld(0x48, 0);
+    code[3] = 0xAB020014u;                 // adds x20, x0, x2
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "register arithmetic is not a pair store");
+    build_yld(0x48, 0);
+    code[1] = enc_mov(17, 1);
+    code[3] = 0xD503211Fu;                 // pacia1716
+    code[5] = enc_mov(21, 17);
+    check(np_compat_probe_tool_head((uintptr_t)code) == 0, "a hint that writes x17 is refused");
+    build_yld(0x48, 0);
+    code[3] = 0xD503237Fu;                 // pacibsp
+    code[4] = 0xD503245Fu;                 // bti c
+    check(np_compat_probe_tool_head((uintptr_t)code) == 1 && g_head_shift == 8, "PAC and BTI hints are allowed");
+
+    // The real prologue, with its logging branch: a call on one side, a move on the other.
+    for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
+    static const uint32_t real[] = {        // Steam beta 1795048523, YldRegisterTool
+        0xD10243FFu, 0xA9036FFCu, 0xA90467FAu, 0xA9055FF8u, 0xA90657F6u, 0xA9074FF4u,
+        0xA9087BFDu, 0x910203FDu, 0xAA0103F4u, 0xAA0003F3u, 0xB0008208u, 0xF9429D08u,
+        0xB9400108u, 0x340000E8u, 0xD00079A0u, 0x913B3400u, 0x9100A3E2u, 0x52800081u,
+        0x9431A16Bu, 0x14000002u, 0xD2800000u, 0xAA1403F5u, 0xF8448EA8u, 0xF90017E0u,
+        0x9000779Au, 0x913A575Au, 0xF100011Fu, 0x9A880348u, 0xB9402AA9u, 0xA90027E8u,
+    };
+    memcpy(code, real, sizeof real);
+    check(np_compat_probe_tool_head((uintptr_t)code) == 1 && g_head_shift == 8 && g_head_appid_off == 0x70,
+          "the beta prologue as Steam builds it probes clean");
+
     g_tool_shift = 0;
     g_tail_probed = 0;
 

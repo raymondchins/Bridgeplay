@@ -178,6 +178,9 @@ static int probe_oslist_offsets(uintptr_t oslist_gate, uint32_t base,
 
 // The head probe reads at most this far into YldRegisterTool, and this many
 // instructions over every path it walks.
+// CEILING: the probe gets only the function's start, so a forward branch inside the
+// window could land in a neighbouring function — the name-check and appid evidence
+// guard this; bound by the function's real end if the resolver ever reports sizes.
 #define TOOL_HEAD_WINDOW 0x200
 #define TOOL_HEAD_BUDGET 256
 
@@ -190,22 +193,38 @@ struct head_hit {
 #define RD(w) ((w) & 0x1Fu)
 #define RN(w) (((w) >> 5) & 0x1Fu)
 
-// After the name load: the appid is the next 32-bit load through the same base, with
-// only instructions in between that leave that base alone.
-static int head_appid(uintptr_t pc, uintptr_t end, uint32_t base, uint32_t delta, uint32_t *appid_off) {
-    for (int i = 0; i < 8 && pc + 4 <= end; i++, pc += 4) {
+// After the name load. The client null-checks the name and swaps in a default string
+// (CMP then CSEL on the loaded register), which is what marks the load as the name
+// rather than some other pointer-sized field; the appid is the next 32-bit load
+// through the same base. In between, only instructions that leave the base alone.
+static int head_appid(uintptr_t pc, uintptr_t end, uint32_t base, uint32_t rt, uint32_t delta,
+                      int *budget, uint32_t *appid_off) {
+    int checked = 0, swapped = 0;
+    for (int i = 0; i < 8; i++, pc += 4) {
+        if (pc + 4 > end || --*budget < 0) return 0;
         uint32_t w = *(const uint32_t *)pc;
         if ((w & 0xFFC00000u) == 0xB9400000u && RN(w) == base) {      // LDR Wt,[Xn,#imm]
+            if (!checked || !swapped) return 0;
             *appid_off = delta + ((w >> 10) & 0xFFFu) * 4u;
             return 1;
+        }
+        if ((w & 0xFFFFFC1Fu) == 0xF100001Fu && RN(w) == rt) {         // CMP Xrt,#0
+            checked = 1;
+            continue;
+        }
+        if ((w & 0xFFE00C00u) == 0x9A800000u) {                        // CSEL (64-bit)
+            if (RD(w) == base) return 0;
+            if (checked && (RN(w) == rt || ((w >> 16) & 0x1Fu) == rt)) swapped = 1;
+            continue;
         }
         int store = (w & 0x3FC00000u) == 0x39000000u;                // STR (unsigned offset)
         int ok = store
               || (w & 0x1F000000u) == 0x10000000u                    // ADR, ADRP
               || (w & 0x1F000000u) == 0x11000000u                    // ADD/SUB/CMP immediate
-              || (w & 0x1F800000u) == 0x12800000u                    // MOVZ/MOVN/MOVK
-              || (w & 0x7FE00C00u) == 0x1A800000u;                   // CSEL
+              || (w & 0x1F800000u) == 0x12800000u;                   // MOVZ/MOVN/MOVK
         if (!ok || (!store && RD(w) == base)) return 0;
+        // Anything that rewrites the loaded name before it is checked is not that check.
+        if (!store && RD(w) == rt && !checked) return 0;
     }
     return 0;
 }
@@ -219,7 +238,14 @@ static int head_walk(uintptr_t start, uintptr_t pc, uint32_t alias, int *budget,
         if (pc < start || pc + 4 > end || --*budget < 0) return 0;
         uint32_t w = *(const uint32_t *)pc;
 
-        if ((w & 0xFFFFF01Fu) == 0xD503201Fu) continue;              // NOP and other hints
+        // Only hints known to leave the general registers alone, or to sign the link
+        // register in place; the rest of the hint space writes x16/x17 among others.
+        if (w == 0xD503201Fu ||                                      // NOP
+            (w & 0xFFFFFF3Fu) == 0xD503241Fu) continue;              // BTI, BTI c/j/jc
+        if (w == 0xD503233Fu || w == 0xD503237Fu) {                  // PACIASP, PACIBSP
+            alias &= ~REG_BIT(30);
+            continue;
+        }
         if ((w & 0xFFE0FFE0u) == 0xAA0003E0u) {                      // MOV Xd,Xm
             uint32_t rd = RD(w), rm = (w >> 16) & 0x1Fu;
             if ((alias & REG_BIT(rm)) && rd != 31) alias |= REG_BIT(rd);
@@ -238,7 +264,7 @@ static int head_walk(uintptr_t start, uintptr_t pc, uint32_t alias, int *budget,
             if (!((w & 0x20000000u) && RD(w) == 31)) alias &= ~REG_BIT(RD(w));
             continue;
         }
-        if ((w & 0x3C000000u) == 0x28000000u) {                      // integer LDP/STP
+        if ((w & 0x3E000000u) == 0x28000000u) {                      // integer LDP/STP
             uint32_t mode = (w >> 23) & 3u, rt2 = (w >> 10) & 0x1Fu;
             if (mode == 0 || (mode != 2 && RN(w) != 31)) return 0;
             if (w & 0x00400000u) {
@@ -251,9 +277,9 @@ static int head_walk(uintptr_t start, uintptr_t pc, uint32_t alias, int *budget,
             uint32_t size = w >> 30, opc = (w >> 22) & 3u;
             if (opc == 0) continue;                                  // store
             if (alias & REG_BIT(RN(w))) {
-                if (size != 3 || opc != 1) return 0;
+                if (size != 3 || opc != 1 || RD(w) == RN(w)) return 0;
                 hit->name_off = ((w >> 10) & 0xFFFu) * 8u;
-                return head_appid(pc + 4, end, RN(w), 0, &hit->appid_off);
+                return head_appid(pc + 4, end, RN(w), RD(w), 0, budget, &hit->appid_off);
             }
             alias &= ~REG_BIT(RD(w));
             continue;
@@ -268,7 +294,7 @@ static int head_walk(uintptr_t start, uintptr_t pc, uint32_t alias, int *budget,
                 int32_t imm = (int32_t)(((w >> 12) & 0x1FFu) << 23) >> 23;
                 if (imm <= 0) return 0;
                 hit->name_off = (uint32_t)imm;
-                return head_appid(pc + 4, end, RN(w), (uint32_t)imm, &hit->appid_off);
+                return head_appid(pc + 4, end, RN(w), RD(w), (uint32_t)imm, budget, &hit->appid_off);
             }
             if (idx != 0 && RN(w) != 31) alias &= ~REG_BIT(RN(w));
             if (load) alias &= ~REG_BIT(RD(w));
