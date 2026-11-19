@@ -472,6 +472,8 @@ final class SystemStatus {
         runInFlight = true
         defer { runInFlight = false }
         let result = await Task.detached(priority: .utility) { () -> SteamDefaultTool.FollowResult? in
+            // Checked before the lock too, so a long Steam session doesn't hold setup up on every poll.
+            if SteamBundle.isRunningForThisUser { return .steamRunning }
             guard let lock = try? DeploymentContent.acquireInstallationLock() else { return nil }
             defer { lock.release() }
             return Self.followDefaultTool()
