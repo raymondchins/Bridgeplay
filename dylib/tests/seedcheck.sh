@@ -636,6 +636,8 @@ check test "$(build_prefix_template && echo accepted || echo refused)" = refused
 check test ! -e "$template_dir/pfx"
 fake_wait_status=0
 # wineboot on a full disk: registry written, later DLLs not copied (#4025).
+fixture
+rm -rf "$template_dir/pfx"
 export fake_left_out=user32
 check test "$(build_prefix_template && echo accepted || echo refused)" = refused
 check test ! -e "$template_dir/pfx"
