@@ -107,6 +107,7 @@ lib/wine/x86_64-windows/{crypt32,wintrust}.dll    11.17 only: NGX signer (ngx-si
 lib/wine/x86_64-unix/win32u.so                    11.17 only: NVIDIA driver version (win32u-patch/)
 lib/wine/x86_64-windows/wined3d.dll               11.17 only: driver version (wined3d-patch/)
 lib/wine/x86_64-unix/winecoreaudio.so             11.17 only: render buffer (winecoreaudio-patch/)
+lib/wine/{x86_64,i386}-windows/mmdevapi.dll       11.17 only: follows the system's default device, replacing the archive's (Default audio device)
 lib/notproton-backends/nvapi-shim/x86_64-windows/nvapi64.dll       11.17 only (nvapi-shim/)
 lib/notproton-backends/rockstar-shim/x86_64-windows/{version,dxgx}.dll   11.17 only (rockstar-shim/)
 lib/notproton-backends/d3d12-stub/x86_64-windows/d3d12.dll         11.17 only (d3d12-stub/)
@@ -280,6 +281,34 @@ Built in the same tree and the same way as the D3DX11 thread pump:
 `{x86_64,i686}-w64-mingw32-strip --strip-debug`. Built without the patch, every section of
 all four is byte-identical to the runtime's; only the build id differs and the runtime's
 `.eh_frame` name is cut to `.eh_fram`. 11.15 keeps the runtime's own.
+
+## Default audio device
+
+Wine's mmdevapi tells a game the default device changed (`IMMNotificationClient::OnDefaultDeviceChanged`)
+only when Wine's own setting in the registry changes. The default macOS picks is read once,
+when the devices are first listed, so a game that follows the default on Windows stays on
+the old output when headphones are connected or another output is picked in macOS's sound
+settings while it runs (Deadlock, #3862).
+
+11.17 ships `mmdevapi-winecx-11.17{,-i386}.dll` as `lib/wine/{x86_64,i386}-windows/mmdevapi.dll`:
+winecx `e0aa380`'s PE halves with `mmdevapi-patch/winecx-follow-system-default.patch`. Once a
+process has registered a notification client, its notification thread asks the driver for
+the system default every second; when it moved, mmdevapi makes that device its default
+(adding it first if it is new) and sends `OnDefaultDeviceChanged` for the console and
+multimedia roles, and for communications too. A role whose default the user set in Wine's
+registry keeps it and is not notified, as in `GetDefaultAudioEndpoint`.
+
+Built in a tree configured as for the D3DX11 thread pump (`--enable-archs=i386,x86_64`, the
+source at `../winecx` so the debug names match the runtime's): `make
+dlls/mmdevapi/{x86_64,i386}-windows/mmdevapi.dll`, then `{x86_64,i686}-w64-mingw32-strip
+--strip-debug`. Built without the patch, `.text`, `.data`, `.rdata` and every other section
+with contents are byte-identical to the runtime's for both arches; only the build id differs
+and the runtime's `.eh_frame` name is cut to `.eh_fram`. 11.15 keeps the runtime's own.
+
+Checked 2026-11-20 with Deadlock on 11.17: with the game's own output device setting on
+default, its audio moved to a newly created output within 4 s of it becoming the macOS default
+and back again; with the runtime's mmdevapi it stayed where it was. A game that picks a fixed
+device in its own settings (Deadlock's `sound_device_override`) keeps that device, as on Windows.
 
 ## D3DMetal: the builtin model
 
@@ -478,6 +507,8 @@ rebuilt Mach-O file needs its line there updated too; `SignedPinTests` fails unt
 | `win32u-winecx-11.17.so` | `win32u-patch/patch-driver-version.sh` | `b012382d09b2ff1b3c0750d93867f72dd04a7c902bc4179be406b6c558ab162d` | `FreeEngineWinecx.v1117.nvidia` |
 | `wined3d-winecx-11.17.dll` | `wined3d-patch/` | `9298c83d927b3b80d0fa36f52bb5f2ecd60ec4daffff3c93d9b080293e59dfe9` | `FreeEngineWinecx.v1117.nvidia` |
 | `winecoreaudio-winecx-11.17.so` | `winecoreaudio-patch/` | `680b267e8cf41af0868de4adf7f6760615a434a4be06b4ab0cfeece2d9240faa` | `FreeEngineWinecx.v1117.audio` |
+| `mmdevapi-winecx-11.17.dll` | `mmdevapi-patch/` | `b953feec59f6e5733696988ea9e22ba5b22b27ea1d89553b6b125e07529b2ca4` | `FreeEngineWinecx.v1117.audio` |
+| `mmdevapi-winecx-11.17-i386.dll` | `mmdevapi-patch/` | `1d316e28ebe29b965b058f0d649ee99f12d9499ea66bf09102054e7237ce4b6f` | `FreeEngineWinecx.v1117.audio` |
 | `ws2_32-winecx-11.17.dll` | `ws2_32-patch/` | `cb0a5670ce6dbf949ed25cca54e9f1c4930cd4c2ade895836d518d3d9073079c` | `FreeEngineWinecx.v1117.network` |
 | `kernel32-winecx-11.17.dll` | `hide-wine-exports-patch/` | `9cffe153abd3f91f7157f936377baac47c5aef9fa807e263a0f9e051c6010af3` | `FreeEngineWinecx.v1117.loader` |
 | `kernelbase-winecx-11.17.dll` | `hide-wine-exports-patch/` | `4d55600b204724046567688ca96132e49e53af1baac7a362f3e2bf285f669a8a` | `FreeEngineWinecx.v1117.loader` |

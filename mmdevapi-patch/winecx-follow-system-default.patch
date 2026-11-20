@@ -1,0 +1,165 @@
+diff --git a/dlls/mmdevapi/devenum.c b/dlls/mmdevapi/devenum.c
+index 8440b5d8..9b556ced 100644
+--- a/dlls/mmdevapi/devenum.c
++++ b/dlls/mmdevapi/devenum.c
+@@ -1347,12 +1347,93 @@ static BOOL notify_if_changed(EDataFlow flow, ERole role, HKEY key,
+     return TRUE;
+ }
+ 
++/* The host's default device can change while a process runs (headphones connected, another
++ * output picked in the system's sound settings), and the driver reports it only when asked.
++ * Returns TRUE when the driver's default for flow is no longer MMDevice_def_play or
++ * MMDevice_def_rec, after making it so. */
++static BOOL refresh_system_default(EDataFlow flow)
++{
++    struct get_endpoint_ids_params params;
++    MMDevice **def = flow == eRender ? &MMDevice_def_play : &MMDevice_def_rec;
++    MMDevice *dev, *found = NULL;
++    BOOL changed = FALSE;
++    GUID guid;
++
++    params.flow = flow;
++    params.size = 1024;
++    params.endpoints = NULL;
++    do {
++        free(params.endpoints);
++        if (!(params.endpoints = malloc(params.size)))
++            return FALSE;
++        __wine_unix_call(drvs.module_unixlib, get_endpoint_ids, &params);
++    } while (params.result == HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER));
++
++    if (SUCCEEDED(params.result) && params.default_idx < params.num)
++    {
++        const struct endpoint *ep = &params.endpoints[params.default_idx];
++        const WCHAR *name = (WCHAR *)((char *)params.endpoints + ep->name);
++        const char *dev_name = (char *)params.endpoints + ep->device;
++
++        get_device_guid(flow, dev_name, &guid);
++        if (!*def || !IsEqualGUID(&(*def)->devguid, &guid))
++        {
++            LIST_FOR_EACH_ENTRY(dev, &device_list, MMDevice, entry)
++            {
++                if (dev->flow == flow && IsEqualGUID(&dev->devguid, &guid))
++                {
++                    found = dev;
++                    break;
++                }
++            }
++            if (found && found->state == DEVICE_STATE_ACTIVE)
++                *def = found;
++            /* CEILING: device_list has no lock of its own, so a device first seen here is
++             * added while another thread may be walking the list. It is rare (once per new
++             * device); a list lock shared with the enumerator is the upgrade path. */
++            else if ((found = MMDevice_Create(name, &guid, flow, DEVICE_STATE_ACTIVE, TRUE)))
++                set_format(found);
++            changed = found != NULL;
++            TRACE("system default %s is now %s\n", flow == eRender ? "output" : "input",
++                    debugstr_w(name));
++        }
++    }
++
++    free(params.endpoints);
++    return changed;
++}
++
++/* Called with g_notif_lock held. A default the user set in the registry wins, as in
++ * MMDevEnum_GetDefaultAudioEndpoint, so only roles that follow the system are notified. */
++static void notify_system_default(EDataFlow flow, const WCHAR *name, const WCHAR *voice_name)
++{
++    MMDevice *def;
++    WCHAR *id;
++
++    if (!refresh_system_default(flow))
++        return;
++
++    def = flow == eRender ? MMDevice_def_play : MMDevice_def_rec;
++    if (FAILED(IMMDevice_GetId(&def->IMMDevice_iface, &id)))
++        return;
++
++    if (!name[0])
++    {
++        notify_clients(flow, eConsole, id);
++        if (!voice_name[0])
++            notify_clients(flow, eCommunications, id);
++    }
++    CoTaskMemFree(id);
++}
++
+ static DWORD WINAPI notif_thread_proc(void *user)
+ {
+     HKEY key;
++    HANDLE changed;
++    BOOL armed = FALSE;
+     WCHAR reg_key[256];
+     WCHAR out_name[64], vout_name[64], in_name[64], vin_name[64];
+-    DWORD size;
++    DWORD size, wait;
+ 
+     SetThreadDescription(GetCurrentThread(), L"wine_mmdevapi_notification");
+ 
+@@ -1382,29 +1463,51 @@ static DWORD WINAPI notif_thread_proc(void *user)
+     if(RegQueryValueExW(key, L"DefaultVoiceInput", 0, NULL, (BYTE*)vin_name, &size) != ERROR_SUCCESS)
+         vin_name[0] = 0;
+ 
++    if(!(changed = CreateEventW(NULL, FALSE, FALSE, NULL))){
++        ERR("CreateEvent failed: %lu\n", GetLastError());
++        RegCloseKey(key);
++        g_notif_thread = NULL;
++        return 1;
++    }
++
+     while(1){
+-        if(RegNotifyChangeKeyValue(key, FALSE, REG_NOTIFY_CHANGE_LAST_SET,
+-                    NULL, FALSE) != ERROR_SUCCESS){
+-            ERR("RegNotifyChangeKeyValue failed: %lu\n", GetLastError());
+-            RegCloseKey(key);
+-            g_notif_thread = NULL;
+-            return 1;
++        if(!armed){
++            if(RegNotifyChangeKeyValue(key, FALSE, REG_NOTIFY_CHANGE_LAST_SET,
++                        changed, TRUE) != ERROR_SUCCESS){
++                ERR("RegNotifyChangeKeyValue failed: %lu\n", GetLastError());
++                CloseHandle(changed);
++                RegCloseKey(key);
++                g_notif_thread = NULL;
++                return 1;
++            }
++            armed = TRUE;
+         }
+ 
++        /* The registry wakes this thread; the system default is polled, once a second. */
++        wait = WaitForSingleObject(changed, 1000);
++
+         EnterCriticalSection(&g_notif_lock);
+ 
+-        notify_if_changed(eRender, eConsole, key, L"DefaultOutput",
+-                out_name, &MMDevice_def_play->IMMDevice_iface);
+-        notify_if_changed(eRender, eCommunications, key, L"DefaultVoiceOutput",
+-                vout_name, &MMDevice_def_play->IMMDevice_iface);
+-        notify_if_changed(eCapture, eConsole, key, L"DefaultInput",
+-                in_name, &MMDevice_def_rec->IMMDevice_iface);
+-        notify_if_changed(eCapture, eCommunications, key, L"DefaultVoiceInput",
+-                vin_name, &MMDevice_def_rec->IMMDevice_iface);
++        if(wait == WAIT_OBJECT_0){
++            armed = FALSE;
++
++            notify_if_changed(eRender, eConsole, key, L"DefaultOutput",
++                    out_name, &MMDevice_def_play->IMMDevice_iface);
++            notify_if_changed(eRender, eCommunications, key, L"DefaultVoiceOutput",
++                    vout_name, &MMDevice_def_play->IMMDevice_iface);
++            notify_if_changed(eCapture, eConsole, key, L"DefaultInput",
++                    in_name, &MMDevice_def_rec->IMMDevice_iface);
++            notify_if_changed(eCapture, eCommunications, key, L"DefaultVoiceInput",
++                    vin_name, &MMDevice_def_rec->IMMDevice_iface);
++        }
++
++        notify_system_default(eRender, out_name, vout_name);
++        notify_system_default(eCapture, in_name, vin_name);
+ 
+         LeaveCriticalSection(&g_notif_lock);
+     }
+ 
++    CloseHandle(changed);
+     RegCloseKey(key);
+ 
+     g_notif_thread = NULL;

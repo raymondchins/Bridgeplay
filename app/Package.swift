@@ -61,6 +61,8 @@ let package = Package(
                 .copy("Resources/win32u-winecx-11.17.so"),
                 .copy("Resources/wined3d-winecx-11.17.dll"),
                 .copy("Resources/winecoreaudio-winecx-11.17.so"),
+                .copy("Resources/mmdevapi-winecx-11.17.dll"),
+                .copy("Resources/mmdevapi-winecx-11.17-i386.dll"),
                 .copy("Resources/d3dx11_43-winecx-11.17.dll"),
                 .copy("Resources/d3dx11_43-winecx-11.17-i386.dll"),
                 .copy("Resources/d3dx11_42-winecx-11.17.dll"),

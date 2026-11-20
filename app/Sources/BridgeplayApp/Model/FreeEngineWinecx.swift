@@ -69,7 +69,8 @@ struct WinecxRelease: Sendable {
     let nvidia: [WinecxBundledFile]
     // winecoreaudio.so rebuilt so an output stream asks CoreAudio for half a period per
     // pull, not a whole one, which Wine padded with silence and was heard as crackling
-    // (winecoreaudio-patch/). Empty where the runtime's own is kept.
+    // (winecoreaudio-patch/), and mmdevapi rebuilt so games are told when macOS changes its
+    // default output or input (mmdevapi-patch/). Empty where the runtime's own are kept.
     let audio: [WinecxBundledFile]
     // d3dx11_43 and d3dx11_42 rebuilt to export D3DX11CreateThreadPump, which games such as
     // Persona 4 Golden import and Wine leaves as a stub (d3dx11-patch/), and d3dx9_41 and
@@ -213,6 +214,15 @@ enum FreeEngineWinecx {
             WinecxBundledFile(resource: "winecoreaudio-winecx-11.17", ext: "so",
                               path: "lib/wine/x86_64-unix/winecoreaudio.so",
                               sha256: "680b267e8cf41af0868de4adf7f6760615a434a4be06b4ab0cfeece2d9240faa"),
+            // mmdevapi.dll: winecx e0aa380's PE halves, both arches, with
+            // mmdevapi-patch/winecx-follow-system-default.patch. No fallback, so an engine set
+            // up with the runtime's own shows "Update & Set Up" once and gets these.
+            WinecxBundledFile(resource: "mmdevapi-winecx-11.17", ext: "dll",
+                              path: "lib/wine/x86_64-windows/mmdevapi.dll",
+                              sha256: "b953feec59f6e5733696988ea9e22ba5b22b27ea1d89553b6b125e07529b2ca4"),
+            WinecxBundledFile(resource: "mmdevapi-winecx-11.17-i386", ext: "dll",
+                              path: "lib/wine/i386-windows/mmdevapi.dll",
+                              sha256: "1d316e28ebe29b965b058f0d649ee99f12d9499ea66bf09102054e7237ce4b6f"),
         ],
         // d3dx11_43.dll, d3dx11_42.dll: winecx e0aa380's PE halves, both arches, with
         // d3dx11-patch/winecx-create-thread-pump.patch. The fallbacks are the runtime's own,
