@@ -12,6 +12,7 @@ native installer, [docs/NATIVE-INSTALLER.md](../docs/NATIVE-INSTALLER.md)). Test
   an environment variable named in the test file (`NOTPROTON_KEYCHAIN_TEST`,
   `NOTPROTON_TEST_WINE`, `BRIDGEPLAY_LIVE_DOWNLOAD`, …). `make mincheck`
   checks that nothing in the built app needs a macOS newer than 26.
+- **UI:** follow [docs/DESIGN.md](../docs/DESIGN.md) (colours, type, controls, sidebar, in-game overlay).
 - **Strings:** both `Resources/Localization/Localizable.xcstrings` (BridgeplayApp and
   BridgeplayInstaller) carry en, it, ru and zh-Hans. A new user-facing string needs all four;
   `make l10ncheck`.
