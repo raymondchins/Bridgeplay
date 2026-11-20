@@ -231,8 +231,9 @@ is "skipping an offered rebuild goes on with the launch" 0 "$status"
 is "a skipped rebuild retakes the lock and launches" "locked
 launched" "$(cat "$data/checks")"
 is "a skipped rebuild never calls the app" no "$([ -f "$data/arguments" ] && echo yes || echo no)"
-is "the skip button is labelled as asked" "Launch Without Rebuilding" "$(tail -2 "$data/prompt-args" | head -1)"
-is "a missing Bridgeplay icon falls back to caution" "" "$(tail -1 "$data/prompt-args")"
+is "the skip button is labelled as asked" "Launch Without Rebuilding" "$(tail -3 "$data/prompt-args" | head -1)"
+is "a missing Bridgeplay icon falls back to caution" "" "$(tail -2 "$data/prompt-args" | head -1)"
+is "an offered rebuild keeps the backup choice" "" "$(tail -1 "$data/prompt-args")"
 rebuild_case 'Rebuild Prefix' 0 run 'Launch Without Rebuilding'
 is "install helpers skip an offered rebuild silently" 0 "$status"
 rebuild_case 'Rebuild Prefix' 0 waitforexitandrun

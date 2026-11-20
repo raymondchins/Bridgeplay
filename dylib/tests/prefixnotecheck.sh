@@ -13,7 +13,9 @@ case "$body" in
 esac
 body="$body"'
 notify_user() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }
-show_alert() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }'
+show_alert() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }
+# The player cancels unless the case sets rebuild=ok.
+rebuild_prefix() { printf "%s|%s|%s\n" "$1" "$2" "$4" >> "$notes"; [ "${rebuild:-}" = ok ] || exit 1; }'
 
 # a failed mktemp must not leave work at the current folder, which the trap deletes
 work=$(mktemp -d) && work=$(cd "$work" && pwd -P) || exit 1
@@ -95,15 +97,18 @@ pfx="$two/steamapps/compatdata/42/pfx"
 check_prefix() { # check_prefix FS [FREE_KB]: prints the exit status
 	: > "$work/log"
 	: > "$work/notes"
-	env log="$work/log" notes="$work/notes" body="$body" fs="$1" WINEPREFIX="$pfx" \
+	env log="$work/log" notes="$work/notes" body="$body" fs="$1" WINEPREFIX="$pfx" rebuild="${rebuild:-}" \
 		STEAM_COMPAT_DATA_PATH="$two/steamapps/compatdata/42" \
 		free="${2:-99999999}" sh -c 'eval "$body"; volume_type() { [ -z "$fs" ] || echo "$fs /Volumes/Drive"; }
 			df() { printf "Filesystem 1024-blocks Used Available\n/dev/disk3 1 1 %s\n" "$free"; }
-			refuse_broken_prefix' && echo 0 || echo $?
+			refuse_broken_prefix; echo "rebuilt=${broken_rebuilt:-0}" >> "$log"' && echo 0 || echo $?
 }
 is "no dosdevices stops the launch" 1 "$(check_prefix apfs)"
 has "it is logged" "Wine did not finish building it" "$work/log"
-has "the player is told to rebuild" "The game's prefix could not be set up|Wine did not finish building it. Rebuild the prefix" "$work/notes"
+has "the player is offered a rebuild" "The game's prefix could not be set up|Wine did not finish building it, so the game can't start. Rebuild the prefix now?" "$work/notes"
+has "the rebuild keeps no backup" "|no-backup" "$work/notes"
+is "a rebuild lets the launch go on" 0 "$(rebuild=ok check_prefix apfs)"
+has "the rebuild is reported" "rebuilt=1" "$work/log"
 is "a full disk stops the launch" 1 "$(check_prefix apfs 1024)"
 has "a full disk is named" "The disk is too full for the game's prefix" "$work/notes"
 is "exFAT stops the launch" 1 "$(check_prefix exfat)"
@@ -119,7 +124,7 @@ for name in mspatcha ucrtbase user32 version win32u ws2_32; do
 	: > "$pfx/drive_c/windows/system32/$name.dll"
 done
 is "a finished prefix launches" 0 "$(check_prefix apfs)"
-is "a finished prefix says nothing" "" "$(cat "$work/notes" "$work/log")"
+is "a finished prefix says nothing" "rebuilt=0" "$(cat "$work/notes" "$work/log")"
 mkdir "$pfx/drive_c/windows/syswow64"
 for name in kernel32 mspatcha ucrtbase user32 version; do
 	: > "$pfx/drive_c/windows/syswow64/$name.dll"
