@@ -1,5 +1,5 @@
-// Reads Steam's appinfo.vdf cache and prints key=value metadata for one app on
-// stdout. Usage: appinfo <appinfo.vdf> <appid>.
+// The appinfo.vdf path selects the newer of the legacy file and its sibling
+// shard set. Pass the appinfo directory directly to read only the shards.
 // With --platforms instead of an appid it prints mac= and windows= appid lists.
 //
 // common/icon is a 32x32 thumbnail. common/clienticon is the real multi-res
@@ -7,27 +7,24 @@
 // inferred from the filesystem. Exits non-zero without printing on read
 // failure.
 
+import CryptoKit
 import Foundation
 
 let args = CommandLine.arguments
 let platforms = args.count == 3 && args[2] == "--platforms"
 guard args.count == 3, platforms || UInt32(args[2]) != nil else {
-    fputs("usage: appinfo <appinfo.vdf> <appid>|--platforms\n", stderr)
+    fputs("usage: appinfo <appinfo.vdf|appinfo-directory> <appid>|--platforms\n", stderr)
     exit(2)
 }
 
-guard let file = FileManager.default.contents(atPath: args[1]) else {
-    fputs("appinfo: cannot read \(args[1])\n", stderr)
-    exit(1)
-}
-let bytes = [UInt8](file)
-
 enum VDFError: Error {
     case truncated
+    case incompleteShardSet
     case unknownType(UInt8)
     case unknownMagic(UInt32)
     case badStringIndex(UInt32)
     case excessiveNesting
+    case checksumMismatch
 }
 
 indirect enum Value {
@@ -103,9 +100,8 @@ struct Cursor {
 
 // v29 moved every key into one table at the end of the file and left an index
 // in its place, so the table has to be read before any app can be parsed.
-func readStringTable(_ b: [UInt8], at offset: Int) throws -> [String] {
-    var c = Cursor(b: b, p: offset)
-    let count = try c.u32()
+func readStringTable(_ c: inout Cursor, count: UInt32) throws -> [String] {
+    guard Int(count) <= c.end - c.p else { throw VDFError.truncated }
     var out: [String] = []
     out.reserveCapacity(Int(count))
     for _ in 0..<count { out.append(try c.cstring()) }
@@ -144,8 +140,59 @@ func readSection(_ c: inout Cursor, _ table: [String]?, depth: Int = 0) throws -
     }
 }
 
-// Returns false when the list runs out before the zero appid that ends it.
-func forEachApp(_ b: [UInt8], _ visit: (UInt32, () throws -> [String: Value]) throws -> Bool) throws -> Bool {
+typealias Visitor = (UInt32, () throws -> [String: Value]) throws -> Bool
+
+func appKeys(_ b: [UInt8], _ start: Int, _ end: Int, _ table: [String]?) throws -> [String: Value] {
+    var kv = Cursor(b: b, p: start, end: end)
+    let root = try readSection(&kv, table)
+    if case .section(let inner)? = root["appinfo"] { return inner }
+    return root
+}
+
+// A false visitor result stops the scan, including all remaining shards.
+// With verify set, checks every payload's SHA-1 and visits nothing.
+func scanShard(_ b: [UInt8], index: Int, verify: Bool = false, visit: Visitor) throws -> Bool {
+    var h = Cursor(b: b, p: 0)
+    let magic = try h.u32()
+    guard magic == 0x0756_442a else { throw VDFError.unknownMagic(magic) }
+    try h.skip(4) // universe
+    guard try h.u32() == index, try h.u32() == 256 else { throw VDFError.incompleteShardSet }
+    let count = try h.u32()
+    let indexSize = Int(try h.u32())
+    let keyCount = try h.u32()
+    let keySize = Int(try h.u32())
+    let dataSize = Int(try h.u32())
+    try h.skip(8)
+    let keyStart = h.p + indexSize
+    let dataStart = keyStart + keySize
+    guard dataStart + dataSize == b.count else { throw VDFError.truncated }
+    var keys = Cursor(b: b, p: keyStart, end: dataStart)
+    let table = try readStringTable(&keys, count: keyCount)
+    guard keys.p == keys.end else { throw VDFError.truncated }
+
+    var entries = Cursor(b: b, p: h.p, end: keyStart)
+    for _ in 0..<count {
+        let id = try entries.u32()
+        let offset = Int(try entries.u32())
+        let size = Int(try entries.u32())
+        guard size >= 20, offset + size <= dataSize else { throw VDFError.truncated }
+        try entries.skip(50)
+        let extraIDs = Int(try entries.u32())
+        try entries.skip(extraIDs * 4 + 13)
+        _ = try entries.cstring() // Usually empty, "JP" in the observed cache.
+        let start = dataStart + offset
+        if verify {
+            let digest = Insecure.SHA1.hash(data: b[(start + 20)..<(start + size)])
+            guard digest.elementsEqual(b[start..<(start + 20)]) else { throw VDFError.checksumMismatch }
+            continue
+        }
+        if try !visit(id, { try appKeys(b, start + 20, start + size, table) }) { return false }
+    }
+    guard entries.p == entries.end else { throw VDFError.truncated }
+    return true
+}
+
+func scanLegacy(_ b: [UInt8], _ visit: Visitor) throws {
     var head = Cursor(b: b, p: 0)
     let magic = try head.u32()
     _ = try head.u32()
@@ -160,7 +207,9 @@ func forEachApp(_ b: [UInt8], _ visit: (UInt32, () throws -> [String: Value]) th
     case 0x0756_4429:
         let offset = try head.u64()
         guard offset >= 16, offset < UInt64(b.count) else { throw VDFError.truncated }
-        table = try readStringTable(b, at: Int(offset))
+        var keys = Cursor(b: b, p: Int(offset))
+        let count = try keys.u32()
+        table = try readStringTable(&keys, count: count)
         entriesEnd = Int(offset)
         pos = 16
     case 0x0756_4428:
@@ -175,27 +224,58 @@ func forEachApp(_ b: [UInt8], _ visit: (UInt32, () throws -> [String: Value]) th
     while pos + 4 <= entriesEnd {
         var e = Cursor(b: b, p: pos, end: entriesEnd)
         let id = try e.u32()
-        if id == 0 { return true }
+        if id == 0 { return }
         let size = Int(try e.u32())
         guard size >= entryHeader, size <= entriesEnd - pos - 8 else { throw VDFError.truncated }
         let entryEnd = pos + 8 + size
         let start = pos + 8 + entryHeader
-        let keys = { () throws -> [String: Value] in
-            var kv = Cursor(b: b, p: start, end: entryEnd)
-            let root = try readSection(&kv, table)
-            // Each entry wraps its keys in one "appinfo" section.
-            if case .section(let inner)? = root["appinfo"] { return inner }
-            return root
-        }
-        if try !visit(id, keys) { return true }
+        if try !visit(id, { try appKeys(b, start, entryEnd, table) }) { return }
         pos = entryEnd
     }
-    return false
+    throw VDFError.truncated
 }
 
-func findApp(_ b: [UInt8], _ appID: UInt32) throws -> [String: Value]? {
+// restart runs before a fallback to the legacy file, so a visitor can drop what the
+// shards already gave it.
+func forEachApp(_ path: URL, restart: () -> Void = {}, _ visit: Visitor) throws {
+    let files = FileManager.default
+    let direct = path.hasDirectoryPath
+    let dir = direct ? path : path.deletingPathExtension()
+    if direct || (path.lastPathComponent == "appinfo.vdf" && files.fileExists(atPath: dir.path)) {
+        let legacyDate = direct ? nil : try? path.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        var shards: [URL] = []
+        var newest = Date.distantPast
+        for index in 0..<256 {
+            let shard = dir.appendingPathComponent(String(format: "appinfo_%02x.vdf", index))
+            guard let date = try? shard.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+            else { break }
+            newest = max(newest, date)
+            shards.append(shard)
+        }
+        if shards.count == 256 && newest >= (legacyDate ?? .distantPast) {
+            // Every shard is checked before any app is visited, so a shard Steam left half
+            // written falls back to the legacy file instead of failing or giving partial data.
+            do {
+                let data = try shards.map { [UInt8](try Data(contentsOf: $0)) }
+                for (index, bytes) in data.enumerated() {
+                    _ = try scanShard(bytes, index: index, verify: true) { _, _ in true }
+                }
+                for (index, bytes) in data.enumerated() {
+                    if try !scanShard(bytes, index: index, visit: visit) { break }
+                }
+                return
+            } catch where legacyDate != nil {
+                restart()
+            }
+        }
+        if legacyDate == nil { throw VDFError.incompleteShardSet }
+    }
+    try scanLegacy([UInt8](Data(contentsOf: path)), visit)
+}
+
+func findApp(_ path: URL, _ appID: UInt32) throws -> [String: Value]? {
     var found: [String: Value]?
-    _ = try forEachApp(b) { id, keys in
+    try forEachApp(path, restart: { found = nil }) { id, keys in
         guard id == appID else { return true }
         found = try keys()
         return false
@@ -205,10 +285,10 @@ func findApp(_ b: [UInt8], _ appID: UInt32) throws -> [String: Value]? {
 
 // Steam treats an app without an oslist as Windows only.
 // oslist can still say macos for a 32-bit build that no longer runs.
-func printPlatforms(_ b: [UInt8]) throws {
+func printPlatforms(_ path: URL) throws {
     var mac: [UInt32] = []
     var windows: [UInt32] = []
-    let complete = try forEachApp(b) { id, keys in
+    try forEachApp(path, restart: { mac = []; windows = [] }) { id, keys in
         guard case .section(let common)? = try keys()["common"] else { return true }
         guard case .string(let oslist)? = common["oslist"] else {
             windows.append(id)
@@ -219,18 +299,18 @@ func printPlatforms(_ b: [UInt8]) throws {
         if systems.contains("windows") { windows.append(id) }
         return true
     }
-    guard complete else { throw VDFError.truncated }
     print("mac=" + mac.map(String.init).joined(separator: ","))
     print("windows=" + windows.map(String.init).joined(separator: ","))
 }
 
 do {
+    let path = URL(fileURLWithPath: args[1])
     if platforms {
-        try printPlatforms(bytes)
+        try printPlatforms(path)
         exit(0)
     }
     let wantAppID = UInt32(args[2])!
-    guard let app = try findApp(bytes, wantAppID) else {
+    guard let app = try findApp(path, wantAppID) else {
         fputs("appinfo: no entry for appid \(wantAppID)\n", stderr)
         exit(1)
     }

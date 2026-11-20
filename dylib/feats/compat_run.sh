@@ -48,7 +48,7 @@ read_app_meta() {
   meta_name=""
   meta_icon=""
   meta_clienticon=""
-  if [ -x "$appinfo_tool" ] && [ -f "$appinfo_vdf" ]; then
+  if [ -x "$appinfo_tool" ] && { [ -f "$appinfo_vdf" ] || [ -d "${appinfo_vdf%.vdf}" ]; }; then
     meta=$("$appinfo_tool" "$appinfo_vdf" "$app_id" 2>> "$log") || meta=""
     meta_name=$(printf '%s\n' "$meta" | sed -n 's/^name=//p')
     meta_icon=$(printf '%s\n' "$meta" | sed -n 's/^icon=//p')
