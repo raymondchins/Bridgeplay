@@ -471,20 +471,26 @@ final class SystemStatus {
         guard canInstall, !UserDefaults.standard.bool(forKey: SteamPatchKeeper.pausedKey) else { return }
         runInFlight = true
         defer { runInFlight = false }
+        let version = AppVersion.bundled
         let result = await Task.detached(priority: .utility) { () -> SteamDefaultTool.FollowResult? in
             // Checked before the lock too, so a long Steam session doesn't hold setup up on every poll.
             if SteamBundle.isRunningForThisUser { return .steamRunning }
             guard let lock = try? DeploymentContent.acquireInstallationLock() else { return nil }
             defer { lock.release() }
+            guard !DeploymentContent.current(version: version).blocksInstallation else { return nil }
             return Self.followDefaultTool()
         }.value
         if let result { defaultToolRetryPending = result == .steamRunning }
     }
 
-    private func runnerOutcome(_ result: RunnerSetup.Outcome) -> String {
-        defaultToolRetryPending = Self.followDefaultTool() == .steamRunning
+    private func runnerOutcome(_ result: RunnerSetup.Outcome) async -> String {
+        let (follow, needsRestart) = await Task.detached(priority: .utility) {
+            let follow = Self.followDefaultTool()
+            return (follow, result.toolsChanged && SteamBundle.isRunning)
+        }.value
+        defaultToolRetryPending = follow == .steamRunning
         if result.stagedNothing { return String(localized: "Compatibility tool is already set up.") }
-        guard result.toolsChanged, SteamBundle.isRunning else { return String(localized: "Compatibility tool ready.") }
+        guard needsRestart else { return String(localized: "Compatibility tool ready.") }
         return String(localized: "Compatibility tool ready. \(Self.toolsRestartHint)")
     }
 
@@ -544,7 +550,7 @@ final class SystemStatus {
                 }
             }.value
 
-            return runnerOutcome(result)
+            return await runnerOutcome(result)
         }
     }
 
@@ -566,7 +572,7 @@ final class SystemStatus {
             let result = try await Task.detached(priority: .userInitiated) {
                 try RunnerSetup.run(from: install, replacingExisting: true) { progress($0.label) }
             }.value
-            return runnerOutcome(result)
+            return await runnerOutcome(result)
         }
     }
 
@@ -582,7 +588,7 @@ final class SystemStatus {
             let result = try await Task.detached(priority: .userInitiated) {
                 try RunnerSetup.run(from: install, replacingExisting: true) { progress($0.label) }
             }.value
-            return runnerOutcome(result)
+            return await runnerOutcome(result)
         }
     }
 
