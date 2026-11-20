@@ -10,7 +10,7 @@
 // fixed per-entry stride from np_compat_tool_stride.
 #define COMPAT_MANAGER_TOOL_ARRAY_OFF  0x320
 #define COMPAT_MANAGER_TOOL_COUNT_OFF  0x330
-#define COMPAT_TOOL_NAME_OFF           0x40
+#define COMPAT_TOOL_NAME_OFF           0x40  // reference; live through np_compat_tool_off
 
 #define COMPAT_MANAGER_TOOLS_HEADROOM  32
 
@@ -18,22 +18,32 @@
 #define COMPAT_PLATFORM_WINDOWS  0x1
 #define COMPAT_PLATFORM_MACOS    0x2
 
-// Tool entry fields ahead of the insertion point. These never move.
+// Every offset below is the reference layout. Clients have grown the entry at two points:
+// ahead of the "unlisted" field (COMPAT_TOOL_HEAD_OFF, beta 1795048523 added 8 bytes there)
+// and ahead of the install dir (COMPAT_TOOL_INSTALL_OFF). Read live values through
+// np_compat_tool_off, which applies whichever shifts sit below a field.
+#define COMPAT_TOOL_HEAD_OFF        0x24
 #define COMPAT_TOOL_GATE_FLAGS_OFF  0x24
 #define COMPAT_TOOL_GATE_HIDDEN     0x1
 #define COMPAT_TOOL_PRIORITY_OFF    0x38
 #define COMPAT_TOOL_DISPLAY_OFF     0x50
-
-// Tool entry fields at or past the insertion point. These are the baseline the
-// probed shift is measured against. Read live values through np_compat_tool_off.
 #define COMPAT_TOOL_INSTALL_OFF     0x58
 #define COMPAT_TOOL_APPID_OFF       0x60
 #define COMPAT_TOOL_PLATFORM_OFF    0x80
+
+// Reads the name's live offset from YldRegisterTool, whose first load through the tool
+// argument is the name, and from it the shift at COMPAT_TOOL_HEAD_OFF. Returns 0 when the
+// load is not found, which leaves the layout unverified (np_compat_layout_known).
+int np_compat_probe_tool_head(uintptr_t yld_register_tool, uintptr_t end);
 
 // Reads live field offsets from the appid and install-dir gates. Returns 0 when
 // the two disagree about how far the struct shifted. The oslist gate is optional
 // and corroborates the result at the far end.
 int np_compat_probe_tool_layout(uintptr_t appid_gate, uintptr_t oslist_gate);
+
+// 1 once both probes agreed on a layout. Writing a tool entry into the manager is only
+// safe then; a wrong layout hands the client an entry it crashes on.
+int np_compat_layout_known(void);
 
 // Reads the enabled-flag offset from BIsCompatibilityToolEnabled. Returns 0
 // when the flag cannot be located, leaving the baseline in place.
@@ -47,12 +57,15 @@ bool np_compat_is_windows_only_table(const void *compat_mgr, const void *map);
 
 void *np_compat_user(const void *compat_mgr);
 
-// Live position of a field by its reference offset. Fields ahead of the
-// insertion point come back unchanged.
+// Live position of a field by its reference offset. Fields ahead of
+// COMPAT_TOOL_HEAD_OFF come back unchanged.
 uint32_t np_compat_tool_off(uint32_t reference_off);
 
 // Live stride of the manager's tool array.
 size_t np_compat_tool_stride(void);
+
+// A tool entry's name, or NULL when the slot holds no plausible pointer.
+const char *np_compat_tool_name(const void *tool);
 
 // Exports STEAM_EXTRA_COMPAT_TOOLS_PATHS. Must run before any thread but the
 // initial one exists (setenv can free the environ the client is reading).

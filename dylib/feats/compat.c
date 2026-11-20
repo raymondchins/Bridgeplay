@@ -28,6 +28,7 @@
 #define COMPAT_MANAGER_ENABLED_OFF  0x7B0
 #define COMPAT_MANAGER_USER_OFF     0x300  // CUser *
 #define COMPAT_TOOL_STRIDE          0x130
+#define COMPAT_TOOL_BUFFER_SIZE     (COMPAT_TOOL_STRIDE + 64)
 #define COMPAT_TOOL_FLAGS_OFF       0x28  // bit 0: tool needs no downloaded app
 #define COMPAT_TOOL_FLAG_NO_APP     0x1
 #define COMPAT_TOOL_FROM_OSLIST_OFF 0x70
@@ -93,7 +94,15 @@ static int ensure_dir(const char *path) {
     return mkdir(path, 0755);
 }
 
+// g_tool_shift is how far the install dir moved, which counts the head insertion too;
+// g_head_shift is how far the fields from COMPAT_TOOL_HEAD_OFF up to the install dir moved.
 static int32_t g_tool_shift;
+static int32_t g_head_shift;
+static int     g_head_probed;
+static int     g_tail_probed;
+// Where YldRegisterTool reads the appid right after the name. It must agree with the
+// appid the tail probe found, which ties the head probe to an independent reading.
+static uint32_t g_head_appid_off;
 
 // LDR Wt,[X0,#imm]. Writes the byte offset and destination register.
 static int ldr32_from_x0(uint32_t w, uint32_t *off, uint32_t *rt) {
@@ -168,7 +177,200 @@ static int probe_oslist_offsets(uintptr_t oslist_gate, uint32_t base,
     return 2;
 }
 
+// Bound the walk by the function and cap total work across branch paths.
+#define TOOL_HEAD_WINDOW 0x200
+#define TOOL_HEAD_BUDGET 256
+
+struct head_hit {
+    uint32_t name_off;
+    uint32_t appid_off;
+};
+
+#define REG_BIT(r) (1u << ((r) & 0x1Fu))
+#define RD(w) ((w) & 0x1Fu)
+#define RN(w) (((w) >> 5) & 0x1Fu)
+
+// After the name load. The client null-checks the name and swaps in a default string
+// (CMP then CSEL on the loaded register), which is what marks the load as the name
+// rather than some other pointer-sized field; the appid is the next 32-bit load
+// through the same base. In between, only instructions that leave the base alone.
+static int head_appid(uintptr_t pc, uintptr_t end, uint32_t base, uint32_t rt, uint32_t delta,
+                      int *budget, uint32_t *appid_off) {
+    int checked = 0, swapped = 0;
+    for (int i = 0; i < 8; i++, pc += 4) {
+        if (pc + 4 > end || --*budget < 0) return 0;
+        uint32_t w = *(const uint32_t *)pc;
+        if ((w & 0xFFC00000u) == 0xB9400000u && RN(w) == base) {      // LDR Wt,[Xn,#imm]
+            if (!checked || !swapped) return 0;
+            *appid_off = delta + ((w >> 10) & 0xFFFu) * 4u;
+            return 1;
+        }
+        if ((w & 0xFFFFFC1Fu) == 0xF100001Fu && RN(w) == rt) {         // CMP Xrt,#0
+            checked = 1;
+            continue;
+        }
+        if ((w & 0xFFE00C00u) == 0x9A800000u) {                        // CSEL (64-bit)
+            uint32_t cond = (w >> 12) & 0xFu;
+            uint32_t rm = (w >> 16) & 0x1Fu;
+            if (!checked || swapped || RD(w) == base || RD(w) == 31) return 0;
+            if (!((cond == 0 && rm == rt && RN(w) != rt && RN(w) != 31) ||
+                  (cond == 1 && RN(w) == rt && rm != rt && rm != 31))) return 0;
+            swapped = 1;
+            continue;
+        }
+        int store = (w & 0x3FC00000u) == 0x39000000u;                // STR (unsigned offset)
+        int ok = store
+              || (w & 0x1F000000u) == 0x10000000u                    // ADR, ADRP
+              || (w & 0x1F000000u) == 0x11000000u                    // ADD/SUB/CMP immediate
+              || (w & 0x1F800000u) == 0x12800000u;                   // MOVZ/MOVN/MOVK
+        if (!ok || (!store && RD(w) == base)) return 0;
+        // Anything that rewrites the loaded name before it is checked is not that check.
+        if (swapped || store) continue;
+        if (RD(w) == rt) return 0;
+        // A flag-setting ADD/SUB after CMP breaks its link to the select.
+        if (checked && (w & 0x3F000000u) == 0x31000000u) return 0;
+    }
+    return 0;
+}
+
+// Walks one path. Anything it does not model ends the walk with no answer, and both
+// sides of a conditional branch must give the same answer.
+static int head_walk(uintptr_t start, uintptr_t end, uintptr_t pc, uint32_t alias, int *budget,
+                     struct head_hit *hit) {
+    for (;; pc += 4) {
+        if (pc < start || pc + 4 > end || --*budget < 0) return 0;
+        uint32_t w = *(const uint32_t *)pc;
+
+        // Only hints known to leave the general registers alone, or to sign the link
+        // register in place; the rest of the hint space writes x16/x17 among others.
+        if (w == 0xD503201Fu ||                                      // NOP
+            (w & 0xFFFFFF3Fu) == 0xD503241Fu) continue;              // BTI, BTI c/j/jc
+        if (w == 0xD503233Fu || w == 0xD503237Fu) {                  // PACIASP, PACIBSP
+            alias &= ~REG_BIT(30);
+            continue;
+        }
+        if ((w & 0xFFE0FFE0u) == 0xAA0003E0u) {                      // MOV Xd,Xm
+            uint32_t rd = RD(w), rm = (w >> 16) & 0x1Fu;
+            if ((alias & REG_BIT(rm)) && rd != 31) alias |= REG_BIT(rd);
+            else alias &= ~REG_BIT(rd);
+            continue;
+        }
+        if ((w & 0xFFE0FFE0u) == 0x2A0003E0u ||                      // MOV Wd,Wm
+            (w & 0x1F000000u) == 0x10000000u ||                      // ADR, ADRP
+            (w & 0x1F800000u) == 0x12800000u) {                      // MOVZ/MOVN/MOVK
+            alias &= ~REG_BIT(RD(w));
+            continue;
+        }
+        if ((w & 0x1F000000u) == 0x11000000u) {                      // ADD/SUB immediate
+            // An address formed from the tool is a field this does not follow.
+            if (alias & REG_BIT(RN(w))) return 0;
+            if (!((w & 0x20000000u) && RD(w) == 31)) alias &= ~REG_BIT(RD(w));
+            continue;
+        }
+        if ((w & 0x3E000000u) == 0x28000000u) {                      // integer LDP/STP
+            uint32_t mode = (w >> 23) & 3u, rt2 = (w >> 10) & 0x1Fu;
+            if (mode == 0 || (mode != 2 && RN(w) != 31)) return 0;
+            if (w & 0x00400000u) {
+                if (alias & REG_BIT(RN(w))) return 0;
+                alias &= ~(REG_BIT(RD(w)) | REG_BIT(rt2));
+            }
+            continue;
+        }
+        if ((w & 0x3F000000u) == 0x39000000u) {                      // integer LDR/STR, unsigned offset
+            uint32_t size = w >> 30, opc = (w >> 22) & 3u;
+            if (opc == 0) continue;                                  // store
+            if (alias & REG_BIT(RN(w))) {
+                if (size != 3 || opc != 1 || (RD(w) == RN(w) || RD(w) == 31)) return 0;
+                hit->name_off = ((w >> 10) & 0xFFFu) * 8u;
+                return head_appid(pc + 4, end, RN(w), RD(w), 0, budget, &hit->appid_off);
+            }
+            alias &= ~REG_BIT(RD(w));
+            continue;
+        }
+        if ((w & 0x3F200000u) == 0x38000000u) {                      // integer LDR/STR, pre/post/unscaled
+            uint32_t size = w >> 30, opc = (w >> 22) & 3u, idx = (w >> 10) & 3u;
+            if (idx == 2) return 0;                                  // unprivileged
+            int load = opc != 0;
+            if (alias & REG_BIT(RN(w))) {
+                // Only the 64-bit pre-indexed load is the name; it leaves the base on it.
+                if (idx != 3 || !load || size != 3 || opc != 1 || (RD(w) == RN(w) || RD(w) == 31)) return 0;
+                int32_t imm = (int32_t)(((w >> 12) & 0x1FFu) << 23) >> 23;
+                if (imm <= 0) return 0;
+                hit->name_off = (uint32_t)imm;
+                return head_appid(pc + 4, end, RN(w), RD(w), (uint32_t)imm, budget, &hit->appid_off);
+            }
+            if (idx != 0 && RN(w) != 31) alias &= ~REG_BIT(RN(w));
+            if (load) alias &= ~REG_BIT(RD(w));
+            continue;
+        }
+        // A call clobbers x0-x18 and the link register.
+        if ((w & 0xFC000000u) == 0x94000000u || (w & 0xFFFFFC1Fu) == 0xD63F0000u) {
+            alias &= ~(0x7FFFFu | REG_BIT(30));
+            continue;
+        }
+        if ((w & 0xFC000000u) == 0x14000000u) {                      // B
+            int32_t imm = (int32_t)(w << 6) >> 4;
+            if (imm <= 0) return 0;
+            pc += (intptr_t)imm - 4;
+            continue;
+        }
+        int32_t disp;
+        if ((w & 0xFF000010u) == 0x54000000u || (w & 0x7E000000u) == 0x34000000u)
+            disp = (int32_t)(((w >> 5) & 0x7FFFFu) << 13) >> 11;     // B.cond, CBZ, CBNZ
+        else if ((w & 0x7E000000u) == 0x36000000u)
+            disp = (int32_t)(((w >> 5) & 0x3FFFu) << 18) >> 16;      // TBZ, TBNZ
+        else
+            return 0;
+        if (disp <= 0) return 0;
+        struct head_hit taken, through;
+        if (!head_walk(start, end, pc + (intptr_t)disp, alias, budget, &taken) ||
+            !head_walk(start, end, pc + 4, alias, budget, &through) ||
+            taken.name_off != through.name_off || taken.appid_off != through.appid_off)
+            return 0;
+        *hit = taken;
+        return 1;
+    }
+}
+
+int np_compat_probe_tool_head(uintptr_t yld_register_tool, uintptr_t end) {
+    g_head_probed = 0;
+    if (!yld_register_tool || end <= yld_register_tool) return 0;
+    if (end - yld_register_tool > TOOL_HEAD_WINDOW)
+        end = yld_register_tool + TOOL_HEAD_WINDOW;
+
+    // YldRegisterTool(manager, tool) parks the tool pointer from x1 before its first
+    // call, then reads the name through it and the appid right after.
+    int budget = TOOL_HEAD_BUDGET;
+    struct head_hit hit;
+    if (!head_walk(yld_register_tool, end, yld_register_tool, REG_BIT(1), &budget, &hit)) {
+        NP_ERR("np_compat_probe_tool_head: no unambiguous name load through the tool "
+               "argument in YldRegisterTool at 0x%lx", (unsigned long)yld_register_tool);
+        return 0;
+    }
+    int32_t head = (int32_t)hit.name_off - COMPAT_TOOL_NAME_OFF;
+    if (head < 0 || head > 0x20 || (head & 7)) {
+        NP_ERR("np_compat_probe_tool_head: the first tool load is at 0x%x, which is "
+               "not where a name can sit", hit.name_off);
+        return 0;
+    }
+    g_head_shift     = head;
+    g_head_appid_off = hit.appid_off;
+    g_head_probed    = 1;
+    if (head)
+        NP_LOG("np_compat_probe_tool_head: tool fields from 0x%x onward are %+d "
+               "from the baseline (name 0x%x, appid 0x%x)",
+               COMPAT_TOOL_HEAD_OFF, head, hit.name_off, hit.appid_off);
+    return 1;
+}
+
+int np_compat_layout_known(void) {
+    return g_head_probed && g_tail_probed && g_head_shift <= g_tool_shift &&
+           np_compat_tool_stride() <= COMPAT_TOOL_BUFFER_SIZE &&
+           g_head_appid_off == (uint32_t)((int32_t)COMPAT_TOOL_APPID_OFF + g_tool_shift);
+}
+
 int np_compat_probe_tool_layout(uintptr_t appid_gate, uintptr_t oslist_gate) {
+    g_tail_probed = 0;
     if (!appid_gate) return 0;
 
     uint32_t appid_off, rt;
@@ -224,6 +426,7 @@ int np_compat_probe_tool_layout(uintptr_t appid_gate, uintptr_t oslist_gate) {
     }
 
     g_tool_shift = by_appid;
+    g_tail_probed = 1;
     if (g_tool_shift)
         NP_LOG("np_compat_probe_tool_layout: tool fields from install onward are "
                "%+d from the baseline (appid 0x%x, install 0x%x)",
@@ -326,12 +529,24 @@ void *np_compat_user(const void *compat_mgr) {
 }
 
 uint32_t np_compat_tool_off(uint32_t reference_off) {
-    if (reference_off < COMPAT_TOOL_INSTALL_OFF) return reference_off;
+    if (reference_off < COMPAT_TOOL_HEAD_OFF) return reference_off;
+    if (reference_off < COMPAT_TOOL_INSTALL_OFF)
+        return (uint32_t)((int32_t)reference_off + g_head_shift);
     return (uint32_t)((int32_t)reference_off + g_tool_shift);
 }
 
 size_t np_compat_tool_stride(void) {
     return (size_t)((int32_t)COMPAT_TOOL_STRIDE + g_tool_shift);
+}
+
+const char *np_compat_tool_name(const void *tool) {
+    // Without a confirmed layout no slot is known to hold the name, so nothing is matched
+    // or compared by it.
+    if (!tool || !np_compat_layout_known()) return NULL;
+    const char *name =
+        *(const char *const *)((const uint8_t *)tool + np_compat_tool_off(COMPAT_TOOL_NAME_OFF));
+    // A layout this build reads wrong puts an int or a flag where the name should be.
+    return np_plausible_addr((uint64_t)(uintptr_t)name) ? name : NULL;
 }
 
 // The compatibility tool needs to go in the folder Steam normally (on Linux)
@@ -817,7 +1032,7 @@ void *np_compat_manager(void) {
 int np_compat_app_runs_tool(uint32_t appid) {
     const uint8_t *tool = np_compat_tool_for_app(g_manager, appid);
 
-    return tool && is_tool_name(*(const char *const *)(tool + COMPAT_TOOL_NAME_OFF));
+    return tool && is_tool_name(np_compat_tool_name(tool));
 }
 
 static void *find_tool(void *compat_mgr, const char *wanted) {
@@ -836,7 +1051,7 @@ static void *find_tool(void *compat_mgr, const char *wanted) {
 
     for (uint32_t i = 0; i < count; i++) {
         uint8_t *entry = array + (size_t)i * np_compat_tool_stride();
-        const char *name = *(const char **)(entry + COMPAT_TOOL_NAME_OFF);
+        const char *name = np_compat_tool_name(entry);
         if (name && strcmp(name, wanted) == 0)
             return entry;
     }
@@ -854,6 +1069,13 @@ void np_compat_register_crossover(void *compat_mgr) {
     if (registered || !compat_mgr || !g_yld_register_tool)
         return;
     registered = 1;
+    if (!np_compat_layout_known()) {
+        // Tools Steam read from compatibilitytools.d itself still show; only the
+        // runtime entries, which would be built on a guessed layout, are left out.
+        NP_ERR("np_compat_register_crossover: this client's tool layout was not "
+               "confirmed, so no tool is registered at runtime");
+        return;
+    }
     load_tool_list_once();
 
     // YldRegisterTool copies the entry and its strings. Each buffer carries headroom
@@ -861,7 +1083,7 @@ void np_compat_register_crossover(void *compat_mgr) {
     // the registration gate, from_oslist=windows intersects the app mask so the
     // dropdown keeps it, and appid 0 marks a manager-local tool the resolver routes
     // to the local run script.
-    uint8_t (*buffers)[COMPAT_TOOL_STRIDE + 64] = calloc((size_t)g_tool_count, sizeof(*buffers));
+    uint8_t (*buffers)[COMPAT_TOOL_BUFFER_SIZE] = calloc((size_t)g_tool_count, sizeof(*buffers));
     if (g_tool_count && !buffers) {
         NP_WARN("np_compat_register_crossover: out of memory, no tool registered");
         return;
@@ -880,9 +1102,9 @@ void np_compat_register_crossover(void *compat_mgr) {
 
         uint8_t *tool = buffers[i];
         memset(tool, 0, sizeof(buffers[i]));
-        *(uint32_t *)(tool + COMPAT_TOOL_FLAGS_OFF)      = COMPAT_TOOL_FLAG_NO_APP;
-        *(const char **)(tool + COMPAT_TOOL_NAME_OFF)    = t->name;
-        *(const char **)(tool + COMPAT_TOOL_DISPLAY_OFF) = t->display;
+        *(uint32_t *)(tool + np_compat_tool_off(COMPAT_TOOL_FLAGS_OFF))      = COMPAT_TOOL_FLAG_NO_APP;
+        *(const char **)(tool + np_compat_tool_off(COMPAT_TOOL_NAME_OFF))    = t->name;
+        *(const char **)(tool + np_compat_tool_off(COMPAT_TOOL_DISPLAY_OFF)) = t->display;
         *(const char **)(tool + np_compat_tool_off(COMPAT_TOOL_INSTALL_OFF)) = t->dir;
         *(uint32_t *)(tool + np_compat_tool_off(COMPAT_TOOL_APPID_OFF)) = 0;
         *(const char **)(tool + np_compat_tool_off(COMPAT_TOOL_FROM_OSLIST_OFF)) = from_oslist;
@@ -920,7 +1142,7 @@ size_t np_compat_fex_tools(const char **names, size_t max) {
 }
 
 void *np_compat_registered_tool(void *compat_mgr) {
-    if (!compat_mgr)
+    if (!compat_mgr || !np_compat_layout_known())
         return NULL;
 
     load_tool_list_once();
