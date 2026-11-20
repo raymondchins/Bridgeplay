@@ -22,11 +22,11 @@ SliderField.toString = () => 'Dt=>{const lr=(0,f.Zt)("SliderField",v);return(0,a
 const barrel = { XY: 'Section', m: 'Dropdown', Yh: 'Toggle', Kc: SliderField };
 const barrelWithoutSlider = { XY: 'Section', m: 'Dropdown', Yh: 'Toggle' };
 
-// The two shapes take the payload in different forms and bind different names, which
-// is the whole of the difference between them.
+// Each page shape binds its own names in the shared payload.
 const FORMS = {
   component: { react: '\u0004', barrel: '\u0005' },
   statement: { react: '\u0003', barrel: '\u0004' },
+  vite: { react: '\u0003', barrel: '\u0004' },
 };
 
 // `fallback` and `fexTools` stand in for what the hook sets before the transform. The
@@ -42,13 +42,19 @@ function panel(emit, form, globals = Object.assign(Object.create(globalThis),
   const SteamClient = {
     Apps: { SetAppLaunchOptions: (appid, opts) => written.push({ appid, opts }) },
   };
-  const build = new Function(names[0], names[1], 'SteamClient', 'globalThis',
+  const vite = form === 'vite';
+  const imports = vite ? ['ViteToggle', 'ViteDropdown', 'ViteSlider'] : [];
+  // A bare Vite import need not carry a recognizable name in its source.
+  const viteSlider = props => ({ type: 'Slider', props });
+  const components = vite ? [react, 'Section', 'Toggle', 'Dropdown', slider ? viteSlider : null] :
+                             [react, slider ? barrel : barrelWithoutSlider];
+  const build = new Function(...names, ...imports, 'SteamClient', 'globalThis',
     src + '\nreturn { MSCXOpts, MSCXApply: typeof MSCXApply === "function" ? MSCXApply : null,' +
     ' MSCXTake: typeof MSCXTake === "function" ? MSCXTake : null,' +
     ' MSCXPick: typeof MSCXPick === "function" ? MSCXPick : null,' +
     ' MSCXToolQuery: typeof MSCXToolQuery === "function" ? MSCXToolQuery : null };');
   const { MSCXOpts, MSCXApply, MSCXTake, MSCXPick, MSCXToolQuery } =
-    build(react, slider ? barrel : barrelWithoutSlider, SteamClient, globals);
+    build(...components, SteamClient, globals);
   return { render: MSCXOpts, apply: MSCXApply, take: MSCXTake, pick: MSCXPick, toolQuery: MSCXToolQuery, written,
            globals };
 }
