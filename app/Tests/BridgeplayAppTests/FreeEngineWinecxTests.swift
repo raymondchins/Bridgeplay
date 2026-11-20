@@ -243,12 +243,14 @@ struct FreeEngineWinecxTests {
         }
     }
 
-    // winecoreaudio-patch: 11.17 ships a winecoreaudio.so with half-period output pulls.
-    @Test("The patched winecoreaudio ships with the app and is pinned for 11.17",
+    // winecoreaudio-patch: 11.17 ships a winecoreaudio.so with half-period output pulls;
+    // mmdevapi-patch: mmdevapi that follows the system's default device.
+    @Test("The patched audio files ship with the app and are pinned for 11.17",
           arguments: FreeEngineWinecx.releases.map(\.build))
     func audio(id: String) throws {
         let release = try #require(FreeEngineWinecx.release(build: id))
-        let expected: Set<String> = release.build == "winecx-11.17" ? ["lib/wine/x86_64-unix/winecoreaudio.so"] : []
+        let expected: Set<String> = release.build == "winecx-11.17" ? ["lib/wine/x86_64-unix/winecoreaudio.so", "lib/wine/x86_64-windows/mmdevapi.dll",
+               "lib/wine/i386-windows/mmdevapi.dll"] : []
         #expect(Set(release.audio.map(\.path)) == expected)
         let table = FreeEngineWinecx.expectedFiles(release)
         for file in release.audio {

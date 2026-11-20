@@ -65,6 +65,8 @@ below for the current archive's name and sha256).
     winebus-winecx-11.17.so       unmodified source, built with SDL2 support
     winebus-winecx-11.17.sys      winebus-patch/winecx-sdl-mappings.patch
     winecoreaudio-winecx-11.17.so winecoreaudio-patch/winecx-render-buffer.patch
+    mmdevapi-winecx-11.17.dll     mmdevapi-patch/winecx-follow-system-default.patch
+    mmdevapi-winecx-11.17-i386.dll   (same patch)
     wined3d-winecx-11.17.dll      wined3d-patch/winecx-driver-version.patch
     ws2_32-winecx-11.17.dll       ws2_32-patch/winecx-own-hostname.patch
     d3dx11_43-winecx-11.17.dll    d3dx11-patch/winecx-create-thread-pump.patch
