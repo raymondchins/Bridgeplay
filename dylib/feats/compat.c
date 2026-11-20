@@ -176,11 +176,7 @@ static int probe_oslist_offsets(uintptr_t oslist_gate, uint32_t base,
     return 2;
 }
 
-// The head probe reads at most this far into YldRegisterTool, and this many
-// instructions over every path it walks.
-// CEILING: the probe gets only the function's start, so a forward branch inside the
-// window could land in a neighbouring function — the name-check and appid evidence
-// guard this; bound by the function's real end if the resolver ever reports sizes.
+// Bound the walk by the function and cap total work across branch paths.
 #define TOOL_HEAD_WINDOW 0x200
 #define TOOL_HEAD_BUDGET 256
 
@@ -213,8 +209,12 @@ static int head_appid(uintptr_t pc, uintptr_t end, uint32_t base, uint32_t rt, u
             continue;
         }
         if ((w & 0xFFE00C00u) == 0x9A800000u) {                        // CSEL (64-bit)
-            if (RD(w) == base) return 0;
-            if (checked && (RN(w) == rt || ((w >> 16) & 0x1Fu) == rt)) swapped = 1;
+            uint32_t cond = (w >> 12) & 0xFu;
+            uint32_t rm = (w >> 16) & 0x1Fu;
+            if (!checked || swapped || RD(w) == base || RD(w) == 31) return 0;
+            if (!((cond == 0 && rm == rt && RN(w) != rt) ||
+                  (cond == 1 && RN(w) == rt && rm != rt))) return 0;
+            swapped = 1;
             continue;
         }
         int store = (w & 0x3FC00000u) == 0x39000000u;                // STR (unsigned offset)
@@ -224,16 +224,18 @@ static int head_appid(uintptr_t pc, uintptr_t end, uint32_t base, uint32_t rt, u
               || (w & 0x1F800000u) == 0x12800000u;                   // MOVZ/MOVN/MOVK
         if (!ok || (!store && RD(w) == base)) return 0;
         // Anything that rewrites the loaded name before it is checked is not that check.
-        if (!store && RD(w) == rt && !checked) return 0;
+        if (swapped || store) continue;
+        if (RD(w) == rt) return 0;
+        // A flag-setting ADD/SUB after CMP breaks its link to the select.
+        if (checked && (w & 0x3F000000u) == 0x31000000u) return 0;
     }
     return 0;
 }
 
 // Walks one path. Anything it does not model ends the walk with no answer, and both
 // sides of a conditional branch must give the same answer.
-static int head_walk(uintptr_t start, uintptr_t pc, uint32_t alias, int *budget,
+static int head_walk(uintptr_t start, uintptr_t end, uintptr_t pc, uint32_t alias, int *budget,
                      struct head_hit *hit) {
-    const uintptr_t end = start + TOOL_HEAD_WINDOW;
     for (;; pc += 4) {
         if (pc < start || pc + 4 > end || --*budget < 0) return 0;
         uint32_t w = *(const uint32_t *)pc;
@@ -277,7 +279,7 @@ static int head_walk(uintptr_t start, uintptr_t pc, uint32_t alias, int *budget,
             uint32_t size = w >> 30, opc = (w >> 22) & 3u;
             if (opc == 0) continue;                                  // store
             if (alias & REG_BIT(RN(w))) {
-                if (size != 3 || opc != 1 || RD(w) == RN(w)) return 0;
+                if (size != 3 || opc != 1 || (RD(w) == RN(w) || RD(w) == 31)) return 0;
                 hit->name_off = ((w >> 10) & 0xFFFu) * 8u;
                 return head_appid(pc + 4, end, RN(w), RD(w), 0, budget, &hit->appid_off);
             }
@@ -290,7 +292,7 @@ static int head_walk(uintptr_t start, uintptr_t pc, uint32_t alias, int *budget,
             int load = opc != 0;
             if (alias & REG_BIT(RN(w))) {
                 // Only the 64-bit pre-indexed load is the name; it leaves the base on it.
-                if (idx != 3 || !load || size != 3 || opc != 1 || RD(w) == RN(w)) return 0;
+                if (idx != 3 || !load || size != 3 || opc != 1 || (RD(w) == RN(w) || RD(w) == 31)) return 0;
                 int32_t imm = (int32_t)(((w >> 12) & 0x1FFu) << 23) >> 23;
                 if (imm <= 0) return 0;
                 hit->name_off = (uint32_t)imm;
@@ -320,8 +322,8 @@ static int head_walk(uintptr_t start, uintptr_t pc, uint32_t alias, int *budget,
             return 0;
         if (disp <= 0) return 0;
         struct head_hit taken, through;
-        if (!head_walk(start, pc + (intptr_t)disp, alias, budget, &taken) ||
-            !head_walk(start, pc + 4, alias, budget, &through) ||
+        if (!head_walk(start, end, pc + (intptr_t)disp, alias, budget, &taken) ||
+            !head_walk(start, end, pc + 4, alias, budget, &through) ||
             taken.name_off != through.name_off || taken.appid_off != through.appid_off)
             return 0;
         *hit = taken;
@@ -329,15 +331,17 @@ static int head_walk(uintptr_t start, uintptr_t pc, uint32_t alias, int *budget,
     }
 }
 
-int np_compat_probe_tool_head(uintptr_t yld_register_tool) {
+int np_compat_probe_tool_head(uintptr_t yld_register_tool, uintptr_t end) {
     g_head_probed = 0;
-    if (!yld_register_tool) return 0;
+    if (!yld_register_tool || end <= yld_register_tool) return 0;
+    if (end - yld_register_tool > TOOL_HEAD_WINDOW)
+        end = yld_register_tool + TOOL_HEAD_WINDOW;
 
     // YldRegisterTool(manager, tool) parks the tool pointer from x1 before its first
     // call, then reads the name through it and the appid right after.
     int budget = TOOL_HEAD_BUDGET;
     struct head_hit hit;
-    if (!head_walk(yld_register_tool, yld_register_tool, REG_BIT(1), &budget, &hit)) {
+    if (!head_walk(yld_register_tool, end, yld_register_tool, REG_BIT(1), &budget, &hit)) {
         NP_ERR("np_compat_probe_tool_head: no unambiguous name load through the tool "
                "argument in YldRegisterTool at 0x%lx", (unsigned long)yld_register_tool);
         return 0;

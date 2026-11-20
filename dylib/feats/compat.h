@@ -34,7 +34,7 @@
 // Reads the name's live offset from YldRegisterTool, whose first load through the tool
 // argument is the name, and from it the shift at COMPAT_TOOL_HEAD_OFF. Returns 0 when the
 // load is not found, which leaves the layout unverified (np_compat_layout_known).
-int np_compat_probe_tool_head(uintptr_t yld_register_tool);
+int np_compat_probe_tool_head(uintptr_t yld_register_tool, uintptr_t end);
 
 // Reads live field offsets from the appid and install-dir gates. Returns 0 when
 // the two disagree about how far the struct shifted. The oslist gate is optional
