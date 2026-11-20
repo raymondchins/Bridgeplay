@@ -448,9 +448,49 @@ final class SystemStatus {
 
     private static let toolsRestartHint = String(localized: "Restart Steam to update its list of compatibility tools.")
 
-    private func runnerOutcome(_ result: RunnerSetup.Outcome) -> String {
+    @ObservationIgnored private var defaultToolRetryPending = false
+
+    // The caller holds the installation lock while reading the installed tools and config.vdf.
+    nonisolated private static func followDefaultTool() -> SteamDefaultTool.FollowResult {
+        do {
+            let result = try SteamDefaultTool.followSuccessors(installed: CompatToolList.installed().map(\.name))
+            if result == .updated {
+                AppLog.note("default tool: pointed Steam's compatibility tool choices at the installed successor")
+            }
+            return result
+        } catch {
+            AppLog.note("default tool: could not follow the updated engine: \(error.localizedDescription)")
+            return .failed
+        }
+    }
+
+    // Stays pending until a check completes, so an attempt skipped for a run in flight or a
+    // held lock is retried on the next patch check.
+    func followDefaultToolWhenIdle() async {
+        defaultToolRetryPending = true
+        guard canInstall, !UserDefaults.standard.bool(forKey: SteamPatchKeeper.pausedKey) else { return }
+        runInFlight = true
+        defer { runInFlight = false }
+        let version = AppVersion.bundled
+        let result = await Task.detached(priority: .utility) { () -> SteamDefaultTool.FollowResult? in
+            // Checked before the lock too, so a long Steam session doesn't hold setup up on every poll.
+            if SteamBundle.isRunningForThisUser { return .steamRunning }
+            guard let lock = try? DeploymentContent.acquireInstallationLock() else { return nil }
+            defer { lock.release() }
+            guard !DeploymentContent.current(version: version).blocksInstallation else { return nil }
+            return Self.followDefaultTool()
+        }.value
+        if let result { defaultToolRetryPending = result.needsRetry }
+    }
+
+    private func runnerOutcome(_ result: RunnerSetup.Outcome) async -> String {
+        let (follow, needsRestart) = await Task.detached(priority: .utility) {
+            let follow = Self.followDefaultTool()
+            return (follow, result.toolsChanged && SteamBundle.isRunning)
+        }.value
+        defaultToolRetryPending = follow.needsRetry
         if result.stagedNothing { return String(localized: "Compatibility tool is already set up.") }
-        guard result.toolsChanged, SteamBundle.isRunning else { return String(localized: "Compatibility tool ready.") }
+        guard needsRestart else { return String(localized: "Compatibility tool ready.") }
         return String(localized: "Compatibility tool ready. \(Self.toolsRestartHint)")
     }
 
@@ -510,7 +550,7 @@ final class SystemStatus {
                 }
             }.value
 
-            return runnerOutcome(result)
+            return await runnerOutcome(result)
         }
     }
 
@@ -532,7 +572,7 @@ final class SystemStatus {
             let result = try await Task.detached(priority: .userInitiated) {
                 try RunnerSetup.run(from: install, replacingExisting: true) { progress($0.label) }
             }.value
-            return runnerOutcome(result)
+            return await runnerOutcome(result)
         }
     }
 
@@ -548,7 +588,7 @@ final class SystemStatus {
             let result = try await Task.detached(priority: .userInitiated) {
                 try RunnerSetup.run(from: install, replacingExisting: true) { progress($0.label) }
             }.value
-            return runnerOutcome(result)
+            return await runnerOutcome(result)
         }
     }
 
@@ -758,6 +798,11 @@ final class SystemStatus {
         lastPatchCheck = now
         let version = AppVersion.bundled
         let seen = await Task.detached(priority: .utility) { SteamPatchKeeper.capture(bundledVersion: version) }.value
+        // Steam open under another macOS account doesn't block this user's config, so the
+        // per-user check inside the follow decides.
+        if defaultToolRetryPending {
+            await followDefaultToolWhenIdle()
+        }
         let decision = SteamPatchKeeper.decide(SteamPatchKeeper.Inputs(
             deployment: seen.deployment,
             previouslyDeployed: seen.previouslyDeployed,
@@ -941,6 +986,7 @@ final class SystemStatus {
 
     func removeEverything() async {
         await perform(from: UninstallPhase.stoppingClient.label) { progress in
+            defaultToolRetryPending = false
             let result = try await Uninstall.run(leftovers: .live) { progress($0.label) }
 
             let summary = result.partialRemoval ?? (result.steamNeedsRedownload

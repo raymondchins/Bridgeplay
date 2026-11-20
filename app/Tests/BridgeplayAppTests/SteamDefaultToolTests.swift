@@ -194,3 +194,138 @@ struct SteamGameEntriesTests {
         #expect(try String(contentsOf: file, encoding: .utf8) == Self.vdf([]))
     }
 }
+
+@Suite("Steam default follows engine updates")
+struct SteamDefaultToolFollowTests {
+    private func vdf(_ names: [(String, String)]) -> String {
+        let entries = names.map { id, name in
+            "\t\t\t\t\t\"\(id)\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"name\"\t\t\"\(name)\"\n\t\t\t\t\t\t\"config\"\t\t\"\"\n\t\t\t\t\t\t\"priority\"\t\t\"75\"\n\t\t\t\t\t}"
+        }.joined(separator: "\n")
+        return "\"InstallConfigStore\"\n{\n\t\"Software\"\n\t{\n\t\t\"valve\"\n\t\t{\n\t\t\t\"Steam\"\n\t\t\t{\n\t\t\t\t\"CompatToolMapping\"\n\t\t\t\t{\n\(entries)\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}"
+    }
+
+    @Test("The highest same-family build wins regardless of installed order")
+    func highestBuild() {
+        let tools = [
+            "bridgeplay-proton-winecx-11.9", "bridgeplay-proton-winecx-11.17", "bridgeplay-proton-winecx-11.10",
+            "bridgeplay-proton-fex-41069", "bridgeplay-proton-fex-41073", "bridgeplay-proton-fex-rosetta-41080",
+        ]
+        #expect(SteamDefaultTool.successor(of: "bridgeplay-proton-winecx-11.8", installed: tools, toolExists: { _ in false })
+            == "bridgeplay-proton-winecx-11.17")
+        #expect(SteamDefaultTool.successor(of: "bridgeplay-proton-fex-41068", installed: tools, toolExists: { _ in false })
+            == "bridgeplay-proton-fex-41073")
+    }
+
+    @Test("The unversioned 40921 preview tools follow their numbered successors")
+    func unversionedPreviewSuccessors() {
+        let tools = ["bridgeplay-proton-preview-41073", "bridgeplay-proton-fex-41073", "bridgeplay-proton-fex-rosetta-41073"]
+        for name in ["bridgeplay-proton-preview", "bridgeplay-proton-fex", "bridgeplay-proton-fex-rosetta"] {
+            #expect(SteamDefaultTool.successor(of: name, installed: tools, toolExists: { _ in false }) == name + "-41073")
+            #expect(SteamDefaultTool.successor(of: name, installed: tools, toolExists: { $0 == name }) == nil)
+        }
+        #expect(SteamDefaultTool.successor(of: "notproton-fex", installed: tools, toolExists: { _ in false })
+            == "bridgeplay-proton-fex-41073")
+    }
+
+    @Test("Older builds, different families, and aliases are left alone")
+    func incompatibleSuccessors() {
+        let tools = ["bridgeplay-proton-winecx-11.9", "bridgeplay-proton-26.3", "bridgeplay-proton-fex-rosetta-41073"]
+        let names = [
+            "bridgeplay-proton-winecx-11.17", "bridgeplay-proton-fex-41069", "bridgeplay-proton",
+            "bridgeplay-proton-winecx", "notproton", "notproton-winecx", "notproton-winecx-11..8", "proton_9",
+            "notproton-other-11.8",
+        ]
+        for name in names {
+            #expect(SteamDefaultTool.successor(of: name, installed: tools, toolExists: { _ in false }) == nil)
+        }
+        #expect(SteamDefaultTool.successor(of: "notproton-winecx-11.8", installed: tools, toolExists: { _ in false })
+            == "bridgeplay-proton-winecx-11.9")
+    }
+
+    @Test("A default naming a replaced tool moves to its successor")
+    func repoints() throws {
+        let text = vdf([("0", "bridgeplay-proton-winecx-11.17"), ("10", "bridgeplay-proton-winecx-11.17"), ("20", "proton_9")])
+        let out = try #require(SteamDefaultTool.followingSuccessors(
+            text, installed: ["bridgeplay-proton-winecx-11.18", "bridgeplay-proton-winehq"], toolExists: { _ in false }
+        ))
+        #expect(out == vdf([("0", "bridgeplay-proton-winecx-11.18"), ("10", "bridgeplay-proton-winecx-11.18"), ("20", "proton_9")]))
+    }
+
+    @Test("Only names directly in app entries change, with comments preserved")
+    func scopesReplacement() throws {
+        let old = "bridgeplay-proton-winecx-11.9"
+        let new = "bridgeplay-proton-winecx-11.17"
+        let direct = "\"name\"\t\t\"\(old)\" // \"\(old)\""
+        // Deliberately use the same indentation for all fields to test structural depth.
+        let fields = "\"metadata\" { // }\n\"name\" \"\(old)\"\n}\n// \"name\" \"\(old)\"\n" + direct
+        let text = vdf([("10", old), ("metadata", old)]).replacingOccurrences(
+            of: "\"name\"\t\t\"\(old)\"\n\t\t\t\t\t\t\"config\"", with: fields + "\n\"config\""
+        )
+        var expected = text
+        expected.replaceSubrange(try #require(expected.range(of: direct)), with: "\"name\"\t\t\"\(new)\" // \"\(old)\"")
+        #expect(SteamDefaultTool.followingSuccessors(text, installed: [new], toolExists: { _ in false }) == expected)
+    }
+
+    @Test("An unrecognized tool folder is kept and a candidate with no tool folder is skipped")
+    func usesFoldersOnDisk() throws {
+        let dir = try scratchDirectory("follow-tools")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let tools = dir.appending(path: "compatibilitytools.d")
+        let file = dir.appending(path: "config.vdf")
+        let present = "bridgeplay-proton-winecx-11.10"
+        let successor = "bridgeplay-proton-winecx-11.17"
+        for name in [present, successor] {
+            try FileManager.default.createDirectory(at: tools.appending(path: name), withIntermediateDirectories: true)
+        }
+        try vdf([("0", present), ("10", "bridgeplay-proton-winecx-11.9")]).write(to: file, atomically: true, encoding: .utf8)
+        #expect(try SteamDefaultTool.followSuccessors(
+            installed: [successor, "bridgeplay-proton-winecx-11.18"], in: file, compatTools: tools, steamRunning: { false }
+        ) == .updated)
+        #expect(try String(contentsOf: file, encoding: .utf8) == vdf([("0", present), ("10", successor)]))
+    }
+
+    @Test("Skips before reading and again before writing if Steam starts")
+    func steamGuard() throws {
+        let dir = try scratchDirectory("follow-steam")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appending(path: "config.vdf")
+        let tools = dir.appending(path: "compatibilitytools.d")
+        let successor = "bridgeplay-proton-winecx-11.17"
+        try FileManager.default.createDirectory(at: tools.appending(path: successor), withIntermediateDirectories: true)
+        #expect(try SteamDefaultTool.followSuccessors(
+            installed: [successor], in: file, compatTools: tools, steamRunning: { true }
+        ) == .steamRunning)
+
+        let text = vdf([("0", "bridgeplay-proton-winecx-11.9")])
+        try text.write(to: file, atomically: true, encoding: .utf8)
+        var checks = 0
+        #expect(try SteamDefaultTool.followSuccessors(installed: [successor], in: file, compatTools: tools, steamRunning: {
+            checks += 1
+            return checks == 2
+        }) == .steamRunning)
+        #expect(checks == 2)
+        #expect(try String(contentsOf: file, encoding: .utf8) == text)
+        #expect(try SteamDefaultTool.followSuccessors(
+            installed: [successor], in: file, compatTools: tools, steamRunning: { false }
+        ) == .updated)
+        #expect(try String(contentsOf: file, encoding: .utf8) == vdf([("0", successor)]))
+    }
+
+    @Test("An unreadable config is a failure, but an absent config needs no repair")
+    func configReadFailure() throws {
+        let dir = try scratchDirectory("follow-config")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appending(path: "config.vdf")
+        let successor = "bridgeplay-proton-winecx-11.17"
+        try FileManager.default.createDirectory(at: dir.appending(path: successor), withIntermediateDirectories: true)
+
+        func follow() throws -> SteamDefaultTool.FollowResult {
+            try SteamDefaultTool.followSuccessors(installed: [successor], in: file, compatTools: dir, steamRunning: { false })
+        }
+
+        #expect(try follow() == .unchanged)
+        try Data([0xFF]).write(to: file)
+        #expect(throws: (any Error).self) { try follow() }
+        #expect(SteamDefaultTool.FollowResult.failed.needsRetry)
+    }
+}
