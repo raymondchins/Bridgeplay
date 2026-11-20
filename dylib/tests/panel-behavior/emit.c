@@ -1,6 +1,5 @@
 // The payload is a macro, so the unit under test is included rather than linked.
-// Both forms come from one body, which is what makes the checks that run against
-// this output speak for both page shapes at once.
+// All forms come from the same panel body.
 #include "../../feats/webpatch.c"
 #include "../../util/file.c"
 
@@ -28,12 +27,20 @@ static void put_panel(const char *body) {
 }
 
 int main(int argc, char **argv) {
-    if (argc >= 2 && (strcmp(argv[1], "component") == 0 || strcmp(argv[1], "statement") == 0)) {
+    int vite = argc >= 2 && strcmp(argv[1], "vite") == 0;
+    int component = argc >= 2 && strcmp(argv[1], "component") == 0;
+    if (vite || component || (argc >= 2 && strcmp(argv[1], "statement") == 0)) {
         np_webpatch_set_fallback_tool(argc >= 3 ? argv[2] : NULL);
         np_webpatch_set_fex_tools((const char *const *)argv + 3,
                                   argc > 3 ? (size_t)(argc - 3) : 0);
-        put_panel(strcmp(argv[1], "component") == 0 ? NP_CX_OPTIONS_COMPONENT
-                                                    : NP_CX_OPTIONS_STATEMENT);
+        if (vite) {
+            strcpy(g_bind_text[bind_index(NP_B_CHECKBOX[0])], "ViteToggle");
+            strcpy(g_bind_text[bind_index(NP_B_DROPDOWN[0])], "ViteDropdown");
+            strcpy(g_bind_text[bind_index(NP_B_SLIDER[0])], "ViteSlider");
+            put_panel(NP_CX_OPTIONS_VITE);
+        } else {
+            put_panel(component ? NP_CX_OPTIONS_COMPONENT : NP_CX_OPTIONS_STATEMENT);
+        }
         return 0;
     }
     if (argc == 2 && strcmp(argv[1], "prefix-row") == 0) {
@@ -79,7 +86,7 @@ int main(int argc, char **argv) {
         fputs(NP_LIBRARY_WINDOWS_SUMMARY, stdout);
         return 0;
     }
-    fputs("usage: emit component|statement [fallback [fex-tool...]]|migration|"
+    fputs("usage: emit component|statement|vite [fallback [fex-tool...]]|migration|"
           "transform <chunk> <fallback tool>|compat-hint|image-files-label|"
           "library-windows-hint|library-windows-summary|prefix-row\n", stderr);
     return 2;

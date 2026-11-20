@@ -412,7 +412,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "@keyframes MSCXSlide{from{left:-30%}to{left:100%}}\""
 
 // FEX runs arm64 Wine, which has no D3DMetal and never runs under Rosetta.
-#define NP_CX_OPTIONS_BODY(ARG, RT, BARREL) \
+#define NP_CX_OPTIONS_BODY(ARG, RT, BARREL, SLIDER) \
     ARG "=>{" \
     "const t=" ARG ".details,o=t.strLaunchOptions||\"\"," \
     /* MSCXApply hands in its own writer, to run several changes into one write. */ \
@@ -492,14 +492,12 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
        slider dims and keeps its value (BRIDGEPLAY_FPS_LIMIT_OFF=1). overlay-shim clamps to the display the game \
        is on, so a value from the game, which knows that display, is kept up to 360 even when \
        Fx.fm, read when Steam loaded this page, is lower. display and half from earlier releases show as the rate they give, 0 or no value \
-       as no limit. Steam's slider is found by the name its export carries, so a renamed export \
-       still works; without it, a menu in steps of 5 stands in. npKey and npSet are for \
+       as no limit. Without Steam's slider, a menu in steps of 5 stands in. npKey and npSet are for \
        MSCXApply, which sets the value even while the switch dims the slider. */ \
     "fm=+Fx.fm>=15&&+Fx.fm<=360?+Fx.fm:60," \
     "lf=x=>{x=(x||\"\").toLowerCase();return x===\"display\"?fm:x===\"half\"?Math.max(15,Math.round(fm/2)):" \
     "/^\\d+$/.test(x)&&+x>=10&&+x<=360?Math.min(fm,Math.max(15,+x)):0}," \
-    "SL=globalThis.MSCXSliderField||(globalThis.MSCXSliderField=(()=>{try{return Object.values(" BARREL ")" \
-    ".find(f=>typeof f===\"function\"&&/[\"`]SliderField[\"`]/.test(String(f)))}catch(e){return null}})())," \
+    "SL=" SLIDER "," \
     "FL=(l,dl)=>{const n=lf(ev(\"BRIDGEPLAY_FPS_LIMIT\")),off=!n||ev(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",v=n||fm," \
     "set=(x,top)=>{x=Math.min(top||fm,Math.max(15,Math.round(+x)));if(!(x>=15))return;const b=dv(\"BRIDGEPLAY_FPS_LIMIT\");" \
     "s([[\"BRIDGEPLAY_FPS_LIMIT\",/^\\d+$/.test(b)&&+b===x?\"\":String(x)]])}," \
@@ -622,8 +620,12 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "children:npL(\"Use Bridgeplay defaults\",\"使用 Bridgeplay 默认设置\",\"Usa le impostazioni predefinite di Bridgeplay\")})},\"npdef\")" \
     "]})})}"
 
-#define NP_CX_OPTIONS_CAPTURE(RT, BARREL) \
-    "((npReact,npUI)=>" NP_CX_OPTIONS_BODY("np", "npReact()", "npUI()") ")(()=>" RT ",()=>" BARREL ")"
+// Find the slider by its original name in webpack's barrel despite export renames.
+#define NP_WEBPACK_SLIDER \
+    "globalThis.MSCXSliderField||(globalThis.MSCXSliderField=(()=>{try{return Object.values(npUI())" \
+    ".find(f=>typeof f===\"function\"&&/\"SliderField\"/.test(String(f)))}catch(e){return null}})())"
+#define NP_CX_OPTIONS_CAPTURE(RT, BARREL, SLIDER) \
+    "((npReact,npUI)=>" NP_CX_OPTIONS_BODY("np", "npReact()", "npUI()", SLIDER) ")(()=>" RT ",()=>" BARREL ")"
 
 // Changes from a game's in-game quick settings (overlay-shim/sidebar.m, collected by the
 // NotProton.TakeQuickSettings route) go through the panel's own menus, so a pick in the game
@@ -672,21 +674,22 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 
 #define NP_CX_OPTIONS_COMPONENT \
     "MSCXLaunch=" NP_CX_LAUNCH ",MSCXPick=" NP_CX_PICK "," \
-    "MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C4, NP_C5) "," \
+    "MSCXOpts=" NP_CX_OPTIONS_CAPTURE(NP_C4, NP_C5, NP_WEBPACK_SLIDER) "," \
     "MSCXApply=" NP_CX_APPLY ",MSCXTake=" NP_CX_TAKE ",MSCXSync=" NP_CX_SYNC ","
 
 // Valve is testing a new compatibility page UI, this logic relates to supporting that
-#define NP_CX_OPTIONS_STATEMENT_WITH(RT, BARREL) \
+#define NP_CX_OPTIONS_STATEMENT_WITH(RT, BARREL, SLIDER) \
     "var MSCXLaunch=" NP_CX_LAUNCH ";" \
     "var MSCXPick=" NP_CX_PICK ";" \
     "var MSCXToolQuery=" NP_CX_TOOL_QUERY ";" \
-    "var MSCXOpts=" NP_CX_OPTIONS_CAPTURE(RT, BARREL) ";" \
+    "var MSCXOpts=" NP_CX_OPTIONS_CAPTURE(RT, BARREL, SLIDER) ";" \
     "var MSCXApply=" NP_CX_APPLY ";var MSCXTake=" NP_CX_TAKE ";var MSCXSync=" NP_CX_SYNC ";"
-#define NP_CX_OPTIONS_STATEMENT NP_CX_OPTIONS_STATEMENT_WITH(NP_C3, NP_C4)
+#define NP_CX_OPTIONS_STATEMENT NP_CX_OPTIONS_STATEMENT_WITH(NP_C3, NP_C4, NP_WEBPACK_SLIDER)
 
 // The Vite build has no barrel module, so the panel gets one made of the bound components.
 #define NP_VITE_UI(SECTION) \
     "({XY:" SECTION ",Yh:" NP_B_CHECKBOX ",m:" NP_B_DROPDOWN ",SliderField:" NP_B_SLIDER "})"
+#define NP_CX_OPTIONS_VITE NP_CX_OPTIONS_STATEMENT_WITH(NP_C3, NP_VITE_UI(NP_C4), "npUI().SliderField")
 
 // 1.0.x saved CrossOver settings without %command%, this migrates them.
 #define NP_LAUNCH_MIGRATION_RULE \
@@ -824,7 +827,7 @@ static const np_gate_t g_gates_selecttool_vite[] = {
       "(`#Settings_SteamPlay_SteamPlay`),children:[(0," NP_C3 ".jsx)(" NP_C6 ",{details:" NP_C2 ".details}),"
       "(0," NP_C3 ".jsx)(" NP_C7 ",{setting:`compat_show_all_tools`,label:" NP_C5
       "(`#Settings_SteamPlay_ShowAll`),feature:7})]})}",
-      NP_CX_OPTIONS_STATEMENT_WITH(NP_C3, NP_VITE_UI(NP_C4))
+      NP_CX_OPTIONS_VITE
       "function " NP_C1 "(" NP_C2 "){return(0," NP_C3 ".jsxs)(" NP_C3 ".Fragment,{children:["
       "(0," NP_C3 ".jsxs)(" NP_C4 ",{label:" NP_C5
       "(`#Settings_SteamPlay_SteamPlay`),children:[(0," NP_C3 ".jsx)(" NP_C6 ",{details:" NP_C2 ".details}),"

@@ -459,6 +459,8 @@ static void check_unbound(const np_ui_shape_t *S, const uint8_t *buf, size_t len
             wrong("[%s] patched without component %zu", S->name, b);
         if (g_binds[b].fallback && !out)
             wrong("[%s] refused without component %zu, which has a fallback", S->name, b);
+        if (g_binds[b].marker == NP_B_SLIDER[0] && out && !strstr(out, "SliderField:null"))
+            wrong("[%s] did not emit the missing slider fallback", S->name);
         free(out);
         free(copy);
     }
