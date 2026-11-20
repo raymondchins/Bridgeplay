@@ -1,5 +1,5 @@
 diff --git a/dlls/mmdevapi/devenum.c b/dlls/mmdevapi/devenum.c
-index 8440b5d..af743ba 100644
+index 8440b5d..9539e69 100644
 --- a/dlls/mmdevapi/devenum.c
 +++ b/dlls/mmdevapi/devenum.c
 @@ -70,6 +70,53 @@ static const IMMEndpointVtbl MMEndpointVtbl;
@@ -84,12 +84,29 @@ index 8440b5d..af743ba 100644
          return TRUE;
      }
      RegCloseKey( key );
-@@ -232,11 +284,45 @@ static void get_device_guid( EDataFlow flow, const char *dev_name, GUID *guid )
-     status = RegQueryValueExW( key, L"guid", 0, &type, (BYTE *)guid, &size );
-     if (status != ERROR_SUCCESS || type != REG_BINARY || size != sizeof(*guid))
+@@ -217,6 +269,7 @@ static void get_device_guid( EDataFlow flow, const char *dev_name, GUID *guid )
+     DWORD type, size = sizeof(*guid);
+     HKEY key;
+     LSTATUS status;
++    GUID tmp;
+     int len;
+ 
+     len = swprintf( name, ARRAY_SIZE(name), L"Software\\Wine\\Drivers\\%s\\devices\\%u,",
+@@ -229,14 +282,55 @@ static void get_device_guid( EDataFlow flow, const char *dev_name, GUID *guid )
+         ERR( "Failed to create key %s: %lu\n", debugstr_w(name), status );
+         return;
+     }
+-    status = RegQueryValueExW( key, L"guid", 0, &type, (BYTE *)guid, &size );
+-    if (status != ERROR_SUCCESS || type != REG_BINARY || size != sizeof(*guid))
++    status = RegQueryValueExW( key, L"guid", 0, &type, (BYTE *)&tmp, &size );
++    if (status == ERROR_SUCCESS && type == REG_BINARY && size == sizeof(tmp))
      {
 -        CoCreateGuid( guid );
 -        RegSetValueExW( key, L"guid", 0, REG_BINARY, (BYTE *)guid, sizeof(*guid) );
++        *guid = tmp;
++    }
++    else
++    {
 +        HANDLE mutex = CreateMutexW( NULL, FALSE, L"Local\\wine_mmdevapi_guid_init" );
 +        DWORD wait;
 +        if (!mutex)
@@ -106,13 +123,16 @@ index 8440b5d..af743ba 100644
 +            RegCloseKey( key );
 +            return;
 +        }
-+        size = sizeof(*guid);
-+        status = RegQueryValueExW( key, L"guid", 0, &type, (BYTE *)guid, &size );
-+        if (status != ERROR_SUCCESS || type != REG_BINARY || size != sizeof(*guid))
++        size = sizeof(tmp);
++        status = RegQueryValueExW( key, L"guid", 0, &type, (BYTE *)&tmp, &size );
++        if (status == ERROR_SUCCESS && type == REG_BINARY && size == sizeof(tmp))
 +        {
-+            GUID new_guid;
-+            if (FAILED(CoCreateGuid( &new_guid )) ||
-+                RegSetValueExW( key, L"guid", 0, REG_BINARY, (BYTE *)&new_guid, sizeof(new_guid) ) != ERROR_SUCCESS)
++            *guid = tmp;
++        }
++        else
++        {
++            if (FAILED(CoCreateGuid( &tmp )) ||
++                RegSetValueExW( key, L"guid", 0, REG_BINARY, (BYTE *)&tmp, sizeof(tmp) ) != ERROR_SUCCESS)
 +            {
 +                ERR( "Failed to persist device GUID for %s\n", debugstr_w(name) );
 +                ReleaseMutex( mutex );
@@ -120,7 +140,7 @@ index 8440b5d..af743ba 100644
 +                RegCloseKey( key );
 +                return;
 +            }
-+            *guid = new_guid;
++            *guid = tmp;
 +        }
 +        ReleaseMutex( mutex );
 +        CloseHandle( mutex );
@@ -132,7 +152,7 @@ index 8440b5d..af743ba 100644
  }
  
  static HRESULT MMDevPropStore_OpenPropKey(const GUID *guid, DWORD flow, HKEY *propkey)
-@@ -683,15 +769,16 @@ HRESULT load_driver_devices(EDataFlow flow)
+@@ -683,15 +777,16 @@ HRESULT load_driver_devices(EDataFlow flow)
          goto end;
  
      for (i = 0; i < params.num; i++) {
@@ -151,7 +171,15 @@ index 8440b5d..af743ba 100644
      }
  
  end:
-@@ -883,7 +970,9 @@ static HRESULT WINAPI MMDevice_GetState(IMMDevice *iface, DWORD *state)
+@@ -853,6 +948,7 @@ static HRESULT WINAPI MMDevice_OpenPropertyStore(IMMDevice *iface, DWORD access,
+ 
+     if (!ppv)
+         return E_POINTER;
++    extend_winmm_init_window();
+     return MMDevPropStore_Create(This, access, ppv);
+ }
+ 
+@@ -883,7 +979,9 @@ static HRESULT WINAPI MMDevice_GetState(IMMDevice *iface, DWORD *state)
  
      if (!state)
          return E_POINTER;
@@ -161,7 +189,7 @@ index 8440b5d..af743ba 100644
      return S_OK;
  }
  
-@@ -956,7 +1045,8 @@ static HRESULT MMDevCol_Create(IMMDeviceCollection **ppv, EDataFlow flow, DWORD
+@@ -956,7 +1054,8 @@ static HRESULT MMDevCol_Create(IMMDeviceCollection **ppv, EDataFlow flow, DWORD
      This->ref = 1;
      This->devices = NULL;
      This->devices_count = 0;
@@ -171,7 +199,7 @@ index 8440b5d..af743ba 100644
  
      LIST_FOR_EACH_ENTRY(cur, &device_list, MMDevice, entry)
      {
-@@ -967,8 +1057,12 @@ static HRESULT MMDevCol_Create(IMMDeviceCollection **ppv, EDataFlow flow, DWORD
+@@ -967,8 +1066,12 @@ static HRESULT MMDevCol_Create(IMMDeviceCollection **ppv, EDataFlow flow, DWORD
      if (This->devices_count)
      {
          This->devices = malloc(This->devices_count * sizeof(IMMDevice *));
@@ -185,7 +213,7 @@ index 8440b5d..af743ba 100644
  
          LIST_FOR_EACH_ENTRY(cur, &device_list, MMDevice, entry)
          {
-@@ -981,6 +1075,9 @@ static HRESULT MMDevCol_Create(IMMDeviceCollection **ppv, EDataFlow flow, DWORD
+@@ -981,6 +1084,9 @@ static HRESULT MMDevCol_Create(IMMDeviceCollection **ppv, EDataFlow flow, DWORD
          }
      }
  
@@ -195,7 +223,7 @@ index 8440b5d..af743ba 100644
      return S_OK;
  }
  
-@@ -1134,6 +1231,7 @@ static HRESULT WINAPI MMDevEnum_EnumAudioEndpoints(IMMDeviceEnumerator *iface, E
+@@ -1134,6 +1240,7 @@ static HRESULT WINAPI MMDevEnum_EnumAudioEndpoints(IMMDeviceEnumerator *iface, E
          return E_INVALIDARG;
      if (mask & ~DEVICE_STATEMASK_ALL)
          return E_INVALIDARG;
@@ -203,7 +231,7 @@ index 8440b5d..af743ba 100644
      return MMDevCol_Create(devices, flow, mask);
  }
  
-@@ -1160,6 +1258,8 @@ static HRESULT WINAPI MMDevEnum_GetDefaultAudioEndpoint(IMMDeviceEnumerator *ifa
+@@ -1160,6 +1267,8 @@ static HRESULT WINAPI MMDevEnum_GetDefaultAudioEndpoint(IMMDeviceEnumerator *ifa
      if(!drvs.module_name[0])
          return E_NOTFOUND;
  
@@ -212,7 +240,7 @@ index 8440b5d..af743ba 100644
      lstrcpyW(reg_key, drv_keyW);
      lstrcatW(reg_key, L"\\");
      lstrcatW(reg_key, drvs.module_name);
-@@ -1178,29 +1278,36 @@ static HRESULT WINAPI MMDevEnum_GetDefaultAudioEndpoint(IMMDeviceEnumerator *ifa
+@@ -1178,29 +1287,36 @@ static HRESULT WINAPI MMDevEnum_GetDefaultAudioEndpoint(IMMDeviceEnumerator *ifa
          }
  
          if(role == eCommunications &&
@@ -255,7 +283,7 @@ index 8440b5d..af743ba 100644
              }
  
              TRACE("Unable to find device %s\n", wine_dbgstr_w(def_id));
-@@ -1209,14 +1316,17 @@ static HRESULT WINAPI MMDevEnum_GetDefaultAudioEndpoint(IMMDeviceEnumerator *ifa
+@@ -1209,14 +1325,17 @@ static HRESULT WINAPI MMDevEnum_GetDefaultAudioEndpoint(IMMDeviceEnumerator *ifa
          RegCloseKey(key);
      }
  
@@ -276,7 +304,7 @@ index 8440b5d..af743ba 100644
      return S_OK;
  }
  
-@@ -1231,6 +1341,7 @@ static HRESULT WINAPI MMDevEnum_GetDevice(IMMDeviceEnumerator *iface, const WCHA
+@@ -1231,6 +1350,7 @@ static HRESULT WINAPI MMDevEnum_GetDevice(IMMDeviceEnumerator *iface, const WCHA
      if(!name || !device)
          return E_POINTER;
  
@@ -284,7 +312,7 @@ index 8440b5d..af743ba 100644
      LIST_FOR_EACH_ENTRY(impl, &device_list, MMDevice, entry)
      {
          HRESULT hr;
-@@ -1248,21 +1359,27 @@ static HRESULT WINAPI MMDevEnum_GetDevice(IMMDeviceEnumerator *iface, const WCHA
+@@ -1248,21 +1368,27 @@ static HRESULT WINAPI MMDevEnum_GetDevice(IMMDeviceEnumerator *iface, const WCHA
              CoTaskMemFree(str);
              IMMDevice_AddRef(dev);
              *device = dev;
@@ -301,6 +329,7 @@ index 8440b5d..af743ba 100644
  struct NotificationClientWrapper {
      IMMNotificationClient *client;
 +    BOOL is_winmm;
++    BOOL winmm_needs_sync;
 +    UINT active_gen;
      struct list entry;
  };
@@ -308,11 +337,10 @@ index 8440b5d..af743ba 100644
  static struct list g_notif_clients = LIST_INIT(g_notif_clients);
  static HANDLE g_notif_thread;
 +static HANDLE g_notif_wake;
-+static DWORD g_notif_reg_seq;
  
  static CRITICAL_SECTION g_notif_lock;
  static CRITICAL_SECTION_DEBUG g_notif_lock_debug =
-@@ -1273,86 +1390,273 @@ static CRITICAL_SECTION_DEBUG g_notif_lock_debug =
+@@ -1273,89 +1399,397 @@ static CRITICAL_SECTION_DEBUG g_notif_lock_debug =
  };
  static CRITICAL_SECTION g_notif_lock = { &g_notif_lock_debug, -1, 0, 0, 0, 0 };
  
@@ -342,8 +370,17 @@ index 8440b5d..af743ba 100644
 +    {
 +        /* Wine's winmm snapshots active devices once at init and crashes on NULL ids,
 +         * empty/uninitialized maps, and rotates its map on unknown hot-plugged ids. */
-+        if (wrapper->is_winmm && (winmm_init || !id || dev_gen > wrapper->active_gen))
-+            continue;
++        if (wrapper->is_winmm)
++        {
++            if (winmm_init)
++            {
++                if (role == eConsole)
++                    wrapper->winmm_needs_sync = TRUE;
++                continue;
++            }
++            if (!id || dev_gen > wrapper->active_gen)
++                continue;
++        }
          IMMNotificationClient_OnDefaultDeviceChanged(wrapper->client, flow,
                  role, id);
 +    }
@@ -352,13 +389,10 @@ index 8440b5d..af743ba 100644
      if(role == eConsole)
 -        notify_clients(flow, eMultimedia, id);
 +        notify_clients(flow, eMultimedia, id, dev_gen);
- }
- 
--static BOOL notify_if_changed(EDataFlow flow, ERole role, HKEY key,
--                              const WCHAR *val_name, WCHAR *old_val, IMMDevice *def_dev)
++}
++
 +static void set_device_state(MMDevice *dev, DWORD state)
- {
--    WCHAR new_val[64], *id;
++{
 +    WCHAR guidstr[39];
 +    HKEY key;
 +
@@ -370,13 +404,16 @@ index 8440b5d..af743ba 100644
 +        RegCloseKey(key);
 +    }
 +    dev->state = state;
-+}
-+
+ }
+ 
+-static BOOL notify_if_changed(EDataFlow flow, ERole role, HKEY key,
+-                              const WCHAR *val_name, WCHAR *old_val, IMMDevice *def_dev)
 +/* Resolves the effective default endpoint id and activation generation for (flow, role)
 + * using the same override/fallback rules as MMDevEnum_GetDefaultAudioEndpoint. */
 +static void get_effective_default(EDataFlow flow, ERole role, HKEY key,
 +                                  WCHAR *out_id, size_t out_chars, UINT *out_gen)
-+{
+ {
+-    WCHAR new_val[64], *id;
 +    const WCHAR *reg_x_name, *reg_vx_name;
 +    WCHAR def_id[256];
      DWORD size;
@@ -394,31 +431,49 @@ index 8440b5d..af743ba 100644
 -                if(FAILED(hr)){
 -                    ERR("GetId failed: %08lx\n", hr);
 -                    return FALSE;
--                }
--            }else
--                id = NULL;
 +    out_id[0] = 0;
 +    *out_gen = 0;
- 
--            notify_clients(flow, role, id);
--            old_val[0] = 0;
--            CoTaskMemFree(id);
-+    if (flow == eRender)
++
++    if (key)
 +    {
-+        reg_x_name = L"DefaultOutput";
-+        reg_vx_name = L"DefaultVoiceOutput";
-+    }
-+    else
-+    {
-+        reg_x_name = L"DefaultInput";
-+        reg_vx_name = L"DefaultVoiceInput";
-+    }
- 
--            return TRUE;
-+    if (role == eCommunications)
-+    {
++        if (flow == eRender)
++        {
++            reg_x_name = L"DefaultOutput";
++            reg_vx_name = L"DefaultVoiceOutput";
++        }
++        else
++        {
++            reg_x_name = L"DefaultInput";
++            reg_vx_name = L"DefaultVoiceInput";
++        }
++
++        if (role == eCommunications)
++        {
++            size = sizeof(def_id);
++            if (RegGetValueW(key, NULL, reg_vx_name, RRF_RT_REG_SZ, NULL,
++                    def_id, &size) == ERROR_SUCCESS && def_id[0])
++            {
++                IMMDevice *dev;
++                if (SUCCEEDED(IMMDeviceEnumerator_GetDevice(&enumerator.IMMDeviceEnumerator_iface, def_id, &dev)))
++                {
++                    EnterCriticalSection(&g_dev_lock);
++                    if (impl_from_IMMDevice(dev)->flow == flow &&
++                            impl_from_IMMDevice(dev)->state == DEVICE_STATE_ACTIVE)
++                    {
++                        lstrcpynW(out_id, def_id, out_chars);
++                        *out_gen = impl_from_IMMDevice(dev)->active_gen;
++                        LeaveCriticalSection(&g_dev_lock);
++                        IMMDevice_Release(dev);
++                        return;
++                    }
++                    LeaveCriticalSection(&g_dev_lock);
++                    IMMDevice_Release(dev);
++                }
++            }
++        }
++
 +        size = sizeof(def_id);
-+        if (RegGetValueW(key, NULL, reg_vx_name, RRF_RT_REG_SZ, NULL,
++        if (RegGetValueW(key, NULL, reg_x_name, RRF_RT_REG_SZ, NULL,
 +                def_id, &size) == ERROR_SUCCESS && def_id[0])
 +        {
 +            IMMDevice *dev;
@@ -433,47 +488,22 @@ index 8440b5d..af743ba 100644
 +                    LeaveCriticalSection(&g_dev_lock);
 +                    IMMDevice_Release(dev);
 +                    return;
-+                }
+                 }
+-            }else
+-                id = NULL;
 +                LeaveCriticalSection(&g_dev_lock);
 +                IMMDevice_Release(dev);
 +            }
-         }
-+    }
- 
--        /* system default -> system default, noop */
--        return FALSE;
-+    size = sizeof(def_id);
-+    if (RegGetValueW(key, NULL, reg_x_name, RRF_RT_REG_SZ, NULL,
-+            def_id, &size) == ERROR_SUCCESS && def_id[0])
-+    {
-+        IMMDevice *dev;
-+        if (SUCCEEDED(IMMDeviceEnumerator_GetDevice(&enumerator.IMMDeviceEnumerator_iface, def_id, &dev)))
-+        {
-+            EnterCriticalSection(&g_dev_lock);
-+            if (impl_from_IMMDevice(dev)->flow == flow &&
-+                    impl_from_IMMDevice(dev)->state == DEVICE_STATE_ACTIVE)
-+            {
-+                lstrcpynW(out_id, def_id, out_chars);
-+                *out_gen = impl_from_IMMDevice(dev)->active_gen;
-+                LeaveCriticalSection(&g_dev_lock);
-+                IMMDevice_Release(dev);
-+                return;
-+            }
-+            LeaveCriticalSection(&g_dev_lock);
-+            IMMDevice_Release(dev);
 +        }
-     }
- 
--    if(!lstrcmpW(old_val, new_val)){
--        /* set by user -> same value */
--        return FALSE;
++    }
++
 +    EnterCriticalSection(&g_dev_lock);
 +    def = flow == eRender ? MMDevice_def_play : MMDevice_def_rec;
 +    if (def)
 +    {
 +        *out_gen = def->active_gen;
 +        hr = IMMDevice_GetId(&def->IMMDevice_iface, &id);
-     }
++    }
 +    else
 +    {
 +        id = NULL;
@@ -481,18 +511,57 @@ index 8440b5d..af743ba 100644
 +    }
 +    LeaveCriticalSection(&g_dev_lock);
  
--    if(new_val[0] != 0){
--        /* set by user -> different value */
--        notify_clients(flow, role, new_val);
--        memcpy(old_val, new_val, sizeof(new_val));
--        return TRUE;
+-            notify_clients(flow, role, id);
+-            old_val[0] = 0;
+-            CoTaskMemFree(id);
 +    if (SUCCEEDED(hr) && id)
 +    {
 +        lstrcpynW(out_id, id, out_chars);
 +        CoTaskMemFree(id);
-     }
++    }
 +}
 +
++/* Called with g_notif_lock held after winmm's init window ends to deliver any eConsole
++ * default change that occurred while winmm callbacks were deferred. */
++static void flush_winmm_sync(HKEY key)
++{
++    struct NotificationClientWrapper *wrapper;
++    BOOL pending = FALSE;
++    WCHAR out_id[64], in_id[64];
++    UINT out_gen, in_gen;
+ 
+-            return TRUE;
++    LIST_FOR_EACH_ENTRY(wrapper, &g_notif_clients, struct NotificationClientWrapper, entry)
++    {
++        if (wrapper->is_winmm && wrapper->winmm_needs_sync)
++        {
++            pending = TRUE;
++            break;
+         }
++    }
++    if (!pending)
++        return;
+ 
+-        /* system default -> system default, noop */
+-        return FALSE;
++    get_effective_default(eRender, eConsole, key, out_id, ARRAY_SIZE(out_id), &out_gen);
++    get_effective_default(eCapture, eConsole, key, in_id, ARRAY_SIZE(in_id), &in_gen);
++
++    LIST_FOR_EACH_ENTRY(wrapper, &g_notif_clients, struct NotificationClientWrapper, entry)
++    {
++        if (!wrapper->is_winmm || !wrapper->winmm_needs_sync)
++            continue;
++        wrapper->winmm_needs_sync = FALSE;
++        if (out_id[0] && out_gen <= wrapper->active_gen)
++            IMMNotificationClient_OnDefaultDeviceChanged(wrapper->client, eRender, eConsole, out_id);
++        if (in_id[0] && in_gen <= wrapper->active_gen)
++            IMMNotificationClient_OnDefaultDeviceChanged(wrapper->client, eCapture, eConsole, in_id);
+     }
++}
+ 
+-    if(!lstrcmpW(old_val, new_val)){
+-        /* set by user -> same value */
+-        return FALSE;
 +/* Called with g_notif_lock held. Notifies clients whenever the effective default changes. */
 +static void sync_effective_default(EDataFlow flow, ERole role, HKEY key, WCHAR *last_id)
 +{
@@ -507,23 +576,19 @@ index 8440b5d..af743ba 100644
 +    notify_clients(flow, role, cur_id[0] ? cur_id : NULL, dev_gen);
 +}
 +
-+/* The host's default device can change while a process runs (headphones connected, another
-+ * output picked in the system's sound settings), and the driver reports it only when asked.
-+ * Updates MMDevice_def_play or MMDevice_def_rec to match the driver's current default. */
++/* The host's default device and active endpoint set can change while a process runs
++ * (headphones connected/disconnected, another output picked in the system's sound settings),
++ * and the driver reports them only when asked. Syncs active endpoint states and updates
++ * MMDevice_def_play or MMDevice_def_rec to match the driver's current default. */
 +static void refresh_system_default(EDataFlow flow)
 +{
 +    struct get_endpoint_ids_params params;
 +    MMDevice **def = flow == eRender ? &MMDevice_def_play : &MMDevice_def_rec;
-+    MMDevice *dev, *found = NULL;
-+    BOOL created = FALSE;
-+    GUID guid = {0};
- 
--    /* set by user -> system default */
--    if(def_dev){
--        hr = IMMDevice_GetId(def_dev, &id);
--        if(FAILED(hr)){
--            ERR("GetId failed: %08lx\n", hr);
--            return FALSE;
++    MMDevice *dev, **created_devs = NULL;
++    BOOL *created_ok = NULL;
++    GUID *guids = NULL;
++    UINT i, n_created = 0;
++
 +    if (!drvs.module_unixlib)
 +        return;
 +
@@ -542,79 +607,158 @@ index 8440b5d..af743ba 100644
 +        {
 +            free(params.endpoints);
 +            return;
++        }
++    } while (params.result == HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER));
++
++    if (FAILED(params.result))
++    {
++        free(params.endpoints);
++        return;
+     }
+ 
+-    if(new_val[0] != 0){
+-        /* set by user -> different value */
+-        notify_clients(flow, role, new_val);
+-        memcpy(old_val, new_val, sizeof(new_val));
+-        return TRUE;
++    if (params.num)
++    {
++        guids = calloc(params.num, sizeof(*guids));
++        created_devs = malloc(params.num * sizeof(*created_devs));
++        created_ok = calloc(params.num, sizeof(*created_ok));
++        if (!guids || !created_devs || !created_ok)
++        {
++            free(guids);
++            free(created_devs);
++            free(created_ok);
++            free(params.endpoints);
++            return;
++        }
++        for (i = 0; i < params.num; i++)
++        {
++            const char *dev_name = (char *)params.endpoints + params.endpoints[i].device;
++            get_device_guid(flow, dev_name, &guids[i]);
++        }
+     }
+ 
+-    /* set by user -> system default */
+-    if(def_dev){
+-        hr = IMMDevice_GetId(def_dev, &id);
+-        if(FAILED(hr)){
+-            ERR("GetId failed: %08lx\n", hr);
+-            return FALSE;
++    EnterCriticalSection(&g_dev_lock);
++
++    /* Deactivate endpoints for this flow that are no longer reported by the driver. */
++    LIST_FOR_EACH_ENTRY(dev, &device_list, MMDevice, entry)
++    {
++        BOOL present = FALSE;
++        if (dev->flow != flow || dev->state != DEVICE_STATE_ACTIVE)
++            continue;
++        for (i = 0; i < params.num; i++)
++        {
++            if (!IsEqualGUID(&guids[i], &GUID_NULL) && IsEqualGUID(&dev->devguid, &guids[i]))
++            {
++                present = TRUE;
++                break;
++            }
          }
 -    }else
 -        id = NULL;
-+    } while (params.result == HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER));
++        if (!present)
++            set_device_state(dev, DEVICE_STATE_NOTPRESENT);
++    }
++
++    /* Stage newly connected or reconnected endpoints as NOTPRESENT until set_format succeeds. */
++    for (i = 0; i < params.num; i++)
++    {
++        MMDevice *found = NULL;
++        const WCHAR *name;
++
++        if (IsEqualGUID(&guids[i], &GUID_NULL))
++            continue;
++        LIST_FOR_EACH_ENTRY(dev, &device_list, MMDevice, entry)
++        {
++            if (dev->flow == flow && IsEqualGUID(&dev->devguid, &guids[i]))
++            {
++                found = dev;
++                break;
++            }
++        }
++        if (found && found->state == DEVICE_STATE_ACTIVE)
++            continue;
++        name = (WCHAR *)((char *)params.endpoints + params.endpoints[i].name);
++        if ((found = MMDevice_Create(name, &guids[i], flow, DEVICE_STATE_NOTPRESENT, FALSE)))
++            created_devs[n_created++] = found;
++    }
++
++    LeaveCriticalSection(&g_dev_lock);
++
++    for (i = 0; i < n_created; i++)
++    {
++        if (SUCCEEDED(set_format(created_devs[i])))
++            created_ok[i] = TRUE;
++        else
++            WARN("set_format failed for %s\n", debugstr_w(created_devs[i]->drv_id));
++    }
++
++    EnterCriticalSection(&g_dev_lock);
++
++    for (i = 0; i < n_created; i++)
++    {
++        if (!created_ok[i])
++            continue;
++        set_device_state(created_devs[i], DEVICE_STATE_ACTIVE);
++        created_devs[i]->active_gen = ++g_dev_gen;
++    }
++
++    /* Point *def at the driver's default if active; otherwise keep *def only if still active,
++     * falling back to any active endpoint for this flow or NULL when none remain. */
++    if (params.default_idx < params.num && !IsEqualGUID(&guids[params.default_idx], &GUID_NULL))
++    {
++        MMDevice *new_def = NULL;
++        LIST_FOR_EACH_ENTRY(dev, &device_list, MMDevice, entry)
++        {
++            if (dev->flow == flow && dev->state == DEVICE_STATE_ACTIVE &&
++                    IsEqualGUID(&dev->devguid, &guids[params.default_idx]))
++            {
++                new_def = dev;
++                break;
++            }
++        }
++        if (new_def && *def != new_def)
++        {
++            *def = new_def;
++            TRACE("system default %s is now %s\n", flow == eRender ? "output" : "input",
++                    debugstr_w(new_def->drv_id));
++        }
++    }
++
++    if (*def && (*def)->state != DEVICE_STATE_ACTIVE)
++    {
++        MMDevice *fallback = NULL;
++        LIST_FOR_EACH_ENTRY(dev, &device_list, MMDevice, entry)
++        {
++            if (dev->flow == flow && dev->state == DEVICE_STATE_ACTIVE)
++            {
++                fallback = dev;
++                break;
++            }
++        }
++        *def = fallback;
++        TRACE("system default %s is now %s\n", flow == eRender ? "output" : "input",
++                fallback ? debugstr_w(fallback->drv_id) : "none");
++    }
  
 -    notify_clients(flow, role, id);
 -    old_val[0] = 0;
 -    CoTaskMemFree(id);
-+    if (SUCCEEDED(params.result) && params.default_idx < params.num)
-+    {
-+        const struct endpoint *ep = &params.endpoints[params.default_idx];
-+        const WCHAR *name = (WCHAR *)((char *)params.endpoints + ep->name);
-+        const char *dev_name = (char *)params.endpoints + ep->device;
-+
-+        get_device_guid(flow, dev_name, &guid);
-+        if (!IsEqualGUID(&guid, &GUID_NULL))
-+        {
-+            EnterCriticalSection(&g_dev_lock);
-+            if (!*def || !IsEqualGUID(&(*def)->devguid, &guid))
-+            {
-+                LIST_FOR_EACH_ENTRY(dev, &device_list, MMDevice, entry)
-+                {
-+                    if (dev->flow == flow && IsEqualGUID(&dev->devguid, &guid))
-+                    {
-+                        found = dev;
-+                        break;
-+                    }
-+                }
-+                if (found && found->state == DEVICE_STATE_ACTIVE)
-+                {
-+                    *def = found;
-+                    TRACE("system default %s is now %s\n", flow == eRender ? "output" : "input",
-+                            debugstr_w(name));
-+                }
-+                else if ((found = MMDevice_Create(name, &guid, flow, DEVICE_STATE_NOTPRESENT, FALSE)))
-+                    created = TRUE;
-+            }
-+            LeaveCriticalSection(&g_dev_lock);
-+
-+            if (created)
-+            {
-+                if (SUCCEEDED(set_format(found)))
-+                {
-+                    EnterCriticalSection(&g_dev_lock);
-+                    set_device_state(found, DEVICE_STATE_ACTIVE);
-+                    found->active_gen = ++g_dev_gen;
-+                    *def = found;
-+                    LeaveCriticalSection(&g_dev_lock);
-+                    TRACE("system default %s is now %s\n", flow == eRender ? "output" : "input",
-+                            debugstr_w(name));
-+                }
-+                else
-+                    WARN("set_format failed for %s\n", debugstr_w(name));
-+            }
-+        }
-+    }
-+    else if (SUCCEEDED(params.result) && params.num == 0)
-+    {
-+        EnterCriticalSection(&g_dev_lock);
-+        LIST_FOR_EACH_ENTRY(dev, &device_list, MMDevice, entry)
-+        {
-+            if (dev->flow == flow && dev->state == DEVICE_STATE_ACTIVE)
-+                set_device_state(dev, DEVICE_STATE_NOTPRESENT);
-+        }
-+        if (*def)
-+        {
-+            *def = NULL;
-+            TRACE("system default %s is now none\n", flow == eRender ? "output" : "input");
-+        }
-+        LeaveCriticalSection(&g_dev_lock);
-+    }
++    LeaveCriticalSection(&g_dev_lock);
  
 -    return TRUE;
++    free(guids);
++    free(created_devs);
++    free(created_ok);
 +    free(params.endpoints);
  }
  
@@ -622,81 +766,66 @@ index 8440b5d..af743ba 100644
  {
 -    HKEY key;
 +    HKEY key = NULL;
-+    HANDLE changed = NULL, handles[2];
-+    DWORD n_handles, seen_seq, wait, timeout;
++    HANDLE changed = NULL, wake, handles[2];
++    BOOL reg_armed = FALSE;
++    DWORD n_handles, wait, timeout;
      WCHAR reg_key[256];
 -    WCHAR out_name[64], vout_name[64], in_name[64], vin_name[64];
 -    DWORD size;
 +    WCHAR eff_out[64], eff_vout[64], eff_in[64], eff_vin[64];
 +    UINT unused_gen;
-+    int retries = 0;
  
      SetThreadDescription(GetCurrentThread(), L"wine_mmdevapi_notification");
  
-@@ -1360,56 +1664,105 @@ static DWORD WINAPI notif_thread_proc(void *user)
-     lstrcatW(reg_key, L"\\");
-     lstrcatW(reg_key, drvs.module_name);
- 
-+retry:
 +    EnterCriticalSection(&g_notif_lock);
-+    seen_seq = g_notif_reg_seq;
++    wake = g_notif_wake;
 +    LeaveCriticalSection(&g_notif_lock);
 +
+     lstrcpyW(reg_key, drv_keyW);
+     lstrcatW(reg_key, L"\\");
+     lstrcatW(reg_key, drvs.module_name);
+@@ -1363,53 +1797,76 @@ static DWORD WINAPI notif_thread_proc(void *user)
      if(RegCreateKeyExW(HKEY_CURRENT_USER, reg_key, 0, NULL, 0,
                  MAXIMUM_ALLOWED, NULL, &key, NULL) != ERROR_SUCCESS){
          ERR("RegCreateKeyEx failed: %lu\n", GetLastError());
 -        return 1;
 +        key = NULL;
-+        goto fail;
++    }else if(!(changed = CreateEventW(NULL, FALSE, FALSE, NULL))){
++        ERR("CreateEvent failed: %lu\n", GetLastError());
++    }else if(RegNotifyChangeKeyValue(key, FALSE, REG_NOTIFY_CHANGE_LAST_SET,
++                changed, TRUE) != ERROR_SUCCESS){
++        ERR("RegNotifyChangeKeyValue failed: %lu\n", GetLastError());
++    }else{
++        reg_armed = TRUE;
      }
  
 -    size = sizeof(out_name);
 -    if(RegQueryValueExW(key, L"DefaultOutput", 0, NULL, (BYTE*)out_name, &size) != ERROR_SUCCESS)
 -        out_name[0] = 0;
-+    if(!(changed = CreateEventW(NULL, FALSE, FALSE, NULL))){
-+        ERR("CreateEvent failed: %lu\n", GetLastError());
-+        goto fail;
-+    }
- 
--    size = sizeof(vout_name);
--    if(RegQueryValueExW(key, L"DefaultVoiceOutput", 0, NULL, (BYTE*)vout_name, &size) != ERROR_SUCCESS)
--        vout_name[0] = 0;
-+    if(RegNotifyChangeKeyValue(key, FALSE, REG_NOTIFY_CHANGE_LAST_SET,
-+                changed, TRUE) != ERROR_SUCCESS){
-+        ERR("RegNotifyChangeKeyValue failed: %lu\n", GetLastError());
-+        goto fail;
-+    }
- 
--    size = sizeof(in_name);
--    if(RegQueryValueExW(key, L"DefaultInput", 0, NULL, (BYTE*)in_name, &size) != ERROR_SUCCESS)
--        in_name[0] = 0;
 +    get_effective_default(eRender, eConsole, key, eff_out, ARRAY_SIZE(eff_out), &unused_gen);
 +    get_effective_default(eRender, eCommunications, key, eff_vout, ARRAY_SIZE(eff_vout), &unused_gen);
 +    get_effective_default(eCapture, eConsole, key, eff_in, ARRAY_SIZE(eff_in), &unused_gen);
 +    get_effective_default(eCapture, eCommunications, key, eff_vin, ARRAY_SIZE(eff_vin), &unused_gen);
  
+-    size = sizeof(vout_name);
+-    if(RegQueryValueExW(key, L"DefaultVoiceOutput", 0, NULL, (BYTE*)vout_name, &size) != ERROR_SUCCESS)
+-        vout_name[0] = 0;
++    while(1){
++        handles[0] = wake;
++        n_handles = 1;
++        if(reg_armed)
++            handles[n_handles++] = changed;
+ 
+-    size = sizeof(in_name);
+-    if(RegQueryValueExW(key, L"DefaultInput", 0, NULL, (BYTE*)in_name, &size) != ERROR_SUCCESS)
+-        in_name[0] = 0;
++        EnterCriticalSection(&g_notif_lock);
++        timeout = list_empty(&g_notif_clients) ? INFINITE : 1000;
++        LeaveCriticalSection(&g_notif_lock);
+ 
 -    size = sizeof(vin_name);
 -    if(RegQueryValueExW(key, L"DefaultVoiceInput", 0, NULL, (BYTE*)vin_name, &size) != ERROR_SUCCESS)
 -        vin_name[0] = 0;
-+    handles[0] = changed;
-+    n_handles = 1;
-+    EnterCriticalSection(&g_notif_lock);
-+    if (g_notif_wake)
-+        handles[n_handles++] = g_notif_wake;
-+    LeaveCriticalSection(&g_notif_lock);
- 
-     while(1){
--        if(RegNotifyChangeKeyValue(key, FALSE, REG_NOTIFY_CHANGE_LAST_SET,
--                    NULL, FALSE) != ERROR_SUCCESS){
--            ERR("RegNotifyChangeKeyValue failed: %lu\n", GetLastError());
--            RegCloseKey(key);
--            g_notif_thread = NULL;
--            return 1;
-+        EnterCriticalSection(&g_notif_lock);
-+        seen_seq = g_notif_reg_seq;
-+        timeout = (list_empty(&g_notif_clients) && n_handles > 1) ? INFINITE : 1000;
-+        LeaveCriticalSection(&g_notif_lock);
-+
 +        /* The registry wakes this thread; the system default is polled once a second
 +         * while any notification client is registered. */
 +        wait = WaitForMultipleObjects(n_handles, handles, FALSE, timeout);
@@ -704,17 +833,23 @@ index 8440b5d..af743ba 100644
 +            ERR("WaitForMultipleObjects failed: %lu (%lu)\n", wait, GetLastError());
 +            break;
 +        }
-+
-+        if(wait == WAIT_OBJECT_0){
+ 
+-    while(1){
+-        if(RegNotifyChangeKeyValue(key, FALSE, REG_NOTIFY_CHANGE_LAST_SET,
+-                    NULL, FALSE) != ERROR_SUCCESS){
+-            ERR("RegNotifyChangeKeyValue failed: %lu\n", GetLastError());
+-            RegCloseKey(key);
+-            g_notif_thread = NULL;
+-            return 1;
++        if(reg_armed && wait == WAIT_OBJECT_0 + 1){
 +            if(RegNotifyChangeKeyValue(key, FALSE, REG_NOTIFY_CHANGE_LAST_SET,
 +                        changed, TRUE) != ERROR_SUCCESS){
 +                ERR("RegNotifyChangeKeyValue failed: %lu\n", GetLastError());
-+                break;
++                reg_armed = FALSE;
 +            }
          }
  
          EnterCriticalSection(&g_notif_lock);
-+        seen_seq = g_notif_reg_seq;
  
 -        notify_if_changed(eRender, eConsole, key, L"DefaultOutput",
 -                out_name, &MMDevice_def_play->IMMDevice_iface);
@@ -725,6 +860,7 @@ index 8440b5d..af743ba 100644
 -        notify_if_changed(eCapture, eCommunications, key, L"DefaultVoiceInput",
 -                vin_name, &MMDevice_def_rec->IMMDevice_iface);
 +        if(!list_empty(&g_notif_clients) && !winmm_init_active()){
++            flush_winmm_sync(key);
 +            refresh_system_default(eRender);
 +            refresh_system_default(eCapture);
 +        }
@@ -738,27 +874,14 @@ index 8440b5d..af743ba 100644
      }
  
 -    RegCloseKey(key);
-+fail:
-+    if (changed)
-+    {
++    if(changed)
 +        CloseHandle(changed);
-+        changed = NULL;
-+    }
-+    if (key)
-+    {
++    if(key)
 +        RegCloseKey(key);
-+        key = NULL;
-+    }
  
 -    g_notif_thread = NULL;
 +    EnterCriticalSection(&g_notif_lock);
-+    if (g_notif_reg_seq != seen_seq && !list_empty(&g_notif_clients) && retries++ < 1)
-+    {
-+        LeaveCriticalSection(&g_notif_lock);
-+        goto retry;
-+    }
-+    if (g_notif_thread)
-+    {
++    if(g_notif_thread){
 +        CloseHandle(g_notif_thread);
 +        g_notif_thread = NULL;
 +    }
@@ -769,7 +892,13 @@ index 8440b5d..af743ba 100644
  }
  
  static HRESULT WINAPI MMDevEnum_RegisterEndpointNotificationCallback(IMMDeviceEnumerator *iface, IMMNotificationClient *client)
-@@ -1427,15 +1780,42 @@ static HRESULT WINAPI MMDevEnum_RegisterEndpointNotificationCallback(IMMDeviceEn
+@@ -1422,20 +1879,53 @@ static HRESULT WINAPI MMDevEnum_RegisterEndpointNotificationCallback(IMMDeviceEn
+     if(!client)
+         return E_POINTER;
+ 
+-    wrapper = malloc(sizeof(*wrapper));
++    wrapper = calloc(1, sizeof(*wrapper));
+     if(!wrapper)
          return E_OUTOFMEMORY;
  
      wrapper->client = client;
@@ -777,6 +906,17 @@ index 8440b5d..af743ba 100644
  
      EnterCriticalSection(&g_notif_lock);
  
++    if(!g_notif_wake){
++        g_notif_wake = CreateEventW(NULL, FALSE, FALSE, NULL);
++        if(!g_notif_wake){
++            DWORD err = GetLastError();
++            ERR("CreateEvent failed: %lu\n", err);
++            LeaveCriticalSection(&g_notif_lock);
++            free(wrapper);
++            return err ? HRESULT_FROM_WIN32(err) : E_FAIL;
++        }
++    }
++
 +    EnterCriticalSection(&g_dev_lock);
 +    wrapper->active_gen = g_dev_gen;
 +    if(wrapper->is_winmm){
@@ -786,12 +926,7 @@ index 8440b5d..af743ba 100644
 +    LeaveCriticalSection(&g_dev_lock);
 +
      list_add_tail(&g_notif_clients, &wrapper->entry);
-+    g_notif_reg_seq++;
-+
-+    if(!g_notif_wake)
-+        g_notif_wake = CreateEventW(NULL, FALSE, FALSE, NULL);
-+    if(g_notif_wake)
-+        SetEvent(g_notif_wake);
++    SetEvent(g_notif_wake);
  
      if(!g_notif_thread){
          g_notif_thread = CreateThread(NULL, 0, notif_thread_proc, NULL, 0, NULL);
@@ -814,7 +949,7 @@ index 8440b5d..af743ba 100644
      }
  
      LeaveCriticalSection(&g_notif_lock);
-@@ -1457,6 +1837,12 @@ static HRESULT WINAPI MMDevEnum_UnregisterEndpointNotificationCallback(IMMDevice
+@@ -1457,6 +1947,12 @@ static HRESULT WINAPI MMDevEnum_UnregisterEndpointNotificationCallback(IMMDevice
  
      LIST_FOR_EACH_ENTRY(wrapper, &g_notif_clients, struct NotificationClientWrapper, entry){
          if(wrapper->client == client){
