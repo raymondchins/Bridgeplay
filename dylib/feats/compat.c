@@ -28,6 +28,7 @@
 #define COMPAT_MANAGER_ENABLED_OFF  0x7B0
 #define COMPAT_MANAGER_USER_OFF     0x300  // CUser *
 #define COMPAT_TOOL_STRIDE          0x130
+#define COMPAT_TOOL_BUFFER_SIZE     (COMPAT_TOOL_STRIDE + 64)
 #define COMPAT_TOOL_FLAGS_OFF       0x28  // bit 0: tool needs no downloaded app
 #define COMPAT_TOOL_FLAG_NO_APP     0x1
 #define COMPAT_TOOL_FROM_OSLIST_OFF 0x70
@@ -212,8 +213,8 @@ static int head_appid(uintptr_t pc, uintptr_t end, uint32_t base, uint32_t rt, u
             uint32_t cond = (w >> 12) & 0xFu;
             uint32_t rm = (w >> 16) & 0x1Fu;
             if (!checked || swapped || RD(w) == base || RD(w) == 31) return 0;
-            if (!((cond == 0 && rm == rt && RN(w) != rt) ||
-                  (cond == 1 && RN(w) == rt && rm != rt))) return 0;
+            if (!((cond == 0 && rm == rt && RN(w) != rt && RN(w) != 31) ||
+                  (cond == 1 && RN(w) == rt && rm != rt && rm != 31))) return 0;
             swapped = 1;
             continue;
         }
@@ -364,6 +365,7 @@ int np_compat_probe_tool_head(uintptr_t yld_register_tool, uintptr_t end) {
 
 int np_compat_layout_known(void) {
     return g_head_probed && g_tail_probed && g_head_shift <= g_tool_shift &&
+           np_compat_tool_stride() <= COMPAT_TOOL_BUFFER_SIZE &&
            g_head_appid_off == (uint32_t)((int32_t)COMPAT_TOOL_APPID_OFF + g_tool_shift);
 }
 
@@ -1081,7 +1083,7 @@ void np_compat_register_crossover(void *compat_mgr) {
     // the registration gate, from_oslist=windows intersects the app mask so the
     // dropdown keeps it, and appid 0 marks a manager-local tool the resolver routes
     // to the local run script.
-    uint8_t (*buffers)[COMPAT_TOOL_STRIDE + 64] = calloc((size_t)g_tool_count, sizeof(*buffers));
+    uint8_t (*buffers)[COMPAT_TOOL_BUFFER_SIZE] = calloc((size_t)g_tool_count, sizeof(*buffers));
     if (g_tool_count && !buffers) {
         NP_WARN("np_compat_register_crossover: out of memory, no tool registered");
         return;
@@ -1140,7 +1142,7 @@ size_t np_compat_fex_tools(const char **names, size_t max) {
 }
 
 void *np_compat_registered_tool(void *compat_mgr) {
-    if (!compat_mgr)
+    if (!compat_mgr || !np_compat_layout_known())
         return NULL;
 
     load_tool_list_once();

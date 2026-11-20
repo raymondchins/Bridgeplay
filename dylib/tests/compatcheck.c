@@ -343,10 +343,13 @@ static void head_cases(void) {
     for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
     code[0] = enc_mov(30, 1);
     code[1] = movz_w(1, 4);
-    code[2] = 0x94000040u;                 // bl
     code[3] = ldr64(30, 0x40, 8);
-    code[4] = ldr32(30, 0x68, 9);
-    code[5] = 0xD65F03C0u;
+    code[4] = CMP_X8_0;
+    code[5] = CSEL_X8;
+    code[6] = ldr32(30, 0x68, 9);
+    code[7] = 0xD65F03C0u;
+    check(probe_tool_head((uintptr_t)code) == 1, "a copy in the link register is accepted before a call");
+    code[2] = 0x94000040u;                 // bl
     check(probe_tool_head((uintptr_t)code) == 0, "a copy in the link register is lost to a call");
 
     // The appid read after the name ties the head to the tail probe.
@@ -375,6 +378,12 @@ static void head_cases(void) {
     build_yld(0x48, 0);
     code[9] = 0x9A800000u | (27u << 16) | (26u << 5) | 8u;  // csel x8, x26, x27, eq
     check(probe_tool_head((uintptr_t)code) == 0, "a select that ignores the load is refused");
+
+    build_yld(0x48, 0);
+    code[9] = 0x9A8803E8u;                 // csel x8, xzr, x8, eq
+    check(!probe_tool_head((uintptr_t)code), "an equal select with no default string is refused");
+    code[9] = 0x9A9F1108u;                 // csel x8, x8, xzr, ne
+    check(!probe_tool_head((uintptr_t)code), "a not-equal select with no default string is refused");
 
     build_yld(0x48, 0);
     code[9] = CSEL_X8 | (2u << 12);         // csel x8, x26, x8, hs
@@ -465,6 +474,12 @@ static void head_cases(void) {
     }
     g_head_shift = 24;
     check(!np_compat_layout_known(), "a head shift past the install shift is not a layout");
+    g_tool_shift = 64;
+    confirm_layout();
+    check(np_compat_layout_known(), "the largest entry that fits the registration buffer is accepted");
+    g_tool_shift = 72;
+    confirm_layout();
+    check(!np_compat_layout_known(), "the first aligned entry larger than the registration buffer is refused");
     g_head_probed = 0;
     g_head_shift = 0;
     check(!np_compat_layout_known(), "an unprobed head leaves the layout unconfirmed");
