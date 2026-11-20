@@ -6,10 +6,15 @@ set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 [ -f "$SRC" ] || { echo "==> prefixnotecheck: $SRC not present, skipped"; exit 0; }
 
-body=$(sed -n '/^volume_type() {/,/^}/p;/^note_prefix_volume() {/,/^}/p;/^steam_libraries() {/,/^}/p;/^note_other_prefixes() {/,/^}/p;/^refuse_broken_prefix() {/,/^}/p;/^missing_core_dll() (/,/^)/p' "$SRC")
+body=$(sed -n '/^without_lock_fds() {/,/^}/p;/^volume_type() {/,/^}/p;/^note_prefix_volume() {/,/^}/p;/^steam_libraries() {/,/^}/p;/^note_other_prefixes() {/,/^}/p;/^refuse_broken_prefix() {/,/^}/p;/^missing_core_dll() (/,/^)/p' "$SRC")
 case "$body" in
-  *note_prefix_volume*refuse_broken_prefix*note_other_prefixes*missing_core_dll*) ;;
+  *without_lock_fds*note_prefix_volume*refuse_broken_prefix*note_other_prefixes*missing_core_dll*) ;;
   *) echo "FAIL: the prefix notes were not found in $SRC"; exit 1 ;;
+esac
+retry=$(awk '/^  set_up_prefix_contents$/{on=1} on{print; if(/^  fi$/ && prev ~ /refuse_broken_prefix/) exit} {prev=$0}' "$SRC")
+case "$retry" in
+  *set_up_prefix_contents*refuse_broken_prefix*broken_rebuilt*) ;;
+  *) echo "FAIL: the broken-prefix retry block was not found in $SRC"; exit 1 ;;
 esac
 body="$body"'
 notify_user() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }
@@ -109,6 +114,51 @@ has "the player is offered a rebuild" "The game's prefix could not be set up|Win
 has "the rebuild keeps no backup" "|no-backup" "$work/notes"
 is "a rebuild lets the launch go on" 0 "$(rebuild=ok check_prefix apfs)"
 has "the rebuild is reported" "rebuilt=1" "$work/log"
+cat > "$work/wineserver" <<'SH'
+#!/bin/sh
+echo "server $1" >> "$notes"
+SH
+chmod +x "$work/wineserver"
+( WINESERVER="$work/wineserver" rebuild=ok check_prefix apfs >/dev/null )
+is "wineserver is stopped before offering a rebuild" "server -k
+server -w
+The game's prefix could not be set up|Wine did not finish building it, so the game can't start. Rebuild the prefix now? Your save games will be preserved and not lost.|no-backup" "$(cat "$work/notes")"
+
+retry_prefix() { # retry_prefix repair|broken: exercises the post-rebuild setup and recheck
+	: > "$work/log"
+	: > "$work/notes"
+	: > "$work/seq"
+	rm -rf "$pfx/dosdevices" "$pfx/drive_c"
+	mkdir -p "$pfx"
+	env log="$work/log" notes="$work/notes" seq="$work/seq" body="$body" retry="$retry" \
+		WINEPREFIX="$pfx" STEAM_COMPAT_DATA_PATH="$two/steamapps/compatdata/42" outcome="$1" \
+		sh -c 'eval "$body"
+			volume_type() { echo "apfs /Volumes/Drive"; }
+			df() { printf "Filesystem 1024-blocks Used Available\n/dev/disk3 1 1 99999999\n"; }
+			set_up_prefix_contents() { echo "setup" >> "$seq"; }
+			rebuild_prefix() {
+				[ "${np_rebuilt:-0}" != 1 ] || { echo "rebuild failed" >> "$notes"; exit 1; }
+				np_rebuilt=1
+				if [ "$outcome" = repair ]; then
+					mkdir -p "$WINEPREFIX/drive_c/windows/system32" "$WINEPREFIX/dosdevices"
+					ln -s ../drive_c "$WINEPREFIX/dosdevices/c:"
+					for name in kernel32 mspatcha ucrtbase user32 version win32u ws2_32; do
+						: > "$WINEPREFIX/drive_c/windows/system32/$name.dll"
+					done
+				fi
+			}
+			eval "$retry"
+			echo "rebuilt=${broken_rebuilt:-unset}" >> "$log"' && echo 0 || echo $?
+}
+is "a repaired prefix reruns setup and launches" 0 "$(retry_prefix repair)"
+is "setup runs before and after the rebuild" "setup
+setup" "$(cat "$work/seq")"
+has "the recheck clears broken_rebuilt" "rebuilt=0" "$work/log"
+is "a prefix still broken after rebuild stops" 1 "$(retry_prefix broken)"
+is "setup still ran twice before stopping" "setup
+setup" "$(cat "$work/seq")"
+has "a still-broken prefix reports rebuild failure" "rebuild failed" "$work/notes"
+rm -rf "$pfx/dosdevices" "$pfx/drive_c"
 is "a full disk stops the launch" 1 "$(check_prefix apfs 1024)"
 has "a full disk is named" "The disk is too full for the game's prefix" "$work/notes"
 is "exFAT stops the launch" 1 "$(check_prefix exfat)"

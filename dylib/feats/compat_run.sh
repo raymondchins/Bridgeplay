@@ -1848,6 +1848,7 @@ note_prefix_volume() {
 # Offers to rebuild a broken prefix and sets broken_rebuilt=1 once it is rebuilt; ends the
 # launch otherwise. A second broken check after a rebuild shows the rebuild failure and exits.
 refuse_broken_prefix() {
+  broken_rebuilt=0
   missing=$(missing_core_dll "$WINEPREFIX/dosdevices/c:/windows") || return 0
   vol=$(volume_type "$STEAM_COMPAT_DATA_PATH") || vol=""
   fs=${vol%% *}
@@ -1862,6 +1863,12 @@ refuse_broken_prefix() {
   if [ -n "$free_kb" ] && [ "$free_kb" -lt 2097152 ]; then
     show_alert "The disk is too full for the game's prefix" "Wine needs about 2 GB free to set up the game. Free some space on the drive that holds this Steam library, then rebuild the prefix in Bridgeplay."
     exit 1
+  fi
+  # set_up_prefix_contents runs reg import, which can leave wineserver holding the prefix
+  # while Bridgeplay tries to claim it for the rebuild.
+  if [ -n "${WINESERVER:-}" ]; then
+    without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
+    without_lock_fds "$WINESERVER" -w >> "$log" 2>&1 || true
   fi
   # The rebuild still carries the saves over. A copy of a prefix that never worked is no help.
   rebuild_prefix "The game's prefix could not be set up" "Wine did not finish building it, so the game can't start. Rebuild the prefix now? Your save games will be preserved and not lost." "" no-backup

@@ -171,7 +171,7 @@ chmod +x "$work/app with spaces/NotProtonApp"
 printf '%s' "$work/app with spaces/NotProtonApp" > "$np_support/app-executable"
 
 rebuild_case() {
-	choice=$1 command_status=$2 launch_verb=$3 skip=${4:-}
+	choice=$1 command_status=$2 launch_verb=$3 skip=${4:-} mode=${5:-}
 	data=$(mktemp -d "$work/compat data.XXXXXX")
 	(
 		export TEST_LEAK=1
@@ -196,8 +196,14 @@ in its name'
 		prepare_prefix_directory
 		: > "$data/checks"
 		echo stale > "$data/notproton-switch"
-		rebuild_prefix 'A title' 'Previous "tool" with \ and a newline
+		if [ -n "$mode" ]; then
+			rebuild_prefix 'A title' 'Previous "tool" with \ and a newline
+in its name' "$skip" "$mode"
+		else
+			rebuild_prefix 'A title' 'Previous "tool" with \ and a newline
 in its name' ${skip:+"$skip"}
+		fi
+		[ -z "${second_rebuild:-}" ] || rebuild_prefix 'A title' 'Still broken' "$skip" "$mode"
 		echo launched >> "$data/checks"
 	) && status=0 || status=$?
 }
@@ -234,6 +240,15 @@ is "a skipped rebuild never calls the app" no "$([ -f "$data/arguments" ] && ech
 is "the skip button is labelled as asked" "Launch Without Rebuilding" "$(tail -3 "$data/prompt-args" | head -1)"
 is "a missing Bridgeplay icon falls back to caution" "" "$(tail -2 "$data/prompt-args" | head -1)"
 is "an offered rebuild keeps the backup choice" "" "$(tail -1 "$data/prompt-args")"
+rebuild_case 'Rebuild Prefix' 0 waitforexitandrun '' no-backup
+is "no-backup rebuild succeeds" 0 "$status"
+is "no-backup rebuild passes no-backup to the prompt" no-backup "$(tail -1 "$data/prompt-args")"
+is "no-backup rebuild passes discard-backup" discard-backup "$(tail -1 "$data/arguments")"
+second_rebuild=1
+rebuild_case 'Rebuild Prefix' 0 waitforexitandrun '' no-backup
+second_rebuild=
+is "a second rebuild in one launch stops" 1 "$status"
+is "a second rebuild reports rebuild failure" "rebuild failed" "$(cat "$data/alerts")"
 rebuild_case 'Rebuild Prefix' 0 run 'Launch Without Rebuilding'
 is "install helpers skip an offered rebuild silently" 0 "$status"
 rebuild_case 'Rebuild Prefix' 0 waitforexitandrun
