@@ -460,7 +460,7 @@ final class SystemStatus {
             return result
         } catch {
             AppLog.note("default tool: could not follow the updated engine: \(error.localizedDescription)")
-            return .unchanged
+            return .failed
         }
     }
 
@@ -480,7 +480,7 @@ final class SystemStatus {
             guard !DeploymentContent.current(version: version).blocksInstallation else { return nil }
             return Self.followDefaultTool()
         }.value
-        if let result { defaultToolRetryPending = result == .steamRunning }
+        if let result { defaultToolRetryPending = result.needsRetry }
     }
 
     private func runnerOutcome(_ result: RunnerSetup.Outcome) async -> String {
@@ -488,7 +488,7 @@ final class SystemStatus {
             let follow = Self.followDefaultTool()
             return (follow, result.toolsChanged && SteamBundle.isRunning)
         }.value
-        defaultToolRetryPending = follow == .steamRunning
+        defaultToolRetryPending = follow.needsRetry
         if result.stagedNothing { return String(localized: "Compatibility tool is already set up.") }
         guard needsRestart else { return String(localized: "Compatibility tool ready.") }
         return String(localized: "Compatibility tool ready. \(Self.toolsRestartHint)")

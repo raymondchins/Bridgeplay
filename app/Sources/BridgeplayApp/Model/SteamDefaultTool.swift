@@ -207,7 +207,9 @@ enum SteamDefaultTool {
     }
 
     enum FollowResult: Equatable, Sendable {
-        case unchanged, updated, steamRunning
+        case unchanged, updated, steamRunning, failed
+
+        var needsRetry: Bool { self == .steamRunning || self == .failed }
     }
 
     @discardableResult
@@ -225,8 +227,15 @@ enum SteamDefaultTool {
             ) && isDirectory.boolValue
         }
         let candidates = installed.filter(toolExists)
-        guard !candidates.isEmpty, let text = try? String(contentsOf: file, encoding: .utf8),
-              let result = followingSuccessors(text, installed: candidates, toolExists: toolExists)
+        guard !candidates.isEmpty else { return .unchanged }
+        let text: String
+        do {
+            text = try String(contentsOf: file, encoding: .utf8)
+        } catch let error as NSError
+            where error.domain == NSCocoaErrorDomain && error.code == CocoaError.fileReadNoSuchFile.rawValue {
+            return .unchanged
+        }
+        guard let result = followingSuccessors(text, installed: candidates, toolExists: toolExists)
         else { return .unchanged }
         // Atomic replacement still can't rule out Steam starting between this check and the write.
         guard !steamRunning() else { return .steamRunning }

@@ -310,4 +310,22 @@ struct SteamDefaultToolFollowTests {
         ) == .updated)
         #expect(try String(contentsOf: file, encoding: .utf8) == vdf([("0", successor)]))
     }
+
+    @Test("An unreadable config is a failure, but an absent config needs no repair")
+    func configReadFailure() throws {
+        let dir = try scratchDirectory("follow-config")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appending(path: "config.vdf")
+        let successor = "bridgeplay-proton-winecx-11.17"
+        try FileManager.default.createDirectory(at: dir.appending(path: successor), withIntermediateDirectories: true)
+
+        func follow() throws -> SteamDefaultTool.FollowResult {
+            try SteamDefaultTool.followSuccessors(installed: [successor], in: file, compatTools: dir, steamRunning: { false })
+        }
+
+        #expect(try follow() == .unchanged)
+        try Data([0xFF]).write(to: file)
+        #expect(throws: (any Error).self) { try follow() }
+        #expect(SteamDefaultTool.FollowResult.failed.needsRetry)
+    }
 }
