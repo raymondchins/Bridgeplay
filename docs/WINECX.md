@@ -507,8 +507,8 @@ rebuilt Mach-O file needs its line there updated too; `SignedPinTests` fails unt
 | `win32u-winecx-11.17.so` | `win32u-patch/patch-driver-version.sh` | `b012382d09b2ff1b3c0750d93867f72dd04a7c902bc4179be406b6c558ab162d` | `FreeEngineWinecx.v1117.nvidia` |
 | `wined3d-winecx-11.17.dll` | `wined3d-patch/` | `9298c83d927b3b80d0fa36f52bb5f2ecd60ec4daffff3c93d9b080293e59dfe9` | `FreeEngineWinecx.v1117.nvidia` |
 | `winecoreaudio-winecx-11.17.so` | `winecoreaudio-patch/` | `680b267e8cf41af0868de4adf7f6760615a434a4be06b4ab0cfeece2d9240faa` | `FreeEngineWinecx.v1117.audio` |
-| `mmdevapi-winecx-11.17.dll` | `mmdevapi-patch/` | `b953feec59f6e5733696988ea9e22ba5b22b27ea1d89553b6b125e07529b2ca4` | `FreeEngineWinecx.v1117.audio` |
-| `mmdevapi-winecx-11.17-i386.dll` | `mmdevapi-patch/` | `1d316e28ebe29b965b058f0d649ee99f12d9499ea66bf09102054e7237ce4b6f` | `FreeEngineWinecx.v1117.audio` |
+| `mmdevapi-winecx-11.17.dll` | `mmdevapi-patch/` | `c9dab3379868eb112ae3db7f1d6b6261aba22266bd655c496192a97ad1b88652` | `FreeEngineWinecx.v1117.audio` |
+| `mmdevapi-winecx-11.17-i386.dll` | `mmdevapi-patch/` | `29f175650d6723d9695faaabd0342ba9c739fc1512ff1178c69b75fe25f85950` | `FreeEngineWinecx.v1117.audio` |
 | `ws2_32-winecx-11.17.dll` | `ws2_32-patch/` | `cb0a5670ce6dbf949ed25cca54e9f1c4930cd4c2ade895836d518d3d9073079c` | `FreeEngineWinecx.v1117.network` |
 | `kernel32-winecx-11.17.dll` | `hide-wine-exports-patch/` | `9cffe153abd3f91f7157f936377baac47c5aef9fa807e263a0f9e051c6010af3` | `FreeEngineWinecx.v1117.loader` |
 | `kernelbase-winecx-11.17.dll` | `hide-wine-exports-patch/` | `4d55600b204724046567688ca96132e49e53af1baac7a362f3e2bf285f669a8a` | `FreeEngineWinecx.v1117.loader` |

@@ -1,8 +1,138 @@
 diff --git a/dlls/mmdevapi/devenum.c b/dlls/mmdevapi/devenum.c
-index 8440b5d8..9b556ced 100644
+index 8440b5d..1d428ea 100644
 --- a/dlls/mmdevapi/devenum.c
 +++ b/dlls/mmdevapi/devenum.c
-@@ -1347,12 +1347,93 @@ static BOOL notify_if_changed(EDataFlow flow, ERole role, HKEY key,
+@@ -71,6 +71,15 @@ static const IMMEndpointVtbl MMEndpointVtbl;
+ static MMDevEnumImpl enumerator;
+ static struct list device_list = LIST_INIT(device_list);
+ 
++static CRITICAL_SECTION g_dev_lock;
++static CRITICAL_SECTION_DEBUG g_dev_lock_debug =
++{
++    0, 0, &g_dev_lock,
++    { &g_dev_lock_debug.ProcessLocksList, &g_dev_lock_debug.ProcessLocksList },
++      0, 0, { (DWORD_PTR)(__FILE__ ": g_dev_lock") }
++};
++static CRITICAL_SECTION g_dev_lock = { &g_dev_lock_debug, -1, 0, 0, 0, 0 };
++
+ typedef struct MMDevColImpl
+ {
+     IMMDeviceCollection IMMDeviceCollection_iface;
+@@ -169,12 +178,15 @@ BOOL get_device_name_from_guid( const GUID *guid, char **name, EDataFlow *flow )
+     DWORD index = 0;
+     HKEY key;
+ 
++    EnterCriticalSection(&g_dev_lock);
+     if ((dev = find_device_in_cache( guid )))
+     {
+         *name = strdup(dev->name);
+         *flow = dev->flow;
+-        return TRUE;
++        LeaveCriticalSection(&g_dev_lock);
++        return *name != NULL;
+     }
++    LeaveCriticalSection(&g_dev_lock);
+ 
+     swprintf( key_name, ARRAY_SIZE(key_name), L"Software\\Wine\\Drivers\\%s\\devices", drvs.module_name );
+     if (RegOpenKeyExW( HKEY_CURRENT_USER, key_name, 0, KEY_READ | KEY_WOW64_64KEY, &key )) return FALSE;
+@@ -203,7 +215,9 @@ BOOL get_device_name_from_guid( const GUID *guid, char **name, EDataFlow *flow )
+         size = WideCharToMultiByte( CP_UNIXCP, 0, key_name + 2, -1, NULL, 0, NULL, NULL );
+         if (!(*name = malloc( size ))) return FALSE;
+         WideCharToMultiByte( CP_UNIXCP, 0, key_name + 2, -1, *name, size, NULL, NULL );
+-        add_device_to_cache( guid, *name, *flow );
++        EnterCriticalSection(&g_dev_lock);
++        if (!find_device_in_cache( guid )) add_device_to_cache( guid, *name, *flow );
++        LeaveCriticalSection(&g_dev_lock);
+         return TRUE;
+     }
+     RegCloseKey( key );
+@@ -236,7 +250,9 @@ static void get_device_guid( EDataFlow flow, const char *dev_name, GUID *guid )
+         RegSetValueExW( key, L"guid", 0, REG_BINARY, (BYTE *)guid, sizeof(*guid) );
+     }
+     RegCloseKey( key );
++    EnterCriticalSection(&g_dev_lock);
+     if (!find_device_in_cache( guid )) add_device_to_cache( guid, dev_name, flow );
++    LeaveCriticalSection(&g_dev_lock);
+ }
+ 
+ static HRESULT MMDevPropStore_OpenPropKey(const GUID *guid, DWORD flow, HKEY *propkey)
+@@ -956,7 +972,8 @@ static HRESULT MMDevCol_Create(IMMDeviceCollection **ppv, EDataFlow flow, DWORD
+     This->ref = 1;
+     This->devices = NULL;
+     This->devices_count = 0;
+-    *ppv = &This->IMMDeviceCollection_iface;
++
++    EnterCriticalSection(&g_dev_lock);
+ 
+     LIST_FOR_EACH_ENTRY(cur, &device_list, MMDevice, entry)
+     {
+@@ -967,8 +984,12 @@ static HRESULT MMDevCol_Create(IMMDeviceCollection **ppv, EDataFlow flow, DWORD
+     if (This->devices_count)
+     {
+         This->devices = malloc(This->devices_count * sizeof(IMMDevice *));
+-        if (!This->devices_count)
++        if (!This->devices)
++        {
++            LeaveCriticalSection(&g_dev_lock);
++            free(This);
+             return E_OUTOFMEMORY;
++        }
+ 
+         LIST_FOR_EACH_ENTRY(cur, &device_list, MMDevice, entry)
+         {
+@@ -981,6 +1002,9 @@ static HRESULT MMDevCol_Create(IMMDeviceCollection **ppv, EDataFlow flow, DWORD
+         }
+     }
+ 
++    LeaveCriticalSection(&g_dev_lock);
++
++    *ppv = &This->IMMDeviceCollection_iface;
+     return S_OK;
+ }
+ 
+@@ -1209,14 +1233,17 @@ static HRESULT WINAPI MMDevEnum_GetDefaultAudioEndpoint(IMMDeviceEnumerator *ifa
+         RegCloseKey(key);
+     }
+ 
++    EnterCriticalSection(&g_dev_lock);
+     if (flow == eRender)
+-        *device = &MMDevice_def_play->IMMDevice_iface;
++        *device = MMDevice_def_play ? &MMDevice_def_play->IMMDevice_iface : NULL;
+     else
+-        *device = &MMDevice_def_rec->IMMDevice_iface;
++        *device = MMDevice_def_rec ? &MMDevice_def_rec->IMMDevice_iface : NULL;
++    if (*device)
++        IMMDevice_AddRef(*device);
++    LeaveCriticalSection(&g_dev_lock);
+ 
+     if (!*device)
+         return E_NOTFOUND;
+-    IMMDevice_AddRef(*device);
+     return S_OK;
+ }
+ 
+@@ -1231,6 +1258,7 @@ static HRESULT WINAPI MMDevEnum_GetDevice(IMMDeviceEnumerator *iface, const WCHA
+     if(!name || !device)
+         return E_POINTER;
+ 
++    EnterCriticalSection(&g_dev_lock);
+     LIST_FOR_EACH_ENTRY(impl, &device_list, MMDevice, entry)
+     {
+         HRESULT hr;
+@@ -1248,10 +1276,12 @@ static HRESULT WINAPI MMDevEnum_GetDevice(IMMDeviceEnumerator *iface, const WCHA
+             CoTaskMemFree(str);
+             IMMDevice_AddRef(dev);
+             *device = dev;
++            LeaveCriticalSection(&g_dev_lock);
+             return S_OK;
+         }
+         CoTaskMemFree(str);
+     }
++    LeaveCriticalSection(&g_dev_lock);
+     TRACE("Could not find device %s\n", debugstr_w(name));
+     return E_INVALIDARG;
+ }
+@@ -1347,12 +1377,119 @@ static BOOL notify_if_changed(EDataFlow flow, ERole role, HKEY key,
      return TRUE;
  }
  
@@ -15,17 +145,28 @@ index 8440b5d8..9b556ced 100644
 +    struct get_endpoint_ids_params params;
 +    MMDevice **def = flow == eRender ? &MMDevice_def_play : &MMDevice_def_rec;
 +    MMDevice *dev, *found = NULL;
-+    BOOL changed = FALSE;
-+    GUID guid;
++    BOOL changed = FALSE, created = FALSE;
++    GUID guid = {0};
++
++    if (!drvs.module_unixlib)
++        return FALSE;
 +
 +    params.flow = flow;
 +    params.size = 1024;
 +    params.endpoints = NULL;
++    params.num = 0;
++    params.default_idx = 0;
++    params.result = E_FAIL;
 +    do {
 +        free(params.endpoints);
 +        if (!(params.endpoints = malloc(params.size)))
 +            return FALSE;
-+        __wine_unix_call(drvs.module_unixlib, get_endpoint_ids, &params);
++        params.result = E_FAIL;
++        if (__wine_unix_call(drvs.module_unixlib, get_endpoint_ids, &params))
++        {
++            free(params.endpoints);
++            return FALSE;
++        }
 +    } while (params.result == HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER));
 +
 +    if (SUCCEEDED(params.result) && params.default_idx < params.num)
@@ -35,26 +176,37 @@ index 8440b5d8..9b556ced 100644
 +        const char *dev_name = (char *)params.endpoints + ep->device;
 +
 +        get_device_guid(flow, dev_name, &guid);
-+        if (!*def || !IsEqualGUID(&(*def)->devguid, &guid))
++        if (!IsEqualGUID(&guid, &GUID_NULL))
 +        {
-+            LIST_FOR_EACH_ENTRY(dev, &device_list, MMDevice, entry)
++            EnterCriticalSection(&g_dev_lock);
++            if (!*def || !IsEqualGUID(&(*def)->devguid, &guid))
 +            {
-+                if (dev->flow == flow && IsEqualGUID(&dev->devguid, &guid))
++                LIST_FOR_EACH_ENTRY(dev, &device_list, MMDevice, entry)
 +                {
-+                    found = dev;
-+                    break;
++                    if (dev->flow == flow && IsEqualGUID(&dev->devguid, &guid))
++                    {
++                        found = dev;
++                        break;
++                    }
 +                }
++                if (found && found->state == DEVICE_STATE_ACTIVE)
++                    *def = found;
++                else if ((found = MMDevice_Create(name, &guid, flow, DEVICE_STATE_ACTIVE, FALSE)))
++                    created = TRUE;
++                changed = found != NULL;
++                if (changed)
++                    TRACE("system default %s is now %s\n", flow == eRender ? "output" : "input",
++                            debugstr_w(name));
 +            }
-+            if (found && found->state == DEVICE_STATE_ACTIVE)
-+                *def = found;
-+            /* CEILING: device_list has no lock of its own, so a device first seen here is
-+             * added while another thread may be walking the list. It is rare (once per new
-+             * device); a list lock shared with the enumerator is the upgrade path. */
-+            else if ((found = MMDevice_Create(name, &guid, flow, DEVICE_STATE_ACTIVE, TRUE)))
++            LeaveCriticalSection(&g_dev_lock);
++
++            if (created)
++            {
 +                set_format(found);
-+            changed = found != NULL;
-+            TRACE("system default %s is now %s\n", flow == eRender ? "output" : "input",
-+                    debugstr_w(name));
++                EnterCriticalSection(&g_dev_lock);
++                *def = found;
++                LeaveCriticalSection(&g_dev_lock);
++            }
 +        }
 +    }
 +
@@ -68,12 +220,16 @@ index 8440b5d8..9b556ced 100644
 +{
 +    MMDevice *def;
 +    WCHAR *id;
++    HRESULT hr;
 +
 +    if (!refresh_system_default(flow))
 +        return;
 +
++    EnterCriticalSection(&g_dev_lock);
 +    def = flow == eRender ? MMDevice_def_play : MMDevice_def_rec;
-+    if (FAILED(IMMDevice_GetId(&def->IMMDevice_iface, &id)))
++    hr = def ? IMMDevice_GetId(&def->IMMDevice_iface, &id) : E_FAIL;
++    LeaveCriticalSection(&g_dev_lock);
++    if (FAILED(hr))
 +        return;
 +
 +    if (!name[0])
@@ -97,7 +253,7 @@ index 8440b5d8..9b556ced 100644
  
      SetThreadDescription(GetCurrentThread(), L"wine_mmdevapi_notification");
  
-@@ -1382,29 +1463,51 @@ static DWORD WINAPI notif_thread_proc(void *user)
+@@ -1382,29 +1519,55 @@ static DWORD WINAPI notif_thread_proc(void *user)
      if(RegQueryValueExW(key, L"DefaultVoiceInput", 0, NULL, (BYTE*)vin_name, &size) != ERROR_SUCCESS)
          vin_name[0] = 0;
  
@@ -125,11 +281,15 @@ index 8440b5d8..9b556ced 100644
 +                return 1;
 +            }
 +            armed = TRUE;
-         }
- 
++        }
++
 +        /* The registry wakes this thread; the system default is polled, once a second. */
 +        wait = WaitForSingleObject(changed, 1000);
-+
++        if(wait != WAIT_OBJECT_0 && wait != WAIT_TIMEOUT){
++            ERR("WaitForSingleObject failed: %lu (%lu)\n", wait, GetLastError());
++            break;
+         }
+ 
          EnterCriticalSection(&g_notif_lock);
  
 -        notify_if_changed(eRender, eConsole, key, L"DefaultOutput",
@@ -144,13 +304,13 @@ index 8440b5d8..9b556ced 100644
 +            armed = FALSE;
 +
 +            notify_if_changed(eRender, eConsole, key, L"DefaultOutput",
-+                    out_name, &MMDevice_def_play->IMMDevice_iface);
++                    out_name, MMDevice_def_play ? &MMDevice_def_play->IMMDevice_iface : NULL);
 +            notify_if_changed(eRender, eCommunications, key, L"DefaultVoiceOutput",
-+                    vout_name, &MMDevice_def_play->IMMDevice_iface);
++                    vout_name, MMDevice_def_play ? &MMDevice_def_play->IMMDevice_iface : NULL);
 +            notify_if_changed(eCapture, eConsole, key, L"DefaultInput",
-+                    in_name, &MMDevice_def_rec->IMMDevice_iface);
++                    in_name, MMDevice_def_rec ? &MMDevice_def_rec->IMMDevice_iface : NULL);
 +            notify_if_changed(eCapture, eCommunications, key, L"DefaultVoiceInput",
-+                    vin_name, &MMDevice_def_rec->IMMDevice_iface);
++                    vin_name, MMDevice_def_rec ? &MMDevice_def_rec->IMMDevice_iface : NULL);
 +        }
 +
 +        notify_system_default(eRender, out_name, vout_name);

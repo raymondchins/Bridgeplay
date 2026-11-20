@@ -219,10 +219,10 @@ enum FreeEngineWinecx {
             // up with the runtime's own shows "Update & Set Up" once and gets these.
             WinecxBundledFile(resource: "mmdevapi-winecx-11.17", ext: "dll",
                               path: "lib/wine/x86_64-windows/mmdevapi.dll",
-                              sha256: "b953feec59f6e5733696988ea9e22ba5b22b27ea1d89553b6b125e07529b2ca4"),
+                              sha256: "c9dab3379868eb112ae3db7f1d6b6261aba22266bd655c496192a97ad1b88652"),
             WinecxBundledFile(resource: "mmdevapi-winecx-11.17-i386", ext: "dll",
                               path: "lib/wine/i386-windows/mmdevapi.dll",
-                              sha256: "1d316e28ebe29b965b058f0d649ee99f12d9499ea66bf09102054e7237ce4b6f"),
+                              sha256: "29f175650d6723d9695faaabd0342ba9c739fc1512ff1178c69b75fe25f85950"),
         ],
         // d3dx11_43.dll, d3dx11_42.dll: winecx e0aa380's PE halves, both arches, with
         // d3dx11-patch/winecx-create-thread-pump.patch. The fallbacks are the runtime's own,
