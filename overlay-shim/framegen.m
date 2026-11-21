@@ -1345,6 +1345,9 @@ static void fg_layer_set_hidden(int hidden)
 		return;
 	fg_clock_set(game, !hidden);
 	fg_on_main(^{
+		// A hand-back after the caller's check queues its hide before this unhide
+		if (!hidden && atomic_load(&fg_mode) != fg_mode_active)
+			return;
 		fg_ca_begin();
 		layer.hidden = hidden ? YES : NO;
 		fg_hud_suppress(game, !hidden);
