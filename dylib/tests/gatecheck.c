@@ -111,12 +111,17 @@ static void check_captures(void) {
     if (seen != (1 << NP_CAP_MAX) - 1) wrong("captures bound by byte: %#x", seen);
 
     static const struct { const char *src, *find; size_t want; } cases[] = {
-        { "(0,T.CI)()",  "(0," NP_C1 ".CI)()", 10 },
-        { "(0,9T.CI)()", "(0," NP_C1 ".CI)()", 0 },
-        { "(0,.CI)()",   "(0," NP_C1 ".CI)()", 0 },
-        { "ab.CI",       NP_C1 ".CI",           5 },
-        { "a.b(a)",      NP_C1 ".b(" NP_C1 ")", 6 },
-        { "a.b(c)",      NP_C1 ".b(" NP_C1 ")", 0 },
+        { "(0,T.CI)()",     "(0," NP_C1 ".CI)()", 10 },
+        { "(0,9T.CI)()",    "(0," NP_C1 ".CI)()", 0 },
+        { "(0,.CI)()",      "(0," NP_C1 ".CI)()", 0 },
+        { "ab.CI",          NP_C1 ".CI",           5 },
+        { "a.b(a)",         NP_C1 ".b(" NP_C1 ")", 6 },
+        { "a.b(c)",         NP_C1 ".b(" NP_C1 ")", 0 },
+        { "`b2N-TSWiyr4-`", "`" NP_C1 "`",         14 },
+        { "`-yCjeuJalIE-`", "`" NP_C1 "`",         14 },
+        { "`0ab-c`",        "`" NP_C1 "`",         7 },
+        { "``",             "`" NP_C1 "`",         0 },
+        { "a-b",            NP_C1,                 1 },
     };
     np_cap_t caps[NP_CAP_MAX];
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
@@ -224,6 +229,15 @@ static void selfcheck(void) {
                 wrong("fix %zu and library anchor %zu share an anchor", f, g);
     }
 
+    for (size_t g = 0; g < NP_LIBRARY_FILTER_VITE_COUNT; g++) {
+        check_gate("library-vite", g, &g_library_filters_vite[g],
+                   g_library_filters_vite, NP_LIBRARY_FILTER_VITE_COUNT);
+        for (size_t f = 0; f < NP_FIX_COUNT; f++)
+            if (strstr(g_fixes[f].find, g_library_filters_vite[g].find) ||
+                strstr(g_library_filters_vite[g].find, g_fixes[f].find))
+                wrong("fix %zu and Vite library anchor %zu share an anchor", f, g);
+    }
+
     for (size_t b = 0; b < NP_BIND_COUNT; b++) {
         if (bind_index(g_binds[b].marker) != (int)b)
             wrong("component %zu is read through the wrong marker", b);
@@ -231,8 +245,9 @@ static void selfcheck(void) {
             wrong("component %zu has no capture 1 to read its name from", b);
     }
 
-    printf("%zu shapes, %zu gates, %zu fixes, %zu library anchors checked\n",
-           NP_SHAPE_COUNT, total, NP_FIX_COUNT, NP_LIBRARY_FILTER_COUNT);
+    printf("%zu shapes, %zu gates, %zu fixes, %zu+%zu library anchors checked\n",
+           NP_SHAPE_COUNT, total, NP_FIX_COUNT,
+           NP_LIBRARY_FILTER_COUNT, NP_LIBRARY_FILTER_VITE_COUNT);
     check_paths();
 }
 
@@ -358,12 +373,6 @@ static int extract(const char *chunk, const char *out_path) {
     return 0;
 }
 
-static const np_gate_t *library_anchor(size_t i) {
-    return i < NP_LIBRARY_FILTER_COUNT ? &g_library_filters[i]
-                                       : &g_fixes[NP_NATIVE_MAC_FILTER_FIX + i - NP_LIBRARY_FILTER_COUNT];
-}
-#define NP_LIBRARY_ANCHORS (NP_LIBRARY_FILTER_COUNT + NP_FIX_COUNT - NP_NATIVE_MAC_FILTER_FIX)
-
 static int extract_library(const char *chunk, const char *out_path) {
     size_t len = 0;
     uint8_t *buf = slurp(chunk, &len);
@@ -371,13 +380,20 @@ static int extract_library(const char *chunk, const char *out_path) {
     FILE *o = fopen(out_path, "wb");
     if (!o) { fprintf(stderr, "cannot write %s\n", out_path); free(buf); return 1; }
 
+    int vite = count_matches((const char *)buf, len, g_fixes[NP_VITE_NATIVE_MAC_FILTER_FIX].find) != 0;
+    const np_gate_t *gates = vite ? g_library_filters_vite : g_library_filters;
+    size_t count = vite ? NP_LIBRARY_FILTER_VITE_COUNT : NP_LIBRARY_FILTER_COUNT;
+    size_t total = count + NP_FIX_COUNT - NP_NATIVE_MAC_FILTER_FIX;
+
     const size_t pad = 160;
     np_cap_t caps[NP_CAP_MAX];
     size_t fixes = 0, toolbars = 0;
-    for (size_t a = 0; a < NP_LIBRARY_ANCHORS; a++) {
+    for (size_t a = 0; a < total; a++) {
+        const np_gate_t *anchor = a < count ? &gates[a]
+                                            : &g_fixes[NP_NATIVE_MAC_FILTER_FIX + a - count];
         size_t hits = 0;
         for (size_t i = 0; i < len; ) {
-            size_t used = match_at((const char *)buf, len, i, library_anchor(a)->find, caps);
+            size_t used = match_at((const char *)buf, len, i, anchor->find, caps);
             if (!used) { i++; continue; }
             size_t from = i > pad ? i - pad : 0;
             size_t to   = i + used + pad < len ? i + used + pad : len;
@@ -386,9 +402,9 @@ static int extract_library(const char *chunk, const char *out_path) {
             hits++;
             i += used;
         }
-        if (a >= NP_LIBRARY_FILTER_COUNT) { fixes += hits; continue; }
-        if (a == NP_LIBRARY_TOOLBAR || a == NP_LOCALIZED_LIBRARY_TOOLBAR) { toolbars += hits; continue; }
-        if (hits != (size_t)library_anchor(a)->expect) {
+        if (a >= count) { fixes += hits; continue; }
+        if (!vite && (a == NP_LIBRARY_TOOLBAR || a == NP_LOCALIZED_LIBRARY_TOOLBAR)) { toolbars += hits; continue; }
+        if (hits != (size_t)anchor->expect) {
             fprintf(stderr, "library anchor %zu found %zu times in %s\n", a, hits, chunk);
             fclose(o); free(buf);
             return 1;
@@ -397,7 +413,7 @@ static int extract_library(const char *chunk, const char *out_path) {
     fclose(o);
     free(buf);
     if (fixes != 1) { fprintf(stderr, "%zu filter fixes in %s\n", fixes, chunk); return 1; }
-    if (toolbars != 1) { fprintf(stderr, "%zu library toolbars in %s\n", toolbars, chunk); return 1; }
+    if (!vite && toolbars != 1) { fprintf(stderr, "%zu library toolbars in %s\n", toolbars, chunk); return 1; }
     printf("extracted fixture to %s\n", out_path);
     return 0;
 }
@@ -501,10 +517,14 @@ static void check_library(const char *path, const char *out_path, int literal_ve
         len = (size_t)(version - (char *)buf) + 1 + tail;
     }
 
-    int present[NP_LIBRARY_FILTER_COUNT];
-    for (size_t g = 0; g < NP_LIBRARY_FILTER_COUNT; g++)
-        present[g] = count_matches((const char *)buf, len, g_library_filters[g].find) != 0;
-    if (present[NP_LIBRARY_TOOLBAR] == present[NP_LOCALIZED_LIBRARY_TOOLBAR])
+    int vite = count_matches((const char *)buf, len, g_fixes[NP_VITE_NATIVE_MAC_FILTER_FIX].find) != 0;
+    const np_gate_t *gates = vite ? g_library_filters_vite : g_library_filters;
+    size_t count = vite ? NP_LIBRARY_FILTER_VITE_COUNT : NP_LIBRARY_FILTER_COUNT;
+
+    int present[NP_LIBRARY_FILTER_MAX] = {0};
+    for (size_t g = 0; g < count; g++)
+        present[g] = count_matches((const char *)buf, len, gates[g].find) != 0;
+    if (!vite && present[NP_LIBRARY_TOOLBAR] == present[NP_LOCALIZED_LIBRARY_TOOLBAR])
         wrong("%s needs exactly one library toolbar", path);
 
     g_platform_js = g_test_lists;
@@ -517,13 +537,17 @@ static void check_library(const char *path, const char *out_path, int literal_ve
             wrong("%s does not start with the platform lists", path);
         if (!strstr(out, "SelectCollectionsAppFilterOption(\"notprotonWindows\""))
             wrong("%s has no Windows button", path);
-        for (size_t a = 0; a < NP_LIBRARY_ANCHORS; a++) {
-            if (count_matches(out, out_len, library_anchor(a)->find))
-                wrong("library anchor %zu survived in %s", a, path);
+        for (size_t g = 0; g < count; g++) {
+            if (count_matches(out, out_len, gates[g].find))
+                wrong("library anchor %zu survived in %s", g, path);
         }
-        for (size_t g = 0; g < NP_LIBRARY_FILTER_COUNT; g++) {
+        for (size_t f = NP_NATIVE_MAC_FILTER_FIX; f < NP_FIX_COUNT; f++) {
+            if (count_matches(out, out_len, g_fixes[f].find))
+                wrong("filter fix %zu survived in %s", f, path);
+        }
+        for (size_t g = 0; g < count; g++) {
             if (!present[g]) continue;
-            if (count_matches(out, out_len, g_library_filters[g].replace) != (size_t)g_library_filters[g].expect)
+            if (count_matches(out, out_len, gates[g].replace) != (size_t)gates[g].expect)
                 wrong("library replacement %zu is missing from %s", g, path);
         }
         size_t again_len = 0;
@@ -541,13 +565,13 @@ static void check_library(const char *path, const char *out_path, int literal_ve
 
     g_platform_js = g_test_lists;
     np_cap_t caps[NP_CAP_MAX];
-    for (size_t g = 0; g < NP_LIBRARY_FILTER_COUNT; g++) {
+    for (size_t g = 0; g < count; g++) {
         if (!present[g]) continue;
         char *copy = malloc(len + 1);
         if (!copy) { wrong("out of memory"); break; }
         memcpy(copy, buf, len + 1);
         for (size_t i = 0; i < len; ) {
-            size_t used = match_at(copy, len, i, g_library_filters[g].find, caps);
+            size_t used = match_at(copy, len, i, gates[g].find, caps);
             if (!used) { i++; continue; }
             copy[i + used - 1] = '\x01';
             i += used;
@@ -558,6 +582,38 @@ static void check_library(const char *path, const char *out_path, int literal_ve
             wrong("drift in library anchor %zu of %s left a partial filter", g, path);
         free(out);
         free(copy);
+    }
+    if (vite && !literal_version) {
+        char *copy = strdup((const char *)buf);
+        if (!copy || count_matches_first(copy, len, gates[NP_VITE_LIBRARY_TOOLBAR].find, caps) != 1) {
+            wrong("cannot change Vite toolbar binding in %s", path);
+        } else {
+            char *name = copy + (caps[0].at - copy);
+            *name = *name == 'z' ? 'y' : 'z';
+            if (count_matches(copy, len, gates[NP_VITE_LIBRARY_TOOLBAR].find) != 1 ||
+                count_matches(copy, len, gates[NP_VITE_LIBRARY_BUTTON].find) != 1)
+                wrong("mismatched toolbar should still match both anchors in %s", path);
+            out = library_transform(copy, len, &out_len);
+            if (!out || strstr(out, "npWindows") || !strstr(out, ".mac.has("))
+                wrong("mismatched Vite toolbar left a partial filter in %s", path);
+            free(out);
+        }
+        free(copy);
+
+        static const char decoy[] = "\ncase L.Pu:return!!(0,P.td)()||"
+            "e.is_available_on_current_platform&&!e.is_invalid_os_type;";
+        copy = malloc(len + sizeof(decoy));
+        if (!copy) {
+            wrong("out of memory");
+        } else {
+            memcpy(copy, buf, len);
+            memcpy(copy + len, decoy, sizeof(decoy));
+            out = library_transform(copy, len + sizeof(decoy) - 1, &out_len);
+            if (out && strstr(out, "notprotonWindows"))
+                wrong("mixed Vite and webpack platform filters were patched in %s", path);
+            free(out);
+            free(copy);
+        }
     }
     g_platform_js = NULL;
     free(buf);
