@@ -1866,32 +1866,13 @@ refuse_broken_prefix() {
   fi
   # set_up_prefix_contents runs reg import, which can leave wineserver holding the prefix
   # while Bridgeplay tries to claim it for the rebuild.
-  if [ -n "${WINESERVER:-}" ]; then
+  if [ -n "$WINESERVER" ]; then
     without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
     without_lock_fds "$WINESERVER" -w >> "$log" 2>&1 || true
   fi
   # The rebuild still carries the saves over. A copy of a prefix that never worked is no help.
   rebuild_prefix "The game's prefix could not be set up" "Wine did not finish building it, so the game can't start. Rebuild the prefix now? Your save games will be preserved and not lost." "" no-backup
   broken_rebuilt=1
-}
-
-# Lays out the profile, drives, settings and fonts of the prefix the launch will use.
-set_up_prefix_contents() {
-  stage_step="profile layout"
-  if ! lay_out_proton_profile; then
-    show_alert "Saved-game folders need attention" "Bridgeplay left the conflicting files in place. Open this prefix's bridgeplay-run.log for details before trying again."
-    exit 1
-  fi
-  [ "$verb" != waitforexitandrun ] || echo "video: RetinaMode=${NOTPROTON_RETINA:-0}" >> "$log" 2>&1 || true
-  stage_step="game drive"
-  map_game_drive
-  stage_step="prefix settings"
-  import_prefix_settings
-  stage_step="fonts"
-  link_fonts
-  # A prefix that Wine built just now only has dosdevices from this point on.
-  stage_step="game drive"
-  map_game_drive
 }
 
 # Steam keeps a game's prefix in the library that holds the game, so a game moved to another
@@ -3095,6 +3076,25 @@ link_fonts() {
       fi
     done
   done
+}
+
+# Lays out the profile, drives, settings and fonts of the prefix the launch will use.
+set_up_prefix_contents() {
+  stage_step="profile layout"
+  if ! lay_out_proton_profile; then
+    show_alert "Saved-game folders need attention" "Bridgeplay left the conflicting files in place. Open this prefix's bridgeplay-run.log for details before trying again."
+    exit 1
+  fi
+  [ "$verb" != waitforexitandrun ] || echo "video: RetinaMode=${NOTPROTON_RETINA:-0}" >> "$log" 2>&1 || true
+  stage_step="game drive"
+  map_game_drive
+  stage_step="prefix settings"
+  import_prefix_settings
+  stage_step="fonts"
+  link_fonts
+  # A prefix that Wine built just now only has dosdevices from this point on.
+  stage_step="game drive"
+  map_game_drive
 }
 
 # Wine loads its own VC++ runtime over Microsoft's, which breaks some games
