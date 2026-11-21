@@ -171,7 +171,7 @@ chmod +x "$work/app with spaces/NotProtonApp"
 printf '%s' "$work/app with spaces/NotProtonApp" > "$np_support/app-executable"
 
 rebuild_case() {
-	choice=$1 command_status=$2 launch_verb=$3 skip=${4:-}
+	choice=$1 command_status=$2 launch_verb=$3 skip=${4:-} mode=${5:-}
 	data=$(mktemp -d "$work/compat data.XXXXXX")
 	(
 		export TEST_LEAK=1
@@ -196,8 +196,14 @@ in its name'
 		prepare_prefix_directory
 		: > "$data/checks"
 		echo stale > "$data/notproton-switch"
-		rebuild_prefix 'A title' 'Previous "tool" with \ and a newline
+		if [ -n "$mode" ]; then
+			rebuild_prefix 'A title' 'Previous "tool" with \ and a newline
+in its name' "$skip" "$mode"
+		else
+			rebuild_prefix 'A title' 'Previous "tool" with \ and a newline
 in its name' ${skip:+"$skip"}
+		fi
+		[ -z "${second_rebuild:-}" ] || rebuild_prefix 'A title' 'Still broken' "$skip" "$mode"
 		echo launched >> "$data/checks"
 	) && status=0 || status=$?
 }
@@ -231,8 +237,18 @@ is "skipping an offered rebuild goes on with the launch" 0 "$status"
 is "a skipped rebuild retakes the lock and launches" "locked
 launched" "$(cat "$data/checks")"
 is "a skipped rebuild never calls the app" no "$([ -f "$data/arguments" ] && echo yes || echo no)"
-is "the skip button is labelled as asked" "Launch Without Rebuilding" "$(tail -2 "$data/prompt-args" | head -1)"
-is "a missing Bridgeplay icon falls back to caution" "" "$(tail -1 "$data/prompt-args")"
+is "the skip button is labelled as asked" "Launch Without Rebuilding" "$(tail -3 "$data/prompt-args" | head -1)"
+is "a missing Bridgeplay icon falls back to caution" "" "$(tail -2 "$data/prompt-args" | head -1)"
+is "an offered rebuild keeps the backup choice" "" "$(tail -1 "$data/prompt-args")"
+rebuild_case 'Rebuild Prefix' 0 waitforexitandrun '' keep-backup
+is "single-choice rebuild succeeds" 0 "$status"
+is "single-choice rebuild passes keep-backup to the prompt" keep-backup "$(tail -1 "$data/prompt-args")"
+is "single-choice rebuild keeps the original prefix" keep-backup "$(tail -1 "$data/arguments")"
+second_rebuild=1
+rebuild_case 'Rebuild Prefix' 0 waitforexitandrun '' keep-backup
+second_rebuild=
+is "a second rebuild in one launch stops" 1 "$status"
+is "a second rebuild reports rebuild failure" "rebuild failed" "$(cat "$data/alerts")"
 rebuild_case 'Rebuild Prefix' 0 run 'Launch Without Rebuilding'
 is "install helpers skip an offered rebuild silently" 0 "$status"
 rebuild_case 'Rebuild Prefix' 0 waitforexitandrun
@@ -255,7 +271,7 @@ printf 0 > "$data/status"
 (
 	STEAM_COMPAT_DATA_PATH=$data np_tool_dir=/tools/chosen np_build=b np_flavor=rosetta log="$data/log"
 	eval "$rebuild"
-	run_rebuild "$work/app with spaces/NotProtonApp" keep-backup
+	TMPDIR="$work" run_rebuild "$work/app with spaces/NotProtonApp" keep-backup
 ) &
 waiter=$!
 sleep 1
@@ -263,6 +279,43 @@ pkill -KILL -P "$waiter" 2>/dev/null || true
 kill -KILL "$waiter" 2>/dev/null || true
 sleep 4
 is "Stop kills the launch but not the rebuild under it" finished "$(cat "$data/finished" 2>/dev/null)"
+
+data=$(mktemp -d "$work/concurrent.XXXXXX")
+cat > "$work/concurrent-app" <<'SH'
+#!/bin/sh
+case "$6" in
+	keep-backup)
+		: > "$2/first-started"
+		for attempt in 1 2 3 4 5 6 7 8 9 10; do
+			[ ! -f "$2/second-returned" ] || exit 0
+			sleep 1
+		done
+		exit 2
+		;;
+	*) exit 1 ;;
+esac
+SH
+chmod +x "$work/concurrent-app"
+(
+	STEAM_COMPAT_DATA_PATH=$data np_tool_dir=/tools/chosen np_build=b np_flavor=rosetta log="$data/log"
+	eval "$rebuild"
+	run_rebuild "$work/concurrent-app" keep-backup
+) &
+first_waiter=$!
+for attempt in 1 2 3 4 5; do
+	[ ! -f "$data/first-started" ] || break
+	sleep 1
+done
+is "the first rebuild app started" yes "$([ -f "$data/first-started" ] && echo yes || echo no)"
+(
+	STEAM_COMPAT_DATA_PATH=$data np_tool_dir=/tools/chosen np_build=b np_flavor=rosetta log="$data/log"
+	eval "$rebuild"
+	run_rebuild "$work/concurrent-app" discard-backup
+) && status=0 || status=$?
+: > "$data/second-returned"
+is "a competing rebuild returns its own failure" 1 "$status"
+wait "$first_waiter" && status=0 || status=$?
+is "the first rebuild returns its own success" 0 "$status"
 
 echo "== crashes after a switch =="
 health_functions="$(extract prefix_machine)

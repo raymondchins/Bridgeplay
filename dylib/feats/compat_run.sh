@@ -1508,16 +1508,17 @@ exit_anticheat() {
 # app runs outside both: the inner subshell is reparented to launchd and the app calls
 # setsid. The script only waits for the exit status the subshell leaves behind.
 run_rebuild() {
-  rebuild_exit="$STEAM_COMPAT_DATA_PATH/notproton-rebuild-exit"
+  # A second launch can choose rebuild while this one is waiting for the app.
+  rebuild_wait=$(mktemp -d "${TMPDIR:-/tmp}/bridgeplay-rebuild.XXXXXX") || return 1
+  rebuild_exit="$rebuild_wait/status"
   rebuild_lock="$STEAM_COMPAT_DATA_PATH/.notproton-rebuild.lock"
-  rm -f "$rebuild_exit"
   (
     (
       env -i HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
         NOTPROTON_REBUILD_WINDOW=1 \
         "$1" --rebuild-prefix "$STEAM_COMPAT_DATA_PATH" "${np_tool_dir##*/}" \
         "$np_build" "$np_flavor" "$2" >> "$log" 2>&1 < /dev/null
-      echo "$?" > "$rebuild_exit.$$" && mv -f "$rebuild_exit.$$" "$rebuild_exit"
+      echo "$?" > "$rebuild_wait/pending" && mv -f "$rebuild_wait/pending" "$rebuild_exit"
     ) &
   )
   waited=0
@@ -1527,15 +1528,20 @@ run_rebuild() {
     # Nothing holds the lock once the app is gone. The grace covers its startup.
     if [ "$waited" -gt 30 ] && /usr/bin/lockf -k -s -t 0 "$rebuild_lock" true 2>/dev/null; then
       sleep 2
-      [ -f "$rebuild_exit" ] || return 1
+      if [ ! -f "$rebuild_exit" ]; then
+        rmdir "$rebuild_wait" 2>/dev/null || true
+        return 1
+      fi
     fi
   done
   read -r rebuild_status_code < "$rebuild_exit" || rebuild_status_code=1
   rm -f "$rebuild_exit"
+  rmdir "$rebuild_wait" 2>/dev/null || true
   [ "$rebuild_status_code" = 0 ]
 }
 
 # $1 is the title, $2 the message. With $3, that button skips the rebuild and the launch goes on.
+# With $4 set to keep-backup, Rebuild Prefix also keeps a backup.
 rebuild_prefix() {
   # Install-script helpers must never prompt or rebuild behind the player's back.
   [ "$verb" != run ] || { [ -n "$3" ] && return 0; exit 1; }
@@ -1549,13 +1555,18 @@ rebuild_prefix() {
   icon=$(cat "$np_support/app-executable" 2>/dev/null) || icon=""
   icon="${icon%/Contents/MacOS/*}/Contents/Resources/Bridgeplay.icns"
   [ -f "$icon" ] || icon=""
-  choice=$(osascript - "$1" "$2" "${3:-Cancel}" "$icon" <<'APPLESCRIPT'
+  choice=$(osascript - "$1" "$2" "${3:-Cancel}" "$icon" "${4:-}" <<'APPLESCRIPT'
 on run argv
   set choices to {item 3 of argv, "Rebuild Prefix", "Backup & Rebuild Prefix"}
+  set preferred to "Backup & Rebuild Prefix"
+  if item 5 of argv is "keep-backup" then
+    set choices to {item 3 of argv, "Rebuild Prefix"}
+    set preferred to "Rebuild Prefix"
+  end if
   if item 4 of argv is "" then
-    set answer to display dialog (item 2 of argv) with title (item 1 of argv) buttons choices default button "Backup & Rebuild Prefix" cancel button (item 3 of argv) with icon caution
+    set answer to display dialog (item 2 of argv) with title (item 1 of argv) buttons choices default button preferred cancel button (item 3 of argv) with icon caution
   else
-    set answer to display dialog (item 2 of argv) with title (item 1 of argv) buttons choices default button "Backup & Rebuild Prefix" cancel button (item 3 of argv) with icon ((POSIX file (item 4 of argv)) as alias)
+    set answer to display dialog (item 2 of argv) with title (item 1 of argv) buttons choices default button preferred cancel button (item 3 of argv) with icon ((POSIX file (item 4 of argv)) as alias)
   end if
   return button returned of answer
 end run
@@ -1563,7 +1574,10 @@ APPLESCRIPT
   ) || choice=""
   case "$choice" in
     'Backup & Rebuild Prefix') backup=keep-backup ;;
-    'Rebuild Prefix') backup=discard-backup ;;
+    'Rebuild Prefix')
+      backup=discard-backup
+      [ "$4" != keep-backup ] || backup=keep-backup
+      ;;
     *)
       [ -n "$3" ] || exit 1
       prepare_prefix_directory || exit 1
@@ -1839,13 +1853,20 @@ note_prefix_volume() {
 # Without C:\windows\system32 Wine stops at "could not load kernel32.dll" and the game quits
 # with no window. exFAT and FAT have no symbolic links, so dosdevices/c: cannot exist there.
 # A prefix with only some DLLs (see missing_core_dll) quits with "Library ... not found".
-# Ends the launch when the prefix is broken.
+# Offers to rebuild a broken prefix and sets broken_rebuilt=1 once it is rebuilt; ends the
+# launch otherwise. A second broken check after a rebuild shows the rebuild failure and exits.
 refuse_broken_prefix() {
+  broken_rebuilt=0
   missing=$(missing_core_dll "$WINEPREFIX/dosdevices/c:/windows") || return 0
-  vol=$(volume_type "$STEAM_COMPAT_DATA_PATH") || vol=""
-  fs=${vol%% *}
   printf '=== the prefix has no C:\\windows\\%s, Wine did not finish building it ===\n' "$missing" \
     >> "$log" 2>&1 || true
+  [ "$verb" != run ] || exit 1
+  if [ "${np_rebuilt:-0}" = 1 ]; then
+    show_rebuild_failure
+    exit 1
+  fi
+  vol=$(volume_type "$STEAM_COMPAT_DATA_PATH") || vol=""
+  fs=${vol%% *}
   case "$fs" in exfat|msdos|ntfs)
     show_alert "This Steam library cannot hold the game's prefix" "It is formatted $fs, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive."
     exit 1
@@ -1856,8 +1877,15 @@ refuse_broken_prefix() {
     show_alert "The disk is too full for the game's prefix" "Wine needs about 2 GB free to set up the game. Free some space on the drive that holds this Steam library, then rebuild the prefix in Bridgeplay."
     exit 1
   fi
-  show_alert "The game's prefix could not be set up" "Wine did not finish building it. Rebuild the prefix in Bridgeplay, then launch again. bridgeplay-run.log has the details."
-  exit 1
+  # set_up_prefix_contents runs reg import, which can leave wineserver holding the prefix
+  # while Bridgeplay tries to claim it for the rebuild.
+  if [ -n "$WINESERVER" ]; then
+    without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
+    without_lock_fds "$WINESERVER" -w >> "$log" 2>&1 || true
+  fi
+  # The rebuild skips system.reg, which may contain game data.
+  rebuild_prefix "The game's prefix could not be set up" "Wine did not finish building it, so the game can't start. Rebuild the prefix now? Bridgeplay will keep a backup of the old prefix." "" keep-backup
+  broken_rebuilt=1
 }
 
 # Steam keeps a game's prefix in the library that holds the game, so a game moved to another
@@ -3063,6 +3091,25 @@ link_fonts() {
   done
 }
 
+# Lays out the profile, drives, settings and fonts of the prefix the launch will use.
+set_up_prefix_contents() {
+  stage_step="profile layout"
+  if ! lay_out_proton_profile; then
+    show_alert "Saved-game folders need attention" "Bridgeplay left the conflicting files in place. Open this prefix's bridgeplay-run.log for details before trying again."
+    exit 1
+  fi
+  [ "$verb" != waitforexitandrun ] || echo "video: RetinaMode=${NOTPROTON_RETINA:-0}" >> "$log" 2>&1 || true
+  stage_step="game drive"
+  map_game_drive
+  stage_step="prefix settings"
+  import_prefix_settings
+  stage_step="fonts"
+  link_fonts
+  # A prefix that Wine built just now only has dosdevices from this point on.
+  stage_step="game drive"
+  map_game_drive
+}
+
 # Wine loads its own VC++ runtime over Microsoft's, which breaks some games
 native_vc_runtime() {
   for name in concrt140 msvcp140 msvcp140_1 msvcp140_2 msvcp140_atomic_wait msvcp140_codecvt_ids \
@@ -3107,23 +3154,15 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   if [ "$prefix_was_new" = 1 ]; then launch_progress setup; else launch_progress prepare; fi
   stage_step="prefix seed"
   seed_prefix_from_template
-  stage_step="profile layout"
-  if ! lay_out_proton_profile; then
-    show_alert "Saved-game folders need attention" "Bridgeplay left the conflicting files in place. Open this prefix's bridgeplay-run.log for details before trying again."
-    exit 1
-  fi
-  [ "$verb" != waitforexitandrun ] || echo "video: RetinaMode=${NOTPROTON_RETINA:-0}" >> "$log" 2>&1 || true
-  stage_step="game drive"
-  map_game_drive
-  stage_step="prefix settings"
-  import_prefix_settings
-  stage_step="fonts"
-  link_fonts
-  # A prefix that Wine built just now only has dosdevices from this point on.
-  stage_step="game drive"
-  map_game_drive
+  set_up_prefix_contents
   stage_step="prefix check"
   refuse_broken_prefix
+  if [ "${broken_rebuilt:-0}" = 1 ]; then
+    launch_step prepare
+    set_up_prefix_contents
+    stage_step="prefix check"
+    refuse_broken_prefix
+  fi
 fi
 low_power_notice
 launch_step prepare

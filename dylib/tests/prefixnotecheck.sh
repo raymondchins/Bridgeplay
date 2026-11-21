@@ -6,14 +6,22 @@ set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 [ -f "$SRC" ] || { echo "==> prefixnotecheck: $SRC not present, skipped"; exit 0; }
 
-body=$(sed -n '/^volume_type() {/,/^}/p;/^note_prefix_volume() {/,/^}/p;/^steam_libraries() {/,/^}/p;/^note_other_prefixes() {/,/^}/p;/^refuse_broken_prefix() {/,/^}/p;/^missing_core_dll() (/,/^)/p' "$SRC")
+body=$(sed -n '/^without_lock_fds() {/,/^}/p;/^volume_type() {/,/^}/p;/^note_prefix_volume() {/,/^}/p;/^steam_libraries() {/,/^}/p;/^note_other_prefixes() {/,/^}/p;/^refuse_broken_prefix() {/,/^}/p;/^missing_core_dll() (/,/^)/p' "$SRC")
 case "$body" in
-  *note_prefix_volume*refuse_broken_prefix*note_other_prefixes*missing_core_dll*) ;;
+  *without_lock_fds*note_prefix_volume*refuse_broken_prefix*note_other_prefixes*missing_core_dll*) ;;
   *) echo "FAIL: the prefix notes were not found in $SRC"; exit 1 ;;
+esac
+retry=$(awk '/^  set_up_prefix_contents$/{on=1} on{print; if(/^  fi$/ && prev ~ /refuse_broken_prefix/) exit} {prev=$0}' "$SRC")
+case "$retry" in
+  *set_up_prefix_contents*refuse_broken_prefix*broken_rebuilt*) ;;
+  *) echo "FAIL: the broken-prefix retry block was not found in $SRC"; exit 1 ;;
 esac
 body="$body"'
 notify_user() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }
-show_alert() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }'
+show_alert() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }
+show_rebuild_failure() { echo "rebuild failed" >> "$notes"; }
+# The player cancels unless the case sets rebuild=ok.
+rebuild_prefix() { printf "%s|%s|%s\n" "$1" "$2" "$4" >> "$notes"; [ "${rebuild:-}" = ok ] || exit 1; }'
 
 # a failed mktemp must not leave work at the current folder, which the trap deletes
 work=$(mktemp -d) && work=$(cd "$work" && pwd -P) || exit 1
@@ -95,15 +103,74 @@ pfx="$two/steamapps/compatdata/42/pfx"
 check_prefix() { # check_prefix FS [FREE_KB]: prints the exit status
 	: > "$work/log"
 	: > "$work/notes"
-	env log="$work/log" notes="$work/notes" body="$body" fs="$1" WINEPREFIX="$pfx" \
+	env log="$work/log" notes="$work/notes" body="$body" fs="$1" WINEPREFIX="$pfx" rebuild="${rebuild:-}" \
+		verb="${verb:-waitforexitandrun}" \
 		STEAM_COMPAT_DATA_PATH="$two/steamapps/compatdata/42" \
 		free="${2:-99999999}" sh -c 'eval "$body"; volume_type() { [ -z "$fs" ] || echo "$fs /Volumes/Drive"; }
 			df() { printf "Filesystem 1024-blocks Used Available\n/dev/disk3 1 1 %s\n" "$free"; }
-			refuse_broken_prefix' && echo 0 || echo $?
+			refuse_broken_prefix; echo "rebuilt=${broken_rebuilt:-0}" >> "$log"' && echo 0 || echo $?
 }
 is "no dosdevices stops the launch" 1 "$(check_prefix apfs)"
 has "it is logged" "Wine did not finish building it" "$work/log"
-has "the player is told to rebuild" "The game's prefix could not be set up|Wine did not finish building it. Rebuild the prefix" "$work/notes"
+has "the player is offered a rebuild" "The game's prefix could not be set up|Wine did not finish building it, so the game can't start. Rebuild the prefix now?" "$work/notes"
+has "the rebuild keeps a backup" "|keep-backup" "$work/notes"
+is "a rebuild lets the launch go on" 0 "$(rebuild=ok check_prefix apfs)"
+has "the rebuild is reported" "rebuilt=1" "$work/log"
+cat > "$work/wineserver" <<'SH'
+#!/bin/sh
+echo "server $1" >> "$notes"
+SH
+chmod +x "$work/wineserver"
+( WINESERVER="$work/wineserver" rebuild=ok check_prefix apfs >/dev/null )
+is "wineserver is stopped before offering a rebuild" "server -k
+server -w
+The game's prefix could not be set up|Wine did not finish building it, so the game can't start. Rebuild the prefix now? Bridgeplay will keep a backup of the old prefix.|keep-backup" "$(cat "$work/notes")"
+is "install helpers stop silently on a broken prefix" 1 "$(verb=run WINESERVER="$work/wineserver" rebuild=ok check_prefix apfs)"
+is "install helpers skip both the rebuild and its server shutdown" "" "$(cat "$work/notes")"
+
+retry_prefix() { # retry_prefix repair|broken: exercises the post-rebuild setup and recheck
+	: > "$work/log"
+	: > "$work/notes"
+	: > "$work/seq"
+	rm -rf "$pfx/dosdevices" "$pfx/drive_c"
+	mkdir -p "$pfx"
+	env log="$work/log" notes="$work/notes" seq="$work/seq" body="$body" retry="$retry" \
+		WINEPREFIX="$pfx" STEAM_COMPAT_DATA_PATH="$two/steamapps/compatdata/42" outcome="$1" \
+		sh -c 'eval "$body"
+			volume_type() { echo "apfs /Volumes/Drive"; }
+			df() {
+				free=99999999
+				[ "${np_rebuilt:-0}" = 0 ] || free=1024
+				printf "Filesystem 1024-blocks Used Available\n/dev/disk3 1 1 %s\n" "$free"
+			}
+			launch_step() { echo "$1" >> "$seq"; }
+			set_up_prefix_contents() { echo "setup" >> "$seq"; }
+			rebuild_prefix() {
+				echo "rebuild" >> "$notes"
+				np_rebuilt=1
+				if [ "$outcome" = repair ]; then
+					mkdir -p "$WINEPREFIX/drive_c/windows/system32" "$WINEPREFIX/dosdevices"
+					ln -s ../drive_c "$WINEPREFIX/dosdevices/c:"
+					for name in kernel32 mspatcha ucrtbase user32 version win32u ws2_32; do
+						: > "$WINEPREFIX/drive_c/windows/system32/$name.dll"
+					done
+				fi
+			}
+			eval "$retry"
+			echo "rebuilt=${broken_rebuilt:-unset}" >> "$log"' && echo 0 || echo $?
+}
+is "a repaired prefix reruns setup and launches" 0 "$(retry_prefix repair)"
+is "setup runs before and after the rebuild" "setup
+prepare
+setup" "$(cat "$work/seq")"
+has "the recheck clears broken_rebuilt" "rebuilt=0" "$work/log"
+is "a prefix still broken after rebuild stops" 1 "$(retry_prefix broken)"
+is "setup still ran twice before stopping" "setup
+prepare
+setup" "$(cat "$work/seq")"
+is "a still-broken prefix reports rebuild failure without offering again" "rebuild
+rebuild failed" "$(cat "$work/notes")"
+rm -rf "$pfx/dosdevices" "$pfx/drive_c"
 is "a full disk stops the launch" 1 "$(check_prefix apfs 1024)"
 has "a full disk is named" "The disk is too full for the game's prefix" "$work/notes"
 is "exFAT stops the launch" 1 "$(check_prefix exfat)"
@@ -119,7 +186,7 @@ for name in mspatcha ucrtbase user32 version win32u ws2_32; do
 	: > "$pfx/drive_c/windows/system32/$name.dll"
 done
 is "a finished prefix launches" 0 "$(check_prefix apfs)"
-is "a finished prefix says nothing" "" "$(cat "$work/notes" "$work/log")"
+is "a finished prefix says nothing" "rebuilt=0" "$(cat "$work/notes" "$work/log")"
 mkdir "$pfx/drive_c/windows/syswow64"
 for name in kernel32 mspatcha ucrtbase user32 version; do
 	: > "$pfx/drive_c/windows/syswow64/$name.dll"
