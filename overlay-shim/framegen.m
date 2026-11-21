@@ -215,8 +215,10 @@ static id<MTLBuffer> fg_diag_buffer[2];
 // Safety net: active with presents issued but none reaching the glass
 static double fg_display_check_time;
 static int fg_display_check_presented, fg_display_check_issued, fg_display_check_dropped;
-// Times the covering layer reached no display; after two, framegen stays off for the session.
-static int fg_display_failures;
+// Hand-backs in a row of a covering layer that never reached the display; after two,
+// framegen stays off for the session. fg_layer_presented_base is fg_total_presented when
+// the current covering layer was made.
+static int fg_display_failures, fg_layer_presented_base;
 static _Atomic int fg_game_presented; // the game's own presents that reached the display
 
 // Which engine the worker ended up with
@@ -1582,8 +1584,8 @@ static void fg_configure(CAMetalLayer *game, NSUInteger width, NSUInteger height
 	fg_rate_start = 0;
 	fg_rate_frames = 0;
 	fg_rate_interval = 0;
-	fg_display_failures = 0;
-	fg_retry_not_before = 0;
+	fg_layer_presented_base = atomic_load(&fg_total_presented);
+	fg_retry_not_before = fg_display_failures >= 2 ? INFINITY : 0;
 	atomic_store(&fg_mode, ok ? fg_mode_passthrough : fg_mode_idle);
 	os_unfair_lock_unlock(&fg_lock);
 
@@ -1854,9 +1856,10 @@ static void fg_display_check(double now)
 	if (still_active) {
 		fg_mode_store(fg_mode_passthrough);
 		fg_hist_valid = 0;
-		// A few seconds of pass-through before trying again; a second failure means this
-		// display never shows the covering layer, and retrying would black it out again.
-		fg_display_failures++;
+		// A few seconds of pass-through before trying again. A layer that has shown frames
+		// (its window was hidden, say) just retries; a second failure of one that never
+		// has means this display never shows it, and retrying would black it out again.
+		fg_display_failures = presented == fg_layer_presented_base ? fg_display_failures + 1 : 0;
 		fg_retry_not_before = fg_display_failures >= 2 ? INFINITY : now + 5.0;
 		fg_slow_since = 0;
 		fg_stat_skips[fg_skip_display_dropped]++;
@@ -1950,8 +1953,13 @@ static void fg_run_job(struct fg_job *job)
 	fg_refill(fg_layer, job->generation);
 	os_unfair_lock_unlock(&fg_lock);
 	double deadline = job->arrived + fmin(job->interval * 0.7, fg_refresh_interval * 1.5);
-	while (n <= count && n < 2 && fg_now() < deadline) {
-		id<CAMetalDrawable> late = fg_extra_drawable(job->generation, deadline);
+	// A lost real frame is a stutter, a lost generated one is not: the real copy waits longer.
+	double real_deadline = fmax(deadline, job->arrived + job->interval * 0.9);
+	while (n <= count && n < 2) {
+		double until = n == 0 ? real_deadline : deadline;
+		if (fg_now() >= until)
+			break;
+		id<CAMetalDrawable> late = fg_extra_drawable(job->generation, until);
 		if (!late)
 			break;
 		outputs[n++] = late;
