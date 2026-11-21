@@ -716,20 +716,19 @@ int main(int argc, char **argv)
 	int rc = inert_without_env(path);
 	if (rc != 0)
 		return rc;
-	// 2x on a 120 Hz display: the whole suite. 3x and adaptive at a simulated
-	// 40 fps on 120 Hz: two generated frames per real one.
-	if ((rc = spawn_child(argv[0], "1", "1", "120")) != 0)
-		return rc;
-	if ((rc = spawn_child(argv[0], "3", "3", "120")) != 0)
-		return rc;
-	if ((rc = spawn_child(argv[0], "adaptive", "adaptive", "120")) != 0)
-		return rc;
-	// A 10-bit PQ layer on the Metal 3 and the Metal 4 (signalDrawable) present paths
-	if ((rc = spawn_child(argv[0], "1", "metal3", "120")) != 0)
-		return rc;
-	if ((rc = spawn_child(argv[0], "1", "metal4", "120")) != 0)
-		return rc;
-	if ((rc = spawn_child(argv[0], "1", "slow-pool", "120")) != 0)
-		return rc;
-	return spawn_child(argv[0], "1", "irregular", "120");
+	// Each child runs even when an earlier one failed; the first failure is the result.
+	static const char *const children[][2] = {
+		// 2x on a 120 Hz display: the whole suite. 3x and adaptive at a simulated
+		// 40 fps on 120 Hz: two generated frames per real one.
+		{ "1", "1" }, { "3", "3" }, { "adaptive", "adaptive" },
+		// A 10-bit PQ layer on the Metal 3 and the Metal 4 (signalDrawable) present paths
+		{ "1", "metal3" }, { "1", "metal4" },
+		{ "1", "slow-pool" }, { "1", "irregular" },
+	};
+	for (size_t i = 0; i < sizeof(children) / sizeof(children[0]); i++) {
+		int child_rc = spawn_child(argv[0], children[i][0], children[i][1], "120");
+		if (child_rc != 0 && rc == 0)
+			rc = child_rc;
+	}
+	return rc;
 }
