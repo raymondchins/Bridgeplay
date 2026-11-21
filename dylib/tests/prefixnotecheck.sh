@@ -19,6 +19,7 @@ esac
 body="$body"'
 notify_user() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }
 show_alert() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }
+show_rebuild_failure() { echo "rebuild failed" >> "$notes"; }
 # The player cancels unless the case sets rebuild=ok.
 rebuild_prefix() { printf "%s|%s|%s\n" "$1" "$2" "$4" >> "$notes"; [ "${rebuild:-}" = ok ] || exit 1; }'
 
@@ -103,6 +104,7 @@ check_prefix() { # check_prefix FS [FREE_KB]: prints the exit status
 	: > "$work/log"
 	: > "$work/notes"
 	env log="$work/log" notes="$work/notes" body="$body" fs="$1" WINEPREFIX="$pfx" rebuild="${rebuild:-}" \
+		verb="${verb:-waitforexitandrun}" \
 		STEAM_COMPAT_DATA_PATH="$two/steamapps/compatdata/42" \
 		free="${2:-99999999}" sh -c 'eval "$body"; volume_type() { [ -z "$fs" ] || echo "$fs /Volumes/Drive"; }
 			df() { printf "Filesystem 1024-blocks Used Available\n/dev/disk3 1 1 %s\n" "$free"; }
@@ -123,6 +125,8 @@ chmod +x "$work/wineserver"
 is "wineserver is stopped before offering a rebuild" "server -k
 server -w
 The game's prefix could not be set up|Wine did not finish building it, so the game can't start. Rebuild the prefix now? Your save games will be preserved and not lost.|no-backup" "$(cat "$work/notes")"
+is "install helpers stop silently on a broken prefix" 1 "$(verb=run WINESERVER="$work/wineserver" rebuild=ok check_prefix apfs)"
+is "install helpers skip both the rebuild and its server shutdown" "" "$(cat "$work/notes")"
 
 retry_prefix() { # retry_prefix repair|broken: exercises the post-rebuild setup and recheck
 	: > "$work/log"
@@ -134,10 +138,15 @@ retry_prefix() { # retry_prefix repair|broken: exercises the post-rebuild setup 
 		WINEPREFIX="$pfx" STEAM_COMPAT_DATA_PATH="$two/steamapps/compatdata/42" outcome="$1" \
 		sh -c 'eval "$body"
 			volume_type() { echo "apfs /Volumes/Drive"; }
-			df() { printf "Filesystem 1024-blocks Used Available\n/dev/disk3 1 1 99999999\n"; }
+			df() {
+				free=99999999
+				[ "${np_rebuilt:-0}" = 0 ] || free=1024
+				printf "Filesystem 1024-blocks Used Available\n/dev/disk3 1 1 %s\n" "$free"
+			}
+			launch_step() { echo "$1" >> "$seq"; }
 			set_up_prefix_contents() { echo "setup" >> "$seq"; }
 			rebuild_prefix() {
-				[ "${np_rebuilt:-0}" != 1 ] || { echo "rebuild failed" >> "$notes"; exit 1; }
+				echo "rebuild" >> "$notes"
 				np_rebuilt=1
 				if [ "$outcome" = repair ]; then
 					mkdir -p "$WINEPREFIX/drive_c/windows/system32" "$WINEPREFIX/dosdevices"
@@ -152,12 +161,15 @@ retry_prefix() { # retry_prefix repair|broken: exercises the post-rebuild setup 
 }
 is "a repaired prefix reruns setup and launches" 0 "$(retry_prefix repair)"
 is "setup runs before and after the rebuild" "setup
+prepare
 setup" "$(cat "$work/seq")"
 has "the recheck clears broken_rebuilt" "rebuilt=0" "$work/log"
 is "a prefix still broken after rebuild stops" 1 "$(retry_prefix broken)"
 is "setup still ran twice before stopping" "setup
+prepare
 setup" "$(cat "$work/seq")"
-has "a still-broken prefix reports rebuild failure" "rebuild failed" "$work/notes"
+is "a still-broken prefix reports rebuild failure without offering again" "rebuild
+rebuild failed" "$(cat "$work/notes")"
 rm -rf "$pfx/dosdevices" "$pfx/drive_c"
 is "a full disk stops the launch" 1 "$(check_prefix apfs 1024)"
 has "a full disk is named" "The disk is too full for the game's prefix" "$work/notes"

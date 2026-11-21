@@ -271,7 +271,7 @@ printf 0 > "$data/status"
 (
 	STEAM_COMPAT_DATA_PATH=$data np_tool_dir=/tools/chosen np_build=b np_flavor=rosetta log="$data/log"
 	eval "$rebuild"
-	run_rebuild "$work/app with spaces/NotProtonApp" keep-backup
+	TMPDIR="$work" run_rebuild "$work/app with spaces/NotProtonApp" keep-backup
 ) &
 waiter=$!
 sleep 1
@@ -279,6 +279,43 @@ pkill -KILL -P "$waiter" 2>/dev/null || true
 kill -KILL "$waiter" 2>/dev/null || true
 sleep 4
 is "Stop kills the launch but not the rebuild under it" finished "$(cat "$data/finished" 2>/dev/null)"
+
+data=$(mktemp -d "$work/concurrent.XXXXXX")
+cat > "$work/concurrent-app" <<'SH'
+#!/bin/sh
+case "$6" in
+	keep-backup)
+		: > "$2/first-started"
+		for attempt in 1 2 3 4 5 6 7 8 9 10; do
+			[ ! -f "$2/second-returned" ] || exit 0
+			sleep 1
+		done
+		exit 2
+		;;
+	*) exit 1 ;;
+esac
+SH
+chmod +x "$work/concurrent-app"
+(
+	STEAM_COMPAT_DATA_PATH=$data np_tool_dir=/tools/chosen np_build=b np_flavor=rosetta log="$data/log"
+	eval "$rebuild"
+	run_rebuild "$work/concurrent-app" keep-backup
+) &
+first_waiter=$!
+for attempt in 1 2 3 4 5; do
+	[ ! -f "$data/first-started" ] || break
+	sleep 1
+done
+is "the first rebuild app started" yes "$([ -f "$data/first-started" ] && echo yes || echo no)"
+(
+	STEAM_COMPAT_DATA_PATH=$data np_tool_dir=/tools/chosen np_build=b np_flavor=rosetta log="$data/log"
+	eval "$rebuild"
+	run_rebuild "$work/concurrent-app" discard-backup
+) && status=0 || status=$?
+: > "$data/second-returned"
+is "a competing rebuild returns its own failure" 1 "$status"
+wait "$first_waiter" && status=0 || status=$?
+is "the first rebuild returns its own success" 0 "$status"
 
 echo "== crashes after a switch =="
 health_functions="$(extract prefix_machine)

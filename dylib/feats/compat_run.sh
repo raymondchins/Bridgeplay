@@ -1508,16 +1508,17 @@ exit_anticheat() {
 # app runs outside both: the inner subshell is reparented to launchd and the app calls
 # setsid. The script only waits for the exit status the subshell leaves behind.
 run_rebuild() {
-  rebuild_exit="$STEAM_COMPAT_DATA_PATH/notproton-rebuild-exit"
+  # A second launch can choose rebuild while this one is waiting for the app.
+  rebuild_wait=$(mktemp -d "${TMPDIR:-/tmp}/bridgeplay-rebuild.XXXXXX") || return 1
+  rebuild_exit="$rebuild_wait/status"
   rebuild_lock="$STEAM_COMPAT_DATA_PATH/.notproton-rebuild.lock"
-  rm -f "$rebuild_exit"
   (
     (
       env -i HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
         NOTPROTON_REBUILD_WINDOW=1 \
         "$1" --rebuild-prefix "$STEAM_COMPAT_DATA_PATH" "${np_tool_dir##*/}" \
         "$np_build" "$np_flavor" "$2" >> "$log" 2>&1 < /dev/null
-      echo "$?" > "$rebuild_exit.$$" && mv -f "$rebuild_exit.$$" "$rebuild_exit"
+      echo "$?" > "$rebuild_wait/pending" && mv -f "$rebuild_wait/pending" "$rebuild_exit"
     ) &
   )
   waited=0
@@ -1527,11 +1528,15 @@ run_rebuild() {
     # Nothing holds the lock once the app is gone. The grace covers its startup.
     if [ "$waited" -gt 30 ] && /usr/bin/lockf -k -s -t 0 "$rebuild_lock" true 2>/dev/null; then
       sleep 2
-      [ -f "$rebuild_exit" ] || return 1
+      if [ ! -f "$rebuild_exit" ]; then
+        rmdir "$rebuild_wait" 2>/dev/null || true
+        return 1
+      fi
     fi
   done
   read -r rebuild_status_code < "$rebuild_exit" || rebuild_status_code=1
   rm -f "$rebuild_exit"
+  rmdir "$rebuild_wait" 2>/dev/null || true
   [ "$rebuild_status_code" = 0 ]
 }
 
@@ -1850,10 +1855,15 @@ note_prefix_volume() {
 refuse_broken_prefix() {
   broken_rebuilt=0
   missing=$(missing_core_dll "$WINEPREFIX/dosdevices/c:/windows") || return 0
-  vol=$(volume_type "$STEAM_COMPAT_DATA_PATH") || vol=""
-  fs=${vol%% *}
   printf '=== the prefix has no C:\\windows\\%s, Wine did not finish building it ===\n' "$missing" \
     >> "$log" 2>&1 || true
+  [ "$verb" != run ] || exit 1
+  if [ "${np_rebuilt:-0}" = 1 ]; then
+    show_rebuild_failure
+    exit 1
+  fi
+  vol=$(volume_type "$STEAM_COMPAT_DATA_PATH") || vol=""
+  fs=${vol%% *}
   case "$fs" in exfat|msdos|ntfs)
     show_alert "This Steam library cannot hold the game's prefix" "It is formatted $fs, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive."
     exit 1
@@ -3145,6 +3155,7 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   stage_step="prefix check"
   refuse_broken_prefix
   if [ "${broken_rebuilt:-0}" = 1 ]; then
+    launch_step prepare
     set_up_prefix_contents
     stage_step="prefix check"
     refuse_broken_prefix
