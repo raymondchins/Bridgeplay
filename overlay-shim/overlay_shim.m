@@ -288,6 +288,7 @@ static int stage_claimed(Class seen, Class *held, const char *stage)
 
 // Frame generation (NOTPROTON_FRAMEGEN=1), one translation unit with the shim
 #include "framegen.m"
+#include "displaymode.m"
 #include "quitkey.m"
 #include "perfhud.m"
 #include "framelimit.m"
@@ -817,6 +818,7 @@ __attribute__((used, section("__DATA,__interpose"))) static const struct {
 	const void *replacement;
 	const void *original;
 } device_interposes[] = {
+	{ (const void *)shim_copy_modes, (const void *)CGDisplayCopyAllDisplayModes },
 	{ (const void *)shim_MTLCreateSystemDefaultDevice,
 	  (const void *)MTLCreateSystemDefaultDevice },
 	{ (const void *)shim_MTLCopyAllDevices, (const void *)MTLCopyAllDevices },
@@ -1120,6 +1122,7 @@ static void rebind_cursor_everywhere(void)
 // FEX specific stuff
 __attribute__((visibility("default"))) void np_overlay_shim_install(void)
 {
+	displaymode_install();
 	ensure_device_hooks(MTLCreateSystemDefaultDevice());
 	rebind_cursor_everywhere();
 	apply_overlay_interposes();

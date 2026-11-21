@@ -6,6 +6,7 @@
 #import <crt_externs.h>
 #import <dlfcn.h>
 #import <spawn.h>
+#import <stdatomic.h>
 #import <stdlib.h>
 #import <string.h>
 #import <sys/wait.h>
@@ -25,6 +26,22 @@ typedef int (*interpolate_opts_fn)(id, id, id, id, int, int, int, int, double, d
 static interpolate_opts_fn interpolate_opts;
 typedef void (*probe_display_fn)(int *, int *, double *, double *, int *);
 static probe_display_fn probe_display;
+static _Atomic int delayed_drawable;
+static id (*next_drawable)(id, SEL);
+
+static id slow_cover_drawable(id layer, SEL selector)
+{
+	static double released;
+	id drawable = next_drawable(layer, selector);
+	if (atomic_load(&delayed_drawable) && [(CALayer *)layer superlayer] != nil) {
+		double now = CACurrentMediaTime();
+		double wait = released + 1.0 / 60 - now;
+		if (wait > 0)
+			usleep((useconds_t)(wait * 1e6));
+		released = wait > 0 ? released + 1.0 / 60 : now;
+	}
+	return drawable;
+}
 
 static void *load_shim(const char *path, probe_fn *probe, interpolate_fn *interpolate)
 {
@@ -438,19 +455,19 @@ static int live_path(probe_fn probe, id<MTLDevice> device, const char *label, do
 // same layer on the Metal 3 present family when metal4 is 0. The frames are a
 // mid-grey clear, so a black copy or a black generated frame shows as luma 0.
 static int pq_path_layer(probe_fn probe, id<MTLDevice> device, int metal4, CAMetalLayer *layer,
-                         const char *label);
+                         const char *label, int slow);
 
-static int pq_path(probe_fn probe, id<MTLDevice> device, int metal4)
+static int pq_path(probe_fn probe, id<MTLDevice> device, int metal4, int slow)
 {
 	CAMetalLayer *layer = [CAMetalLayer layer];
 	layer.device = device;
 	layer.pixelFormat = MTLPixelFormatRGB10A2Unorm;
 	layer.drawableSize = CGSizeMake(1024, 768);
-	return pq_path_layer(probe, device, metal4, layer, metal4 ? "pq metal4" : "pq metal3");
+	return pq_path_layer(probe, device, metal4, layer, metal4 ? "pq metal4" : "pq metal3", slow);
 }
 
 static int pq_path_layer(probe_fn probe, id<MTLDevice> device, int metal4, CAMetalLayer *layer,
-                         const char *label)
+                         const char *label, int slow)
 {
 	// CoreGraphics is not linked by the test flags; QuartzCore has it loaded
 	CGColorSpaceRef (*create_space)(CFStringRef) = dlsym(RTLD_DEFAULT, "CGColorSpaceCreateWithName");
@@ -477,7 +494,20 @@ static int pq_path_layer(probe_fn probe, id<MTLDevice> device, int metal4, CAMet
 
 	int enabled = 0, hooks = 0, mode = 0, objects = 0, generated = 0, copies = 0;
 	double start = CACurrentMediaTime();
-	for (int i = 0; i < 180; i++) {
+	int changes = 0, before_real = 0, pressure_copies = 0;
+	for (int i = 0; i < (slow ? 420 : 180); i++) {
+		if (slow && (i == 180 || i == 300)) {
+			probe(NULL, NULL, &mode, NULL, NULL, &copies);
+			CHECK(mode == 2, "slow pool: mode %d at frame %d", mode, i);
+			if (i == 180)
+				probe_display(NULL, NULL, NULL, NULL, &changes);
+			else {
+				pressure_copies = copies - before_real;
+				CHECK(pressure_copies >= 95, "slow pool: only %d real frames", pressure_copies);
+			}
+			before_real = copies;
+			atomic_store(&delayed_drawable, i == 180);
+		}
 		@autoreleasepool {
 			id<CAMetalDrawable> drawable = [layer nextDrawable];
 			CHECK(drawable != nil, "%s: layer vends no drawable at frame %d", label, i);
@@ -525,6 +555,14 @@ static int pq_path_layer(probe_fn probe, id<MTLDevice> device, int metal4, CAMet
 	int presented = -1, dropped = -1;
 	double luma_real = -1, luma_generated = -1;
 	probe_display(&presented, &dropped, &luma_real, &luma_generated, NULL);
+	if (slow) {
+		int after = 0;
+		probe_display(NULL, NULL, NULL, NULL, &after);
+		CHECK(after == changes && copies - before_real >= 95,
+		      "slow pool: %d mode transitions, %d real copies after recovery", after - changes, copies - before_real);
+		printf("slow pool: %d real copies under pressure, %d after recovery, %d mode transitions\n",
+		       pressure_copies, copies - before_real, after - changes);
+	}
 	printf("%-14s mode=%d copies=%d generated=%d presented=%d dropped=%d luma real=%.3f generated=%.3f\n",
 	       label, mode, copies, generated, presented, dropped, luma_real, luma_generated);
 	CHECK(mode == 2, "%s: framegen mode %d after 180 frames at 60 fps on 120 Hz, expected active", label,
@@ -588,9 +626,14 @@ static int child_with_env(const char *path, const char *which)
 	probe_display = (probe_display_fn)dlsym(dlopen(path, RTLD_NOW | RTLD_LOCAL), "np_framegen_probe_display");
 	CHECK(probe_display != NULL, "%s exports no np_framegen_probe_display", path);
 	if (strcmp(which, "metal4") == 0)
-		return pq_path(probe, device, 1);
+		return pq_path(probe, device, 1, 0);
+	if (strcmp(which, "slow-pool") == 0) {
+		Method m = class_getInstanceMethod([CAMetalLayer class], @selector(nextDrawable));
+		next_drawable = (void *)method_setImplementation(m, (IMP)slow_cover_drawable);
+		return pq_path(probe, device, 0, 1);
+	}
 	if (strcmp(which, "metal3") == 0)
-		return pq_path(probe, device, 0);
+		return pq_path(probe, device, 0, 0);
 	if (strcmp(which, "irregular") == 0)
 		return irregular_cadence(probe, device);
 	if (strcmp(which, "3") == 0)
@@ -673,18 +716,22 @@ int main(int argc, char **argv)
 	int rc = inert_without_env(path);
 	if (rc != 0)
 		return rc;
-	// 2x on a 120 Hz display: the whole suite. 3x and adaptive at a simulated
-	// 40 fps on 120 Hz: two generated frames per real one.
-	if ((rc = spawn_child(argv[0], "1", "1", "120")) != 0)
-		return rc;
-	if ((rc = spawn_child(argv[0], "3", "3", "120")) != 0)
-		return rc;
-	if ((rc = spawn_child(argv[0], "adaptive", "adaptive", "120")) != 0)
-		return rc;
-	// A 10-bit PQ layer on the Metal 3 and the Metal 4 (signalDrawable) present paths
-	if ((rc = spawn_child(argv[0], "1", "metal3", "120")) != 0)
-		return rc;
-	if ((rc = spawn_child(argv[0], "1", "metal4", "120")) != 0)
-		return rc;
-	return spawn_child(argv[0], "1", "irregular", "120");
+	// Each child runs even when an earlier one failed. A failure wins over a skip (3).
+	static const char *const children[][2] = {
+		// 2x on a 120 Hz display: the whole suite. 3x and adaptive at a simulated
+		// 40 fps on 120 Hz: two generated frames per real one.
+		{ "1", "1" }, { "3", "3" }, { "adaptive", "adaptive" },
+		// A 10-bit PQ layer on the Metal 3 and the Metal 4 (signalDrawable) present paths
+		{ "1", "metal3" }, { "1", "metal4" },
+		{ "1", "slow-pool" }, { "1", "irregular" },
+	};
+	int failed = 0;
+	for (size_t i = 0; i < sizeof(children) / sizeof(children[0]); i++) {
+		int child_rc = spawn_child(argv[0], children[i][0], children[i][1], "120");
+		if (child_rc == NP_SKIP)
+			rc = NP_SKIP;
+		else if (child_rc != 0 && failed == 0)
+			failed = child_rc;
+	}
+	return failed != 0 ? failed : rc;
 }
