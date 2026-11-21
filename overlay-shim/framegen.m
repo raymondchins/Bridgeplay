@@ -215,11 +215,12 @@ static id<MTLBuffer> fg_diag_buffer[2];
 // Safety net: active with presents issued but none reaching the glass
 static double fg_display_check_time;
 static int fg_display_check_presented, fg_display_check_issued, fg_display_check_dropped;
-// Hand-backs in a row of a covering layer that never reached the display; after two,
-// framegen stays off for the session. fg_layer_presented_base is fg_total_presented when
-// the current covering layer was made.
-static int fg_display_failures, fg_layer_presented_base;
+// Hand-backs while the game's own layer was on screen, with no covering-layer frame shown
+// in between; after two, framegen stays off for the session. fg_failure_presented is
+// fg_total_presented at the last hand-back or at configure.
+static int fg_display_failures, fg_failure_presented;
 static _Atomic int fg_game_presented; // the game's own presents that reached the display
+static _Atomic int fg_game_last_shown; // whether the game's last tracked present did
 
 // Which engine the worker ended up with
 static int fg_engine_kind; // 0 none, 1 own, 2 metalfx
@@ -1511,6 +1512,13 @@ static void fg_refill(CAMetalLayer *layer, unsigned generation)
 	}
 }
 
+// After a generation change, under fg_lock: a worker waiting for a drawable stops waiting.
+static void fg_wake_drawable_waiter(void)
+{
+	if (fg_drawable_waiter)
+		dispatch_semaphore_signal(fg_drawable_waiter);
+}
+
 // A late drawable can arrive while the game GPU is still rendering this pair.
 static id<CAMetalDrawable> fg_extra_drawable(unsigned generation, double deadline)
 {
@@ -1584,7 +1592,7 @@ static void fg_configure(CAMetalLayer *game, NSUInteger width, NSUInteger height
 	fg_rate_start = 0;
 	fg_rate_frames = 0;
 	fg_rate_interval = 0;
-	fg_layer_presented_base = atomic_load(&fg_total_presented);
+	fg_failure_presented = atomic_load(&fg_total_presented);
 	fg_retry_not_before = fg_display_failures >= 2 ? INFINITY : 0;
 	atomic_store(&fg_mode, ok ? fg_mode_passthrough : fg_mode_idle);
 	os_unfair_lock_unlock(&fg_lock);
@@ -1661,10 +1669,10 @@ static void fg_present_output(id<MTLCommandBuffer> buffer, id<CAMetalDrawable> d
 // the safety net must not fire there.
 static void fg_track_game_present(id drawable)
 {
-	if (atomic_load(&fg_game_presented) > 0)
-		return;
 	[(id<CAMetalDrawable>)drawable addPresentedHandler:^(id<MTLDrawable> done) {
-		if (done.presentedTime > 0)
+		int shown = done.presentedTime > 0;
+		atomic_store(&fg_game_last_shown, shown);
+		if (shown)
 			atomic_fetch_add(&fg_game_presented, 1);
 	}];
 }
@@ -1856,10 +1864,15 @@ static void fg_display_check(double now)
 	if (still_active) {
 		fg_mode_store(fg_mode_passthrough);
 		fg_hist_valid = 0;
-		// A few seconds of pass-through before trying again. A layer that has shown frames
-		// (its window was hidden, say) just retries; a second failure of one that never
-		// has means this display never shows it, and retrying would black it out again.
-		fg_display_failures = presented == fg_layer_presented_base ? fg_display_failures + 1 : 0;
+		// A few seconds of pass-through before trying again. Only a failure while the game's
+		// own frames were on screen counts (not a hidden window); two in a row with nothing
+		// of ours shown between mean this display never shows the covering layer, and
+		// retrying would black it out again.
+		if (presented != fg_failure_presented)
+			fg_display_failures = 0;
+		fg_failure_presented = presented;
+		if (atomic_load(&fg_game_last_shown))
+			fg_display_failures++;
 		fg_retry_not_before = fg_display_failures >= 2 ? INFINITY : now + 5.0;
 		fg_slow_since = 0;
 		fg_stat_skips[fg_skip_display_dropped]++;
@@ -2306,6 +2319,7 @@ static int fg_decide(id drawable, int *interpolate)
 		}
 		int was_active = atomic_load(&fg_mode) == fg_mode_active;
 		atomic_fetch_add(&fg_generation, 1);
+		fg_wake_drawable_waiter();
 		atomic_store(&fg_mode, fg_mode_idle);
 		fg_hist_valid = 0;
 		if (!fg_adopt(layer, texture)) {
@@ -2363,6 +2377,7 @@ static int fg_decide(id drawable, int *interpolate)
 			return 0;
 		}
 		unsigned generation = atomic_fetch_add(&fg_generation, 1) + 1;
+		fg_wake_drawable_waiter();
 		NSUInteger width = texture.width, height = texture.height, format = texture.pixelFormat;
 		fg_mode_store(fg_mode_configuring);
 		fg_hist_valid = 0;
