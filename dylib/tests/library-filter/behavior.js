@@ -21,6 +21,21 @@ function grab(src, re, what) {
 const english = () => { globalThis.document = { documentElement: { lang: 'en' } }; };
 
 function filter(src) {
+  const viteHead = /case"notprotonWindows":return ([\w$]+)\(\)&&\(window\.__NOTPROTON_NATIVE_PLATFORM__\.windows\.has\(([\w$]+)\.appid\)/.exec(src);
+  if (viteHead) {
+    const apple = grab(src.slice(viteHead.index), /;case 5:return /, 'Vite Apple case');
+    const end = src.indexOf('.is_invalid_os_type;', viteHead.index + apple.index + apple[0].length);
+    const stmt = src.slice(viteHead.index, end + '.is_invalid_os_type;'.length);
+    const [, macFn, app] = viteHead;
+    const tail = grab(stmt, /:([\w$]+)\(\)&&!([\w$]+)\(\)\?([\w$]+)\(\w+\):([\w$]+)\(\)\?!0:/, 'Vite platform calls');
+    const [, ciFn, mpFn, devFn, tdFn] = tail;
+    const run = new Function('window', macFn, ciFn, mpFn, tdFn, devFn, app, '__k',
+                             `switch(__k){${stmt}}`);
+    return {
+      vite: true,
+      run: (key, win, os, a) => run(win, os.Pr, os.CI, os.mP, os.td, () => 'device', a, key === 'Apple' ? 5 : key),
+    };
+  }
   const head = grab(src, /case"notprotonWindows":return\(0,([\w$]+)\.Pr\)\(\)&&\(window\.__NOTPROTON_NATIVE_PLATFORM__\.windows\.has\(([\w$]+)\.appid\)/,
                     'filter fix');
   const apple = grab(src.slice(head.index), /;case ([\w$]+)\.([\w$]+):return /, 'Apple case');
@@ -31,7 +46,10 @@ function filter(src) {
   const device = /\.mP\)\(\)\?([\w$]+)\(/.exec(stmt);
   const run = new Function('window', group, platform, app, device ? device[1] : '__device', '__k',
                            `switch(__k){${stmt}}`);
-  return (key, win, os, a) => run(win, { [option]: 'Apple' }, os, a, () => 'device', key);
+  return {
+    vite: false,
+    run: (key, win, os, a) => run(win, { [option]: 'Apple' }, os, a, () => 'device', key),
+  };
 }
 
 function lists(src) {
@@ -44,7 +62,7 @@ function lists(src) {
 function check(file, name, t) {
   const src = fs.readFileSync(file, 'latin1');
   const win = lists(src);
-  const run = filter(src);
+  const { vite, run } = filter(src);
   const mac = { Pr: () => true, td: () => false, CI: () => false, mP: () => false };
   const windows = { Pr: () => false, td: () => true, CI: () => false, mP: () => false };
   const app = (appid, { old = false, available = true } = {}) =>
@@ -102,31 +120,39 @@ function check(file, name, t) {
 
   grab(src, /filterGroups:\[([\w$]+)\(!0,([\w$]+)&&\2\.filterGroups\[0\]\),\1\(!1,\2&&\2\.filterGroups\[1\]\)/,
        "Steam's default intersection for the state group");
-  const checks = [...src.matchAll(/if\(!(.+?)\|\|!([\w$]+)\(([\w$]+)\[([\w$]+)\.sc\],/g)];
+  const checks = vite
+    ? [...src.matchAll(/if\(!(.+?)\|\|!([\w$]+)\(([\w$]+)\[2\],/g)]
+    : [...src.matchAll(/if\(!(.+?)\|\|!([\w$]+)\(([\w$]+)\[([\w$]+)\.sc\],/g)];
   t(checks.length === 2, 'both matching paths include the platform check');
+  const appleOpt = vite ? 5 : 'Apple';
   for (const [, expr, match, groups, enums] of checks) {
     const [, predicate, argument] = grab(expr, /,([\w$]+)\(([\w$]+)\)\)\)*$/, 'platform predicate');
-    const evaluate = new Function(match, groups, enums, predicate, argument, `return ${expr}`);
+    const evaluate = vite
+      ? new Function(match, groups, predicate, argument, `return ${expr}`)
+      : new Function(match, groups, enums, predicate, argument, `return ${expr}`);
     const matches = (g, p) => !g.rgOptions.length || (g.bAcceptUnion ? g.rgOptions.some(p) : g.rgOptions.every(p));
     const test = (options, windowsOn, a, union = false) => {
       const state = [{ rgOptions: [], bAcceptUnion: true }, { rgOptions: options, bAcceptUnion: union }];
       const before = JSON.stringify(state);
-      const result = evaluate.call({ m_filterSpec: { notprotonWindows: windowsOn } }, matches, state,
-        { W6: 1, Pu: 'Apple' }, a => key => key === 'installed' ? !!a.installed : run(key, win, mac, a), a);
+      const pred = a => key => key === 'installed' ? !!a.installed : run(key === 5 ? 'Apple' : key, win, mac, a);
+      const result = vite
+        ? evaluate.call({ m_filterSpec: { notprotonWindows: windowsOn } }, matches, state, pred, a)
+        : evaluate.call({ m_filterSpec: { notprotonWindows: windowsOn } }, matches, state,
+                        { W6: 1, Pu: 'Apple' }, pred, a);
       t(JSON.stringify(state) === before, 'matching leaves the saved filter unchanged');
       return result;
     };
     for (const id of [1, 2, 4]) {
       t(test([], false, app(id)), 'neither platform button filters games');
-      t(test(['Apple'], false, app(id)) === (id !== 2), 'Apple alone keeps its platform check');
+      t(test([appleOpt], false, app(id)) === (id !== 2), 'Apple alone keeps its platform check');
       t(test([], true, app(id)) === (id === 2), 'Windows alone keeps its platform check');
-      t(test(['Apple'], true, app(id)), 'both buttons show both platforms with the default intersection');
-      t(test(['Apple'], true, app(id), true), 'both buttons show both platforms with a union');
-      t(!test(['Apple', 'installed'], true, app(id)) &&
-        test(['Apple', 'installed'], true, { ...app(id), installed: true }),
+      t(test([appleOpt], true, app(id)), 'both buttons show both platforms with the default intersection');
+      t(test([appleOpt], true, app(id), true), 'both buttons show both platforms with a union');
+      t(!test([appleOpt, 'installed'], true, app(id)) &&
+        test([appleOpt, 'installed'], true, { ...app(id), installed: true }),
         'installed stays an intersection with the combined platforms');
     }
-    t(!test(['Apple'], true, app(3, { available: false })), 'neither platform admits an unavailable unknown game');
+    t(!test([appleOpt], true, app(3, { available: false })), 'neither platform admits an unavailable unknown game');
     t(test(['installed'], true, { ...app(1), installed: true }, true), 'other union options still admit games');
   }
 
@@ -154,6 +180,40 @@ function check(file, name, t) {
   t(new Function(`return ${summary[2]}`)() === 'Runs on Windows, no Mac OS version',
     'the filter summary names the Windows filter');
 
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if (vite) {
+    const button = grab(src, /children:\[(([\w$]+)&&!([\w$]+)&&\(0,([\w$]+)\.jsxs\)\(([\w$]+),\{.*?\}\)\]\}\)\]\}\)),\2&&\(0,\4\.jsxs\)\(\5,\{direction:`top`,nDelayShowMS:240,toolTipContent:[\w$]+\(\3\?`#GameList_View_Platform_Linux`:`#GameList_View_Platform_Apple`\)/,
+                        'Vite Windows button before Apple');
+    const [, expr, shown, linux, rt, tip] = button;
+    const cls = grab(expr, /className:([\w$]+)\(`([\w$-]+)`,([\w$]+)&&`([\w$-]+)`,npWindows&&`([\w$-]+)`\)/, 'Vite classes');
+    const [, clsFn, boxCls, disabledVar, offCls, onCls] = cls;
+    const draw = new Function(shown, linux, rt, tip, clsFn, disabledVar, 'npWindows', 'npStore',
+                              `return ${expr}`);
+    const press = ({ visible = true, onLinux = false, disabled = false, active = false } = {}) => {
+      const calls = [];
+      const node = draw(visible, onLinux, { jsx: (type, p) => ({ type, p }), jsxs: (type, p) => ({ type, p }) },
+                        'Tooltip', (...c) => c.filter(Boolean).join(' '), disabled, active,
+                        { SelectCollectionsAppFilterOption: (...a) => calls.push(a) });
+      if (node) node.p.onClick();
+      return { node, calls };
+    };
+    const lit = press({ active: true });
+    t(same(press().calls, [['notprotonWindows', null, true]]) && same(lit.calls, [['notprotonWindows', null, false]]),
+      'a click toggles the Windows button');
+    t(lit.node.p.className === `${boxCls} ${onCls}` && press().node.p.className === boxCls &&
+      press({ disabled: true }).node.p.className === `${boxCls} ${offCls}` &&
+      lit.node.p.children[1].type === 'svg' && lit.node.p.children[1].p.children.length === 4 &&
+      lit.node.p.nDelayShowMS === 240 &&
+      lit.node.p.children[0].type === 'style' &&
+      lit.node.p.children[0].p.children === `.${boxCls} .SVGIcon_WindowsLogo{width:13px;height:13px}.${boxCls} .SVGIcon_WindowsLogo rect{fill:inherit}` &&
+      lit.node.p.toolTipContent === 'Show only games that run on Windows and do not have a macOS version',
+      "the Windows button looks and times like Steam's Apple button");
+    t(press({ disabled: true }).calls.length === 0, 'a disabled Windows button does nothing');
+    t(!press({ onLinux: true }).node && !press({ visible: false }).node,
+      'no Windows button on Linux or when Steam hides the Apple one');
+    return;
+  }
+
   const button = grab(src, /children:\[(([\w$]+)&&!([\w$]+)&&([\w$]+)\.Xz0&&\(0,([\w$]+)\.jsxs\)\(([\w$]+)\.he,\{.*?\(0,\5\.jsx\)\(\4\.Xz0,\{\}\)\]\}\)),\2&&\(0,\5\.jsxs\)\(\6\.he,\{direction:"top",nDelayShowMS:240,toolTipContent:\3\?(?:\(0,[\w$]+\.we\)\()?"#GameList_View_Platform_Linux"/,
                       'Windows button before Apple');
   const [, expr, shown, linux, icons, rt, tip] = button;
@@ -169,7 +229,6 @@ function check(file, name, t) {
     if (node) node.p.onClick();
     return { node, calls };
   };
-  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const lit = press({ active: true });
   t(same(press().calls, [['notprotonWindows', null, true]]) && same(lit.calls, [['notprotonWindows', null, false]]),
     'a click toggles the Windows button');
