@@ -37,10 +37,33 @@ static bool keep_display_refresh(CGDisplayModeRef current, CGDisplayModeRef requ
 	return same;
 }
 
+// Each display's refresh rate before Wine first set a mode on it. Main thread only.
+static struct {
+	CGDirectDisplayID display;
+	double hz;
+} desktop_rates[16];
+static int desktop_rate_count;
+
+static double desktop_rate(CGDirectDisplayID display, CGDisplayModeRef current)
+{
+	for (int i = 0; i < desktop_rate_count; i++)
+		if (desktop_rates[i].display == display)
+			return desktop_rates[i].hz;
+	double hz = current ? CGDisplayModeGetRefreshRate(current) : -1;
+	if (desktop_rate_count < 16) {
+		desktop_rates[desktop_rate_count].display = display;
+		desktop_rates[desktop_rate_count++].hz = hz;
+	}
+	return hz;
+}
+
 static BOOL shim_set_mode(id controller, SEL cmd, CGDisplayModeRef requested, CGDirectDisplayID display)
 {
 	CGDisplayModeRef current = CGDisplayCopyDisplayMode(display);
-	bool keep = keep_display_refresh(current, requested);
+	// Only while the display still runs at the desktop's rate: once the game has raised it,
+	// a 60 Hz request may be Wine restoring the desktop's own mode.
+	bool keep = current && CGDisplayModeGetRefreshRate(current) == desktop_rate(display, current) &&
+	            keep_display_refresh(current, requested);
 	BOOL result = wine_set_mode(controller, cmd, keep ? current : requested, display);
 	if (keep && result)
 		shim_log("overlay_shim display %u: kept current mode (%.2f Hz, requested %.2f Hz)\n", display,
