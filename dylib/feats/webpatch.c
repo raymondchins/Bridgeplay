@@ -991,10 +991,12 @@ static const np_gate_t g_fixes[] = {
       NP_C3 ".td)()?!0:" NP_C5 ".is_available_on_current_platform&&!" NP_C5 ".is_invalid_os_type;", 1, 0 },
     // The Vite build inlines the enum and calls CI, mP and td by bare names; Pr is bound.
     { "case 5:return " NP_C1 "()&&!" NP_C2 "()?" NP_C4 "(" NP_C5 "):" NP_C3 "()?!0:" NP_C5
-      ".is_available_on_current_platform&&!" NP_C5 ".is_invalid_os_type;",
+      ".is_available_on_current_platform&&!" NP_C5 ".is_invalid_os_type;"
+      "case 6:return " NP_C6 ".BIsAppPrivate(" NP_C5 ".appid);",
       NP_WINDOWS_ONLY_CASE_CALL(NP_B_MACOS "()", NP_C5) "case 5:return "
       NP_MAC_CHECK_CALL(NP_B_MACOS "()", NP_C5) NP_C1 "()&&!" NP_C2 "()?" NP_C4 "(" NP_C5 "):"
-      NP_C3 "()?!0:" NP_C5 ".is_available_on_current_platform&&!" NP_C5 ".is_invalid_os_type;", 1, 0 },
+      NP_C3 "()?!0:" NP_C5 ".is_available_on_current_platform&&!" NP_C5 ".is_invalid_os_type;"
+      "case 6:return " NP_C6 ".BIsAppPrivate(" NP_C5 ".appid);", 1, 0 },
 };
 #define NP_FIX_COUNT (sizeof(g_fixes) / sizeof(g_fixes[0]))
 
@@ -1067,26 +1069,25 @@ static const np_gate_t g_library_filters[] = {
     NP_C1 "&&(0," NP_C2 ".jsxs)(" NP_C3 ",{direction:`top`,nDelayShowMS:240," \
     "toolTipContent:" NP_C4 "(" NP_C5 "?`#GameList_View_Platform_Linux`:`#GameList_View_Platform_Apple`)," \
     "className:" NP_C6 "(`" NP_C7 "`," NP_C8 "&&`" NP_C9 "`," NP_C10 "&&`" NP_C11 "`)," \
-    "onClick:()=>" NP_C8 "||"
-// The Vite library chunk never imports WindowsLogo, so the button draws the four-pane mark inline.
+    "onClick:()=>" NP_C8 "||" NP_C12 "(1,5,!" NP_C10 "),"
+// The Vite library chunk never imports WindowsLogo.
+#define NP_WINDOWS_PANE(x, y) \
+    "(0," NP_C2 ".jsx)(\"rect\",{x:" x ",y:" y ",width:7,height:7,fill:\"inherit\"})"
 #define NP_WINDOWS_BUTTON_VITE \
     NP_C1 "&&!" NP_C5 "&&(0," NP_C2 ".jsxs)(" NP_C3 ",{direction:\"top\",nDelayShowMS:240," \
     "toolTipContent:" NP_LIBRARY_WINDOWS_HINT ",className:" NP_C6 "(`" NP_C7 "`," NP_C8 "&&`" NP_C9 "`," \
     "npWindows&&`" NP_C11 "`),onClick:()=>" NP_C8 \
     "||npStore.SelectCollectionsAppFilterOption(\"notprotonWindows\",null,!npWindows)," \
-    "children:[(0," NP_C2 ".jsx)(\"style\",{children:\".\"+`" NP_C7 \
-    "`+\" .SVGIcon_WindowsLogo{width:13px;height:13px}.\"+`" NP_C7 \
-    "`+\" .SVGIcon_WindowsLogo rect{fill:inherit}\"}),(0," NP_C2 ".jsxs)(\"svg\"," \
-    "{className:\"SVGIcon_Button SVGIcon_WindowsLogo\",viewBox:\"0 0 16 16\",children:[" \
-    "(0," NP_C2 ".jsx)(\"rect\",{x:0,y:0,width:7,height:7})," \
-    "(0," NP_C2 ".jsx)(\"rect\",{x:9,y:0,width:7,height:7})," \
-    "(0," NP_C2 ".jsx)(\"rect\",{x:0,y:9,width:7,height:7})," \
-    "(0," NP_C2 ".jsx)(\"rect\",{x:9,y:9,width:7,height:7})]})]})"
+    "children:(0," NP_C2 ".jsxs)(\"svg\",{className:\"SVGIcon_Button SVGIcon_WindowsLogo\"," \
+    "style:{width:13,height:13},viewBox:\"0 0 16 16\",\"aria-hidden\":true,children:[" \
+    NP_WINDOWS_PANE("0", "0") "," NP_WINDOWS_PANE("9", "0") "," \
+    NP_WINDOWS_PANE("0", "9") "," NP_WINDOWS_PANE("9", "9") "]})})"
 
 static const np_gate_t g_library_filters_vite[] = {
     // Library list and search (Vite inlines filter group 1/2 and platform option 5)
-    { "if(!" NP_C1 "(" NP_C2 "[1]," NP_C3 "(" NP_C4 "))||!" NP_C1 "(" NP_C2 "[2],",
-      "if(!(this.m_filterSpec.notprotonWindows?((npGroup,npCheck)=>{"
+    { "let " NP_C2 "=this.m_filterSpec.filterGroups;if(!" NP_C1 "(" NP_C2 "[1],"
+      NP_C3 "(" NP_C4 "))||!" NP_C1 "(" NP_C2 "[2],",
+      "let " NP_C2 "=this.m_filterSpec.filterGroups;if(!(this.m_filterSpec.notprotonWindows?((npGroup,npCheck)=>{"
       "const npApple=npGroup.rgOptions.includes(5);return " NP_C1 "({...npGroup,"
       "rgOptions:[...npGroup.rgOptions.filter(npOption=>npOption!==5),\"notprotonWindows\"]},"
       "npOption=>npOption===\"notprotonWindows\"?npCheck(npOption)||npApple&&npCheck(5):npCheck(npOption))"
@@ -1109,17 +1110,23 @@ static const np_gate_t g_library_filters_vite[] = {
       NP_C1 ",\"notprotonWindows\"]);" NP_C1 ".length>0&&" NP_C2 ".push(" NP_C1 ".map(" NP_C3 "=>{if(" NP_C3
       "===\"notprotonWindows\")return " NP_LIBRARY_WINDOWS_SUMMARY ";if(" NP_C3 "==5){", 1, 0 },
     // Library toolbar
-    { "," NP_C1 "=" NP_C2 ".currentAppFilter.BIsSelected(1,5);return(0,"
+    { "," NP_C5 "=" NP_C6 "()," NP_C1 "=" NP_C2 ".currentAppFilter.BIsSelected(1,5);return(0,"
       NP_C3 ".jsxs)(`div`,{className:" NP_C4 ",",
-      "," NP_C1 "=" NP_C2 ".currentAppFilter.BIsSelected(1,5),npStore=" NP_C2 ","
+      "," NP_C5 "=" NP_C6 "()," NP_C1 "=" NP_C2 ".currentAppFilter.BIsSelected(1,5),npStore=" NP_C2 ","
       "npWindows=!!" NP_C2 ".currentAppFilter.m_filterSpec.notprotonWindows;return(0,"
       NP_C3 ".jsxs)(`div`,{className:" NP_C4 ",", 1, 0 },
     { "children:[" NP_PLATFORM_BUTTON_VITE,
       "children:[" NP_WINDOWS_BUTTON_VITE "," NP_PLATFORM_BUTTON_VITE, 1, 0 },
 };
 #define NP_LIBRARY_FILTER_VITE_COUNT (sizeof(g_library_filters_vite) / sizeof(g_library_filters_vite[0]))
+#define NP_VITE_LIBRARY_TOOLBAR (NP_LIBRARY_FILTER_VITE_COUNT - 2)
+#define NP_VITE_LIBRARY_BUTTON (NP_LIBRARY_FILTER_VITE_COUNT - 1)
 #define NP_LIBRARY_FILTER_MAX (NP_LIBRARY_FILTER_COUNT > NP_LIBRARY_FILTER_VITE_COUNT \
     ? NP_LIBRARY_FILTER_COUNT : NP_LIBRARY_FILTER_VITE_COUNT)
+
+static int same_capture(np_cap_t a, np_cap_t b) {
+    return a.at && b.at && a.len == b.len && memcmp(a.at, b.at, a.len) == 0;
+}
 
 typedef struct {
     const char     *name;
@@ -1502,13 +1509,19 @@ char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
     int    fix_on[NP_FIX_COUNT];
     size_t fix_live = 0;
     int    need_binds = shape != NULL;
+    size_t mac_variants = 0;
     for (size_t f = 0; f < NP_FIX_COUNT; f++) {
         size_t n = count_matches(s, src_len, g_fixes[f].find);
         fix_on[f] = n == (size_t)g_fixes[f].expect;
+        if (NP_IS_MAC_FILTER_FIX(f) && n) mac_variants++;
         need_binds |= fix_on[f] && uses_binds(g_fixes[f].replace);
         if (!fix_on[f] && n)
             NP_WARN("webpatch: fix %zu expected %d occurrence(s), found %zu; "
                     "leaving it alone", f, g_fixes[f].expect, n);
+    }
+    if (mac_variants > 1) {
+        NP_WARN("webpatch: multiple platform filter patterns matched; leaving the library filters stock");
+        for (size_t f = NP_NATIVE_MAC_FILTER_FIX; f < NP_FIX_COUNT; f++) fix_on[f] = 0;
     }
     if (need_binds) resolve_binds(s, src_len);
     else clear_binds();
@@ -1536,13 +1549,26 @@ char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
     const np_gate_t *lib_gates = vite_library ? g_library_filters_vite : g_library_filters;
     size_t lib_count = vite_library ? NP_LIBRARY_FILTER_VITE_COUNT : NP_LIBRARY_FILTER_COUNT;
     int library_on[NP_LIBRARY_FILTER_MAX] = {0};
-    for (size_t g = 0; library_filter && g < lib_count; g++) {
-        size_t n = count_matches(s, src_len, lib_gates[g].find);
+    np_cap_t vite_toolbar[NP_CAP_MAX] = {{0}}, vite_button[NP_CAP_MAX] = {{0}};
+    for (size_t g = 0; mac_filter && g < lib_count; g++) {
+        np_cap_t *first = NULL;
+        if (vite_library && g == NP_VITE_LIBRARY_TOOLBAR) first = vite_toolbar;
+        if (vite_library && g == NP_VITE_LIBRARY_BUTTON) first = vite_button;
+        size_t n = count_matches_first(s, src_len, lib_gates[g].find, first);
         library_on[g] = n == (size_t)lib_gates[g].expect;
         if (library_on[g] || (!vite_library && (g == NP_LIBRARY_TOOLBAR || g == NP_LOCALIZED_LIBRARY_TOOLBAR)))
             continue;
-        NP_WARN("webpatch: library anchor %zu expected %d occurrence(s), found %zu; "
-                "no Windows filter button", g, lib_gates[g].expect, n);
+        NP_WARN("webpatch: [%s] library anchor %zu expected %d occurrence(s), found %zu; "
+                "no Windows filter button", vite_library ? "Vite" : "webpack", g, lib_gates[g].expect, n);
+        library_filter = 0;
+    }
+    if (!mac_variants && count_matches(s, src_len, g_library_filters_vite[NP_VITE_LIBRARY_BUTTON].find))
+        NP_WARN("webpatch: [Vite] library toolbar found without a platform filter; no Windows filter button");
+    if (library_filter && vite_library &&
+        (!same_capture(vite_toolbar[0], vite_button[9]) ||
+         !same_capture(vite_toolbar[2], vite_button[1]) ||
+         !same_capture(vite_toolbar[4], vite_button[4]))) {
+        NP_WARN("webpatch: [Vite] library toolbar bindings differ; no Windows filter button");
         library_filter = 0;
     }
     if (library_filter && !vite_library &&
@@ -1653,7 +1679,7 @@ char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
     if (!out_reserve(&out, 0)) { free(out.buf); return NULL; }
     out.buf[out.len] = '\0';
     *out_len = out.len;
-    if (library_filter) NP_LOG("webpatch: Windows library filter button added");
+    if (library_filter) NP_LOG("webpatch: Windows library filter button added (%s)", vite_library ? "Vite" : "webpack");
     NP_LOG("webpatch: [%s] %zu gates, %zu fixes applied",
            shape ? shape->name : "no compat UI", gate_live, fix_live);
     return out.buf;

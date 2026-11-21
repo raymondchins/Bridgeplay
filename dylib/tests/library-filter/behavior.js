@@ -182,7 +182,7 @@ function check(file, name, t) {
 
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   if (vite) {
-    const button = grab(src, /children:\[(([\w$]+)&&!([\w$]+)&&\(0,([\w$]+)\.jsxs\)\(([\w$]+),\{.*?\}\)\]\}\)\]\}\)),\2&&\(0,\4\.jsxs\)\(\5,\{direction:`top`,nDelayShowMS:240,toolTipContent:[\w$]+\(\3\?`#GameList_View_Platform_Linux`:`#GameList_View_Platform_Apple`\)/,
+    const button = grab(src, /children:\[(([\w$]+)&&!([\w$]+)&&\(0,([\w$]+)\.jsxs\)\(([\w$]+),\{.*?\}\)\]\}\)\}\)),\2&&\(0,\4\.jsxs\)\(\5,\{direction:`top`,nDelayShowMS:240,toolTipContent:[\w$]+\(\3\?`#GameList_View_Platform_Linux`:`#GameList_View_Platform_Apple`\)/,
                         'Vite Windows button before Apple');
     const [, expr, shown, linux, rt, tip] = button;
     const cls = grab(expr, /className:([\w$]+)\(`([\w$-]+)`,([\w$]+)&&`([\w$-]+)`,npWindows&&`([\w$-]+)`\)/, 'Vite classes');
@@ -202,10 +202,11 @@ function check(file, name, t) {
       'a click toggles the Windows button');
     t(lit.node.p.className === `${boxCls} ${onCls}` && press().node.p.className === boxCls &&
       press({ disabled: true }).node.p.className === `${boxCls} ${offCls}` &&
-      lit.node.p.children[1].type === 'svg' && lit.node.p.children[1].p.children.length === 4 &&
+      lit.node.p.children.type === 'svg' &&
+      same(lit.node.p.children.p.style, { width: 13, height: 13 }) &&
+      same(lit.node.p.children.p.children, [[0, 0], [9, 0], [0, 9], [9, 9]].map(([x, y]) =>
+        ({ type: 'rect', p: { x, y, width: 7, height: 7, fill: 'inherit' } }))) &&
       lit.node.p.nDelayShowMS === 240 &&
-      lit.node.p.children[0].type === 'style' &&
-      lit.node.p.children[0].p.children === `.${boxCls} .SVGIcon_WindowsLogo{width:13px;height:13px}.${boxCls} .SVGIcon_WindowsLogo rect{fill:inherit}` &&
       lit.node.p.toolTipContent === 'Show only games that run on Windows and do not have a macOS version',
       "the Windows button looks and times like Steam's Apple button");
     t(press({ disabled: true }).calls.length === 0, 'a disabled Windows button does nothing');

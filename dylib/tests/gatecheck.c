@@ -583,6 +583,38 @@ static void check_library(const char *path, const char *out_path, int literal_ve
         free(out);
         free(copy);
     }
+    if (vite && !literal_version) {
+        char *copy = strdup((const char *)buf);
+        if (!copy || count_matches_first(copy, len, gates[NP_VITE_LIBRARY_TOOLBAR].find, caps) != 1) {
+            wrong("cannot change Vite toolbar binding in %s", path);
+        } else {
+            char *name = copy + (caps[0].at - copy);
+            *name = *name == 'z' ? 'y' : 'z';
+            if (count_matches(copy, len, gates[NP_VITE_LIBRARY_TOOLBAR].find) != 1 ||
+                count_matches(copy, len, gates[NP_VITE_LIBRARY_BUTTON].find) != 1)
+                wrong("mismatched toolbar should still match both anchors in %s", path);
+            out = library_transform(copy, len, &out_len);
+            if (!out || strstr(out, "npWindows") || !strstr(out, ".mac.has("))
+                wrong("mismatched Vite toolbar left a partial filter in %s", path);
+            free(out);
+        }
+        free(copy);
+
+        static const char decoy[] = "\ncase L.Pu:return!!(0,P.td)()||"
+            "e.is_available_on_current_platform&&!e.is_invalid_os_type;";
+        copy = malloc(len + sizeof(decoy));
+        if (!copy) {
+            wrong("out of memory");
+        } else {
+            memcpy(copy, buf, len);
+            memcpy(copy + len, decoy, sizeof(decoy));
+            out = library_transform(copy, len + sizeof(decoy) - 1, &out_len);
+            if (out && strstr(out, "notprotonWindows"))
+                wrong("mixed Vite and webpack platform filters were patched in %s", path);
+            free(out);
+            free(copy);
+        }
+    }
     g_platform_js = NULL;
     free(buf);
 }
