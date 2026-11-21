@@ -716,7 +716,7 @@ int main(int argc, char **argv)
 	int rc = inert_without_env(path);
 	if (rc != 0)
 		return rc;
-	// Each child runs even when an earlier one failed; the first failure is the result.
+	// Each child runs even when an earlier one failed. A failure wins over a skip (3).
 	static const char *const children[][2] = {
 		// 2x on a 120 Hz display: the whole suite. 3x and adaptive at a simulated
 		// 40 fps on 120 Hz: two generated frames per real one.
@@ -725,10 +725,13 @@ int main(int argc, char **argv)
 		{ "1", "metal3" }, { "1", "metal4" },
 		{ "1", "slow-pool" }, { "1", "irregular" },
 	};
+	int failed = 0;
 	for (size_t i = 0; i < sizeof(children) / sizeof(children[0]); i++) {
 		int child_rc = spawn_child(argv[0], children[i][0], children[i][1], "120");
-		if (child_rc != 0 && rc == 0)
-			rc = child_rc;
+		if (child_rc == NP_SKIP)
+			rc = NP_SKIP;
+		else if (child_rc != 0 && failed == 0)
+			failed = child_rc;
 	}
-	return rc;
+	return failed != 0 ? failed : rc;
 }
