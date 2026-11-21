@@ -113,7 +113,7 @@ check_prefix() { # check_prefix FS [FREE_KB]: prints the exit status
 is "no dosdevices stops the launch" 1 "$(check_prefix apfs)"
 has "it is logged" "Wine did not finish building it" "$work/log"
 has "the player is offered a rebuild" "The game's prefix could not be set up|Wine did not finish building it, so the game can't start. Rebuild the prefix now?" "$work/notes"
-has "the rebuild keeps no backup" "|no-backup" "$work/notes"
+has "the rebuild keeps a backup" "|keep-backup" "$work/notes"
 is "a rebuild lets the launch go on" 0 "$(rebuild=ok check_prefix apfs)"
 has "the rebuild is reported" "rebuilt=1" "$work/log"
 cat > "$work/wineserver" <<'SH'
@@ -124,7 +124,7 @@ chmod +x "$work/wineserver"
 ( WINESERVER="$work/wineserver" rebuild=ok check_prefix apfs >/dev/null )
 is "wineserver is stopped before offering a rebuild" "server -k
 server -w
-The game's prefix could not be set up|Wine did not finish building it, so the game can't start. Rebuild the prefix now? Your save games will be preserved and not lost.|no-backup" "$(cat "$work/notes")"
+The game's prefix could not be set up|Wine did not finish building it, so the game can't start. Rebuild the prefix now? Bridgeplay will keep a backup of the old prefix.|keep-backup" "$(cat "$work/notes")"
 is "install helpers stop silently on a broken prefix" 1 "$(verb=run WINESERVER="$work/wineserver" rebuild=ok check_prefix apfs)"
 is "install helpers skip both the rebuild and its server shutdown" "" "$(cat "$work/notes")"
 

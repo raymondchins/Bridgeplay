@@ -1541,7 +1541,7 @@ run_rebuild() {
 }
 
 # $1 is the title, $2 the message. With $3, that button skips the rebuild and the launch goes on.
-# With $4 set to no-backup, only Rebuild Prefix is offered: a broken prefix is not worth keeping.
+# With $4 set to keep-backup, Rebuild Prefix also keeps a backup.
 rebuild_prefix() {
   # Install-script helpers must never prompt or rebuild behind the player's back.
   [ "$verb" != run ] || { [ -n "$3" ] && return 0; exit 1; }
@@ -1559,7 +1559,7 @@ rebuild_prefix() {
 on run argv
   set choices to {item 3 of argv, "Rebuild Prefix", "Backup & Rebuild Prefix"}
   set preferred to "Backup & Rebuild Prefix"
-  if item 5 of argv is "no-backup" then
+  if item 5 of argv is "keep-backup" then
     set choices to {item 3 of argv, "Rebuild Prefix"}
     set preferred to "Rebuild Prefix"
   end if
@@ -1574,7 +1574,10 @@ APPLESCRIPT
   ) || choice=""
   case "$choice" in
     'Backup & Rebuild Prefix') backup=keep-backup ;;
-    'Rebuild Prefix') backup=discard-backup ;;
+    'Rebuild Prefix')
+      backup=discard-backup
+      [ "$4" != keep-backup ] || backup=keep-backup
+      ;;
     *)
       [ -n "$3" ] || exit 1
       prepare_prefix_directory || exit 1
@@ -1880,8 +1883,8 @@ refuse_broken_prefix() {
     without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
     without_lock_fds "$WINESERVER" -w >> "$log" 2>&1 || true
   fi
-  # The rebuild still carries the saves over. A copy of a prefix that never worked is no help.
-  rebuild_prefix "The game's prefix could not be set up" "Wine did not finish building it, so the game can't start. Rebuild the prefix now? Your save games will be preserved and not lost." "" no-backup
+  # The rebuild skips system.reg, which may contain game data.
+  rebuild_prefix "The game's prefix could not be set up" "Wine did not finish building it, so the game can't start. Rebuild the prefix now? Bridgeplay will keep a backup of the old prefix." "" keep-backup
   broken_rebuilt=1
 }
 
