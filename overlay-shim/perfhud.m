@@ -408,17 +408,32 @@ static CTFontRef ph_font(double size, double weight)
 	return font;
 }
 
-// The brand's colours (BridgeplayTheme.swift): off-white and secondary grey type, near-black
-// raised surface, hairline borders, the violet-blue-pink gradient for a value's extent (a slider's
-// fill, the frame-time line), and amber only for a warning (a frame well over budget).
+// The app's colours (BP in BridgeplayTheme.swift, docs/DESIGN.md): layered greys, never pure
+// black (#111113 page, #1A1A1D card, #242428 control), off-white and grey type, hairlines, the
+// accent blue for controls, the violet-blue-pink gradient for the frame-time line, and amber only
+// for a warning (a frame well over budget). Secondary text and hairlines are brighter with
+// Increase Contrast, as in the app.
 #define PH_RGB(hex, a) (((hex) >> 16) & 0xff) / 255.0, (((hex) >> 8) & 0xff) / 255.0, ((hex) & 0xff) / 255.0, (a)
+#define PH_PAGE 0x111113
+#define PH_CARD 0x1A1A1D
+#define PH_CONTROL 0x242428
+#define PH_ACCENT 0x1F75FE
+#define PH_ORANGE 0xFF9F0A
 
 struct ph_style {
-	CTFontRef value, value_big, label, small;
-	CGColorRef fg, fg2, fg3, line;
+	CTFontRef value, value_big, label, small, caption;
+	// [0] standard, [1] Increase Contrast
+	CGColorRef fg, fg2_[2], fg3_[2], line_[2], line_strong_[2];
 };
 
 static struct ph_style ph_style;
+// System Settings › Accessibility › Display › Increase contrast, read on the main thread
+static _Atomic int ph_contrast;
+
+#define PH_FG2 (ph_style.fg2_[atomic_load(&ph_contrast) != 0])
+#define PH_FG3 (ph_style.fg3_[atomic_load(&ph_contrast) != 0])
+#define PH_LINE (ph_style.line_[atomic_load(&ph_contrast) != 0])
+#define PH_LINE_STRONG (ph_style.line_strong_[atomic_load(&ph_contrast) != 0])
 
 // The sampler's queue (the overlay) and the main thread (the sidebar, its hint) both draw, so the
 // style is made once, before either reads a font.
@@ -426,18 +441,25 @@ static void ph_style_make(void *unused)
 {
 	(void)unused;
 	CGColorSpaceRef srgb = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-	CGFloat fg[] = { PH_RGB(0xF5F5F7, 1) }, fg2[] = { PH_RGB(0xA1A1A6, 1) },
-	        fg3[] = { PH_RGB(0x86868B, 1) }, line[] = { 1, 1, 1, 0.10 };
+	CGFloat fg[] = { PH_RGB(0xF5F5F7, 1) };
+	CGFloat fg2[2][4] = { { PH_RGB(0xA1A1A6, 1) }, { PH_RGB(0xC7C7CC, 1) } };
+	CGFloat fg3[2][4] = { { PH_RGB(0x86868B, 1) }, { PH_RGB(0xAEAEB2, 1) } };
+	CGFloat line[2][4] = { { 1, 1, 1, 0.08 }, { 1, 1, 1, 0.24 } };
+	CGFloat strong[2][4] = { { 1, 1, 1, 0.18 }, { 1, 1, 1, 0.42 } };
 	ph_style.fg = CGColorCreate(srgb, fg);
-	ph_style.fg2 = CGColorCreate(srgb, fg2);
-	ph_style.fg3 = CGColorCreate(srgb, fg3);
-	ph_style.line = CGColorCreate(srgb, line);
+	for (int i = 0; i < 2; i++) {
+		ph_style.fg2_[i] = CGColorCreate(srgb, fg2[i]);
+		ph_style.fg3_[i] = CGColorCreate(srgb, fg3[i]);
+		ph_style.line_[i] = CGColorCreate(srgb, line[i]);
+		ph_style.line_strong_[i] = CGColorCreate(srgb, strong[i]);
+	}
 	CGColorSpaceRelease(srgb);
 	ph_style.value = ph_font(13, 600);
 	ph_style.value_big = ph_font(22, 600);
-	// 10.5 and 11 pt: the smallest that stay readable over a game on a Retina window
-	ph_style.label = ph_font(10.5, 500);
+	// 11 pt: the smallest that stays readable over a game on a Retina window
+	ph_style.label = ph_font(11, 500);
 	ph_style.small = ph_font(11, 400);
+	ph_style.caption = ph_font(12, 400);
 }
 
 static void ph_style_load(void)
@@ -504,15 +526,18 @@ static void ph_gradient(CGContextRef ctx, CGPoint from, CGPoint to)
 	CGColorSpaceRelease(srgb);
 }
 
-static void ph_surface(CGContextRef ctx, double w, double h)
+// A card floating over the game, as the app's floating card is: the card grey, nearly opaque so
+// the numbers stay readable over a bright scene, and the stronger hairline. Radius 8 for the
+// one-line overlay, the app's card radius (12) for the panel.
+static void ph_surface(CGContextRef ctx, double w, double h, double radius)
 {
 	CGRect box = CGRectMake(0.5, 0.5, w - 1, h - 1);
-	CGPathRef path = CGPathCreateWithRoundedRect(box, 8, 8, NULL);
+	CGPathRef path = CGPathCreateWithRoundedRect(box, radius, radius, NULL);
 	CGContextAddPath(ctx, path);
-	CGContextSetRGBFillColor(ctx, PH_RGB(0x0D0D0F, 0.86));
+	CGContextSetRGBFillColor(ctx, PH_RGB(PH_CARD, 0.9));
 	CGContextFillPath(ctx);
 	CGContextAddPath(ctx, path);
-	CGContextSetStrokeColorWithColor(ctx, ph_style.line);
+	CGContextSetStrokeColorWithColor(ctx, PH_LINE_STRONG);
 	CGContextSetLineWidth(ctx, 1);
 	CGContextStrokePath(ctx);
 	CGPathRelease(path);
@@ -526,7 +551,7 @@ static void ph_format_gb(char *out, size_t size, double bytes)
 // One "LABEL value" pair centred on the line at mid; returns the advance.
 static double ph_pair(CGContextRef ctx, double h, double x, double mid, const char *label, const char *value)
 {
-	double w = ph_text(ctx, h, x, ph_centred(mid, ph_style.label), label, ph_style.label, ph_style.fg2, 0.5);
+	double w = ph_text(ctx, h, x, ph_centred(mid, ph_style.label), label, ph_style.label, PH_FG2, 0.3);
 	return w + 5 + ph_text(ctx, h, x + w + 5, ph_centred(mid, ph_style.value), value, ph_style.value, ph_style.fg, 0);
 }
 
@@ -534,7 +559,7 @@ static void ph_divider(CGContextRef ctx, double h, double x)
 {
 	if (ctx == NULL)
 		return;
-	CGContextSetFillColorWithColor(ctx, ph_style.line);
+	CGContextSetFillColorWithColor(ctx, PH_LINE);
 	CGContextFillRect(ctx, CGRectMake(x, (h - 12) / 2, 1, 12));
 }
 
@@ -571,7 +596,7 @@ static CGSize ph_draw_compact(CGContextRef ctx, const struct ph_sample *s, doubl
 	double x = pad;
 	x += ph_text(ctx, h_box, x, ph_centred(mid, ph_style.value), fps, ph_style.value, ph_style.fg, 0);
 	x += 4;
-	x += ph_text(ctx, h_box, x, ph_centred(mid, ph_style.label), "FPS", ph_style.label, ph_style.fg2, 0.5);
+	x += ph_text(ctx, h_box, x, ph_centred(mid, ph_style.label), "FPS", ph_style.label, PH_FG2, 0.3);
 	return CGSizeMake(x + pad, h);
 }
 
@@ -585,14 +610,14 @@ static CGSize ph_draw_summary(CGContextRef ctx, const struct ph_sample *s, doubl
 	ph_fps_text(text, sizeof(text), s);
 	x += ph_text(ctx, h_box, x, base, text, ph_style.value, ph_style.fg, 0);
 	x += 4;
-	x += ph_text(ctx, h_box, x, ph_centred(mid, ph_style.label), "FPS", ph_style.label, ph_style.fg2, 0.5);
+	x += ph_text(ctx, h_box, x, ph_centred(mid, ph_style.label), "FPS", ph_style.label, PH_FG2, 0.3);
 	if (!s->idle && s->ft_avg > 0) {
 		snprintf(text, sizeof(text), "%.1f", s->ft_avg);
 		x += 8;
 		x += ph_text(ctx, h_box, x, base, text, ph_style.value, ph_style.fg, 0);
 		x += 3;
 		// A lowercase unit stays on its number's baseline
-		x += ph_text(ctx, h_box, x, base, "ms", ph_style.label, ph_style.fg2, 0.2);
+		x += ph_text(ctx, h_box, x, base, "ms", ph_style.label, PH_FG2, 0.2);
 	}
 	if (s->cap > 0) {
 		snprintf(text, sizeof(text), "%.0f", s->cap);
@@ -644,7 +669,7 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 {
 	// Every text line is centred in its own slot by cap height, so the padding reads the same
 	// above the first line and below the last
-	const double w = 240, left = 14, right = w - 14, row = 20, pad = 10, bottom = 12;
+	const double w = 240, left = 16, right = w - 16, row = 20, pad = 10, bottom = 12;
 	char text[64], label_ms[48];
 	double y = pad;
 
@@ -653,14 +678,14 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 	ph_fps_text(text, sizeof(text), s);
 	double x = left;
 	x += ph_text(ctx, h_box, x, ph_centred(head_mid, ph_style.value_big), text, ph_style.value_big, ph_style.fg, -0.3);
-	ph_text(ctx, h_box, x + 5, ph_centred(head_mid, ph_style.label), "FPS", ph_style.label, ph_style.fg2, 0.5);
+	ph_text(ctx, h_box, x + 5, ph_centred(head_mid, ph_style.label), "FPS", ph_style.label, PH_FG2, 0.3);
 	if (!s->idle && s->ft_avg > 0) {
 		snprintf(text, sizeof(text), "%.1f", s->ft_avg);
 		double unit = ph_width("ms", ph_style.label, 0.2);
 		double value = ph_width(text, ph_style.value, 0);
 		double base = ph_centred(head_mid, ph_style.value);
 		ph_text(ctx, h_box, right - unit - 3 - value, base, text, ph_style.value, ph_style.fg, 0);
-		ph_text(ctx, h_box, right - unit, base, "ms", ph_style.label, ph_style.fg2, 0.2);
+		ph_text(ctx, h_box, right - unit, base, "ms", ph_style.label, PH_FG2, 0.2);
 	}
 	y += head + 6;
 
@@ -671,9 +696,10 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 	double budget = s->cap > 0 ? 1000.0 / s->cap : s->hz > 0 ? 1000.0 / s->hz : 0;
 	if (ctx != NULL) {
 		CGRect area = CGRectMake(gx, h_box - y - gh, gw, gh);
-		CGPathRef bg = CGPathCreateWithRoundedRect(area, 4, 4, NULL);
+		// The graph's well in the control grey, as a track is in the app
+		CGPathRef bg = CGPathCreateWithRoundedRect(area, 8, 8, NULL);
 		CGContextAddPath(ctx, bg);
-		CGContextSetRGBFillColor(ctx, 1, 1, 1, 0.03);
+		CGContextSetRGBFillColor(ctx, PH_RGB(PH_CONTROL, 1));
 		CGContextFillPath(ctx);
 		CGPathRelease(bg);
 
@@ -687,14 +713,14 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 			top = budget * 1.15;
 		if (budget > 0) {
 			double ty = area.origin.y + 3 + budget / top * (gh - 6);
-			CGContextSetRGBFillColor(ctx, 1, 1, 1, 0.16);
-			CGContextFillRect(ctx, CGRectMake(gx + 4, ty, gw - 8, 1));
+			CGContextSetFillColorWithColor(ctx, PH_LINE_STRONG);
+			CGContextFillRect(ctx, CGRectMake(gx + 6, ty, gw - 12, 1));
 		}
 		if (n > 1) {
 			double px[ph_ring], py[ph_ring];
 			CGMutablePathRef path = CGPathCreateMutable(), over = CGPathCreateMutable();
 			for (int i = 0; i < n; i++) {
-				px[i] = gx + 4 + (gw - 8) * (i + ph_ring - n) / (double)(ph_ring - 1);
+				px[i] = gx + 6 + (gw - 12) * (i + ph_ring - n) / (double)(ph_ring - 1);
 				py[i] = area.origin.y + 3 + (frames[i] / top) * (gh - 6);
 				if (i == 0)
 					CGPathMoveToPoint(path, NULL, px[i], py[i]);
@@ -716,7 +742,7 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 			ph_gradient(ctx, CGPointMake(gx, 0), CGPointMake(gx + gw, 0));
 			CGContextRestoreGState(ctx);
 			CGContextAddPath(ctx, over);
-			CGContextSetRGBStrokeColor(ctx, PH_RGB(0xFF9F0A, 1));
+			CGContextSetRGBStrokeColor(ctx, PH_RGB(PH_ORANGE, 1));
 			CGContextStrokePath(ctx);
 			CGPathRelease(path);
 			CGPathRelease(over);
@@ -729,10 +755,15 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 			snprintf(label_ms, sizeof(label_ms), "min %.1f · max %.1f · line %.1f ms", s->ft_min, s->ft_max, budget);
 		else
 			snprintf(label_ms, sizeof(label_ms), "min %.1f · max %.1f ms", s->ft_min, s->ft_max);
-		ph_text(ctx, h_box, left, ph_centred(y + 4 + 9, ph_style.small), label_ms, ph_style.small, ph_style.fg3, 0);
+		ph_text(ctx, h_box, left, ph_centred(y + 4 + 9, ph_style.small), label_ms, ph_style.small, PH_FG3, 0);
 		y += 4 + 18;
 	}
-	y += 6;
+	// A hairline between the graph and the readings, as between a grouped list's rows
+	if (ctx != NULL) {
+		CGContextSetFillColorWithColor(ctx, PH_LINE);
+		CGContextFillRect(ctx, CGRectMake(left, h_box - y - 4, right - left, 1));
+	}
+	y += 8;
 
 	// The rest, a label and a value per row, only what this Mac reports
 	double scale = 0;
@@ -769,7 +800,7 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 		if (!rows[i].shown)
 			continue;
 		double mid = y + row / 2;
-		ph_text(ctx, h_box, left, ph_centred(mid, ph_style.small), rows[i].label, ph_style.small, ph_style.fg2, 0);
+		ph_text(ctx, h_box, left, ph_centred(mid, ph_style.caption), rows[i].label, ph_style.caption, PH_FG2, 0);
 		double vw = ph_width(rows[i].value, ph_style.value, 0);
 		ph_text(ctx, h_box, right - vw, ph_centred(mid, ph_style.value), rows[i].value, ph_style.value, ph_style.fg, 0);
 		y += row;
@@ -804,7 +835,7 @@ static CGImageRef ph_render(const struct ph_sample *s, double scale, CGSize *siz
 		return NULL;
 	CGContextScaleCTM(ctx, scale, scale);
 	CGContextSetShouldSmoothFonts(ctx, false);
-	ph_surface(ctx, size.width, size.height);
+	ph_surface(ctx, size.width, size.height, ph_level == ph_detailed ? 12 : 8);
 	ph_draw(ctx, s, size.height);
 	CGImageRef image = CGBitmapContextCreateImage(ctx);
 	CGContextRelease(ctx);
@@ -822,11 +853,16 @@ static id ph_msg(id target, const char *selector)
 	return ((id (*)(id, SEL))objc_msgSend)(target, sel);
 }
 
-// The screen the game's window is on: its backing scale, for a sharp overlay at any game
-// resolution, and its refresh rate. Main thread, through the runtime: the shim does not
-// link AppKit, it only finds it in the game.
+// Whether Increase Contrast is on, and the screen the game's window is on: its backing scale,
+// for a sharp overlay at any game resolution, and its refresh rate. Main thread, through the
+// runtime: the shim does not link AppKit, it only finds it in the game.
 static void ph_read_screen(CALayer *host)
 {
+	id workspace = ph_msg((id)objc_getClass("NSWorkspace"), "sharedWorkspace");
+	SEL contrast_sel = sel_registerName("accessibilityDisplayShouldIncreaseContrast");
+	if (workspace != nil && [workspace respondsToSelector:contrast_sel])
+		atomic_store(&ph_contrast, ((BOOL (*)(id, SEL))objc_msgSend)(workspace, contrast_sel) ? 1 : 0);
+
 	Class view_class = objc_getClass("NSView");
 	id window = nil;
 	for (CALayer *l = host; l != nil && view_class != Nil; l = l.superlayer) {

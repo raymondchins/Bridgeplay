@@ -2,8 +2,8 @@ import AppKit
 import CoreText
 import SwiftUI
 
-// The look of bridgeplay.dev (styles.css :root) for the app's own surfaces: black canvas,
-// near-white type in Geist, hairline borders, small radii, and the violet-blue-pink
+// The app's own surfaces (docs/DESIGN.md): layered dark greys, near-white type in Geist,
+// hairline borders, small radii, an accent blue for controls, and the violet-blue-pink
 // gradient kept for emphasis only (progress, the last step, one word of a headline).
 public enum BP {
     // Layered near-blacks, never pure black: each step up (page, card, control) is a little
