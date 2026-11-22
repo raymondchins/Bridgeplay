@@ -375,6 +375,15 @@ static void sb_fill_round(CGContextRef ctx, CGRect r, double radius, double red,
 	CGPathRelease(path);
 }
 
+static void sb_fill_round_color(CGContextRef ctx, CGRect r, double radius, CGColorRef color)
+{
+	CGPathRef path = CGPathCreateWithRoundedRect(r, radius, radius, NULL);
+	CGContextAddPath(ctx, path);
+	CGContextSetFillColorWithColor(ctx, color);
+	CGContextFillPath(ctx);
+	CGPathRelease(path);
+}
+
 static void sb_stroke_round(CGContextRef ctx, CGRect r, double radius, CGColorRef color)
 {
 	CGPathRef path = CGPathCreateWithRoundedRect(r, radius, radius, NULL);
@@ -646,10 +655,12 @@ static void sb_draw_row(CGContextRef ctx, double w, double h, int row)
 	} else if (disabled) {
 		// The Metal HUD is the game's only overlay: say where it is changed instead of a slider
 		// that cannot move
+		const char *where = "Change it in Steam Properties › Bridgeplay.";
+		if (ph_width(where, sb_f.small, 0) > w - 2 * sb_text)
+			where = "Change in Steam › Bridgeplay.";
 		ph_text(ctx, h, sb_text, ph_centred(top + sb_track_mid, sb_f.small), "Apple's Metal HUD is on for this game.",
 		        sb_f.small, PH_FG2, 0);
-		ph_text(ctx, h, sb_text, ph_centred(top + sb_stops_mid, sb_f.small),
-		        "Change it in Steam Properties › Bridgeplay.", sb_f.small, PH_FG3, 0);
+		ph_text(ctx, h, sb_text, ph_centred(top + sb_stops_mid, sb_f.small), where, sb_f.small, PH_FG3, 0);
 	} else {
 		sb_draw_slider(ctx, w, h, top, row, 0);
 	}
@@ -692,7 +703,7 @@ static void sb_draw(CGContextRef ctx, double w, double h)
 		if (low)
 			sb_fill_round(ctx, fill, 2, PH_RGB(PH_ORANGE, 1));
 		else
-			sb_fill_round(ctx, fill, 2, PH_RGB(0x86868B, 1));
+			sb_fill_round_color(ctx, fill, 2, PH_FG3);
 	} else if (watts > 0) {
 		snprintf(text, sizeof(text), "%.1f W", watts);
 		ph_text(ctx, h, sb_pad, ph_centred(sb_power_mid, sb_f.value), "Power drawn", sb_f.value, PH_FG2, 0);
@@ -710,9 +721,19 @@ static void sb_draw(CGContextRef ctx, double w, double h)
 
 	// Right under the settings, where the eye is after a change
 	double foot = sb_row_top(sb_rows - 1) + sb_row_heights[sb_rows - 1];
-	// 11 pt, so the longest message still fits a window under 300 pt wide
-	ph_text(ctx, h, sb_pad, ph_centred(foot + 24, sb_f.small),
-	        sb_status[0] ? sb_status : "Changes apply now and are saved for this game.", sb_f.small,
+	// 11 pt, with shorter fallbacks so the text stays within the 20 pt margins at 280 pt wide
+	const char *foot_text = sb_status[0] ? sb_status : "Changes apply now and are saved for this game.";
+	if (ph_width(foot_text, sb_f.small, 0) > w - 2 * sb_pad) {
+		if (!sb_status[0])
+			foot_text = "Applied now and saved for this game.";
+		else if (strstr(sb_status, "No Steam app") != NULL)
+			foot_text = "Applied for this session. No Steam app.";
+		else if (strstr(sb_status, "Could not save") != NULL)
+			foot_text = "Applied for this session. Not saved.";
+		else
+			foot_text = "Applied and saved for next launch.";
+	}
+	ph_text(ctx, h, sb_pad, ph_centred(foot + 24, sb_f.small), foot_text, sb_f.small,
 	        sb_status[0] ? ph_style.fg : PH_FG2, 0);
 	ph_text(ctx, h, sb_pad, ph_centred(foot + 44, sb_f.small), "↑↓ setting    ←→ change    esc close",
 	        sb_f.small, PH_FG3, 0.2);

@@ -755,7 +755,7 @@ static CGSize ph_draw_detailed(CGContextRef ctx, const struct ph_sample *s, doub
 			snprintf(label_ms, sizeof(label_ms), "min %.1f · max %.1f · line %.1f ms", s->ft_min, s->ft_max, budget);
 		else
 			snprintf(label_ms, sizeof(label_ms), "min %.1f · max %.1f ms", s->ft_min, s->ft_max);
-		ph_text(ctx, h_box, left, ph_centred(y + 4 + 9, ph_style.small), label_ms, ph_style.small, PH_FG3, 0);
+		ph_text(ctx, h_box, left, ph_centred(y + 4 + 9, ph_style.small), label_ms, ph_style.small, PH_FG2, 0);
 		y += 4 + 18;
 	}
 	// A hairline between the graph and the readings, as between a grouped list's rows

@@ -340,7 +340,7 @@ Inconsistencies in today's UI. Don't copy them. Fix each in its own PR and remov
 | 7 | Hero frame written twice | `StatusHero`, `DefaultsHero` |
 | 8 | Sheet titles 15 and 17 | `WhatsNewSheet`, report sheets |
 | 9 | Off-scale: 12.5, 15, 19 pt; a radius 6 that is not continuous | `GuideView`, `InstallerView`, `RowWash` |
-| 10 | Mixed case: "Has issues" beside "Smooth"; "Last used" beside "Private Size" | `PlayReportCard`, `PrefixesView` |
+| 10 | Mixed case: "Has issues" beside "Smooth"; "Last used" beside "Private Size"; "Enable frame limit" instead of "Enable Frame Limit" | `PlayReportCard`, `PrefixesView`, `webpatch.c`, `GuideView` |
 | 11 | Engine rows are not localized ("Download & Set Up", "Rescan") | `StatusView.crossOverSection` |
 | 12 | Languages: app 4; Steam tab 3; game English; `Install.command` Indonesian | `webpatch.c`, `sidebar.m`, `installer/` |
 | 13 | ⌘1 to ⌘5 are not in the sidebar's order | `App.swift` |
