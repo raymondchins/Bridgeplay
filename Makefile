@@ -290,9 +290,11 @@ quicksettings-check:
 	$(OUT_DIR)/quicksettings-check
 
 displayratecheck:
-	@if [ ! -f dylib/tests/displayratecheck.c ]; then $(call SKIP,displayratecheck,dylib/tests/displayratecheck.c); exit 0; fi; \
+	@if [ ! -f dylib/tests/displayratecheck.m ]; then $(call SKIP,displayratecheck,dylib/tests/displayratecheck.m); exit 0; fi; \
 	mkdir -p $(OUT_DIR) && \
-	$(TEST_CC) -framework CoreGraphics -framework CoreFoundation -o $(OUT_DIR)/displayratecheck dylib/tests/displayratecheck.c && \
+	$(CC) -arch $(ARCH) -mmacosx-version-min=$(MIN_VER) -g -Wall -Wextra -Wno-unused-parameter -Idylib \
+		-framework CoreGraphics -framework CoreFoundation -framework AppKit \
+		-o $(OUT_DIR)/displayratecheck dylib/tests/displayratecheck.m && \
 	$(OUT_DIR)/displayratecheck
 
 compatsvc-check:

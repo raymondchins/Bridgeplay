@@ -307,11 +307,12 @@ static int spawn_child(const char *self, const char *mode, const char *home, int
 	int n = 0;
 	while (parent[n] != NULL)
 		n++;
-	char **env = calloc((size_t)n + 6, sizeof(char *));
+	char **env = calloc((size_t)n + 7, sizeof(char *));
 	int k = 0;
 	for (int i = 0; i < n; i++)
 		if (strncmp(parent[i], "NOTPROTON_", 10) != 0 && strncmp(parent[i], "MTL_HUD_ENABLED=", 16) != 0 &&
-		    strncmp(parent[i], "HOME=", 5) != 0 && strncmp(parent[i], "SteamAppId=", 11) != 0)
+		    strncmp(parent[i], "HOME=", 5) != 0 && strncmp(parent[i], "SteamAppId=", 11) != 0 &&
+		    strncmp(parent[i], "STEAM_COMPAT_APP_ID=", 20) != 0)
 			env[k++] = parent[i];
 	char child_var[64], home_var[1100];
 	snprintf(child_var, sizeof(child_var), "NP_QUICK_TEST_CHILD=%s", mode);
@@ -319,6 +320,7 @@ static int spawn_child(const char *self, const char *mode, const char *home, int
 	env[k++] = child_var;
 	env[k++] = home_var;
 	env[k++] = "SteamAppId=4242";
+	env[k++] = "STEAM_COMPAT_APP_ID=4242";
 	char shim_var[1100];
 	snprintf(shim_var, sizeof(shim_var), "NOTPROTON_OVERLAY_SHIM=%s", getenv("NOTPROTON_OVERLAY_SHIM"));
 	env[k++] = shim_var;

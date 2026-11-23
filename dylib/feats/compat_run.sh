@@ -1259,6 +1259,46 @@ compose_dll_overrides() {
 
 load_gamefixes || true
 
+# The in-game sidebar writes its picks to quick-settings/<app_id>.conf. Steam's own JS
+# normally carries them into Steam launch options a few seconds later, but that poller only
+# runs once the Compatibility or Settings page module has evaluated, so a session where the
+# user never visits either page leaves the file on disk. Promote any still-pending change
+# over the launch options for this run and remove the file, so the pick takes effect
+# whether or not the poller came. Only the four keys the sidebar sets are promoted, and each
+# goes through gamefix_reason before it is applied.
+consume_sidebar_quick_settings() {
+  case "$app_id" in ''|0) return 0 ;; esac
+  qs_file="$np_support/quick-settings/$app_id.conf"
+  [ -f "$qs_file" ] || return 0
+  if [ ! -r "$qs_file" ] || [ "$(stat -f %z "$qs_file" 2>/dev/null || echo 0)" -gt 4096 ]; then
+    gamefix_log "quick-settings conf $qs_file is unreadable or over 4 KiB, left in place"
+    return 0
+  fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    while :; do case "$line" in [[:space:]]*) line=${line#?} ;; *) break ;; esac; done
+    while :; do case "$line" in *[[:space:]]) line=${line%?} ;; *) break ;; esac; done
+    case "$line" in ''|'#'*) continue ;; esac
+    key=${line%%=*}
+    case "$key" in
+      BRIDGEPLAY_FPS_LIMIT|BRIDGEPLAY_FPS_LIMIT_OFF|BRIDGEPLAY_PERF_OVERLAY|BRIDGEPLAY_SCALING_FILTER)
+        key=${key#BRIDGEPLAY_} ;;
+      *) continue ;;
+    esac
+    value=${line#*=}
+    reason=$(gamefix_reason "$key" "$value")
+    if [ -n "$reason" ]; then
+      gamefix_log "quick-settings $key=$value rejected: $reason"
+      continue
+    fi
+    # Last write wins: the sidebar's pick overrides launch options for this session.
+    export "NOTPROTON_$key=$value"
+    gamefix_log "applied NOTPROTON_$key=$value from the sidebar's quick-settings"
+  done < "$qs_file"
+  rm -f "$qs_file"
+}
+
+consume_sidebar_quick_settings
+
 # Steam gives every non-Steam shortcut a game ID ending in 0x02000000.
 shortcut_game_id() {
   case "$1" in ''|*[!0-9]*) return 1 ;; esac

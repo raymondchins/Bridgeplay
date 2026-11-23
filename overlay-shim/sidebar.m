@@ -206,17 +206,31 @@ static const char *sb_short_key(const char *key)
 // the shim out of memory (gamefix_read also refuses files over 64 KiB).
 #define sb_conf_cap (64 * 1024)
 
+// The run script (compat_run.sh for Wine, native-launch/np-native.c for a native macOS game)
+// reads its gamefix from two different places, so the sidebar's mirror follows. STEAM_COMPAT_APP_ID
+// is set by Steam only when a compat tool runs the game, which is how compat_run.sh is
+// started; a native launch has it unset. The appid is the same in both.
+static const char *sb_gamefix_subdir(void)
+{
+	const char *tool = getenv("STEAM_COMPAT_APP_ID");
+	return (tool != NULL && tool[0] != '\0') ? "gamefixes" : "gamefixes/native";
+}
+
 static int sb_save_gamefix(const char *key, const char *value)
 {
 	if (!sb_appid[0])
 		return 0;
-	char support[1024], dir[1100], path[1200], tmp[1300];
+	char support[1024], gamefixes[1100], dir[1200], path[1300], tmp[1400];
 	sb_support(support, sizeof(support));
 	if (support[0] == '\0')
 		return 0;
-	snprintf(dir, sizeof(dir), "%s/gamefixes", support);
+	// For native games the conf sits under gamefixes/native/<appid>.conf; both parents
+	// must exist as directories (never followed through a link).
+	snprintf(gamefixes, sizeof(gamefixes), "%s/gamefixes", support);
 	struct stat st;
-	// A link in place of the folder is refused, so nothing is written where it points
+	if ((mkdir(gamefixes, 0700) != 0 && errno != EEXIST) || lstat(gamefixes, &st) != 0 || !S_ISDIR(st.st_mode))
+		return 0;
+	snprintf(dir, sizeof(dir), "%s/%s", support, sb_gamefix_subdir());
 	if ((mkdir(dir, 0700) != 0 && errno != EEXIST) || lstat(dir, &st) != 0 || !S_ISDIR(st.st_mode))
 		return 0;
 	snprintf(path, sizeof(path), "%s/%s.conf", dir, sb_appid);
@@ -229,10 +243,13 @@ static int sb_save_gamefix(const char *key, const char *value)
 	size_t brand_len = strlen(brand_key);
 
 	// Copy every other line from the current file, dropping any line whose key matches ours
-	// (short or BRIDGEPLAY_ spelling, with optional leading whitespace).
+	// (short or BRIDGEPLAY_ spelling, with optional leading whitespace). An unreadable file
+	// that exists is left in place: wiping it would discard the user's other overrides.
 	char keep[sb_conf_cap];
 	size_t keep_len = 0;
 	FILE *in = fopen(path, "r");
+	if (in == NULL && errno != ENOENT)
+		return 0;
 	if (in != NULL) {
 		char line[1024];
 		while (fgets(line, sizeof(line), in) != NULL) {
@@ -253,7 +270,10 @@ static int sb_save_gamefix(const char *key, const char *value)
 			memcpy(keep + keep_len, line, n);
 			keep_len += n;
 		}
+		int read_failed = ferror(in);
 		fclose(in);
+		if (read_failed)
+			return 0;
 	}
 	// A trailing newline before the new line, so the appended entry is on its own line.
 	if (keep_len > 0 && keep[keep_len - 1] != '\n') {
@@ -261,6 +281,10 @@ static int sb_save_gamefix(const char *key, const char *value)
 			return 0;
 		keep[keep_len++] = '\n';
 	}
+	// The run script refuses a conf over 64 KiB; keep ourselves well under.
+	size_t new_line = strlen(short_key) + 1 + strlen(value) + 1;
+	if (keep_len + new_line >= sb_conf_cap)
+		return 0;
 
 	unlink(tmp);
 	int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);

@@ -488,6 +488,39 @@ int main(int argc, char **argv)
 			free(legacy);
 		}
 
+	/* Promote any pending in-game sidebar change over the launch options for this run and
+	 * remove the file, so the pick takes effect whether or not the Steam JS poller came.
+	 * Only the four keys the sidebar sets are promoted; the mirror in gamefixes/native/<appid>.conf
+	 * is what gives persistence across launches. */
+	if (home && valid_appid(appid)) {
+		char *support = current_or_legacy(home, SUPPORT_REL, LEGACY_SUPPORT_REL, dir_exists);
+		char *qs_dir = join3(support, "/quick-settings/", appid);
+		char *qs_path = join3(qs_dir, ".conf", "");
+		struct layer qs = {.src = qs_path};
+		load_conf(&qs, qs_path, home);
+		static const char *const allowed[] = {
+			"BRIDGEPLAY_FPS_LIMIT", "BRIDGEPLAY_FPS_LIMIT_OFF",
+			"BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_SCALING_FILTER", NULL,
+		};
+		for (int j = 0; j < qs.n; j++) {
+			int ok = 0;
+			for (int a = 0; allowed[a]; a++)
+				if (strcmp(qs.names[j], allowed[a]) == 0) { ok = 1; break; }
+			if (!ok)
+				continue;
+			xsetenv(qs.names[j], qs.values[j]);
+			char *legacy = legacy_name(qs.names[j]);
+			if (legacy)
+				xsetenv(legacy, qs.values[j]);
+			free(legacy);
+		}
+		if (qs.n > 0)
+			unlink(qs_path);
+		free(qs_path);
+		free(qs_dir);
+		free(support);
+	}
+
 	/* 3. compose DYLD_INSERT_LIBRARIES */
 	struct libs L = {.n = 0};
 	const char *pad_mode = getenv("NP_PAD_MODE");
