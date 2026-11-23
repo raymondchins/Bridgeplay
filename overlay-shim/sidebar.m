@@ -192,6 +192,150 @@ static int sb_index(int row)
 	}
 }
 
+// The shared per-game conf the app's Game Defaults page reads and writes. The sidebar writes
+// the same keys here so a change in game is reflected in the app and sticks across relaunches
+// even when the Steam page's poller never ran. The BRIDGEPLAY_ spelling matches what
+// compat_run.sh maps to NOTPROTON_ and what np-native.c (the native macOS launcher) reads
+// to set its NOTPROTON_ alias; the app's Game Defaults page accepts both spellings.
+static void sb_canonical_key(const char *key, char *out, size_t cap)
+{
+	static const char *const prefix = "BRIDGEPLAY_";
+	const char *bare = strncmp(key, prefix, strlen(prefix)) == 0 ? key + strlen(prefix) : key;
+	snprintf(out, cap, "%s%s", prefix, bare);
+}
+
+// The written-out length of lines kept from an old conf, bounded so a hostile file cannot run
+// the shim out of memory (gamefix_read also refuses files over 64 KiB).
+#define sb_conf_cap (64 * 1024)
+
+// The run script (compat_run.sh for Wine, native-launch/np-native.c for a native macOS game)
+// reads its gamefix from two different places, so the sidebar's mirror follows. STEAM_COMPAT_APP_ID
+// is set by Steam only when a compat tool runs the game, which is how compat_run.sh is
+// started; a native launch has it unset. The appid is the same in both.
+static const char *sb_gamefix_subdir(void)
+{
+	const char *tool = getenv("STEAM_COMPAT_APP_ID");
+	return (tool != NULL && tool[0] != '\0') ? "gamefixes" : "gamefixes/native";
+}
+
+static int sb_save_gamefix(const char *key, const char *value)
+{
+	if (!sb_appid[0])
+		return 0;
+	char support[1024], gamefixes[1100], dir[1200], path[1300], tmp[1400];
+	sb_support(support, sizeof(support));
+	if (support[0] == '\0')
+		return 0;
+	// For native games the conf sits under gamefixes/native/<appid>.conf; both parents
+	// must exist as directories (never followed through a link).
+	snprintf(gamefixes, sizeof(gamefixes), "%s/gamefixes", support);
+	struct stat st;
+	if ((mkdir(gamefixes, 0700) != 0 && errno != EEXIST) || lstat(gamefixes, &st) != 0 || !S_ISDIR(st.st_mode))
+		return 0;
+	snprintf(dir, sizeof(dir), "%s/%s", support, sb_gamefix_subdir());
+	if ((mkdir(dir, 0700) != 0 && errno != EEXIST) || lstat(dir, &st) != 0 || !S_ISDIR(st.st_mode))
+		return 0;
+	snprintf(path, sizeof(path), "%s/%s.conf", dir, sb_appid);
+	snprintf(tmp, sizeof(tmp), "%s.%d.tmp", path, getpid());
+
+	char canonical[64];
+	sb_canonical_key(key, canonical, sizeof(canonical));
+	// The run scripts also accept the short spelling (FPS_LIMIT=X) and the NOTPROTON_ alias,
+	// so the sidebar drops any of those three too when it rewrites: one line per key, no
+	// matter which side wrote it last, and no higher-priority alias left to beat ours.
+	const char *bare = canonical + strlen("BRIDGEPLAY_");
+	char ntoken[64];
+	snprintf(ntoken, sizeof(ntoken), "NOTPROTON_%s", bare);
+	const char *tokens[3] = { canonical, bare, ntoken };
+
+	// Copy every other line from the current file, dropping any line whose key matches ours.
+	// The matcher mirrors the run script's tolerance: leading whitespace, an optional
+	// `export ` prefix, and whitespace around `=`. An unreadable file that exists is left in
+	// place: wiping it would discard the user's other overrides.
+	char keep[sb_conf_cap];
+	size_t keep_len = 0;
+	int read_fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+	int open_errno = errno;
+	FILE *in = read_fd >= 0 ? fdopen(read_fd, "r") : NULL;
+	if (read_fd >= 0 && in == NULL)
+		close(read_fd);
+	if (read_fd < 0 && open_errno != ENOENT)
+		return 0;
+	if (in != NULL) {
+		// Lines up to 4 KiB, long enough for any sensible comment; a longer line the player
+		// wrote is read as several fgets calls, and the matcher only looks at the start of
+		// a complete line to avoid treating a chunk's tail as a new key assignment.
+		char line[4096];
+		int at_line_start = 1;
+		while (fgets(line, sizeof(line), in) != NULL) {
+			size_t n = strlen(line);
+			int line_done = n > 0 && line[n - 1] == '\n';
+			int drop = 0;
+			if (at_line_start) {
+				const char *p = line;
+				while (*p == ' ' || *p == '\t')
+					p++;
+				if (strncmp(p, "export ", 7) == 0) {
+					p += 7;
+					while (*p == ' ' || *p == '\t')
+						p++;
+				}
+				for (int t = 0; !drop && t < 3; t++) {
+					size_t tl = strlen(tokens[t]);
+					if (strncmp(p, tokens[t], tl) != 0)
+						continue;
+					const char *q = p + tl;
+					while (*q == ' ' || *q == '\t')
+						q++;
+					if (*q == '=')
+						drop = 1;
+				}
+			}
+			at_line_start = line_done;
+			if (drop)
+				continue;
+			if (keep_len + n + 1 >= sizeof(keep)) {
+				fclose(in);
+				return 0;
+			}
+			memcpy(keep + keep_len, line, n);
+			keep_len += n;
+		}
+		int read_failed = ferror(in);
+		fclose(in);
+		if (read_failed)
+			return 0;
+	}
+	// A trailing newline before the new line, so the appended entry is on its own line.
+	if (keep_len > 0 && keep[keep_len - 1] != '\n') {
+		if (keep_len + 1 >= sizeof(keep))
+			return 0;
+		keep[keep_len++] = '\n';
+	}
+	// The run script refuses a conf over 64 KiB; keep ourselves well under.
+	size_t new_line = strlen(canonical) + 1 + strlen(value) + 1;
+	if (keep_len + new_line >= sb_conf_cap)
+		return 0;
+
+	unlink(tmp);
+	int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+	FILE *out = fd >= 0 ? fdopen(fd, "w") : NULL;
+	if (fd >= 0 && out == NULL)
+		close(fd);
+	int ok = out != NULL;
+	if (ok && keep_len > 0 && fwrite(keep, 1, keep_len, out) != keep_len)
+		ok = 0;
+	if (ok && fprintf(out, "%s=%s\n", canonical, value) <= 0)
+		ok = 0;
+	if (out != NULL && fclose(out) != 0)
+		ok = 0;
+	if (!ok || rename(tmp, path) != 0) {
+		unlink(tmp);
+		return 0;
+	}
+	return 1;
+}
+
 // The change waits there until Steam's page takes it; a newer pick of the same setting
 // replaces it, and the other settings still waiting stay.
 static int sb_save(const char *key, const char *value)
@@ -212,14 +356,19 @@ static int sb_save(const char *key, const char *value)
 	snprintf(path, sizeof(path), "%s/%s.conf", dir, sb_appid);
 	snprintf(tmp, sizeof(tmp), "%s.%d.tmp", path, getpid());
 
-	// Picks still waiting from this game carry over; a file from before it started belongs to
-	// an earlier session, maybe another Steam account's, and is replaced, not merged
+	// Picks still waiting from an earlier session carry over, so a change here does not
+	// silently lose the player's older picks for other sidebar keys. The file is opened with
+	// O_NOFOLLOW so a symlink planted at its name is not followed; a non-regular file
+	// (socket, FIFO) that was somehow placed here is also refused.
 	char kept[sb_rows][16] = { { 0 } };
-	FILE *in = fopen(path, "r");
-	struct stat file;
-	if (in != NULL && (fstat(fileno(in), &file) != 0 || file.st_mtime < sb_started)) {
-		fclose(in);
-		in = NULL;
+	int read_fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+	FILE *in = NULL;
+	if (read_fd >= 0) {
+		struct stat file;
+		if (fstat(read_fd, &file) == 0 && S_ISREG(file.st_mode))
+			in = fdopen(read_fd, "r");
+		if (in == NULL)
+			close(read_fd);
 	}
 	if (in != NULL) {
 		char line[128];
@@ -254,6 +403,11 @@ static int sb_save(const char *key, const char *value)
 		snprintf(sb_status, sizeof(sb_status), "Applied for this session. Could not save it.");
 		return 0;
 	}
+	// Mirror the change into the shared per-game conf. A failure here is logged but doesn't
+	// change the sidebar's status: the Steam page poll above is already saved, and the
+	// gamefix mirror only adds persistence for the case the page poll never ran.
+	if (!sb_save_gamefix(key, value))
+		shim_log("overlay_shim sidebar: %s=%s not mirrored to gamefixes conf\n", key, value);
 	snprintf(sb_status, sizeof(sb_status), "Applied. Saved for this game's next launch.");
 	return 1;
 }

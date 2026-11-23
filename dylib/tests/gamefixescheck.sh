@@ -6,7 +6,7 @@ SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 
 functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
-	load_gamefixes resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available dxmt_without_d3d12 \
+	load_gamefixes consume_sidebar_quick_settings resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available dxmt_without_d3d12 \
 	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
 	activate_backend record_backend rockstar_shim_copy rockstar_put_back rockstar_dxgi_copy rockstar_note rockstar_shim_lock_fd rockstar_shim_in_use rockstar_shim_folders stage_rockstar_shim compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
@@ -116,6 +116,7 @@ launch() {
 			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_nvapi="" gamefix_dlss_fg="" gamefix_args="" gamefix_rockstar_shim=""
 			backend_root="$CX_ROOT/lib/notproton-backends"
 			load_gamefixes || true
+			consume_sidebar_quick_settings || true
 			resolve_msync
 			export WINEMSYNC="${WINEMSYNC:-0}"
 			select_backend "$1"
@@ -741,6 +742,59 @@ for bad in 5 9 361 400 1000 max 30fps -30; do
 	has "FPS_LIMIT=$bad is refused" "rejected FPS_LIMIT: not 0, display, half or 10 to 360" "$case_dir/log"
 	is "a refused FPS_LIMIT=$bad leaves no limit" "<unset>" "$(got NOTPROTON_FPS_LIMIT)"
 done
+echo "== quick-settings promoted over launch options"
+# The in-game sidebar's pending change wins over launch options for the current run. The
+# file is left in place for the next relaunch (the Steam JS poller unlinks it when it runs),
+# so a user who never opens Steam Properties still gets the pick on the following launches.
+new_case
+full_engine
+mkdir -p "$case_dir/support/quick-settings"
+printf 'BRIDGEPLAY_FPS_LIMIT=90\nBRIDGEPLAY_PERF_OVERLAY=summary\nBRIDGEPLAY_SCALING_FILTER=nearest\n' \
+	> "$case_dir/support/quick-settings/4242.conf"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_FPS_LIMIT=30 BRIDGEPLAY_PERF_OVERLAY=fps
+is "the sidebar's limit wins over the launch options" "90" "$(got NOTPROTON_FPS_LIMIT)"
+is "the sidebar's overlay wins over the launch options" "summary" "$(got NOTPROTON_PERF_OVERLAY)"
+is "the sidebar's filter is applied even without a launch option" "nearest" "$(got NOTPROTON_SCALING_FILTER)"
+if [ -f "$case_dir/support/quick-settings/4242.conf" ]; then
+	ok "the pending file stays for the next relaunch"
+else
+	bad "the pending file stays for the next relaunch" "still there" "removed"
+fi
+# The second relaunch reads the same pending file and still wins over launch options.
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_FPS_LIMIT=30
+is "the second relaunch still gets 90" "90" "$(got NOTPROTON_FPS_LIMIT)"
+# compat_run.sh runs for helpers too (e.g. runinprefix); those must not consume or apply
+# the sidebar's pending change, since the game process is not starting.
+launch runinprefix "$case_dir/game/game.exe" BRIDGEPLAY_FPS_LIMIT=30
+is "a non-launch verb keeps launch options" "30" "$(got NOTPROTON_FPS_LIMIT)"
+
+# A pending change that fails gamefix_reason is rejected with a logged line.
+new_case
+full_engine
+mkdir -p "$case_dir/support/quick-settings"
+printf 'BRIDGEPLAY_FPS_LIMIT=9\nBRIDGEPLAY_BACKEND=dxmt\n' > "$case_dir/support/quick-settings/4242.conf"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a refused limit sets nothing" "<unset>" "$(got NOTPROTON_FPS_LIMIT)"
+has "a refused limit is logged" "quick-settings FPS_LIMIT=9 rejected" "$case_dir/log"
+# A key not on the sidebar's allow-list is silently ignored — the quick-settings consumer
+# never touches BACKEND, which belongs to Game Defaults.
+if grep -q "applied NOTPROTON_BACKEND=.* from the sidebar" "$case_dir/log"; then
+	bad "a non-sidebar key in quick-settings is not promoted" "no promotion" "found one"
+else
+	ok "a non-sidebar key in quick-settings is not promoted"
+fi
+
+# A symlink to a valid regular file is still refused by the consumer: the regular-file check
+# runs against the link's own type, so the consumer never follows a planted pointer.
+new_case
+full_engine
+mkdir -p "$case_dir/support/quick-settings"
+printf 'BRIDGEPLAY_FPS_LIMIT=75\n' > "$case_dir/elsewhere.conf"
+ln -s "$case_dir/elsewhere.conf" "$case_dir/support/quick-settings/4242.conf"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a symlinked pending file does not promote anything" "<unset>" "$(got NOTPROTON_FPS_LIMIT)"
+has "a symlinked pending file is logged as not regular" "not a regular file" "$case_dir/log"
+
 echo "== FPS_LIMIT_OFF"
 for value in 0 1; do
 	new_case
