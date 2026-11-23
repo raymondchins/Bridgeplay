@@ -494,18 +494,36 @@ enum GameDefaults {
     }
 
     // Use Defaults for a game's own conf: its lines for these settings go, after a backup.
+    // The sidebar's quick-settings pending file for this game is also removed so a later
+    // launch does not restore a pick from it — the run script leaves pending in place to
+    // survive multiple relaunches, which also means the app must clear it explicitly.
     static func clearConf(appID: String, gamefixes: URL = SupportPaths.gamefixes,
-                          backups: URL = SupportPaths.backups, now: Date = Date()) throws {
+                          backups: URL = SupportPaths.backups,
+                          quickSettings: URL = SupportPaths.support.appending(path: "quick-settings"),
+                          now: Date = Date()) throws {
         let url = gamefixes.appending(path: "\(appID).conf")
+        let nativeUrl = gamefixes.appending(path: "native/\(appID).conf")
+        let pending = quickSettings.appending(path: "\(appID).conf")
         let current = read(url)
+        let nativeCurrent = read(nativeUrl)
         let updated = resettingAll(in: current)
-        guard updated != current else { return }
-        let backup = backups.appending(path: "\(appID).conf.\(Int(now.timeIntervalSince1970))")
-        try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
-        if !FileManager.default.fileExists(atPath: backup.path(percentEncoded: false)) {
-            try FileManager.default.copyItem(at: url, to: backup)
+        let nativeUpdated = resettingAll(in: nativeCurrent)
+        let hadPending = FileManager.default.fileExists(atPath: pending.path(percentEncoded: false))
+        guard updated != current || nativeUpdated != nativeCurrent || hadPending else { return }
+        if updated != current {
+            let backup = backups.appending(path: "\(appID).conf.\(Int(now.timeIntervalSince1970))")
+            try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
+            if !FileManager.default.fileExists(atPath: backup.path(percentEncoded: false)) {
+                try FileManager.default.copyItem(at: url, to: backup)
+            }
+            try Data(updated.utf8).write(to: url, options: .atomic)
         }
-        try Data(updated.utf8).write(to: url, options: .atomic)
+        if nativeUpdated != nativeCurrent {
+            try Data(nativeUpdated.utf8).write(to: nativeUrl, options: .atomic)
+        }
+        if hadPending {
+            try? FileManager.default.removeItem(at: pending)
+        }
         AppLog.note("game defaults: \(appID).conf now uses the defaults")
     }
 

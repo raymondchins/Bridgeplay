@@ -1306,7 +1306,9 @@ consume_sidebar_quick_settings() {
   done < "$qs_file"
 }
 
-consume_sidebar_quick_settings
+# A failure (unlikely, but a poller rename between the check and the read could trip it)
+# must never abort the launch.
+consume_sidebar_quick_settings || true
 
 # Steam gives every non-Steam shortcut a game ID ending in 0x02000000.
 shortcut_game_id() {

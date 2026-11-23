@@ -348,9 +348,35 @@ import Testing
         try FileManager.default.createDirectory(at: gamefixes, withIntermediateDirectories: true)
         try Data("# fix\nBACKEND=dxvk\nWINEDEBUG=-all\n".utf8).write(to: gamefixes.appending(path: "42.conf"))
         let backups = root.appending(path: "backups")
+        let quickSettings = root.appending(path: "quick-settings")
         try GameDefaults.clearConf(appID: "42", gamefixes: gamefixes, backups: backups,
+                                   quickSettings: quickSettings,
                                    now: Date(timeIntervalSince1970: 5))
         #expect(GameDefaults.read(gamefixes.appending(path: "42.conf")) == "# fix\nWINEDEBUG=-all\n")
         #expect(GameDefaults.read(backups.appending(path: "42.conf.5")) == "# fix\nBACKEND=dxvk\nWINEDEBUG=-all\n")
+    }
+
+    @Test func useDefaultsRemovesTheSidebarPendingFileToo() throws {
+        let root = try scratchDirectory("gamedefaults-clear-pending")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let gamefixes = root.appending(path: "gamefixes")
+        let native = gamefixes.appending(path: "native")
+        let quickSettings = root.appending(path: "quick-settings")
+        for dir in [gamefixes, native, quickSettings, root.appending(path: "backups")] {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        try Data("BRIDGEPLAY_FPS_LIMIT=90\n".utf8).write(to: gamefixes.appending(path: "42.conf"))
+        try Data("BRIDGEPLAY_FPS_LIMIT=90\n".utf8).write(to: native.appending(path: "42.conf"))
+        let pending = quickSettings.appending(path: "42.conf")
+        try Data("BRIDGEPLAY_FPS_LIMIT=90\n".utf8).write(to: pending)
+        try GameDefaults.clearConf(appID: "42", gamefixes: gamefixes,
+                                   backups: root.appending(path: "backups"),
+                                   quickSettings: quickSettings,
+                                   now: Date(timeIntervalSince1970: 7))
+        // The gamefix and native-gamefix mirrors are both reset; the pending file that would
+        // have reapplied the pick on next launch is removed.
+        #expect(GameDefaults.read(gamefixes.appending(path: "42.conf")) == "")
+        #expect(GameDefaults.read(native.appending(path: "42.conf")) == "")
+        #expect(!FileManager.default.fileExists(atPath: pending.path(percentEncoded: false)))
     }
 }

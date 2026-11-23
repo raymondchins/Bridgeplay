@@ -50,22 +50,36 @@ int main(void) {
                     hz, nsscreen_max);
             return 1;
         }
-        // Reject a result that overshoots every reading source: no CG mode has a higher
-        // refresh than this across every display, and every NSScreen is bounded.
+        // Reject a result that overshoots every reading source. The options and both the
+        // mode-list and current-mode fallback match the production code so a mirrored
+        // display or a current-mode-only ProMotion reading is covered the same way.
         CGDirectDisplayID ids[16];
         uint32_t n = 0;
         if (CGGetActiveDisplayList(16, ids, &n) != kCGErrorSuccess) n = 0;
         int cg_max = 0;
+        const void *keys[1] = { kCGDisplayShowDuplicateLowResolutionModes };
+        const void *values[1] = { kCFBooleanTrue };
+        CFDictionaryRef options = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 1,
+                                                     &kCFTypeDictionaryKeyCallBacks,
+                                                     &kCFTypeDictionaryValueCallBacks);
         for (uint32_t i = 0; i < n; i++) {
-            CFArrayRef modes = CGDisplayCopyAllDisplayModes(ids[i], NULL);
-            if (!modes) continue;
-            for (CFIndex j = 0; j < CFArrayGetCount(modes); j++) {
-                CGDisplayModeRef m = (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, j);
-                int rounded = (int)(CGDisplayModeGetRefreshRate(m) + 0.5);
-                if (rounded > cg_max && rounded <= 360) cg_max = rounded;
+            CFArrayRef modes = CGDisplayCopyAllDisplayModes(ids[i], options);
+            if (modes) {
+                for (CFIndex j = 0; j < CFArrayGetCount(modes); j++) {
+                    CGDisplayModeRef m = (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, j);
+                    int rounded = (int)(CGDisplayModeGetRefreshRate(m) + 0.5);
+                    if (rounded > cg_max && rounded <= 360) cg_max = rounded;
+                }
+                CFRelease(modes);
             }
-            CFRelease(modes);
+            CGDisplayModeRef cur = CGDisplayCopyDisplayMode(ids[i]);
+            if (cur) {
+                int rounded = (int)(CGDisplayModeGetRefreshRate(cur) + 0.5);
+                if (rounded > cg_max && rounded <= 360) cg_max = rounded;
+                CGDisplayModeRelease(cur);
+            }
         }
+        if (options) CFRelease(options);
         int bounded = (int)nsscreen_max > cg_max ? (int)nsscreen_max : cg_max;
         if (bounded > 0 && hz > bounded) {
             fprintf(stderr, "np_display_max_hz returned %d, above the highest reading %d\n",

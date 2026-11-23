@@ -240,33 +240,60 @@ static int sb_save_gamefix(const char *key, const char *value)
 
 	char canonical[64];
 	sb_canonical_key(key, canonical, sizeof(canonical));
-	size_t canonical_len = strlen(canonical);
-	// The app's old writes used the short spelling (FPS_LIMIT=X), which the sidebar replaces
-	// too so the file carries one line per key, no matter which side wrote it last.
+	// The run scripts also accept the short spelling (FPS_LIMIT=X) and the NOTPROTON_ alias,
+	// so the sidebar drops any of those three too when it rewrites: one line per key, no
+	// matter which side wrote it last, and no higher-priority alias left to beat ours.
 	const char *bare = canonical + strlen("BRIDGEPLAY_");
-	size_t bare_len = strlen(bare);
+	char ntoken[64];
+	snprintf(ntoken, sizeof(ntoken), "NOTPROTON_%s", bare);
+	const char *tokens[3] = { canonical, bare, ntoken };
 
-	// Copy every other line from the current file, dropping any line whose key matches ours
-	// (short or BRIDGEPLAY_ spelling, with optional leading whitespace). An unreadable file
-	// that exists is left in place: wiping it would discard the user's other overrides.
+	// Copy every other line from the current file, dropping any line whose key matches ours.
+	// The matcher mirrors the run script's tolerance: leading whitespace, an optional
+	// `export ` prefix, and whitespace around `=`. An unreadable file that exists is left in
+	// place: wiping it would discard the user's other overrides.
 	char keep[sb_conf_cap];
 	size_t keep_len = 0;
-	FILE *in = fopen(path, "r");
-	if (in == NULL && errno != ENOENT)
+	int read_fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+	int open_errno = errno;
+	FILE *in = read_fd >= 0 ? fdopen(read_fd, "r") : NULL;
+	if (read_fd >= 0 && in == NULL)
+		close(read_fd);
+	if (read_fd < 0 && open_errno != ENOENT)
 		return 0;
 	if (in != NULL) {
-		char line[1024];
+		// Lines up to 4 KiB, long enough for any sensible comment; a longer line the player
+		// wrote is read as several fgets calls, and the matcher only looks at the start of
+		// a complete line to avoid treating a chunk's tail as a new key assignment.
+		char line[4096];
+		int at_line_start = 1;
 		while (fgets(line, sizeof(line), in) != NULL) {
-			const char *p = line;
-			while (*p == ' ' || *p == '\t')
-				p++;
+			size_t n = strlen(line);
+			int line_done = n > 0 && line[n - 1] == '\n';
 			int drop = 0;
-			if ((strncmp(p, canonical, canonical_len) == 0 && p[canonical_len] == '=') ||
-			    (strncmp(p, bare, bare_len) == 0 && p[bare_len] == '='))
-				drop = 1;
+			if (at_line_start) {
+				const char *p = line;
+				while (*p == ' ' || *p == '\t')
+					p++;
+				if (strncmp(p, "export ", 7) == 0) {
+					p += 7;
+					while (*p == ' ' || *p == '\t')
+						p++;
+				}
+				for (int t = 0; !drop && t < 3; t++) {
+					size_t tl = strlen(tokens[t]);
+					if (strncmp(p, tokens[t], tl) != 0)
+						continue;
+					const char *q = p + tl;
+					while (*q == ' ' || *q == '\t')
+						q++;
+					if (*q == '=')
+						drop = 1;
+				}
+			}
+			at_line_start = line_done;
 			if (drop)
 				continue;
-			size_t n = strlen(line);
 			if (keep_len + n + 1 >= sizeof(keep)) {
 				fclose(in);
 				return 0;
@@ -286,7 +313,7 @@ static int sb_save_gamefix(const char *key, const char *value)
 		keep[keep_len++] = '\n';
 	}
 	// The run script refuses a conf over 64 KiB; keep ourselves well under.
-	size_t new_line = canonical_len + 1 + strlen(value) + 1;
+	size_t new_line = strlen(canonical) + 1 + strlen(value) + 1;
 	if (keep_len + new_line >= sb_conf_cap)
 		return 0;
 
@@ -329,14 +356,19 @@ static int sb_save(const char *key, const char *value)
 	snprintf(path, sizeof(path), "%s/%s.conf", dir, sb_appid);
 	snprintf(tmp, sizeof(tmp), "%s.%d.tmp", path, getpid());
 
-	// Picks still waiting from this game carry over; a file from before it started belongs to
-	// an earlier session, maybe another Steam account's, and is replaced, not merged
+	// Picks still waiting from an earlier session carry over, so a change here does not
+	// silently lose the player's older picks for other sidebar keys. The file is opened with
+	// O_NOFOLLOW so a symlink planted at its name is not followed; a non-regular file
+	// (socket, FIFO) that was somehow placed here is also refused.
 	char kept[sb_rows][16] = { { 0 } };
-	FILE *in = fopen(path, "r");
-	struct stat file;
-	if (in != NULL && (fstat(fileno(in), &file) != 0 || file.st_mtime < sb_started)) {
-		fclose(in);
-		in = NULL;
+	int read_fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+	FILE *in = NULL;
+	if (read_fd >= 0) {
+		struct stat file;
+		if (fstat(read_fd, &file) == 0 && S_ISREG(file.st_mode))
+			in = fdopen(read_fd, "r");
+		if (in == NULL)
+			close(read_fd);
 	}
 	if (in != NULL) {
 		char line[128];

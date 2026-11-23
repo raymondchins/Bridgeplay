@@ -51,6 +51,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -492,32 +493,62 @@ int main(int argc, char **argv)
 	 * the pick takes effect whether or not the Steam JS poller came. The file is left in
 	 * place for another relaunch in the same situation; the Steam JS poller unlinks it
 	 * when it runs, and the sidebar's gamefixes/native/<appid>.conf mirror gives persistence
-	 * after that. Only the four sidebar keys are promoted. The regular-file check keeps a
-	 * FIFO or socket at this name from blocking the read. */
+	 * after that. Only the four sidebar keys are promoted. The file is opened with O_NOFOLLOW
+	 * and checked for a regular type on its own fd so no FIFO/socket/symlink planted at this
+	 * name blocks the launch or steers a read elsewhere between the type check and the open. */
 	if (home && valid_appid(appid)) {
 		char *support = current_or_legacy(home, SUPPORT_REL, LEGACY_SUPPORT_REL, dir_exists);
 		char *qs_dir = join3(support, "/quick-settings/", appid);
 		char *qs_path = join3(qs_dir, ".conf", "");
-		struct stat qst;
-		if (lstat(qs_path, &qst) == 0 && S_ISREG(qst.st_mode) && qst.st_size <= 4096) {
-			struct layer qs = {.src = qs_path};
-			load_conf(&qs, qs_path, home);
-			static const char *const allowed[] = {
-				"BRIDGEPLAY_FPS_LIMIT", "BRIDGEPLAY_FPS_LIMIT_OFF",
-				"BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_SCALING_FILTER", NULL,
-			};
-			for (int j = 0; j < qs.n; j++) {
-				int ok = 0;
-				for (int a = 0; allowed[a]; a++)
-					if (strcmp(qs.names[j], allowed[a]) == 0) { ok = 1; break; }
-				if (!ok)
-					continue;
-				xsetenv(qs.names[j], qs.values[j]);
-				char *legacy = legacy_name(qs.names[j]);
-				if (legacy)
-					xsetenv(legacy, qs.values[j]);
-				free(legacy);
+		int qs_fd = open(qs_path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+		if (qs_fd >= 0) {
+			struct stat qst;
+			if (fstat(qs_fd, &qst) == 0 && S_ISREG(qst.st_mode) && qst.st_size > 0
+			    && qst.st_size <= 4096) {
+				/* Clear O_NONBLOCK for the regular file; stdio reads cleanly. */
+				int flags = fcntl(qs_fd, F_GETFL);
+				if (flags != -1)
+					fcntl(qs_fd, F_SETFL, flags & ~O_NONBLOCK);
+				struct layer qs = {.src = qs_path};
+				FILE *f = fdopen(qs_fd, "r");
+				if (f) {
+					char *line = NULL;
+					size_t cap = 0;
+					while (getline(&line, &cap, f) >= 0) {
+						char *s = trim(line);
+						if (*s == '\0' || *s == '#') continue;
+						if (strncmp(s, "export ", 7) == 0) s = trim(s + 7);
+						char *eq = strchr(s, '=');
+						if (!eq) continue;
+						*eq = '\0';
+						char *name = trim(s), *val = trim(eq + 1);
+						if (!valid_name(name, strlen(name))) continue;
+						if (val[0] == '\0') continue;
+						layer_put(&qs, name, strlen(name), val);
+					}
+					free(line);
+					fclose(f);
+					qs_fd = -1;
+				}
+				static const char *const allowed[] = {
+					"BRIDGEPLAY_FPS_LIMIT", "BRIDGEPLAY_FPS_LIMIT_OFF",
+					"BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_SCALING_FILTER", NULL,
+				};
+				for (int j = 0; j < qs.n; j++) {
+					int ok = 0;
+					for (int a = 0; allowed[a]; a++)
+						if (strcmp(qs.names[j], allowed[a]) == 0) { ok = 1; break; }
+					if (!ok)
+						continue;
+					xsetenv(qs.names[j], qs.values[j]);
+					char *legacy = legacy_name(qs.names[j]);
+					if (legacy)
+						xsetenv(legacy, qs.values[j]);
+					free(legacy);
+				}
 			}
+			if (qs_fd >= 0)
+				close(qs_fd);
 		}
 		free(qs_path);
 		free(qs_dir);

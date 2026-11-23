@@ -121,13 +121,16 @@ static int child(const char *path, const char *mode, const char *home)
 	CHECK(before > 45, "the game ran at only %.1f fps before any limit", before);
 	CHECK(!layer.displaySyncEnabled, "VSync was forced before any limit");
 
-	// A pick still waiting from an earlier session is replaced, not carried into this one's
+	// A pick still waiting from an earlier session carries over so one sidebar key does not
+	// clear the rest, and the new one joins it.
 	NSString *stale = [dir stringByAppendingString:@"/4242.conf"];
 	[@"BRIDGEPLAY_PERF_OVERLAY=detailed\n" writeToFile:stale atomically:NO encoding:NSUTF8StringEncoding error:nil];
 	[[NSFileManager defaultManager] setAttributes:@{ NSFileModificationDate : [NSDate dateWithTimeIntervalSinceNow:-3600] }
 	                                 ofItemAtPath:stale error:nil];
 	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "30"), "a 30 fps limit was refused");
-	CHECK([saved(home) isEqualToString:@"BRIDGEPLAY_FPS_LIMIT=30\n"], "the save carried over an earlier session's pick: %s",
+	CHECK([saved(home) containsString:@"BRIDGEPLAY_PERF_OVERLAY=detailed\n"]
+	      && [saved(home) containsString:@"BRIDGEPLAY_FPS_LIMIT=30\n"],
+	      "the save did not carry over an earlier session's overlay pick beside the new limit: %s",
 	      saved(home).UTF8String);
 	// Mirror into the shared gamefixes conf (BRIDGEPLAY_ spelling, which both compat_run.sh
 	// and np-native read; the app's Game Defaults page accepts both spellings).
