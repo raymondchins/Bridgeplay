@@ -289,6 +289,12 @@ quicksettings-check:
 	$(TEST_CC) -o $(OUT_DIR)/quicksettings-check dylib/tests/quicksettings-check.c && \
 	$(OUT_DIR)/quicksettings-check
 
+displayratecheck:
+	@if [ ! -f dylib/tests/displayratecheck.c ]; then $(call SKIP,displayratecheck,dylib/tests/displayratecheck.c); exit 0; fi; \
+	mkdir -p $(OUT_DIR) && \
+	$(TEST_CC) -framework CoreGraphics -framework CoreFoundation -o $(OUT_DIR)/displayratecheck dylib/tests/displayratecheck.c && \
+	$(OUT_DIR)/displayratecheck
+
 compatsvc-check:
 	@if [ ! -f dylib/tests/compatsvc-check.c ]; then $(call SKIP,compatsvc-check,dylib/tests/compatsvc-check.c); exit 0; fi; \
 	mkdir -p $(OUT_DIR) && \
@@ -970,7 +976,7 @@ np-inventory-check:
 # overlay-shim-tests is left out: it needs a Metal GPU and real frame timing.
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
-	activatecheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check prefixstate-check shortcutcheck launch-shell envcheck \
+	activatecheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck launchercheck \
 	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
 	app-tests native-installercheck
