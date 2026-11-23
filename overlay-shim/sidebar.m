@@ -194,12 +194,14 @@ static int sb_index(int row)
 
 // The shared per-game conf the app's Game Defaults page reads and writes. The sidebar writes
 // the same keys here so a change in game is reflected in the app and sticks across relaunches
-// even when the Steam page's poller never ran. The short (non-BRIDGEPLAY_) spelling matches
-// what the app writes; the run script treats both spellings the same.
-static const char *sb_short_key(const char *key)
+// even when the Steam page's poller never ran. The BRIDGEPLAY_ spelling matches what
+// compat_run.sh maps to NOTPROTON_ and what np-native.c (the native macOS launcher) reads
+// to set its NOTPROTON_ alias; the app's Game Defaults page accepts both spellings.
+static void sb_canonical_key(const char *key, char *out, size_t cap)
 {
 	static const char *const prefix = "BRIDGEPLAY_";
-	return strncmp(key, prefix, strlen(prefix)) == 0 ? key + strlen(prefix) : key;
+	const char *bare = strncmp(key, prefix, strlen(prefix)) == 0 ? key + strlen(prefix) : key;
+	snprintf(out, cap, "%s%s", prefix, bare);
 }
 
 // The written-out length of lines kept from an old conf, bounded so a hostile file cannot run
@@ -236,11 +238,13 @@ static int sb_save_gamefix(const char *key, const char *value)
 	snprintf(path, sizeof(path), "%s/%s.conf", dir, sb_appid);
 	snprintf(tmp, sizeof(tmp), "%s.%d.tmp", path, getpid());
 
-	const char *short_key = sb_short_key(key);
-	size_t short_len = strlen(short_key);
-	char brand_key[64];
-	snprintf(brand_key, sizeof(brand_key), "BRIDGEPLAY_%s", short_key);
-	size_t brand_len = strlen(brand_key);
+	char canonical[64];
+	sb_canonical_key(key, canonical, sizeof(canonical));
+	size_t canonical_len = strlen(canonical);
+	// The app's old writes used the short spelling (FPS_LIMIT=X), which the sidebar replaces
+	// too so the file carries one line per key, no matter which side wrote it last.
+	const char *bare = canonical + strlen("BRIDGEPLAY_");
+	size_t bare_len = strlen(bare);
 
 	// Copy every other line from the current file, dropping any line whose key matches ours
 	// (short or BRIDGEPLAY_ spelling, with optional leading whitespace). An unreadable file
@@ -257,8 +261,8 @@ static int sb_save_gamefix(const char *key, const char *value)
 			while (*p == ' ' || *p == '\t')
 				p++;
 			int drop = 0;
-			if ((strncmp(p, short_key, short_len) == 0 && p[short_len] == '=') ||
-			    (strncmp(p, brand_key, brand_len) == 0 && p[brand_len] == '='))
+			if ((strncmp(p, canonical, canonical_len) == 0 && p[canonical_len] == '=') ||
+			    (strncmp(p, bare, bare_len) == 0 && p[bare_len] == '='))
 				drop = 1;
 			if (drop)
 				continue;
@@ -282,7 +286,7 @@ static int sb_save_gamefix(const char *key, const char *value)
 		keep[keep_len++] = '\n';
 	}
 	// The run script refuses a conf over 64 KiB; keep ourselves well under.
-	size_t new_line = strlen(short_key) + 1 + strlen(value) + 1;
+	size_t new_line = canonical_len + 1 + strlen(value) + 1;
 	if (keep_len + new_line >= sb_conf_cap)
 		return 0;
 
@@ -294,7 +298,7 @@ static int sb_save_gamefix(const char *key, const char *value)
 	int ok = out != NULL;
 	if (ok && keep_len > 0 && fwrite(keep, 1, keep_len, out) != keep_len)
 		ok = 0;
-	if (ok && fprintf(out, "%s=%s\n", short_key, value) <= 0)
+	if (ok && fprintf(out, "%s=%s\n", canonical, value) <= 0)
 		ok = 0;
 	if (out != NULL && fclose(out) != 0)
 		ok = 0;

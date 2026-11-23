@@ -1263,13 +1263,23 @@ load_gamefixes || true
 # normally carries them into Steam launch options a few seconds later, but that poller only
 # runs once the Compatibility or Settings page module has evaluated, so a session where the
 # user never visits either page leaves the file on disk. Promote any still-pending change
-# over the launch options for this run and remove the file, so the pick takes effect
-# whether or not the poller came. Only the four keys the sidebar sets are promoted, and each
-# goes through gamefix_reason before it is applied.
+# over the launch options for this run so the pick takes effect whether or not the poller
+# came, and leave the file in place so another relaunch in the same situation gets the
+# same value; the Steam JS poller unlinks it once it runs, and the gamefixes mirror the
+# sidebar writes beside this file gives persistence after that happens. Only applied on a
+# real game launch (waitforexitandrun), so the Steam helpers that also run compat_run.sh
+# do not steal the pending change. The regular file check keeps a fifo or socket at this
+# name from stalling the read, and symlinks at the path are refused.
 consume_sidebar_quick_settings() {
   case "$app_id" in ''|0) return 0 ;; esac
+  [ "${verb:-}" = waitforexitandrun ] || return 0
   qs_file="$np_support/quick-settings/$app_id.conf"
   [ -f "$qs_file" ] || return 0
+  qs_mode=$(stat -f %HT "$qs_file" 2>/dev/null)
+  if [ "$qs_mode" != "Regular File" ]; then
+    gamefix_log "quick-settings conf $qs_file is not a regular file ($qs_mode), left in place"
+    return 0
+  fi
   if [ ! -r "$qs_file" ] || [ "$(stat -f %z "$qs_file" 2>/dev/null || echo 0)" -gt 4096 ]; then
     gamefix_log "quick-settings conf $qs_file is unreadable or over 4 KiB, left in place"
     return 0
@@ -1294,7 +1304,6 @@ consume_sidebar_quick_settings() {
     export "NOTPROTON_$key=$value"
     gamefix_log "applied NOTPROTON_$key=$value from the sidebar's quick-settings"
   done < "$qs_file"
-  rm -f "$qs_file"
 }
 
 consume_sidebar_quick_settings

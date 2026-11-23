@@ -30,24 +30,46 @@ int main(void) {
 
         // The NSScreen path has to be exercised, not skipped: a ProMotion display reports
         // 120 Hz through maximumFramesPerSecond even when CGDisplayModeGetRefreshRate still
-        // gives 0 on the current mode. Check both: the result at least matches the fastest
-        // screen, and the NSScreen class is actually loaded.
+        // gives 0 on the current mode. The test asserts the result matches the NSScreen
+        // max, so a build that hard-coded 360 or dropped the NSScreen path would fail.
         NSArray<NSScreen *> *screens = [NSScreen screens];
         if (screens.count == 0) {
             fprintf(stderr, "no NSScreen reported; AppKit did not come up\n");
             return 1;
         }
-        long fastest = 0;
+        long nsscreen_max = 0;
         for (NSScreen *screen in screens) {
             if (@available(macOS 12.0, *)) {
                 long screen_hz = [screen maximumFramesPerSecond];
-                if (screen_hz > fastest && screen_hz <= 360)
-                    fastest = screen_hz;
+                if (screen_hz > nsscreen_max && screen_hz <= 360)
+                    nsscreen_max = screen_hz;
             }
         }
-        if (fastest > 0 && fastest > hz) {
-            fprintf(stderr, "np_display_max_hz returned %d, but NSScreen reports %ld\n",
-                    hz, fastest);
+        if (nsscreen_max > 0 && hz < nsscreen_max) {
+            fprintf(stderr, "np_display_max_hz returned %d, below NSScreen's %ld\n",
+                    hz, nsscreen_max);
+            return 1;
+        }
+        // Reject a result that overshoots every reading source: no CG mode has a higher
+        // refresh than this across every display, and every NSScreen is bounded.
+        CGDirectDisplayID ids[16];
+        uint32_t n = 0;
+        if (CGGetActiveDisplayList(16, ids, &n) != kCGErrorSuccess) n = 0;
+        int cg_max = 0;
+        for (uint32_t i = 0; i < n; i++) {
+            CFArrayRef modes = CGDisplayCopyAllDisplayModes(ids[i], NULL);
+            if (!modes) continue;
+            for (CFIndex j = 0; j < CFArrayGetCount(modes); j++) {
+                CGDisplayModeRef m = (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, j);
+                int rounded = (int)(CGDisplayModeGetRefreshRate(m) + 0.5);
+                if (rounded > cg_max && rounded <= 360) cg_max = rounded;
+            }
+            CFRelease(modes);
+        }
+        int bounded = (int)nsscreen_max > cg_max ? (int)nsscreen_max : cg_max;
+        if (bounded > 0 && hz > bounded) {
+            fprintf(stderr, "np_display_max_hz returned %d, above the highest reading %d\n",
+                    hz, bounded);
             return 1;
         }
 
@@ -58,8 +80,8 @@ int main(void) {
             return 1;
         }
 
-        printf("ok    np_display_max_hz: %d Hz (NSScreen reports %ld Hz; %lu screen%s)\n",
-               hz, fastest, (unsigned long)screens.count, screens.count == 1 ? "" : "s");
+        printf("ok    np_display_max_hz: %d Hz (NSScreen %ld, CG modes max %d; %lu screen%s)\n",
+               hz, nsscreen_max, cg_max, (unsigned long)screens.count, screens.count == 1 ? "" : "s");
         printf("==> displayratecheck: the slider's top is the fastest display's rate\n");
         return 0;
     }

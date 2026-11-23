@@ -743,8 +743,9 @@ for bad in 5 9 361 400 1000 max 30fps -30; do
 	is "a refused FPS_LIMIT=$bad leaves no limit" "<unset>" "$(got NOTPROTON_FPS_LIMIT)"
 done
 echo "== quick-settings promoted over launch options"
-# The in-game sidebar's pending change wins over launch options for the current run and the
-# file is removed once consumed. A pending change that is refused never reaches the game.
+# The in-game sidebar's pending change wins over launch options for the current run. The
+# file is left in place for the next relaunch (the Steam JS poller unlinks it when it runs),
+# so a user who never opens Steam Properties still gets the pick on the following launches.
 new_case
 full_engine
 mkdir -p "$case_dir/support/quick-settings"
@@ -754,13 +755,20 @@ launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_FPS_LIMIT=30 BRIDG
 is "the sidebar's limit wins over the launch options" "90" "$(got NOTPROTON_FPS_LIMIT)"
 is "the sidebar's overlay wins over the launch options" "summary" "$(got NOTPROTON_PERF_OVERLAY)"
 is "the sidebar's filter is applied even without a launch option" "nearest" "$(got NOTPROTON_SCALING_FILTER)"
-if [ ! -f "$case_dir/support/quick-settings/4242.conf" ]; then
-	ok "the consumed quick-settings file is removed"
+if [ -f "$case_dir/support/quick-settings/4242.conf" ]; then
+	ok "the pending file stays for the next relaunch"
 else
-	bad "the consumed quick-settings file is removed" "missing" "still at $case_dir/support/quick-settings/4242.conf"
+	bad "the pending file stays for the next relaunch" "still there" "removed"
 fi
-# A pending change for a key not on the sidebar's list is ignored; one that fails
-# gamefix_reason is rejected with a logged line.
+# The second relaunch reads the same pending file and still wins over launch options.
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_FPS_LIMIT=30
+is "the second relaunch still gets 90" "90" "$(got NOTPROTON_FPS_LIMIT)"
+# compat_run.sh runs for helpers too (e.g. runinprefix); those must not consume or apply
+# the sidebar's pending change, since the game process is not starting.
+launch runinprefix "$case_dir/game/game.exe" BRIDGEPLAY_FPS_LIMIT=30
+is "a non-launch verb keeps launch options" "30" "$(got NOTPROTON_FPS_LIMIT)"
+
+# A pending change that fails gamefix_reason is rejected with a logged line.
 new_case
 full_engine
 mkdir -p "$case_dir/support/quick-settings"
@@ -775,6 +783,17 @@ if grep -q "applied NOTPROTON_BACKEND=.* from the sidebar" "$case_dir/log"; then
 else
 	ok "a non-sidebar key in quick-settings is not promoted"
 fi
+
+# A symlink to a valid regular file is still refused by the consumer: the regular-file check
+# runs against the link's own type, so the consumer never follows a planted pointer.
+new_case
+full_engine
+mkdir -p "$case_dir/support/quick-settings"
+printf 'BRIDGEPLAY_FPS_LIMIT=75\n' > "$case_dir/elsewhere.conf"
+ln -s "$case_dir/elsewhere.conf" "$case_dir/support/quick-settings/4242.conf"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a symlinked pending file does not promote anything" "<unset>" "$(got NOTPROTON_FPS_LIMIT)"
+has "a symlinked pending file is logged as not regular" "not a regular file" "$case_dir/log"
 
 echo "== FPS_LIMIT_OFF"
 for value in 0 1; do
