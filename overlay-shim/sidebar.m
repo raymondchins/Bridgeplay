@@ -657,7 +657,7 @@ static void sb_draw_row(CGContextRef ctx, double w, double h, int row)
 		// that cannot move
 		const char *where = "Change it in Steam Properties › Bridgeplay.";
 		if (ph_width(where, sb_f.small, 0) > w - 2 * sb_text)
-			where = "Change in Steam › Bridgeplay.";
+			where = "Open Steam Properties › Bridgeplay.";
 		ph_text(ctx, h, sb_text, ph_centred(top + sb_track_mid, sb_f.small), "Apple's Metal HUD is on for this game.",
 		        sb_f.small, PH_FG2, 0);
 		ph_text(ctx, h, sb_text, ph_centred(top + sb_stops_mid, sb_f.small), where, sb_f.small, PH_FG3, 0);
