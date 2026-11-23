@@ -192,6 +192,95 @@ static int sb_index(int row)
 	}
 }
 
+// The shared per-game conf the app's Game Defaults page reads and writes. The sidebar writes
+// the same keys here so a change in game is reflected in the app and sticks across relaunches
+// even when the Steam page's poller never ran. The short (non-BRIDGEPLAY_) spelling matches
+// what the app writes; the run script treats both spellings the same.
+static const char *sb_short_key(const char *key)
+{
+	static const char *const prefix = "BRIDGEPLAY_";
+	return strncmp(key, prefix, strlen(prefix)) == 0 ? key + strlen(prefix) : key;
+}
+
+// The written-out length of lines kept from an old conf, bounded so a hostile file cannot run
+// the shim out of memory (gamefix_read also refuses files over 64 KiB).
+#define sb_conf_cap (64 * 1024)
+
+static int sb_save_gamefix(const char *key, const char *value)
+{
+	if (!sb_appid[0])
+		return 0;
+	char support[1024], dir[1100], path[1200], tmp[1300];
+	sb_support(support, sizeof(support));
+	if (support[0] == '\0')
+		return 0;
+	snprintf(dir, sizeof(dir), "%s/gamefixes", support);
+	struct stat st;
+	// A link in place of the folder is refused, so nothing is written where it points
+	if ((mkdir(dir, 0700) != 0 && errno != EEXIST) || lstat(dir, &st) != 0 || !S_ISDIR(st.st_mode))
+		return 0;
+	snprintf(path, sizeof(path), "%s/%s.conf", dir, sb_appid);
+	snprintf(tmp, sizeof(tmp), "%s.%d.tmp", path, getpid());
+
+	const char *short_key = sb_short_key(key);
+	size_t short_len = strlen(short_key);
+	char brand_key[64];
+	snprintf(brand_key, sizeof(brand_key), "BRIDGEPLAY_%s", short_key);
+	size_t brand_len = strlen(brand_key);
+
+	// Copy every other line from the current file, dropping any line whose key matches ours
+	// (short or BRIDGEPLAY_ spelling, with optional leading whitespace).
+	char keep[sb_conf_cap];
+	size_t keep_len = 0;
+	FILE *in = fopen(path, "r");
+	if (in != NULL) {
+		char line[1024];
+		while (fgets(line, sizeof(line), in) != NULL) {
+			const char *p = line;
+			while (*p == ' ' || *p == '\t')
+				p++;
+			int drop = 0;
+			if ((strncmp(p, short_key, short_len) == 0 && p[short_len] == '=') ||
+			    (strncmp(p, brand_key, brand_len) == 0 && p[brand_len] == '='))
+				drop = 1;
+			if (drop)
+				continue;
+			size_t n = strlen(line);
+			if (keep_len + n + 1 >= sizeof(keep)) {
+				fclose(in);
+				return 0;
+			}
+			memcpy(keep + keep_len, line, n);
+			keep_len += n;
+		}
+		fclose(in);
+	}
+	// A trailing newline before the new line, so the appended entry is on its own line.
+	if (keep_len > 0 && keep[keep_len - 1] != '\n') {
+		if (keep_len + 1 >= sizeof(keep))
+			return 0;
+		keep[keep_len++] = '\n';
+	}
+
+	unlink(tmp);
+	int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+	FILE *out = fd >= 0 ? fdopen(fd, "w") : NULL;
+	if (fd >= 0 && out == NULL)
+		close(fd);
+	int ok = out != NULL;
+	if (ok && keep_len > 0 && fwrite(keep, 1, keep_len, out) != keep_len)
+		ok = 0;
+	if (ok && fprintf(out, "%s=%s\n", short_key, value) <= 0)
+		ok = 0;
+	if (out != NULL && fclose(out) != 0)
+		ok = 0;
+	if (!ok || rename(tmp, path) != 0) {
+		unlink(tmp);
+		return 0;
+	}
+	return 1;
+}
+
 // The change waits there until Steam's page takes it; a newer pick of the same setting
 // replaces it, and the other settings still waiting stay.
 static int sb_save(const char *key, const char *value)
@@ -254,6 +343,11 @@ static int sb_save(const char *key, const char *value)
 		snprintf(sb_status, sizeof(sb_status), "Applied for this session. Could not save it.");
 		return 0;
 	}
+	// Mirror the change into the shared per-game conf. A failure here is logged but doesn't
+	// change the sidebar's status: the Steam page poll above is already saved, and the
+	// gamefix mirror only adds persistence for the case the page poll never ran.
+	if (!sb_save_gamefix(key, value))
+		shim_log("overlay_shim sidebar: %s=%s not mirrored to gamefixes conf\n", key, value);
 	snprintf(sb_status, sizeof(sb_status), "Applied. Saved for this game's next launch.");
 	return 1;
 }

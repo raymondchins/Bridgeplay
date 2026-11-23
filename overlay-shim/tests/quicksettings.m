@@ -69,6 +69,15 @@ static NSString *saved(const char *home)
 	return [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
 }
 
+// The shared per-game conf the app's Game Defaults page reads and writes. A sidebar change
+// mirrors here so the app sees it and so it still applies on next launch when the Steam
+// page's poller never consumed quick-settings.
+static NSString *gamefix(const char *home)
+{
+	NSString *path = [NSString stringWithFormat:@"%s/Library/Application Support/bridgeplay/gamefixes/4242.conf", home];
+	return [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
+}
+
 static int child(const char *path, const char *mode, const char *home)
 {
 	void *shim = dlopen(path, RTLD_NOW | RTLD_LOCAL);
@@ -120,6 +129,9 @@ static int child(const char *path, const char *mode, const char *home)
 	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "30"), "a 30 fps limit was refused");
 	CHECK([saved(home) isEqualToString:@"BRIDGEPLAY_FPS_LIMIT=30\n"], "the save carried over an earlier session's pick: %s",
 	      saved(home).UTF8String);
+	// Mirror into the shared gamefixes conf (short spelling, as the app writes it).
+	CHECK([gamefix(home) isEqualToString:@"FPS_LIMIT=30\n"],
+	      "the gamefix mirror was not written: %s", gamefix(home).UTF8String);
 	CHECK(layer.displaySyncEnabled, "the limit did not turn display sync on at once");
 	double capped = present_for(layer, 2.0);
 	CHECK(capped > 27 && capped < 31, "a limit set mid-run let the game run at %.1f fps", capped);
@@ -206,6 +218,29 @@ static int child(const char *path, const char *mode, const char *home)
 	      "the saved changes read %s", file.UTF8String);
 	CHECK([[NSString stringWithContentsOfFile:victim encoding:NSUTF8StringEncoding error:nil] isEqualToString:@"SAVE"],
 	      "saving wrote through a link at its temporary name");
+	// The gamefix mirror carries the same keys, in the short spelling the app writes. The
+	// order depends on which key was changed last; every line stays once.
+	NSString *mirror = gamefix(home);
+	CHECK([mirror containsString:@"FPS_LIMIT=0\n"] && [mirror containsString:@"PERF_OVERLAY=0\n"]
+	      && [mirror containsString:@"SCALING_FILTER=0\n"],
+	      "the gamefix mirror is missing a sidebar key: %s", mirror.UTF8String);
+	// Each key on its own line, no duplicates left after the last write for that key.
+	NSUInteger limit_lines = 0;
+	for (NSString *line in [mirror componentsSeparatedByString:@"\n"])
+		if ([line hasPrefix:@"FPS_LIMIT="])
+			limit_lines++;
+	CHECK(limit_lines == 1, "the gamefix mirror has %lu FPS_LIMIT lines, not 1: %s",
+	      (unsigned long)limit_lines, mirror.UTF8String);
+	// An unrelated line the user wrote stays untouched after a sidebar change.
+	NSString *gf_dir = [NSString stringWithFormat:@"%s/Library/Application Support/bridgeplay/gamefixes", home];
+	NSString *gf_path = [gf_dir stringByAppendingString:@"/4242.conf"];
+	NSString *touched = [NSString stringWithFormat:@"BACKEND=dxmt\n%@", mirror];
+	[touched writeToFile:gf_path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "33"), "a limit of 33 was refused");
+	NSString *after_mirror = gamefix(home);
+	CHECK([after_mirror hasPrefix:@"BACKEND=dxmt\n"] && [after_mirror containsString:@"FPS_LIMIT=33\n"]
+	      && ![after_mirror containsString:@"FPS_LIMIT=0\n"],
+	      "the gamefix mirror did not keep BACKEND or replace FPS_LIMIT: %s", after_mirror.UTF8String);
 
 	// Switched off, the limit keeps its value and lets the game go; switched back on, it holds again
 	CHECK(set("BRIDGEPLAY_FPS_LIMIT", "45"), "a limit of 45 was refused");
