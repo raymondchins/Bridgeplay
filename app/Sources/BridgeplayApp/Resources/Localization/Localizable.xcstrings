@@ -15619,6 +15619,28 @@
         }
       }
     },
+    "The bundled cabextract does not match its pin. Reinstall Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il cabextract incluso non corrisponde alla sua impronta. Reinstalla Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Встроенный cabextract не совпадает со своей контрольной суммой. Переустановите Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内置的 cabextract 与其校验值不符。请重新安装 Bridgeplay。"
+          }
+        }
+      }
+    },
     "The cave" : {
       "localizations" : {
         "it" : {

@@ -529,6 +529,7 @@ rebuilt Mach-O file needs its line there updated too; `SignedPinTests` fails unt
 | `winemac-winecx-11.15.so` | `winemac-patch/winecx-d3dmetal-retina.patch` | `76d8f93839386f37e8badf0c82bb31b5ead22ac580f17896f9d2a729af0fc147` | `FreeEngineWinecx.v1115.macDriver` |
 | `winebus-winecx-11.15.so` | Controllers (SDL2 build) | `1bc53184f5d026ab84a26cf6ef721348fc3b028c019ff969e69eb6cf9b9d1af9` | `FreeEngineWinecx.v1115.gamepad` |
 | `libSDL2-2.0.0.dylib` | SDL 2.32.10, `winemac-patch/sdl2-iokit-gamepad-collection.patch` | `aeeec088bf51f9eac0dbd8e26ae994c7b8568fb42fc676835d6dc2109fc559d1` | `FreeEngineWinecx` `sdl` (both releases) |
+| `cabextract` | cabextract 1.12, `scripts/build-cabextract.sh` | `8c8f3b80ce8998b952df3638abcacd44161793646376fa549d9f33ab8aeea171` | `PrefixTools.cabextractSHA256`, `SignedPin` (Winetricks PATH, not laid into engines) |
 | `winemac-winehq-11.15.so` | `winemac-patch/dxmt_export.c` | `d95fe40b6321ba8a34933a6b394af6d75547220a7168896c357af3a32377b08f` | `FreeEngine` `macDriver` |
 | `detour2-41069.bin` | `ntdll-patch/build.sh` (41069) | `660ea7c935620e620a45a46e552c0a3de9292e031bf93ef676968154d45e78d5` | `NtdllPatcher.byBuild` |
 | `detour2-41073.bin` | `ntdll-patch/build.sh` (41073) | `971c9c8c0f5a9fc7338fb5012a88f8a5297924e48cadb0aa0fa827cce0984a6e` | `NtdllPatcher.byBuild` |

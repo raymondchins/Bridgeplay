@@ -8,6 +8,7 @@ struct SignedPinTests {
 
     private var machOResources: [URL] {
         ["so", "dylib"].flatMap { Bundle.module.urls(forResourcesWithExtension: $0, subdirectory: nil) ?? [] }
+            + [Bundle.module.url(forResource: "cabextract", withExtension: nil)].compactMap { $0 }
     }
 
     // A rebuilt Wine binary with a new sha256 pin but a stale content line would pass in a

@@ -281,6 +281,41 @@ enum PrefixTools {
     static let winetricksRelease = "20260125"
     static let winetricksSHA256 = "431f82fc74000e6c864409f1d8fb495d696c03928808e3e8acffc45179312a7b"
     static let winetricksLogName = "winetricks.log"
+    // cabextract 1.12 (GPL-3.0-or-later, NOTICE), built by scripts/build-cabextract.sh.
+    static let cabextractSHA256 = "8c8f3b80ce8998b952df3638abcacd44161793646376fa549d9f33ab8aeea171"
+
+    // Copies the bundled cabextract into its own folder next to the wrapper and returns that
+    // folder, or nil when this build carries none (the runner's own stays on PATH).
+    static func stagedCabextract(
+        beside wrapper: URL, step: String,
+        source: URL? = Bundle.module.url(forResource: "cabextract", withExtension: nil)
+    ) throws -> URL? {
+        guard let source else { return nil }
+        let dir = wrapper.deletingLastPathComponent().appending(path: "bin")
+        let staged = dir.appending(path: "cabextract")
+        let files = FileManager.default
+        if files.isExecutableFile(atPath: staged.path(percentEncoded: false)),
+           SignedPin.matches(staged, sha256: cabextractSHA256) {
+            return dir
+        }
+        // Two prefixes can run Winetricks at once, so a checked temp copy is renamed into place.
+        let temp = dir.appending(path: "cabextract.\(UUID().uuidString)")
+        defer { try? files.removeItem(at: temp) }
+        do {
+            try files.createDirectory(at: dir, withIntermediateDirectories: true)
+            try files.copyItem(at: source, to: temp)
+            try files.setAttributes([.posixPermissions: 0o755], ofItemAtPath: temp.path(percentEncoded: false))
+        } catch {
+            throw StepFailure(step: step, detail: error.localizedDescription)
+        }
+        guard SignedPin.matches(temp, sha256: cabextractSHA256) else {
+            throw StepFailure(step: step, detail: String(localized: "The bundled cabextract does not match its pin. Reinstall Bridgeplay."))
+        }
+        guard rename(temp.path(percentEncoded: false), staged.path(percentEncoded: false)) == 0 else {
+            throw StepFailure(step: step, detail: String(cString: strerror(errno)))
+        }
+        return dir
+    }
 
     // Wine truncates vc_redist's 1638 (newer runtime installed) to 102; Winetricks only accepts 236
     static let winetricksWine = #"""
@@ -344,8 +379,12 @@ enum PrefixTools {
             throw StepFailure(step: step, detail: error.localizedDescription)
         }
 
-        // cabextract comes from the runner's bin, which environment() puts on PATH.
+        // Most verbs unpack cabinets, and only CrossOver's own runners ship cabextract in bin,
+        // so the bundled one goes first on PATH.
         var environment = environment(prefix: prefix, runner: runner, flavor: flavor)
+        if let tools = try stagedCabextract(beside: wrapper, step: step) {
+            environment["PATH"] = tools.path(percentEncoded: false) + ":" + (environment["PATH"] ?? "/usr/bin:/bin")
+        }
         environment["WINE"] = wrapper.path(percentEncoded: false)
         environment["BRIDGEPLAY_WINE"] = loader.path(percentEncoded: false)
         // Winetricks reads the architecture from WINE_BIN, which would otherwise be the wrapper.

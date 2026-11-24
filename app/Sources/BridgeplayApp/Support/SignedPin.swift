@@ -10,6 +10,9 @@ enum SignedPin {
     // sha256 as committed -> hash without the signature. SignedPinTests checks every entry
     // against the file in Resources, so a rebuilt binary needs its line updated here.
     static let content: [String: String] = [
+        // cabextract (PrefixTools, for Winetricks)
+        "8c8f3b80ce8998b952df3638abcacd44161793646376fa549d9f33ab8aeea171":
+            "d8ac10ff9343a991c7a8d8de6f9576db29c0febe0a0f9ebc807c7a12cfd4d034",
         // libSDL2-2.0.0.dylib
         "aeeec088bf51f9eac0dbd8e26ae994c7b8568fb42fc676835d6dc2109fc559d1":
             "2e2a0912e0b1831986684a26e68e2b195e8e7d3ae2a0e7dce7084bd23827065c",
