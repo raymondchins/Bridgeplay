@@ -71,6 +71,16 @@ else
 	run "$volume/c" 1
 	is "no arial.ttf link" none "$(link "$cs/arial.ttf")"
 	is "Arial.TTF is kept" installed "$(cat "$cs/Arial.TTF")"
+
+	echo "== a dangling ARIAL.TTF link doesn't keep arial.ttf out"
+	run "$volume/d" 1
+	dl="$volume/d/pfx/drive_c/windows/Fonts"
+	ln -s "$work/gone/ARIAL.TTF" "$dl/ARIAL.TTF"
+	run "$volume/d" 1
+	is "arial.ttf still links" "$support/fonts/arial.ttf" "$(link "$dl/arial.ttf")"
+	rm "$dl/arial.ttf"
+	run "$volume/d" 1
+	is "a missing arial.ttf is linked again" "$support/fonts/arial.ttf" "$(link "$dl/arial.ttf")"
 fi
 
 [ "$fails" -eq 0 ] || { echo "fontlinkcheck: $fails failed"; exit 1; }

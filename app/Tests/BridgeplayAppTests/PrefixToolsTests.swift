@@ -429,24 +429,37 @@ struct PrefixToolsTests {
         #expect(!PrefixTools.isSharedFont("/Users/someone/Fonts/mine.ttf"))
     }
 
-    // Another prefix's Fonts isn't claimed, so a Fonts folder that is a link to one is left alone.
-    @Test("Font links in a Fonts folder reached through a link stay where they are")
-    func linkedFontsFolderIsLeftAlone() throws {
+    // Another prefix's Fonts isn't claimed, and Winetricks would put fonts there and through its
+    // links, so a Fonts folder that leads out of the prefix stops Winetricks before it runs.
+    @Test("Winetricks doesn't run when the prefix's Fonts folder leads out of it")
+    func linkedFontsFolderStopsWinetricks() throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "np-fonts-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let prefix = WinePrefix(appID: "2075800", name: "Game", library: SteamLibrary(root: dir.appending(path: "library")), lastUsed: nil)
         let windows = prefix.pfx.appending(path: "drive_c/windows")
         let other = dir.appending(path: "other/Fonts")
-        let shared = dir.appending(path: "runner/share/wine/fonts")
-        for folder in [windows, other, shared] {
+        let runner = dir.appending(path: "runner")
+        let unix = runner.appending(path: "lib/wine/x86_64-unix")
+        let shared = runner.appending(path: "share/wine/fonts")
+        for folder in [windows, other, shared, unix, dir.appending(path: "cache")] {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: unix.appending(path: "wine"))
+        let script = dir.appending(path: "cache/winetricks")
+        try Data("#!/bin/sh\ntouch \"$WINEPREFIX/ran\"\n".utf8).write(to: script)
+        for file in [unix.appending(path: "wine"), script] {
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path(percentEncoded: false))
         }
         try Data("shared".utf8).write(to: shared.appending(path: "tahoma.ttf"))
         try FileManager.default.createSymbolicLink(at: other.appending(path: "tahoma.ttf"), withDestinationURL: shared.appending(path: "tahoma.ttf"))
         try FileManager.default.createSymbolicLink(at: windows.appending(path: "Fonts"), withDestinationURL: other)
 
-        #expect(try PrefixTools.setAsideFontLinks(in: prefix, step: "test").isEmpty)
-        #expect(FileManager.default.fileExists(atPath: other.appending(path: "tahoma.ttf").path(percentEncoded: false)))
+        #expect(throws: StepFailure.self) {
+            try PrefixTools.winetricks(["corefonts"], in: prefix, script: script, runner: runner)
+        }
+        #expect(!FileManager.default.fileExists(atPath: prefix.pfx.appending(path: "ran").path(percentEncoded: false)))
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: other.appending(path: "tahoma.ttf").path(percentEncoded: false))
+            == shared.appending(path: "tahoma.ttf").path(percentEncoded: false))
     }
 
     @Test("A font link comes back only where no file of that name in any case took its place")

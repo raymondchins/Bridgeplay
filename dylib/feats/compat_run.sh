@@ -3127,7 +3127,8 @@ link_fonts() {
   mkdir -p "$fonts_dir" 2>> "$log" || return 0
   # Windows finds a font by name in any case, so on a case-sensitive volume a font that
   # Winetricks installed as Arial.TTF keeps the arial.ttf link out, and drops one made before.
-  fonts_present=$(find "$fonts_dir" -mindepth 1 -maxdepth 1 2>/dev/null | sed 's|.*/||' | tr '[:upper:]' '[:lower:]')
+  # -L -type f: fonts and links that reach one; a dangling link holds no name.
+  fonts_present=$(find -L "$fonts_dir" -mindepth 1 -maxdepth 1 -type f 2>/dev/null | sed 's|.*/||' | tr '[:upper:]' '[:lower:]')
   fonts_twice=$(printf '%s\n' "$fonts_present" | sort | uniq -d)
   for dir in "$np_support/fonts" "$CX_ROOT/share/wine/fonts"; do
     for src in "$dir"/*.ttf "$dir"/*.ttc; do

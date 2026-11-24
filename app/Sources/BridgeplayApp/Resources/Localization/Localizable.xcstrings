@@ -15553,6 +15553,28 @@
         }
       }
     },
+    "The Fonts folder in %@ links to another folder, so Winetricks would install fonts outside this prefix." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La cartella Fonts di %@ punta a un'altra cartella, quindi Winetricks installerebbe i font fuori da questo prefisso."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Папка Fonts в %@ ссылается на другую папку, поэтому Winetricks установил бы шрифты за пределами этого префикса."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 中的 Fonts 文件夹链接到其他文件夹，Winetricks 会把字体安装到此前缀之外。"
+          }
+        }
+      }
+    },
     "The Game Porting Toolkit wasn't added. %@" : {
       "localizations" : {
         "it" : {

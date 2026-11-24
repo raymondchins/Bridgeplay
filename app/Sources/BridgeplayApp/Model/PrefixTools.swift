@@ -426,14 +426,22 @@ enum PrefixTools {
     // stay, so a crash mid-run loses none the launcher can't make again.
     static func setAsideFontLinks(in prefix: WinePrefix, step: String) throws -> [(link: String, target: String)] {
         let fonts = prefix.pfx.appending(path: "drive_c/windows/Fonts").path(percentEncoded: false)
-        // A Fonts folder reached through a link may belong to another prefix, which isn't claimed.
         func real(_ path: String) -> String? {
             guard let resolved = realpath(path, nil) else { return nil }
             defer { free(resolved) }
             return String(cString: resolved)
         }
-        guard let root = real(prefix.pfx.path(percentEncoded: false)),
-              real(fonts)?.lowercased() == (root + "/drive_c/windows/Fonts").lowercased() else { return [] }
+        // A Fonts folder that leads out of the prefix (into another one, which isn't claimed) would
+        // take Winetricks' fonts there, so it doesn't run. Only Wine's part of the path may differ
+        // in case, and only on a volume that ignores case.
+        guard let root = real(prefix.pfx.path(percentEncoded: false)), let resolved = real(fonts) else { return [] }
+        guard resolved.hasPrefix(root + "/"),
+              resolved.dropFirst(root.count + 1).lowercased() == "drive_c/windows/fonts" else {
+            throw StepFailure(
+                step: step,
+                detail: String(localized: "The Fonts folder in \(prefix.title) links to another folder, so Winetricks would install fonts outside this prefix.")
+            )
+        }
         let files = FileManager.default
         guard let names = try? files.contentsOfDirectory(atPath: fonts) else { return [] }
         var moved: [(link: String, target: String)] = []
