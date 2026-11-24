@@ -24,7 +24,7 @@ main `Steam Helper` (no `--type=` argument) it only installs the spawn hook.
     allow-list in `gamefix_reason`, a row in [docs/GAMEFIXES.md](../docs/GAMEFIXES.md), and
     a passing `make gamefixescheck`.
   - Checks that run it: `runcheck`, `envcheck`, `envpasscheck`, `settingscheck`, `routecheck`,
-    `buildcheck`, `bridgecheck`, `seedcheck`, `gamedrivecheck`, `prefixnotecheck`,
+    `buildcheck`, `bridgecheck`, `seedcheck`, `gamedrivecheck`, `fontlinkcheck`, `prefixnotecheck`,
     `powernotecheck`, `exitcheck`, `launchprogresscheck`, `launchercheck`, `gamefixescheck`,
     `anticheatcheck`, `padcheck`, `shortcutcheck`.
   - Controllers: the script starts the game's launcher bundle itself rather than through

@@ -421,8 +421,9 @@ enum PrefixTools {
 
     // The launcher links the prefix's Fonts to Bridgeplay's shared fonts and the engine's
     // (link_fonts), and Winetricks installs fonts with cp -f, which writes through a link into
-    // every prefix's copy. So the links are moved out while it runs; any name Winetricks did
-    // not fill gets its link back, and the next launch links the rest as before.
+    // every prefix's copy. So those links are moved out while it runs; any name Winetricks did
+    // not fill gets its link back, and the next launch links the rest as before. Other links
+    // stay, so a crash mid-run loses none the launcher can't make again.
     static func setAsideFontLinks(in prefix: WinePrefix, step: String) throws -> [(link: String, target: String)] {
         let fonts = prefix.pfx.appending(path: "drive_c/windows/Fonts").path(percentEncoded: false)
         let files = FileManager.default
@@ -430,7 +431,7 @@ enum PrefixTools {
         var moved: [(link: String, target: String)] = []
         for name in names {
             let link = fonts + "/" + name
-            guard let target = try? files.destinationOfSymbolicLink(atPath: link) else { continue }
+            guard let target = try? files.destinationOfSymbolicLink(atPath: link), isSharedFont(target) else { continue }
             guard unlink(link) == 0 else {
                 let detail = String(cString: strerror(errno))
                 restoreFontLinks(moved)
@@ -439,6 +440,13 @@ enum PrefixTools {
             moved.append((link, target))
         }
         return moved
+    }
+
+    // The folders link_fonts links from: Bridgeplay's fonts (and their alt/) and an engine's.
+    static func isSharedFont(_ target: String) -> Bool {
+        let folder = (target as NSString).deletingLastPathComponent
+        let shared = SupportPaths.fonts.path(percentEncoded: false)
+        return folder == shared || folder == shared + "/alt" || folder.hasSuffix("/share/wine/fonts")
     }
 
     static func restoreFontLinks(_ links: [(link: String, target: String)]) {

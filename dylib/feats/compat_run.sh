@@ -3125,6 +3125,9 @@ link_fonts() {
   [ -f "$WINEPREFIX/system.reg" ] || return 0
   fonts_dir="$WINEPREFIX/drive_c/windows/Fonts"
   mkdir -p "$fonts_dir" 2>> "$log" || return 0
+  # Windows finds a font by name in any case, so on a case-sensitive volume a font that
+  # Winetricks installed as Arial.TTF keeps the arial.ttf link out.
+  fonts_present=$(find "$fonts_dir" -mindepth 1 -maxdepth 1 2>/dev/null | sed 's|.*/||' | tr '[:upper:]' '[:lower:]')
   for dir in "$np_support/fonts" "$CX_ROOT/share/wine/fonts"; do
     for src in "$dir"/*.ttf "$dir"/*.ttc; do
       [ -f "$src" ] || continue
@@ -3135,7 +3138,8 @@ link_fonts() {
       dst="$fonts_dir/$name"
       if [ -L "$dst" ]; then
         rm -f "$dst" && ln -s "$src" "$dst" 2>> "$log" || true
-      elif [ ! -e "$dst" ]; then
+      elif [ ! -e "$dst" ] \
+        && ! printf '%s\n' "$fonts_present" | grep -qxF "$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"; then
         ln -s "$src" "$dst" 2>> "$log" || true
       fi
     done

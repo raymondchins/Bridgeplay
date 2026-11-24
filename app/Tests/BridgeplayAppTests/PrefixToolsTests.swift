@@ -364,8 +364,8 @@ struct PrefixToolsTests {
 
     // corefonts and friends copy with cp -f, which would write through the launcher's links
     // into the fonts every prefix shares.
-    @Test("Winetricks installs fonts into the prefix, not through its links into the shared fonts")
-    func winetricksLeavesSharedFontsAlone() throws {
+    @Test("Winetricks installs fonts into the prefix, not through its links into the shared fonts", arguments: [0, 3])
+    func winetricksLeavesSharedFontsAlone(exit: Int) throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "np-winetricks-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let library = SteamLibrary(root: dir.appending(path: "library"))
@@ -373,8 +373,9 @@ struct PrefixToolsTests {
         let runner = dir.appending(path: "runner")
         let unix = runner.appending(path: "lib/wine/x86_64-unix")
         let fonts = prefix.pfx.appending(path: "drive_c/windows/Fonts")
-        let shared = dir.appending(path: "shared-fonts")
-        for folder in [fonts, unix, shared, dir.appending(path: "cache")] {
+        let shared = runner.appending(path: "share/wine/fonts")
+        let own = dir.appending(path: "own-fonts")
+        for folder in [fonts, unix, shared, own, dir.appending(path: "cache")] {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         }
         func executable(_ url: URL, _ body: String) throws {
@@ -386,18 +387,35 @@ struct PrefixToolsTests {
             try Data("shared \(name)".utf8).write(to: shared.appending(path: name))
             try FileManager.default.createSymbolicLink(at: fonts.appending(path: name), withDestinationURL: shared.appending(path: name))
         }
-        // What Winetricks' w_try_cp_font_files does for one font.
+        // A link the user made to their own font is none of Winetricks' business.
+        try Data("mine".utf8).write(to: own.appending(path: "mine.ttf"))
+        try FileManager.default.createSymbolicLink(at: fonts.appending(path: "mine.ttf"), withDestinationURL: own.appending(path: "mine.ttf"))
+        // What Winetricks' w_try_cp_font_files does for one font, noting what Fonts held then.
         let script = dir.appending(path: "cache/winetricks")
-        try executable(script, "#!/bin/sh\necho installed > \"$WINEPREFIX/arial.new\"\ncp -f \"$WINEPREFIX/arial.new\" \"$WINEPREFIX/drive_c/windows/Fonts/arial.ttf\"\n")
+        try executable(script, """
+            #!/bin/sh
+            ls "$WINEPREFIX/drive_c/windows/Fonts" > "$WINEPREFIX/during"
+            echo installed > "$WINEPREFIX/arial.new"
+            cp -f "$WINEPREFIX/arial.new" "$WINEPREFIX/drive_c/windows/Fonts/arial.ttf"
+            exit \(exit)
 
-        _ = try PrefixTools.winetricks(["corefonts"], in: prefix, script: script, runner: runner)
+            """)
 
+        if exit == 0 {
+            _ = try PrefixTools.winetricks(["corefonts"], in: prefix, script: script, runner: runner)
+        } else {
+            #expect(throws: StepFailure.self) { try PrefixTools.winetricks(["corefonts"], in: prefix, script: script, runner: runner) }
+        }
+
+        #expect(try String(contentsOf: prefix.pfx.appending(path: "during"), encoding: .utf8) == "mine.ttf\n")
         #expect(try String(contentsOf: shared.appending(path: "arial.ttf"), encoding: .utf8) == "shared arial.ttf")
         let arial = fonts.appending(path: "arial.ttf").path(percentEncoded: false)
         #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: arial)) == nil)
         #expect(try String(contentsOfFile: arial, encoding: .utf8) == "installed\n")
         let times = fonts.appending(path: "times.ttf").path(percentEncoded: false)
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: times) == shared.appending(path: "times.ttf").path(percentEncoded: false))
+        let mine = fonts.appending(path: "mine.ttf").path(percentEncoded: false)
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: mine) == own.appending(path: "mine.ttf").path(percentEncoded: false))
     }
 
     @Test("A font link comes back only where no file of that name in any case took its place")
