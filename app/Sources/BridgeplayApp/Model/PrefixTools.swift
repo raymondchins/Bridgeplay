@@ -281,7 +281,7 @@ enum PrefixTools {
     static let winetricksRelease = "20260125"
     static let winetricksSHA256 = "431f82fc74000e6c864409f1d8fb495d696c03928808e3e8acffc45179312a7b"
     static let winetricksLogName = "winetricks.log"
-    // cabextract 1.12 (GPL-3.0-or-later, NOTICE), built by scripts/build-cabextract.sh.
+    // cabextract 1.12 (GPL-2.0-or-later, NOTICE), built by scripts/build-cabextract.sh.
     static let cabextractSHA256 = "8c8f3b80ce8998b952df3638abcacd44161793646376fa549d9f33ab8aeea171"
 
     // Copies the bundled cabextract into its own folder next to the wrapper and returns that
@@ -294,7 +294,11 @@ enum PrefixTools {
         let dir = wrapper.deletingLastPathComponent().appending(path: "bin")
         let staged = dir.appending(path: "cabextract")
         let files = FileManager.default
+        // A copy of an app unzipped from a browser download carries quarantine, and macOS then
+        // stops an ad hoc cabextract at exec, so a quarantined copy is replaced too.
+        let quarantine = "com.apple.quarantine"
         if files.isExecutableFile(atPath: staged.path(percentEncoded: false)),
+           getxattr(staged.path(percentEncoded: false), quarantine, nil, 0, 0, 0) < 0,
            SignedPin.matches(staged, sha256: cabextractSHA256) {
             return dir
         }
@@ -307,6 +311,9 @@ enum PrefixTools {
             try files.setAttributes([.posixPermissions: 0o755], ofItemAtPath: temp.path(percentEncoded: false))
         } catch {
             throw StepFailure(step: step, detail: error.localizedDescription)
+        }
+        if removexattr(temp.path(percentEncoded: false), quarantine, XATTR_NOFOLLOW) != 0, errno != ENOATTR, errno != ENOTSUP {
+            throw StepFailure(step: step, detail: String(cString: strerror(errno)))
         }
         guard SignedPin.matches(temp, sha256: cabextractSHA256) else {
             throw StepFailure(step: step, detail: String(localized: "The bundled cabextract does not match its pin. Reinstall Bridgeplay."))
@@ -393,6 +400,9 @@ enum PrefixTools {
         let checked = try sha256.map { try verifiedCopy(of: script, sha256: $0, step: step) }
         defer { if let checked { try? FileManager.default.removeItem(at: checked.deletingLastPathComponent()) } }
 
+        let fontLinks = try setAsideFontLinks(in: prefix, step: step)
+        defer { restoreFontLinks(fontLinks) }
+
         let log = prefix.root.appending(path: winetricksLogName)
         let status = try Shell.logged(
             "/bin/sh", [(checked ?? script).path(percentEncoded: false), "-q"] + verbs,
@@ -407,6 +417,87 @@ enum PrefixTools {
             )
         }
         return log
+    }
+
+    // The launcher links the prefix's Fonts to Bridgeplay's shared fonts and the engine's
+    // (link_fonts), and Winetricks installs fonts with cp -f, which writes through a link into
+    // every prefix's copy. So those links are moved out while it runs; any name Winetricks did
+    // not fill gets its link back, and the next launch links the rest as before. Other links
+    // stay, so a crash mid-run loses none the launcher can't make again.
+    static func setAsideFontLinks(in prefix: WinePrefix, step: String) throws -> [(link: String, target: String)] {
+        let fonts = prefix.pfx.appending(path: "drive_c/windows/Fonts").path(percentEncoded: false)
+        func real(_ path: String) -> String? {
+            guard let resolved = realpath(path, nil) else { return nil }
+            defer { free(resolved) }
+            return String(cString: resolved)
+        }
+        // A Fonts folder that is a link (into another prefix, which isn't claimed, or anywhere
+        // else) would take Winetricks' fonts and cp -f through its links, so it doesn't run.
+        // Only Wine's part of the path may differ in case, and only on a volume that ignores case.
+        let refused = StepFailure(
+            step: step,
+            detail: String(localized: "The Fonts folder in \(prefix.title) is a link to another folder, so Bridgeplay didn't run Winetricks. Replace the link with a regular Fonts folder, then try again.")
+        )
+        guard let root = real(prefix.pfx.path(percentEncoded: false)) else { return [] }
+        guard let resolved = real(fonts) else {
+            // Nothing there: Winetricks makes the folder. A dangling link: it would follow it.
+            var info = stat()
+            if lstat(fonts, &info) == 0 { throw refused }
+            return []
+        }
+        guard resolved.hasPrefix(root + "/"),
+              resolved.dropFirst(root.count + 1).lowercased() == "drive_c/windows/fonts" else { throw refused }
+        let files = FileManager.default
+        // The folder is there (realpath found it), so a listing that fails leaves its links unguarded.
+        let names: [String]
+        do {
+            names = try files.contentsOfDirectory(atPath: fonts)
+        } catch {
+            throw StepFailure(step: step, detail: error.localizedDescription)
+        }
+        var moved: [(link: String, target: String)] = []
+        for name in names {
+            let link = fonts + "/" + name
+            guard let target = try? files.destinationOfSymbolicLink(atPath: link), isSharedFont(target) else { continue }
+            guard unlink(link) == 0 else {
+                let detail = String(cString: strerror(errno))
+                restoreFontLinks(moved, anyCase: false)
+                throw StepFailure(step: step, detail: detail)
+            }
+            moved.append((link, target))
+        }
+        return moved
+    }
+
+    // The folders link_fonts links from: Bridgeplay's fonts and their alt/ (the legacy notproton
+    // ones too, which older launches linked), and an engine's.
+    static func isSharedFont(_ target: String) -> Bool {
+        let folder = (target as NSString).deletingLastPathComponent
+        let shared = [SupportPaths.support, SupportPaths.legacyApplicationSupport].map {
+            $0.appending(path: "fonts").path(percentEncoded: false)
+        }
+        return shared.contains { folder == $0 || folder == $0 + "/alt" } || folder.hasSuffix("/share/wine/fonts")
+    }
+
+    // anyCase: false puts back exactly what was moved, for a set-aside that stopped halfway.
+    static func restoreFontLinks(_ links: [(link: String, target: String)], anyCase: Bool = true) {
+        guard let first = links.first else { return }
+        let fonts = (first.link as NSString).deletingLastPathComponent
+        // A dangling link holds no name, as in link_fonts.
+        let present = anyCase ? ((try? FileManager.default.contentsOfDirectory(atPath: fonts)) ?? [])
+            .filter { FileManager.default.fileExists(atPath: fonts + "/" + $0) } : []
+        for (link, target) in fontLinksToRestore(links, present: present) where symlink(target, link) != 0 {
+            AppLog.note("winetricks: could not link \(link) back to \(target): \(String(cString: strerror(errno)))")
+        }
+    }
+
+    // Windows finds fonts by name in any case, so a font installed as Arial.TTF on a
+    // case-sensitive volume takes the place of the arial.ttf link too.
+    static func fontLinksToRestore(
+        _ links: [(link: String, target: String)], present: [String]
+    ) -> [(link: String, target: String)] {
+        let taken = Set(present.map { $0.lowercased() })
+        return links.filter { !taken.contains(($0.link as NSString).lastPathComponent.lowercased()) }
     }
 
     // Reads the script once, checks those bytes against the pin and writes them to a new

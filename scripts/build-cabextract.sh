@@ -4,9 +4,10 @@
 #
 #   scripts/build-cabextract.sh [OUTPUT]
 #
-# Downloads cabextract 1.12 (GPL-3.0-or-later, NOTICE) at a pinned sha256, builds it arm64
+# Downloads cabextract 1.12 (GPL-2.0-or-later, NOTICE) at a pinned sha256, builds it arm64
 # for macOS 15.0, strips it and signs it ad hoc. OUTPUT defaults to the app resource. After a
 # rebuild, update the sha256 pins in PrefixTools.swift, SignedPin.swift, docs/WINECX.md and NOTICE.
+# The linker stamps its version into the binary, so another Xcode gives other bytes (new pins).
 
 set -eu
 

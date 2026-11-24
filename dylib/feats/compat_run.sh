@@ -3125,6 +3125,11 @@ link_fonts() {
   [ -f "$WINEPREFIX/system.reg" ] || return 0
   fonts_dir="$WINEPREFIX/drive_c/windows/Fonts"
   mkdir -p "$fonts_dir" 2>> "$log" || return 0
+  # Windows finds a font by name in any case, so on a case-sensitive volume a font that
+  # Winetricks installed as Arial.TTF keeps the arial.ttf link out, and drops one made before.
+  # -L -type f: fonts and links that reach one; a dangling link holds no name.
+  fonts_present=$(find -L "$fonts_dir" -mindepth 1 -maxdepth 1 -type f 2>/dev/null | sed 's|.*/||' | tr '[:upper:]' '[:lower:]')
+  fonts_twice=$(printf '%s\n' "$fonts_present" | sort | uniq -d)
   for dir in "$np_support/fonts" "$CX_ROOT/share/wine/fonts"; do
     for src in "$dir"/*.ttf "$dir"/*.ttc; do
       [ -f "$src" ] || continue
@@ -3134,8 +3139,16 @@ link_fonts() {
       esac
       dst="$fonts_dir/$name"
       if [ -L "$dst" ]; then
-        rm -f "$dst" && ln -s "$src" "$dst" 2>> "$log" || true
-      elif [ ! -e "$dst" ]; then
+        # Another font of this name in any case keeps the link out: beside a working link it
+        # shows as the name twice, beside a dangling one (not counted) as the name at all.
+        if [ -e "$dst" ]; then fonts_other=$fonts_twice; else fonts_other=$fonts_present; fi
+        rm -f "$dst" || continue
+        if [ -z "$fonts_other" ] \
+          || ! printf '%s\n' "$fonts_other" | grep -qxF "$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"; then
+          ln -s "$src" "$dst" 2>> "$log" || true
+        fi
+      elif [ ! -e "$dst" ] \
+        && ! printf '%s\n' "$fonts_present" | grep -qxF "$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"; then
         ln -s "$src" "$dst" 2>> "$log" || true
       fi
     done
