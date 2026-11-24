@@ -15,6 +15,10 @@ sha256=8f39ad5f9c076b9c62c67dea4f8649e75dcc16899a2d8122ca32ba68262cb713
 url=https://www.cabextract.org.uk/cabextract-$version.tar.gz
 root=$(cd "$(dirname "$0")/.." && pwd)
 out=${1:-$root/app/Sources/BridgeplayApp/Resources/cabextract}
+case "$out" in
+    /*) ;;
+    *) out=$PWD/$out ;;
+esac
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/bridgeplay-cabextract.XXXXXX")
 trap 'rm -rf "$work"' EXIT INT TERM
