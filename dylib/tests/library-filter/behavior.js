@@ -177,7 +177,7 @@ function check(file, name, t) {
 
   english();
   const summary = grab(src, /if\(([\w$]+)==="notprotonWindows"\)return (.*?);if\(\1==/, 'summary');
-  t(new Function(`return ${summary[2]}`)() === 'Runs on Windows, no Mac OS version',
+  t(new Function(`return ${summary[2]}`)() === 'Runs on Windows, no macOS version',
     'the filter summary names the Windows filter');
 
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);

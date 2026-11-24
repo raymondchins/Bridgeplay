@@ -121,7 +121,7 @@ const need = { needsRebuild: true, app: true, running: false, rebuild: '' };
     w.buttons()[1].onclick(); await w.settle(); await w.settle(); await w.settle();
     assert(w.calls.includes('NotProton.RebuildPrefix#1'), 'a plain rebuild is asked for');
     await w.tick();
-    assert.deepEqual(w.texts(), ['Prefix rebuild failed!']);
+    assert.deepEqual(w.texts(), ['Could not rebuild the prefix.']);
     assert.deepEqual(w.buttons().map(b => b.textContent), ['Open Log', 'Backup & Rebuild Prefix', 'Rebuild Prefix'],
       'a failure offers the log and another try');
     w.buttons()[0].onclick(); await w.settle();
@@ -139,14 +139,14 @@ const need = { needsRebuild: true, app: true, running: false, rebuild: '' };
   {
     const w = world([{ ...need, app: false }]);
     w.g.MSCXPrefixRow(w.row, 480); await w.settle(); await w.settle();
-    assert.deepEqual(w.texts(), ["Couldn't find the Bridgeplay app. Move Bridgeplay to Applications, open it and click Install again."]);
+    assert.deepEqual(w.texts(), ["Could not find the Bridgeplay app. Move Bridgeplay to Applications, open it and click Install again."]);
     assert.equal(w.buttons().length, 0);
   }
   {
     const w = world([need, need], '{"error":"spawn"}');
     w.g.MSCXPrefixRow(w.row, 480); await w.settle(); await w.settle();
     w.buttons()[1].onclick(); await w.settle(); await w.settle(); await w.settle();
-    assert.deepEqual(w.texts(), ['Prefix rebuild failed!'], 'a rebuild that cannot start says so');
+    assert.deepEqual(w.texts(), ['Could not rebuild the prefix.'], 'a rebuild that cannot start says so');
   }
   {
     const w = world([need, { needsRebuild: false, app: true, rebuild: '' }]);
