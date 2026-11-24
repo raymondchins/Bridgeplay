@@ -442,13 +442,21 @@ enum PrefixTools {
     }
 
     static func restoreFontLinks(_ links: [(link: String, target: String)]) {
-        for (link, target) in links {
-            var info = stat()
-            guard lstat(link, &info) != 0, errno == ENOENT else { continue }
-            if symlink(target, link) != 0 {
-                AppLog.note("winetricks: could not link \(link) back to \(target): \(String(cString: strerror(errno)))")
-            }
+        guard let first = links.first else { return }
+        let fonts = (first.link as NSString).deletingLastPathComponent
+        let present = (try? FileManager.default.contentsOfDirectory(atPath: fonts)) ?? []
+        for (link, target) in fontLinksToRestore(links, present: present) where symlink(target, link) != 0 {
+            AppLog.note("winetricks: could not link \(link) back to \(target): \(String(cString: strerror(errno)))")
         }
+    }
+
+    // Windows finds fonts by name in any case, so a font installed as Arial.TTF on a
+    // case-sensitive volume takes the place of the arial.ttf link too.
+    static func fontLinksToRestore(
+        _ links: [(link: String, target: String)], present: [String]
+    ) -> [(link: String, target: String)] {
+        let taken = Set(present.map { $0.lowercased() })
+        return links.filter { !taken.contains(($0.link as NSString).lastPathComponent.lowercased()) }
     }
 
     // Reads the script once, checks those bytes against the pin and writes them to a new

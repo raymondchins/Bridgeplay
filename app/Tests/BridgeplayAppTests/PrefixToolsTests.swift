@@ -331,6 +331,15 @@ struct PrefixToolsTests {
         #expect(setxattr(staged.path(percentEncoded: false), "com.apple.quarantine", flag, flag.utf8.count, 0, 0) == 0)
         _ = try PrefixTools.stagedCabextract(beside: dir.appending(path: "cache/bridgeplay-wine"), step: "test")
         #expect(getxattr(staged.path(percentEncoded: false), "com.apple.quarantine", nil, 0, 0, 0) < 0)
+        // Nor does a staged link to a quarantined copy pass for a good one.
+        let parked = dir.appending(path: "parked-cabextract")
+        try FileManager.default.moveItem(at: staged, to: parked)
+        #expect(setxattr(parked.path(percentEncoded: false), "com.apple.quarantine", flag, flag.utf8.count, 0, 0) == 0)
+        try FileManager.default.createSymbolicLink(at: staged, withDestinationURL: parked)
+        _ = try PrefixTools.stagedCabextract(beside: dir.appending(path: "cache/bridgeplay-wine"), step: "test")
+        #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: staged.path(percentEncoded: false))) == nil)
+        #expect(getxattr(staged.path(percentEncoded: false), "com.apple.quarantine", nil, 0, 0, 0) < 0)
+        #expect(SignedPin.matches(staged, sha256: PrefixTools.cabextractSHA256))
         // Nor does a bundle unzipped with quarantine pass the flag on to the staged copy.
         let source = dir.appending(path: "quarantined-cabextract")
         try FileManager.default.copyItem(at: try #require(Bundle.module.url(forResource: "cabextract", withExtension: nil)), to: source)
@@ -389,6 +398,14 @@ struct PrefixToolsTests {
         #expect(try String(contentsOfFile: arial, encoding: .utf8) == "installed\n")
         let times = fonts.appending(path: "times.ttf").path(percentEncoded: false)
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: times) == shared.appending(path: "times.ttf").path(percentEncoded: false))
+    }
+
+    @Test("A font link comes back only where no file of that name in any case took its place")
+    func fontLinksComeBackOnlyToFreeNames() {
+        let links = [("/f/arial.ttf", "/shared/arial.ttf"), ("/f/times.ttf", "/shared/times.ttf"),
+                     ("/f/georgia.ttf", "/shared/georgia.ttf")].map { (link: $0.0, target: $0.1) }
+        let restored = PrefixTools.fontLinksToRestore(links, present: ["Arial.TTF", "georgia.ttf", "corefonts.installed"])
+        #expect(restored.map(\.link) == ["/f/times.ttf"])
     }
 
     // The script is hashed when downloaded but runs later from a cache the user can write to.
