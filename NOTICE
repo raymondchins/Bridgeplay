@@ -242,6 +242,16 @@ notproton.dylib):
   vendor/cJSON.c                     cJSON 1.7.19, MIT (header)
   vendor/cJSON.h                     cJSON 1.7.19, MIT (header)
 
+Winetricks gets cabextract from the app bundle (most verbs unpack Microsoft cabinets):
+
+  app/Sources/BridgeplayApp/Resources/cabextract
+      cabextract 1.12, https://www.cabextract.org.uk/cabextract-1.12.tar.gz
+      (sha256 8f39ad5f9c076b9c62c67dea4f8649e75dcc16899a2d8122ca32ba68262cb713),
+      built arm64 by scripts/build-cabextract.sh and signed ad hoc,
+      sha256 8c8f3b80ce8998b952df3638abcacd44161793646376fa549d9f33ab8aeea171.
+      Copyright (C) 2000-2023 Stuart Caie <kyzer@cabextract.org.uk>.
+      GPL-3.0-or-later; source at the URL above.
+
 The WineCX engine gets an x86_64 SDL2 from the app bundle, for controller support
 in winebus.so (docs/WINECX.md):
 

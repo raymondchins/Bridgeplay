@@ -292,6 +292,43 @@ struct PrefixToolsTests {
         #expect(output.contains("bin \(unix.appending(path: "wine").path(percentEncoded: false))"))
     }
 
+    // The free engines ship no cabextract, and without one most verbs stop with status 1.
+    @Test("Winetricks finds the bundled cabextract first on PATH, and a changed copy is replaced")
+    func winetricksGetsBundledCabextract() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "np-winetricks-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let library = SteamLibrary(root: dir.appending(path: "library"))
+        let prefix = WinePrefix(appID: "2075800", name: "Game", library: library, lastUsed: nil)
+        let runner = dir.appending(path: "runner")
+        let unix = runner.appending(path: "lib/wine/x86_64-unix")
+        for folder in [prefix.pfx, unix, dir.appending(path: "cache")] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        func executable(_ url: URL, _ body: String) throws {
+            try Data(body.utf8).write(to: url)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path(percentEncoded: false))
+        }
+        try executable(unix.appending(path: "wine"), "#!/bin/sh\nexit 0\n")
+        let script = dir.appending(path: "cache/winetricks")
+        try executable(script, "#!/bin/sh\necho \"cab $(command -v cabextract)\"\ncabextract --version\n")
+
+        let staged = dir.appending(path: "cache/bin/cabextract")
+        let log = try PrefixTools.winetricks(["vcrun2022"], in: prefix, script: script, runner: runner)
+        let output = try String(contentsOf: log, encoding: .utf8)
+        #expect(output.contains("cab \(staged.path(percentEncoded: false))"))
+        #expect(output.contains("cabextract version 1.12"))
+
+        try Data("#!/bin/sh\necho tampered\n".utf8).write(to: staged)
+        _ = try PrefixTools.stagedCabextract(beside: dir.appending(path: "cache/bridgeplay-wine"), step: "test")
+        #expect(SignedPin.matches(staged, sha256: PrefixTools.cabextractSHA256))
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: staged.path(percentEncoded: false))
+        _ = try PrefixTools.stagedCabextract(beside: dir.appending(path: "cache/bridgeplay-wine"), step: "test")
+        #expect(FileManager.default.isExecutableFile(atPath: staged.path(percentEncoded: false)))
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: staged.deletingLastPathComponent().path(percentEncoded: false))
+        #expect(leftovers == ["cabextract"])
+    }
+
     // The script is hashed when downloaded but runs later from a cache the user can write to.
     @Test("Winetricks runs only the bytes that match its pin")
     func winetricksRunsOnlyThePinnedScript() throws {
