@@ -338,6 +338,17 @@ struct PrefixToolsTests {
         try FileManager.default.removeItem(at: staged)
         _ = try PrefixTools.stagedCabextract(beside: dir.appending(path: "cache/bridgeplay-wine"), step: "test", source: source)
         #expect(getxattr(staged.path(percentEncoded: false), "com.apple.quarantine", nil, 0, 0, 0) < 0)
+        // A bundled copy that doesn't match its pin is refused and leaves nothing behind.
+        let wrong = dir.appending(path: "wrong-cabextract")
+        try executable(wrong, "#!/bin/sh\necho wrong\n")
+        try FileManager.default.removeItem(at: staged)
+        #expect(throws: StepFailure.self) {
+            try PrefixTools.stagedCabextract(beside: dir.appending(path: "cache/bridgeplay-wine"), step: "test", source: wrong)
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: staged.deletingLastPathComponent().path(percentEncoded: false)).isEmpty)
+        // A build without one leaves PATH to the runner.
+        #expect(try PrefixTools.stagedCabextract(beside: dir.appending(path: "cache/bridgeplay-wine"), step: "test", source: nil) == nil)
+        _ = try PrefixTools.stagedCabextract(beside: dir.appending(path: "cache/bridgeplay-wine"), step: "test")
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: staged.deletingLastPathComponent().path(percentEncoded: false))
         #expect(leftovers == ["cabextract"])
     }

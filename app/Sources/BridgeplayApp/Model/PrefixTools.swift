@@ -298,7 +298,7 @@ enum PrefixTools {
         // stops an ad hoc cabextract at exec, so a quarantined copy is replaced too.
         let quarantine = "com.apple.quarantine"
         if files.isExecutableFile(atPath: staged.path(percentEncoded: false)),
-           getxattr(staged.path(percentEncoded: false), quarantine, nil, 0, 0, XATTR_NOFOLLOW) < 0,
+           getxattr(staged.path(percentEncoded: false), quarantine, nil, 0, 0, 0) < 0,
            SignedPin.matches(staged, sha256: cabextractSHA256) {
             return dir
         }
@@ -312,7 +312,7 @@ enum PrefixTools {
         } catch {
             throw StepFailure(step: step, detail: error.localizedDescription)
         }
-        if removexattr(temp.path(percentEncoded: false), quarantine, XATTR_NOFOLLOW) != 0, errno != ENOATTR {
+        if removexattr(temp.path(percentEncoded: false), quarantine, XATTR_NOFOLLOW) != 0, errno != ENOATTR, errno != ENOTSUP {
             throw StepFailure(step: step, detail: String(cString: strerror(errno)))
         }
         guard SignedPin.matches(temp, sha256: cabextractSHA256) else {
