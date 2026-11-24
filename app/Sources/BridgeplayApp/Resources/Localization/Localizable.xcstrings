@@ -6684,6 +6684,28 @@
         }
       }
     },
+    "Edit the DLL overrides, then click Apply to save." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifica gli override delle DLL, quindi fai clic su Applica per salvare."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Измените переопределения DLL и нажмите «Применить», чтобы сохранить изменения."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑 DLL 覆盖设置，然后点按“应用”保存。"
+          }
+        }
+      }
+    },
     "Enable Frame Limit" : {
       "localizations" : {
         "it" : {

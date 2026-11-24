@@ -26,15 +26,13 @@ struct StatusHero: View {
                             .font(BP.sans(24, .semibold))
                             .tracking(-0.7)
                             .foregroundStyle(ready ? AnyShapeStyle(BP.iridescent) : AnyShapeStyle(BP.fg))
+                            .accessibilityAddTraits(.isHeader)
                         Text(detail)
                             .font(BP.sans(13))
                             .foregroundStyle(BP.fg2)
                             .lineLimit(2)
-                        HStack(spacing: 6) {
-                            ForEach(Array(chips.enumerated()), id: \.element) { index, chip in
-                                HeroChip(text: chip, index: index)
-                            }
-                        }
+                            .help(detail)
+                        HeroChips(chips: chips)
                     }
                     Spacer(minLength: 0)
                 }
@@ -108,6 +106,20 @@ struct StatusHero: View {
     }
 }
 
+// A hero's chips, read by VoiceOver as one line ("WineCX 11.17, D3DMetal, Steam running").
+struct HeroChips: View {
+    let chips: [String]
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(Array(chips.enumerated()), id: \.element) { index, chip in
+                HeroChip(text: chip, index: index)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 // A fact under a hero headline: near-white text on a quiet pill, with the colour kept to a
 // small dot in one of the brand's three hues.
 struct HeroChip: View {
@@ -127,7 +139,7 @@ struct HeroChip: View {
         .padding(.leading, 9)
         .padding(.trailing, 11)
         .padding(.vertical, 5)
-        .background(Color.white.opacity(0.07), in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
+        .background(BP.chipFill, in: Capsule())
+        .overlay(Capsule().strokeBorder(BP.chipLine, lineWidth: 1))
     }
 }

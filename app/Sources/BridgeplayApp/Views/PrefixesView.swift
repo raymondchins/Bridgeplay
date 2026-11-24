@@ -1,11 +1,11 @@
 // Prefix management UI inside Bridgeplay, also see PrefixesModel
 
+import BridgeplayUI
 import SwiftUI
 
 struct PrefixesView: View {
 
     @Environment(PrefixesModel.self) private var model
-    @Environment(\.colorSchemeContrast) private var contrast
     @State private var sortOrder = [KeyPathComparator(\PrefixRow.lastUsed, order: .reverse)]
     @State private var winetricksPrefix: WinePrefix?
     @State private var winetricksVerbs = ""
@@ -261,23 +261,25 @@ struct PrefixesView: View {
                             rebuildChoices([prefix])
                         } label: {
                             Image(systemName: "exclamationmark.circle.fill")
-                                .foregroundStyle(.tint)
+                                .foregroundStyle(BP.orange)
                         }
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
                         .fixedSize()
                         .disabled(model.isBusy || model.tools.isEmpty)
                         .accessibilityLabel("Needs rebuilding")
+                        .help(String(localized: "Needs rebuilding"))
                     }
                     Text(prefix.title).lineLimit(1).help(prefix.title)
                     if prefix.name == nil {
                         Text("No longer installed")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .modifier(CellGrey())
                             .fixedSize()
                     }
                     if model.busy.contains(prefix.id) {
                         ProgressView().controlSize(.small)
+                            .accessibilityLabel("Working…")
                     }
                 }
             }
@@ -286,22 +288,22 @@ struct PrefixesView: View {
             TableColumn("Tool", value: \.tool) { row in
                 let prefix = row.prefix
                 if let tool = model.lastTool(prefix) {
-                    Text(tool).foregroundStyle(.secondary).help(tool)
+                    Text(tool).modifier(CellGrey()).help(tool)
                 } else {
                     Text("None")
-                        .foregroundStyle(contrast == .increased ? .secondary : .tertiary)
+                        .modifier(CellGrey(faint: true))
                 }
             }
             .width(min: 60, ideal: toolWidth)
 
             TableColumn("App ID", value: \.appID) { row in
-                Text(row.prefix.appID).monospacedDigit().foregroundStyle(.secondary)
+                Text(row.prefix.appID).monospacedDigit().modifier(CellGrey())
             }
             .width(min: 50, ideal: 80)
 
             TableColumn("Library", value: \.library) { row in
                 Text(row.library)
-                    .foregroundStyle(.secondary)
+                    .modifier(CellGrey())
                     .help(row.library)
             }
             .width(min: 44, ideal: libraryWidth)
@@ -310,17 +312,17 @@ struct PrefixesView: View {
                 if let usage = model.usage[row.id] {
                     Text(usage.bytes.formatted(.byteCount(style: .file)))
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                        .modifier(CellGrey())
                 } else {
                     Text("Calculating…")
-                        .foregroundStyle(contrast == .increased ? .secondary : .tertiary)
+                        .modifier(CellGrey(faint: true))
                 }
             }
             .width(min: 56, ideal: 90)
 
             TableColumn("Last used", value: \.lastUsed) { row in
                 Text(lastUsed(row.prefix))
-                    .foregroundStyle(.secondary)
+                    .modifier(CellGrey())
                     .help(lastUsed(row.prefix))
             }
             .width(min: 60, ideal: lastUsedWidth)
@@ -404,5 +406,21 @@ struct PrefixesView: View {
 
     private func report(_ row: StatusRow) -> some View {
         row.padding(10).frame(maxWidth: .infinity, alignment: .leading).background(.bar)
+    }
+}
+
+// A table cell's quiet text in the BP greys. On a selected row it takes the system's, which
+// turn light on the selection, where a fixed grey would be hard to read.
+private struct CellGrey: ViewModifier {
+    var faint = false
+    @Environment(\.backgroundProminence) private var prominence
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        if prominence == .increased {
+            content.foregroundStyle(faint && contrast != .increased ? .tertiary : .secondary)
+        } else {
+            content.foregroundStyle(faint ? BP.fg3 : BP.fg2)
+        }
     }
 }

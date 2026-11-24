@@ -95,6 +95,7 @@ struct GameDefaultsView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button("Reset All") { confirmsReset = true }
                     .disabled(GameDefaults.resettingAll(in: user) == user)
+                    .help(String(localized: "Every setting on this page goes back to Bridgeplay's default."))
             }
         }
         .confirmationDialog(String(localized: "Reset every game default?"), isPresented: $confirmsReset,
@@ -155,7 +156,7 @@ struct GameDefaultsView: View {
         HStack(alignment: .center, spacing: 8) {
             label(title, caption)
             Spacer(minLength: 12)
-            if changed { resetButton(reset) }
+            if changed { ResetButton(title: title, action: reset) }
             control()
         }
         .contextMenu {
@@ -163,10 +164,6 @@ struct GameDefaultsView: View {
                 Button(String(localized: "Reset to Bridgeplay's Default"), action: reset)
             }
         }
-    }
-
-    private func resetButton(_ reset: @escaping () -> Void) -> some View {
-        ResetButton(action: reset)
     }
 
     private func row(_ setting: GameDefaults.Setting, @ViewBuilder control: () -> some View) -> some View {
@@ -212,7 +209,7 @@ struct GameDefaultsView: View {
                 if !limitOff {
                     Text(verbatim: "\(shown) FPS")
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(BP.fg2)
                 }
                 Toggle(Self.title(.frameLimitOff), isOn: Binding(get: { !limitOff }, set: { setLimitOff(!$0) }))
                     .toggleStyle(.switch)
@@ -356,27 +353,35 @@ struct GameDefaultsView: View {
                 .onSubmit(saveDLLOverrides)
             Button("Apply", action: saveDLLOverrides)
                 .disabled(dllDraft == (resolved(.dllOverrides).value ?? ""))
+                .help(String(localized: "Edit the DLL overrides, then click Apply to save."))
         }
     }
 
     private var overridesSection: some View {
         Section {
             ForEach(overrides) { item in
+                let name = item.name ?? String(localized: "App \(item.appID)")
                 HStack(alignment: .center, spacing: 12) {
                     gameIcon(item.appID)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.name ?? String(localized: "App \(item.appID)"))
+                        Text(name)
                             .font(BP.sans(13, .semibold))
                             .tracking(-0.1)
                             .foregroundStyle(BP.fg)
                         Text(item.settings.map(Self.overrideTitle).joined(separator: ", "))
                             .font(BP.sans(12))
                             .foregroundStyle(BP.fg2)
-                            .help(Self.place(item.place))
                     }
+                    .help(Self.place(item.place))
                     Spacer(minLength: 12)
                     Button("Open in Steam") { Self.openInSteam(item.appID) }
                         .controlSize(.small)
+                        .accessibilityLabel(Text("\(String(localized: "Open in Steam")), \(name)"))
+                        .accessibilityActions {
+                            if item.place == .conf {
+                                Button(String(localized: "Use Defaults…")) { clearing = item }
+                            }
+                        }
                 }
                 .contextMenu {
                     if item.place == .conf {
@@ -590,15 +595,13 @@ private struct DefaultsHero: View {
                         .font(BP.sans(24, .semibold))
                         .tracking(-0.7)
                         .foregroundStyle(BP.fg)
+                        .accessibilityAddTraits(.isHeader)
                     Text("Every game starts with these, unless it has its own settings in Steam.")
                         .font(BP.sans(13))
                         .foregroundStyle(BP.fg2)
                         .lineLimit(2)
-                    HStack(spacing: 6) {
-                        ForEach(Array(chips.enumerated()), id: \.element) { index, chip in
-                            HeroChip(text: chip, index: index)
-                        }
-                    }
+                        .help(String(localized: "Every game starts with these, unless it has its own settings in Steam."))
+                    HeroChips(chips: chips)
                 }
                 .padding(.horizontal, 24)
         }
@@ -614,6 +617,8 @@ private struct DefaultsHero: View {
 
 // A changed setting's way back: a small arrow, quiet until the pointer is on it.
 private struct ResetButton: View {
+    // The setting's name, so VoiceOver says which one resets
+    let title: String
     let action: () -> Void
     @State private var hovered = false
 
@@ -628,5 +633,6 @@ private struct ResetButton: View {
         .buttonStyle(.borderless)
         .onHover { hovered = $0 }
         .help(String(localized: "Reset to Bridgeplay's Default"))
+        .accessibilityLabel(Text("\(String(localized: "Reset to Bridgeplay's Default")), \(title)"))
     }
 }

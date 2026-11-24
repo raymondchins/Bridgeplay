@@ -17,6 +17,9 @@ public enum BP {
     public static let fg3 = adaptive(0x86868B, highContrast: 0xAEAEB2)
     public static let line = adaptive(white: 0.08, highContrast: 0.24)
     public static let lineStrong = adaptive(white: 0.18, highContrast: 0.42)
+    // A hero chip's pill and its border
+    public static let chipFill = adaptive(white: 0.07, highContrast: 0.12)
+    public static let chipLine = adaptive(white: 0.12, highContrast: 0.32)
     public static let violet = Color(hex: 0x8B7BFF)
     public static let blue = Color(hex: 0x4FB3FF)
     // Controls and selection (switches, sliders, the chosen sidebar item): a fuller blue than
