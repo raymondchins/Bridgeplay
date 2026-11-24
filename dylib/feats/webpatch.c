@@ -381,7 +381,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "start('NotProton.RebuildPrefix#1')));return r},draw=s=>{if(stopped||!e.isConnected||e.npApp!==id)return;clearTimeout(timer);live=0;const ph=s?s.rebuild" \
     ":'',k=[];if(ph==='done'||ph==='done-backup'||ph==='failed')term=ph;s&&s.needsRebuild&&term!=='failed'&&(term='');if(busy||ph==='setup'||ph==='" \
     "copy'||ph==='finish'){k.push(el('div','',ph==='copy'?T.copy:ph==='finish'?T.finish:T.setup));con" \
-    "st b=el('div','MSCXBar');t0||(t0=Date.now());const m=el('div','');m.style.animationDelay=-((Date.now()-t0)%1200)+'ms';b.append(m);k.push(b);live=1;timer=setTimeout(refresh,500)}else if((t0=0)||" \
+    "st b=el('div','MSCXBar');t0||(t0=Date.now());const m=el('div','');m.style.animationDelay=-((Date.now()-t0)%2400)+'ms';b.append(m);k.push(b);live=1;timer=setTimeout(refresh,500)}else if((t0=0)||" \
     "term==='failed'){k.push(el('div','',T.failed));const r=el('div','MSCXBtns');r.append(btn(T.log,0" \
     ",0,()=>call('NotProton.OpenPrefixLog#1').catch(()=>0)));k.push(r);s&&s.needsRebuild&&s.app&&!s.r" \
     "unning&&k.push(pair(0))}else if(term)k.push(el('div','',term==='done-backup'?T.doneBackup:T.done" \
@@ -413,7 +413,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     ".MSCXBar>div{position:absolute;top:0;bottom:0;left:-30%;width:30%;background:#1a9fff;" \
     "animation:MSCXSlide 1.2s linear infinite}" \
     "@keyframes MSCXSlide{from{left:-30%}to{left:100%}}" \
-    /* Reduce Motion: the bar stays still and fades instead of sliding. */ \
+    /* Reduce Motion: the bar stays still and fades instead of sliding. The row's delay is \
+       taken modulo 2.4s, the fade's full cycle, so redraws don't jump. */ \
     "@media (prefers-reduced-motion:reduce){.MSCXPanel .MSCXRow:hover{box-shadow:none}" \
     ".MSCXBar>div{left:0;width:100%;animation:MSCXFade 1.2s ease-in-out infinite alternate}}" \
     "@keyframes MSCXFade{from{opacity:.35}to{opacity:1}}\""
