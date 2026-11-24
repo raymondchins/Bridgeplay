@@ -325,8 +325,59 @@ struct PrefixToolsTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: staged.path(percentEncoded: false))
         _ = try PrefixTools.stagedCabextract(beside: dir.appending(path: "cache/bridgeplay-wine"), step: "test")
         #expect(FileManager.default.isExecutableFile(atPath: staged.path(percentEncoded: false)))
+
+        // A quarantined copy would stop at exec, so it is replaced by one without the flag.
+        let flag = "0081;00000000;Safari;"
+        #expect(setxattr(staged.path(percentEncoded: false), "com.apple.quarantine", flag, flag.utf8.count, 0, 0) == 0)
+        _ = try PrefixTools.stagedCabextract(beside: dir.appending(path: "cache/bridgeplay-wine"), step: "test")
+        #expect(getxattr(staged.path(percentEncoded: false), "com.apple.quarantine", nil, 0, 0, 0) < 0)
+        // Nor does a bundle unzipped with quarantine pass the flag on to the staged copy.
+        let source = dir.appending(path: "quarantined-cabextract")
+        try FileManager.default.copyItem(at: try #require(Bundle.module.url(forResource: "cabextract", withExtension: nil)), to: source)
+        #expect(setxattr(source.path(percentEncoded: false), "com.apple.quarantine", flag, flag.utf8.count, 0, 0) == 0)
+        try FileManager.default.removeItem(at: staged)
+        _ = try PrefixTools.stagedCabextract(beside: dir.appending(path: "cache/bridgeplay-wine"), step: "test", source: source)
+        #expect(getxattr(staged.path(percentEncoded: false), "com.apple.quarantine", nil, 0, 0, 0) < 0)
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: staged.deletingLastPathComponent().path(percentEncoded: false))
         #expect(leftovers == ["cabextract"])
+    }
+
+    // corefonts and friends copy with cp -f, which would write through the launcher's links
+    // into the fonts every prefix shares.
+    @Test("Winetricks installs fonts into the prefix, not through its links into the shared fonts")
+    func winetricksLeavesSharedFontsAlone() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "np-winetricks-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let library = SteamLibrary(root: dir.appending(path: "library"))
+        let prefix = WinePrefix(appID: "2075800", name: "Game", library: library, lastUsed: nil)
+        let runner = dir.appending(path: "runner")
+        let unix = runner.appending(path: "lib/wine/x86_64-unix")
+        let fonts = prefix.pfx.appending(path: "drive_c/windows/Fonts")
+        let shared = dir.appending(path: "shared-fonts")
+        for folder in [fonts, unix, shared, dir.appending(path: "cache")] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        func executable(_ url: URL, _ body: String) throws {
+            try Data(body.utf8).write(to: url)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path(percentEncoded: false))
+        }
+        try executable(unix.appending(path: "wine"), "#!/bin/sh\nexit 0\n")
+        for name in ["arial.ttf", "times.ttf"] {
+            try Data("shared \(name)".utf8).write(to: shared.appending(path: name))
+            try FileManager.default.createSymbolicLink(at: fonts.appending(path: name), withDestinationURL: shared.appending(path: name))
+        }
+        // What Winetricks' w_try_cp_font_files does for one font.
+        let script = dir.appending(path: "cache/winetricks")
+        try executable(script, "#!/bin/sh\necho installed > \"$WINEPREFIX/arial.new\"\ncp -f \"$WINEPREFIX/arial.new\" \"$WINEPREFIX/drive_c/windows/Fonts/arial.ttf\"\n")
+
+        _ = try PrefixTools.winetricks(["corefonts"], in: prefix, script: script, runner: runner)
+
+        #expect(try String(contentsOf: shared.appending(path: "arial.ttf"), encoding: .utf8) == "shared arial.ttf")
+        let arial = fonts.appending(path: "arial.ttf").path(percentEncoded: false)
+        #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: arial)) == nil)
+        #expect(try String(contentsOfFile: arial, encoding: .utf8) == "installed\n")
+        let times = fonts.appending(path: "times.ttf").path(percentEncoded: false)
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: times) == shared.appending(path: "times.ttf").path(percentEncoded: false))
     }
 
     // The script is hashed when downloaded but runs later from a cache the user can write to.

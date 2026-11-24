@@ -281,7 +281,7 @@ enum PrefixTools {
     static let winetricksRelease = "20260125"
     static let winetricksSHA256 = "431f82fc74000e6c864409f1d8fb495d696c03928808e3e8acffc45179312a7b"
     static let winetricksLogName = "winetricks.log"
-    // cabextract 1.12 (GPL-3.0-or-later, NOTICE), built by scripts/build-cabextract.sh.
+    // cabextract 1.12 (GPL-2.0-or-later, NOTICE), built by scripts/build-cabextract.sh.
     static let cabextractSHA256 = "8c8f3b80ce8998b952df3638abcacd44161793646376fa549d9f33ab8aeea171"
 
     // Copies the bundled cabextract into its own folder next to the wrapper and returns that
@@ -294,7 +294,11 @@ enum PrefixTools {
         let dir = wrapper.deletingLastPathComponent().appending(path: "bin")
         let staged = dir.appending(path: "cabextract")
         let files = FileManager.default
+        // A copy of an app unzipped from a browser download carries quarantine, and macOS then
+        // stops an ad hoc cabextract at exec, so a quarantined copy is replaced too.
+        let quarantine = "com.apple.quarantine"
         if files.isExecutableFile(atPath: staged.path(percentEncoded: false)),
+           getxattr(staged.path(percentEncoded: false), quarantine, nil, 0, 0, XATTR_NOFOLLOW) < 0,
            SignedPin.matches(staged, sha256: cabextractSHA256) {
             return dir
         }
@@ -307,6 +311,9 @@ enum PrefixTools {
             try files.setAttributes([.posixPermissions: 0o755], ofItemAtPath: temp.path(percentEncoded: false))
         } catch {
             throw StepFailure(step: step, detail: error.localizedDescription)
+        }
+        if removexattr(temp.path(percentEncoded: false), quarantine, XATTR_NOFOLLOW) != 0, errno != ENOATTR {
+            throw StepFailure(step: step, detail: String(cString: strerror(errno)))
         }
         guard SignedPin.matches(temp, sha256: cabextractSHA256) else {
             throw StepFailure(step: step, detail: String(localized: "The bundled cabextract does not match its pin. Reinstall Bridgeplay."))
@@ -393,6 +400,9 @@ enum PrefixTools {
         let checked = try sha256.map { try verifiedCopy(of: script, sha256: $0, step: step) }
         defer { if let checked { try? FileManager.default.removeItem(at: checked.deletingLastPathComponent()) } }
 
+        let fontLinks = try setAsideFontLinks(in: prefix, step: step)
+        defer { restoreFontLinks(fontLinks) }
+
         let log = prefix.root.appending(path: winetricksLogName)
         let status = try Shell.logged(
             "/bin/sh", [(checked ?? script).path(percentEncoded: false), "-q"] + verbs,
@@ -407,6 +417,38 @@ enum PrefixTools {
             )
         }
         return log
+    }
+
+    // The launcher links the prefix's Fonts to Bridgeplay's shared fonts and the engine's
+    // (link_fonts), and Winetricks installs fonts with cp -f, which writes through a link into
+    // every prefix's copy. So the links are moved out while it runs; any name Winetricks did
+    // not fill gets its link back, and the next launch links the rest as before.
+    static func setAsideFontLinks(in prefix: WinePrefix, step: String) throws -> [(link: String, target: String)] {
+        let fonts = prefix.pfx.appending(path: "drive_c/windows/Fonts").path(percentEncoded: false)
+        let files = FileManager.default
+        guard let names = try? files.contentsOfDirectory(atPath: fonts) else { return [] }
+        var moved: [(link: String, target: String)] = []
+        for name in names {
+            let link = fonts + "/" + name
+            guard let target = try? files.destinationOfSymbolicLink(atPath: link) else { continue }
+            guard unlink(link) == 0 else {
+                let detail = String(cString: strerror(errno))
+                restoreFontLinks(moved)
+                throw StepFailure(step: step, detail: detail)
+            }
+            moved.append((link, target))
+        }
+        return moved
+    }
+
+    static func restoreFontLinks(_ links: [(link: String, target: String)]) {
+        for (link, target) in links {
+            var info = stat()
+            guard lstat(link, &info) != 0, errno == ENOENT else { continue }
+            if symlink(target, link) != 0 {
+                AppLog.note("winetricks: could not link \(link) back to \(target): \(String(cString: strerror(errno)))")
+            }
+        }
     }
 
     // Reads the script once, checks those bytes against the pin and writes them to a new
