@@ -12998,6 +12998,28 @@
         }
       }
     },
+    "Saves the DLL overrides once you change them." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salva gli override delle DLL dopo che li hai modificati."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохраняет переопределения DLL после того, как вы их измените."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改 DLL 覆盖后将其保存。"
+          }
+        }
+      }
+    },
     "Scaling Filter" : {
       "localizations" : {
         "it" : {

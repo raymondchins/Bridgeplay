@@ -52,6 +52,7 @@ Tokens: `BP.*` in `app/Sources/BridgeplayUI/BridgeplayTheme.swift`. The app is d
 | `fg3` | `#86868B` (`#AEAEB2`) | Captions, inactive, min and max labels |
 | `line` | white 8% (24%) | Card borders, dividers |
 | `lineStrong` | white 18% (42%) | Secondary button, floating card |
+| `chipFill` `chipLine` | white 7% (12%) · white 12% (32%) | A hero chip's pill and its border |
 | `accent` | `#1F75FE` | Switch on, slider fill, chosen sidebar icon, links in controls |
 | `iridescent` | `#8B7BFF` → `#4FB3FF` → `#FF7AC6` | Progress, the ready headline, the frame-time line |
 | `violet` `blue` `pink` | `#8B7BFF` `#4FB3FF` `#FF7AC6` | One per hero chip's dot, in that order |
@@ -178,7 +179,7 @@ Files are in `app/Sources/BridgeplayApp/Views/` unless a path is given.
 | One of several | `Picker` menu | Value tinted `fg` | `GameDefaultsView.swift` |
 | State or setting | `StatusRow` in a grouped `Form` | 8 pt dot, title, value, one control | `StatusView.swift` |
 | The same in a wizard | `SetupCard` + `WizardRow` | Badge 24 × 24; padding 16 × 13; hairline inset 54 | `BridgeplayUI/SetupCard.swift`, `SetupAssistantView.swift` |
-| A fact | `HeroChip` | 6 pt dot in violet, blue, pink; 12 medium on white 7%, white 12% border | `StatusHero.swift` |
+| A fact | `HeroChip` | 6 pt dot in violet, blue, pink; 12 medium on `chipFill`, `chipLine` border; VoiceOver reads a hero's chips as one line | `StatusHero.swift` |
 | Known progress | `GradientProgress` · `DownloadStrip` | 4 pt, with a count or bytes | `SetupAssistantView.swift`, `DownloadStrip.swift` |
 | Steps | `StepBar` + `StepHeader` | 3 pt segments, 6 pt gaps | `SetupAssistantView.swift` |
 | Page top | `StatusHero` | Aurora, headline, one line, chips | `StatusHero.swift` |
