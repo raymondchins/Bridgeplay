@@ -49,7 +49,7 @@ exceptions:
 | `fonts/` | Each font's own license; the build files under `LICENSE.fonts` |
 | `app/Sources/BridgeplayUI/Resources/Fonts/` | OFL-1.1 (`OFL-*.txt` there) |
 | `app/Sources/BridgeplayApp/Resources/libSDL2-2.0.0.dylib` | zlib (SDL) |
-| `app/Sources/BridgeplayApp/Resources/cabextract` | GPL-3.0-or-later (cabextract 1.12) |
+| `app/Sources/BridgeplayApp/Resources/cabextract` | GPL-2.0-or-later (cabextract 1.12), with libmspack built in under LGPL-2.1 |
 | `vendor/cJSON.*`, `steam-shim/jsoncpp.cpp`, `steam-shim/json/` | MIT (cJSON), public domain / MIT (JsonCpp) |
 | `installer/licenses/` | The license texts of DXMT and DXVK, shipped beside them |
 | `compat/reported.json` | CC BY-NC-SA 3.0 (adapted from AppleGamingWiki), see [NOTICE](NOTICE) |

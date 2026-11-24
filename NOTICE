@@ -149,11 +149,12 @@ those old installer downloads have been removed from the releases.
 Written offer for source code: the Corresponding Source of each binary above is
 the upstream source at the commit named above plus the patch or file named next
 to it, all of which are public: winecx at https://github.com/dappermint/winecx,
-Wine 11.15 at https://dl.winehq.org/wine/source/11.x/, DXMT at
+Wine 11.15 at https://dl.winehq.org/wine/source/11.x/, cabextract 1.12 at
+https://www.cabextract.org.uk/ (built by scripts/build-cabextract.sh), DXMT at
 https://github.com/3Shain/dxmt, DXVK-macOS at https://github.com/Gcenx/DXVK-macOS,
 and the patches in this repository (https://github.com/raymondchins/Bridgeplay).
 This offer covers every LGPL- or GPL-licensed file Bridgeplay or its installer
-ships: the patched Wine files in the app (above) and DXMT. It also covers the
+ships: the patched Wine files in the app (above), cabextract (below) and DXMT. It also covers the
 WineCX runtime, including its GPL libraries, in the installers up to Bridgeplay
 0.7.50 that carried it. For at least
 three years after the last release that ships them, Raymond Chin will also
@@ -249,8 +250,13 @@ Winetricks gets cabextract from the app bundle (most verbs unpack Microsoft cabi
       (sha256 8f39ad5f9c076b9c62c67dea4f8649e75dcc16899a2d8122ca32ba68262cb713),
       built arm64 by scripts/build-cabextract.sh and signed ad hoc,
       sha256 8c8f3b80ce8998b952df3638abcacd44161793646376fa549d9f33ab8aeea171.
-      Copyright (C) 2000-2023 Stuart Caie <kyzer@cabextract.org.uk>.
-      GPL-3.0-or-later; source at the URL above.
+      Copyright (C) 2000-2023 Stuart Caie <kyzer@cabextract.org.uk>,
+      GPL-2.0-or-later (its source files say so; the tarball's COPYING is the
+      GPL-3.0 text, as in LICENSE). Its md5.c is Copyright (C) 1995-2003 Free
+      Software Foundation, Inc., GPL-2.0-or-later. Built in from the tarball's
+      mspack/ folder: libmspack, Copyright (C) 2003-2023 Stuart Caie, LGPL-2.1
+      (text in LICENSE.wine). Source at the URL above; the written offer above
+      covers it.
 
 The WineCX engine gets an x86_64 SDL2 from the app bundle, for controller support
 in winebus.so (docs/WINECX.md):
