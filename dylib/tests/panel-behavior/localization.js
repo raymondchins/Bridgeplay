@@ -59,16 +59,38 @@ for (const form of Object.keys(FORMS)) {
       assert.equal(written.at(-1).opts, 'BRIDGEPLAY_RAW_CONTROLLERS=1 CX_GRAPHICS_BACKEND=dxmt %command%');
       dropdowns[1].props.onChange({ data: 'hud' });
       assert.equal(written.at(-1).opts, 'MTL_HUD_ENABLED=1 CX_GRAPHICS_BACKEND=dxmt %command%');
+      // A native Mac game gets its own panel, in the same three languages.
+      const nat = walk(render({ details: details('', { vecPlatforms: ['osx'], strCompatToolName: '' }) }));
+      const label = l => nat.find(n => n.props.label === l);
+      assert(label(t('Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)',
+        '性能叠加层（游戏中按 ⌥⌘P 打开这些设置的快捷面板）',
+        'Overlay delle prestazioni (in gioco, ⌥⌘P apre le impostazioni rapide di questi controlli)')));
+      assert(label(t('Enable frame limit', '启用帧率限制', 'Attiva limite di fotogrammi')));
+      assert(label(t('Frame Generation (Experimental. Adds input lag)', '帧生成（实验性。会增加输入延迟）',
+        'Generazione fotogrammi (sperimentale. Aggiunge input lag)')));
+      assert.deepEqual(label(t('Mode', '模式', 'Modalità')).props.rgOptions.map(o => o.label),
+        [t('Off', '关闭', 'Disattivato'), '2x', '3x', t('Adaptive (fills to display refresh)',
+          '自适应（补足到显示器刷新率）', 'Adattiva (arriva alla frequenza dello schermo)')]);
+      assert.equal(label(t('Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)',
+        '缩放过滤（当游戏绘制的像素少于屏幕时生效，例如关闭高分辨率时）',
+        'Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)'))
+        .props.children.props.rgOptions[0].label,
+        t('Automatic (as the game sets it)', '自动（沿用游戏的设置）', 'Automatico (come lo imposta il gioco)'));
+      assert(label(t('Controllers', '控制器', 'Controller')));
+      assert.deepEqual(label(t('Controller layer', '控制器层', 'Livello controller')).props.rgOptions.map(o => [o.data, o.label]),
+        [['', t('Automatic', '自动', 'Automatico')],
+         ['hid', t('Raw HID (Unity, SDL, Unreal)', 'Raw HID（Unity、SDL、Unreal）', 'Raw HID (Unity, SDL, Unreal)')],
+         ['gc', 'GameController'], ['off', t('Off', '关闭', 'Disattivato')]]);
       for (const [mode, ...labels] of [
-        ['compat-hint', 'Enable CrossOver under Properties > Bridgeplay to install and run the Windows version.',
-          '请在“属性 > Bridgeplay”中启用 CrossOver，以安装并运行 Windows 版本。',
-          'Abilita CrossOver in Proprietà > Bridgeplay per installare e avviare la versione Windows.'],
+        ['compat-hint', 'Enable CrossOver under Properties › Bridgeplay to install and run the Windows version.',
+          '请在“属性 › Bridgeplay”中启用 CrossOver，以安装并运行 Windows 版本。',
+          'Abilita CrossOver in Proprietà › Bridgeplay per installare e avviare la versione Windows.'],
         ['image-files-label', 'Image Files (*.tga,*.png,*.exe)', '图像文件 (*.tga,*.png,*.exe)',
           'File immagine (*.tga,*.png,*.exe)'],
         ['library-windows-hint', 'Show only games that run on Windows and do not have a macOS version',
-          'Show only games that run on Windows and do not have a macOS version',
+          '仅显示可在 Windows 上运行且没有 macOS 版本的游戏',
           'Mostra solo i giochi che funzionano su Windows e non hanno una versione macOS'],
-        ['library-windows-summary', 'Runs on Windows, no Mac OS version', 'Runs on Windows, no Mac OS version',
+        ['library-windows-summary', 'Runs on Windows, no macOS version', '可在 Windows 上运行，无 macOS 版本',
           'Funziona su Windows, nessuna versione macOS'],
       ]) {
         const src = execFileSync(emit, [mode], { encoding: 'utf8' });
