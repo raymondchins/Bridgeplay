@@ -3139,9 +3139,12 @@ link_fonts() {
       esac
       dst="$fonts_dir/$name"
       if [ -L "$dst" ]; then
+        # Another font of this name in any case keeps the link out: beside a working link it
+        # shows as the name twice, beside a dangling one (not counted) as the name at all.
+        if [ -e "$dst" ]; then fonts_other=$fonts_twice; else fonts_other=$fonts_present; fi
         rm -f "$dst" || continue
-        if [ -z "$fonts_twice" ] \
-          || ! printf '%s\n' "$fonts_twice" | grep -qxF "$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"; then
+        if [ -z "$fonts_other" ] \
+          || ! printf '%s\n' "$fonts_other" | grep -qxF "$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"; then
           ln -s "$src" "$dst" 2>> "$log" || true
         fi
       elif [ ! -e "$dst" ] \

@@ -15553,24 +15553,24 @@
         }
       }
     },
-    "The Fonts folder in %@ links to another folder, so Winetricks would install fonts outside this prefix." : {
+    "The Fonts folder in %@ is a link to another folder, so Bridgeplay didn't run Winetricks. Replace the link with a regular Fonts folder, then try again." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La cartella Fonts di %@ punta a un'altra cartella, quindi Winetricks installerebbe i font fuori da questo prefisso."
+            "value" : "La cartella Fonts di %@ è un collegamento a un'altra cartella, quindi Bridgeplay non ha eseguito Winetricks. Sostituisci il collegamento con una normale cartella Fonts, poi riprova."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Папка Fonts в %@ ссылается на другую папку, поэтому Winetricks установил бы шрифты за пределами этого префикса."
+            "value" : "Папка Fonts в %@ — это ссылка на другую папку, поэтому Bridgeplay не запустил Winetricks. Замените ссылку обычной папкой Fonts и попробуйте снова."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 中的 Fonts 文件夹链接到其他文件夹，Winetricks 会把字体安装到此前缀之外。"
+            "value" : "%@ 中的 Fonts 文件夹是指向其他文件夹的链接，因此 Bridgeplay 没有运行 Winetricks。请将该链接替换为普通的 Fonts 文件夹，然后重试。"
           }
         }
       }

@@ -431,17 +431,22 @@ enum PrefixTools {
             defer { free(resolved) }
             return String(cString: resolved)
         }
-        // A Fonts folder that leads out of the prefix (into another one, which isn't claimed) would
-        // take Winetricks' fonts there, so it doesn't run. Only Wine's part of the path may differ
-        // in case, and only on a volume that ignores case.
-        guard let root = real(prefix.pfx.path(percentEncoded: false)), let resolved = real(fonts) else { return [] }
-        guard resolved.hasPrefix(root + "/"),
-              resolved.dropFirst(root.count + 1).lowercased() == "drive_c/windows/fonts" else {
-            throw StepFailure(
-                step: step,
-                detail: String(localized: "The Fonts folder in \(prefix.title) links to another folder, so Winetricks would install fonts outside this prefix.")
-            )
+        // A Fonts folder that is a link (into another prefix, which isn't claimed, or anywhere
+        // else) would take Winetricks' fonts and cp -f through its links, so it doesn't run.
+        // Only Wine's part of the path may differ in case, and only on a volume that ignores case.
+        let refused = StepFailure(
+            step: step,
+            detail: String(localized: "The Fonts folder in \(prefix.title) is a link to another folder, so Bridgeplay didn't run Winetricks. Replace the link with a regular Fonts folder, then try again.")
+        )
+        guard let root = real(prefix.pfx.path(percentEncoded: false)) else { return [] }
+        guard let resolved = real(fonts) else {
+            // Nothing there: Winetricks makes the folder. A dangling link: it would follow it.
+            var info = stat()
+            if lstat(fonts, &info) == 0 { throw refused }
+            return []
         }
+        guard resolved.hasPrefix(root + "/"),
+              resolved.dropFirst(root.count + 1).lowercased() == "drive_c/windows/fonts" else { throw refused }
         let files = FileManager.default
         // The folder is there (realpath found it), so a listing that fails leaves its links unguarded.
         let names: [String]
@@ -478,7 +483,9 @@ enum PrefixTools {
     static func restoreFontLinks(_ links: [(link: String, target: String)], anyCase: Bool = true) {
         guard let first = links.first else { return }
         let fonts = (first.link as NSString).deletingLastPathComponent
-        let present = anyCase ? (try? FileManager.default.contentsOfDirectory(atPath: fonts)) ?? [] : []
+        // A dangling link holds no name, as in link_fonts.
+        let present = anyCase ? ((try? FileManager.default.contentsOfDirectory(atPath: fonts)) ?? [])
+            .filter { FileManager.default.fileExists(atPath: fonts + "/" + $0) } : []
         for (link, target) in fontLinksToRestore(links, present: present) where symlink(target, link) != 0 {
             AppLog.note("winetricks: could not link \(link) back to \(target): \(String(cString: strerror(errno)))")
         }

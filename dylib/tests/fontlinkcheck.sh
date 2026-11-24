@@ -43,6 +43,11 @@ echo "== a game with its own arial gets the alternative"
 run "$work/b" 1313860
 is "arial.ttf links to alt" "$support/fonts/alt/arial.ttf" "$(link "$work/b/pfx/drive_c/windows/Fonts/arial.ttf")"
 
+echo "== a link left dangling by an engine update is linked again"
+ln -sf "$work/old-engine/times.ttf" "$fonts/times.ttf"
+run "$work/a" 1
+is "times.ttf links to Bridgeplay's again" "$support/fonts/times.ttf" "$(link "$fonts/times.ttf")"
+
 echo "== a font installed in the prefix is kept"
 rm "$fonts/arial.ttf"
 echo "installed" > "$fonts/arial.ttf"
@@ -81,6 +86,15 @@ else
 	rm "$dl/arial.ttf"
 	run "$volume/d" 1
 	is "a missing arial.ttf is linked again" "$support/fonts/arial.ttf" "$(link "$dl/arial.ttf")"
+
+	echo "== a dangling arial.ttf link beside an installed Arial.TTF is dropped"
+	run "$volume/e" 1
+	de="$volume/e/pfx/drive_c/windows/Fonts"
+	ln -sf "$work/old-engine/arial.ttf" "$de/arial.ttf"
+	echo "installed" > "$de/Arial.TTF"
+	run "$volume/e" 1
+	is "no arial.ttf link beside Arial.TTF" none "$(link "$de/arial.ttf")"
+	is "Arial.TTF is kept" installed "$(cat "$de/Arial.TTF")"
 fi
 
 [ "$fails" -eq 0 ] || { echo "fontlinkcheck: $fails failed"; exit 1; }

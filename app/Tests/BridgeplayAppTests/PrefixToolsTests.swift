@@ -431,7 +431,7 @@ struct PrefixToolsTests {
 
     // Another prefix's Fonts isn't claimed, and Winetricks would put fonts there and through its
     // links, so a Fonts folder that leads out of the prefix stops Winetricks before it runs.
-    @Test("Winetricks doesn't run when the prefix's Fonts folder leads out of it")
+    @Test("Winetricks doesn't run when the prefix's Fonts folder is a link, working or not")
     func linkedFontsFolderStopsWinetricks() throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "np-fonts-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -460,6 +460,18 @@ struct PrefixToolsTests {
         #expect(!FileManager.default.fileExists(atPath: prefix.pfx.appending(path: "ran").path(percentEncoded: false)))
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: other.appending(path: "tahoma.ttf").path(percentEncoded: false))
             == shared.appending(path: "tahoma.ttf").path(percentEncoded: false))
+
+        // Nor does a Fonts link to a folder that isn't there, which Winetricks would follow.
+        try FileManager.default.removeItem(at: windows.appending(path: "Fonts"))
+        try FileManager.default.createSymbolicLink(at: windows.appending(path: "Fonts"), withDestinationURL: dir.appending(path: "gone/Fonts"))
+        #expect(throws: StepFailure.self) {
+            try PrefixTools.winetricks(["corefonts"], in: prefix, script: script, runner: runner)
+        }
+        #expect(!FileManager.default.fileExists(atPath: prefix.pfx.appending(path: "ran").path(percentEncoded: false)))
+        // A prefix with no Fonts folder yet runs, and Winetricks makes it.
+        try FileManager.default.removeItem(at: windows.appending(path: "Fonts"))
+        _ = try PrefixTools.winetricks(["corefonts"], in: prefix, script: script, runner: runner)
+        #expect(FileManager.default.fileExists(atPath: prefix.pfx.appending(path: "ran").path(percentEncoded: false)))
     }
 
     @Test("A Fonts folder that can't be listed stops Winetricks rather than leaving its links in place")
