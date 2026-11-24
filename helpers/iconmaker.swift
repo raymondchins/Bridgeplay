@@ -60,66 +60,79 @@ let sizes: [(side: Int, scale: Int, name: String)] = [
     (512, 2, "icon_512x512@2x.png"),
 ]
 
-let fm = FileManager.default
-let iconsetURL = URL(filePath: outputPath + ".iconset")
-try? fm.removeItem(at: iconsetURL)
-try fm.createDirectory(at: iconsetURL, withIntermediateDirectories: true)
-
-for entry in sizes {
-    let px = entry.side * entry.scale
-    let s = CGFloat(px)
-    let r = s * maskRadius
-
-    let rep = NSBitmapImageRep(
-        bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px,
-        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
-        isPlanar: false, colorSpaceName: .deviceRGB,
-        bytesPerRow: 0, bitsPerPixel: 0
-    )!
-
-    let ctx = NSGraphicsContext(bitmapImageRep: rep)!
-    NSGraphicsContext.current = ctx
-
-    // Clip to the squircle, then draw the source image scaled to fill.
-    let rect = NSRect(x: 0, y: 0, width: s, height: s)
-    let path = NSBezierPath(roundedRect: rect, xRadius: r, yRadius: r)
-    path.addClip()
-
-    // Scale-to-fill: pick the scale that covers the canvas on both axes,
-    // then center the overflow.
-    let srcSize = srcImage.size
-    let scale = max(s / srcSize.width, s / srcSize.height)
-    let drawW = srcSize.width * scale
-    let drawH = srcSize.height * scale
-    let drawRect = NSRect(
-        x: (s - drawW) / 2, y: (s - drawH) / 2,
-        width: drawW, height: drawH
-    )
-    srcImage.draw(in: drawRect)
-
-    ctx.flushGraphics()
-    NSGraphicsContext.current = nil
-
-    guard let png = rep.representation(using: .png, properties: [:]) else {
-        fputs("iconmaker: failed to render \(entry.name)\n", stderr)
-        exit(1)
-    }
-
-    let fileURL = iconsetURL.appending(path: entry.name)
-    try png.write(to: fileURL)
+struct IconmakerError: Error {
+    let message: String
 }
 
-// iconutil produces the .icns from the populated iconset directory.
-let proc = Process()
-proc.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
-proc.arguments = ["-c", "icns", iconsetURL.path, "-o", outputPath]
-try proc.run()
-proc.waitUntilExit()
+// Renders each size into a temporary iconset next to the output and packs it
+// with iconutil. The defer removes the iconset on every exit, failures included.
+func writeIcns(_ image: NSImage, to outputPath: String) throws {
+    let fm = FileManager.default
+    let iconsetURL = URL(filePath: outputPath + ".iconset")
+    try? fm.removeItem(at: iconsetURL)
+    try fm.createDirectory(at: iconsetURL, withIntermediateDirectories: true)
+    defer { try? fm.removeItem(at: iconsetURL) }
 
-// Clean up the intermediate iconset.
-try? fm.removeItem(at: iconsetURL)
+    for entry in sizes {
+        let px = entry.side * entry.scale
+        let s = CGFloat(px)
+        let r = s * maskRadius
 
-if proc.terminationStatus != 0 {
-    fputs("iconmaker: iconutil failed with status \(proc.terminationStatus)\n", stderr)
+        let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+            isPlanar: false, colorSpaceName: .deviceRGB,
+            bytesPerRow: 0, bitsPerPixel: 0
+        )!
+
+        let ctx = NSGraphicsContext(bitmapImageRep: rep)!
+        NSGraphicsContext.current = ctx
+
+        // Clip to the squircle, then draw the source image scaled to fill.
+        let rect = NSRect(x: 0, y: 0, width: s, height: s)
+        let path = NSBezierPath(roundedRect: rect, xRadius: r, yRadius: r)
+        path.addClip()
+
+        // Scale-to-fill: pick the scale that covers the canvas on both axes,
+        // then center the overflow.
+        let srcSize = image.size
+        let scale = max(s / srcSize.width, s / srcSize.height)
+        let drawW = srcSize.width * scale
+        let drawH = srcSize.height * scale
+        let drawRect = NSRect(
+            x: (s - drawW) / 2, y: (s - drawH) / 2,
+            width: drawW, height: drawH
+        )
+        image.draw(in: drawRect)
+
+        ctx.flushGraphics()
+        NSGraphicsContext.current = nil
+
+        guard let png = rep.representation(using: .png, properties: [:]) else {
+            throw IconmakerError(message: "failed to render \(entry.name)")
+        }
+
+        try png.write(to: iconsetURL.appending(path: entry.name))
+    }
+
+    // iconutil produces the .icns from the populated iconset directory.
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
+    proc.arguments = ["-c", "icns", iconsetURL.path, "-o", outputPath]
+    try proc.run()
+    proc.waitUntilExit()
+
+    if proc.terminationStatus != 0 {
+        throw IconmakerError(message: "iconutil failed with status \(proc.terminationStatus)")
+    }
+}
+
+do {
+    try writeIcns(srcImage, to: outputPath)
+} catch let error as IconmakerError {
+    fputs("iconmaker: \(error.message)\n", stderr)
+    exit(1)
+} catch {
+    fputs("iconmaker: \(error.localizedDescription)\n", stderr)
     exit(1)
 }
