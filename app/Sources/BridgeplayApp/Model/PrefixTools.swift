@@ -426,6 +426,14 @@ enum PrefixTools {
     // stay, so a crash mid-run loses none the launcher can't make again.
     static func setAsideFontLinks(in prefix: WinePrefix, step: String) throws -> [(link: String, target: String)] {
         let fonts = prefix.pfx.appending(path: "drive_c/windows/Fonts").path(percentEncoded: false)
+        // A Fonts folder reached through a link may belong to another prefix, which isn't claimed.
+        func real(_ path: String) -> String? {
+            guard let resolved = realpath(path, nil) else { return nil }
+            defer { free(resolved) }
+            return String(cString: resolved)
+        }
+        guard let root = real(prefix.pfx.path(percentEncoded: false)),
+              real(fonts)?.lowercased() == (root + "/drive_c/windows/Fonts").lowercased() else { return [] }
         let files = FileManager.default
         guard let names = try? files.contentsOfDirectory(atPath: fonts) else { return [] }
         var moved: [(link: String, target: String)] = []
@@ -434,7 +442,7 @@ enum PrefixTools {
             guard let target = try? files.destinationOfSymbolicLink(atPath: link), isSharedFont(target) else { continue }
             guard unlink(link) == 0 else {
                 let detail = String(cString: strerror(errno))
-                restoreFontLinks(moved)
+                restoreFontLinks(moved, anyCase: false)
                 throw StepFailure(step: step, detail: detail)
             }
             moved.append((link, target))
@@ -442,17 +450,21 @@ enum PrefixTools {
         return moved
     }
 
-    // The folders link_fonts links from: Bridgeplay's fonts (and their alt/) and an engine's.
+    // The folders link_fonts links from: Bridgeplay's fonts and their alt/ (the legacy notproton
+    // ones too, which older launches linked), and an engine's.
     static func isSharedFont(_ target: String) -> Bool {
         let folder = (target as NSString).deletingLastPathComponent
-        let shared = SupportPaths.fonts.path(percentEncoded: false)
-        return folder == shared || folder == shared + "/alt" || folder.hasSuffix("/share/wine/fonts")
+        let shared = [SupportPaths.support, SupportPaths.legacyApplicationSupport].map {
+            $0.appending(path: "fonts").path(percentEncoded: false)
+        }
+        return shared.contains { folder == $0 || folder == $0 + "/alt" } || folder.hasSuffix("/share/wine/fonts")
     }
 
-    static func restoreFontLinks(_ links: [(link: String, target: String)]) {
+    // anyCase: false puts back exactly what was moved, for a set-aside that stopped halfway.
+    static func restoreFontLinks(_ links: [(link: String, target: String)], anyCase: Bool = true) {
         guard let first = links.first else { return }
         let fonts = (first.link as NSString).deletingLastPathComponent
-        let present = (try? FileManager.default.contentsOfDirectory(atPath: fonts)) ?? []
+        let present = anyCase ? (try? FileManager.default.contentsOfDirectory(atPath: fonts)) ?? [] : []
         for (link, target) in fontLinksToRestore(links, present: present) where symlink(target, link) != 0 {
             AppLog.note("winetricks: could not link \(link) back to \(target): \(String(cString: strerror(errno)))")
         }

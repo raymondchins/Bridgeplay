@@ -50,10 +50,13 @@ run "$work/a" 1
 is "arial.ttf is still the installed file" "none installed" "$(link "$fonts/arial.ttf") $(cat "$fonts/arial.ttf")"
 is "times.ttf still links" "$support/fonts/times.ttf" "$(link "$fonts/times.ttf")"
 
-if command -v hdiutil >/dev/null 2>&1 \
-	&& hdiutil create -quiet -size 8m -fs "Case-sensitive APFS" -volname fontlink "$work/cs.dmg" 2>/dev/null \
-	&& volume=$(hdiutil attach -nobrowse "$work/cs.dmg" 2>/dev/null | sed -n 's|.*\(/Volumes/.*\)$|\1|p' | tail -1) \
-	&& [ -n "$volume" ]; then
+if ! command -v hdiutil >/dev/null 2>&1; then
+	echo "==> fontlinkcheck: hdiutil not found, the case-sensitive volume cases skipped"
+elif ! hdiutil create -quiet -size 8m -fs "Case-sensitive APFS" -volname fontlink "$work/cs.dmg" 2> "$work/hdiutil.err" \
+	|| ! volume=$(hdiutil attach -nobrowse "$work/cs.dmg" 2>> "$work/hdiutil.err" | sed -n 's|.*\(/Volumes/.*\)$|\1|p' | tail -1) \
+	|| [ -z "$volume" ]; then
+	bad "a case-sensitive disk image mounts" "a mounted volume" "$(tr '\n' ' ' < "$work/hdiutil.err")"
+else
 	echo "== on a case-sensitive volume, Arial.TTF takes arial.ttf's place"
 	run "$volume/c" 1
 	cs="$volume/c/pfx/drive_c/windows/Fonts"
@@ -62,8 +65,12 @@ if command -v hdiutil >/dev/null 2>&1 \
 	run "$volume/c" 1
 	is "no arial.ttf link beside Arial.TTF" none "$(link "$cs/arial.ttf")"
 	is "times.ttf still links" "$support/fonts/times.ttf" "$(link "$cs/times.ttf")"
-else
-	echo "== case-sensitive volume: hdiutil unavailable, that case skipped"
+
+	echo "== an arial.ttf link made before Arial.TTF was installed is dropped"
+	ln -sf "$support/fonts/arial.ttf" "$cs/arial.ttf"
+	run "$volume/c" 1
+	is "no arial.ttf link" none "$(link "$cs/arial.ttf")"
+	is "Arial.TTF is kept" installed "$(cat "$cs/Arial.TTF")"
 fi
 
 [ "$fails" -eq 0 ] || { echo "fontlinkcheck: $fails failed"; exit 1; }

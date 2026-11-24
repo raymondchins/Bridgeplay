@@ -418,6 +418,37 @@ struct PrefixToolsTests {
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: mine) == own.appending(path: "mine.ttf").path(percentEncoded: false))
     }
 
+    @Test("Only links into Bridgeplay's fonts, the legacy notproton ones or an engine's are set aside")
+    func sharedFontFolders() {
+        for folder in [SupportPaths.support, SupportPaths.legacyApplicationSupport] {
+            let fonts = folder.appending(path: "fonts")
+            #expect(PrefixTools.isSharedFont(fonts.appending(path: "arial.ttf").path(percentEncoded: false)))
+            #expect(PrefixTools.isSharedFont(fonts.appending(path: "alt/arial.ttf").path(percentEncoded: false)))
+        }
+        #expect(PrefixTools.isSharedFont("/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/share/wine/fonts/tahoma.ttf"))
+        #expect(!PrefixTools.isSharedFont("/Users/someone/Fonts/mine.ttf"))
+    }
+
+    // Another prefix's Fonts isn't claimed, so a Fonts folder that is a link to one is left alone.
+    @Test("Font links in a Fonts folder reached through a link stay where they are")
+    func linkedFontsFolderIsLeftAlone() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "np-fonts-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let prefix = WinePrefix(appID: "2075800", name: "Game", library: SteamLibrary(root: dir.appending(path: "library")), lastUsed: nil)
+        let windows = prefix.pfx.appending(path: "drive_c/windows")
+        let other = dir.appending(path: "other/Fonts")
+        let shared = dir.appending(path: "runner/share/wine/fonts")
+        for folder in [windows, other, shared] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        try Data("shared".utf8).write(to: shared.appending(path: "tahoma.ttf"))
+        try FileManager.default.createSymbolicLink(at: other.appending(path: "tahoma.ttf"), withDestinationURL: shared.appending(path: "tahoma.ttf"))
+        try FileManager.default.createSymbolicLink(at: windows.appending(path: "Fonts"), withDestinationURL: other)
+
+        #expect(try PrefixTools.setAsideFontLinks(in: prefix, step: "test").isEmpty)
+        #expect(FileManager.default.fileExists(atPath: other.appending(path: "tahoma.ttf").path(percentEncoded: false)))
+    }
+
     @Test("A font link comes back only where no file of that name in any case took its place")
     func fontLinksComeBackOnlyToFreeNames() {
         let links = [("/f/arial.ttf", "/shared/arial.ttf"), ("/f/times.ttf", "/shared/times.ttf"),

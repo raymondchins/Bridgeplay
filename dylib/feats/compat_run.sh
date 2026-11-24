@@ -3126,8 +3126,9 @@ link_fonts() {
   fonts_dir="$WINEPREFIX/drive_c/windows/Fonts"
   mkdir -p "$fonts_dir" 2>> "$log" || return 0
   # Windows finds a font by name in any case, so on a case-sensitive volume a font that
-  # Winetricks installed as Arial.TTF keeps the arial.ttf link out.
+  # Winetricks installed as Arial.TTF keeps the arial.ttf link out, and drops one made before.
   fonts_present=$(find "$fonts_dir" -mindepth 1 -maxdepth 1 2>/dev/null | sed 's|.*/||' | tr '[:upper:]' '[:lower:]')
+  fonts_twice=$(printf '%s\n' "$fonts_present" | sort | uniq -d)
   for dir in "$np_support/fonts" "$CX_ROOT/share/wine/fonts"; do
     for src in "$dir"/*.ttf "$dir"/*.ttc; do
       [ -f "$src" ] || continue
@@ -3137,7 +3138,11 @@ link_fonts() {
       esac
       dst="$fonts_dir/$name"
       if [ -L "$dst" ]; then
-        rm -f "$dst" && ln -s "$src" "$dst" 2>> "$log" || true
+        rm -f "$dst" || continue
+        if [ -z "$fonts_twice" ] \
+          || ! printf '%s\n' "$fonts_twice" | grep -qxF "$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"; then
+          ln -s "$src" "$dst" 2>> "$log" || true
+        fi
       elif [ ! -e "$dst" ] \
         && ! printf '%s\n' "$fonts_present" | grep -qxF "$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"; then
         ln -s "$src" "$dst" 2>> "$log" || true
