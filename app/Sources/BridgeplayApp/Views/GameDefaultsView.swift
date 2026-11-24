@@ -353,7 +353,7 @@ struct GameDefaultsView: View {
                 .onSubmit(saveDLLOverrides)
             Button("Apply", action: saveDLLOverrides)
                 .disabled(dllDraft == (resolved(.dllOverrides).value ?? ""))
-                .help(String(localized: "Saves the DLL overrides once you change them."))
+                .help(String(localized: "Edit the DLL overrides, then click Apply to save."))
         }
     }
 
@@ -376,15 +376,14 @@ struct GameDefaultsView: View {
                     Spacer(minLength: 12)
                     Button("Open in Steam") { Self.openInSteam(item.appID) }
                         .controlSize(.small)
-                        .accessibilityLabel("\(String(localized: "Open in Steam")), \(name)")
+                        .accessibilityLabel(Text("\(String(localized: "Open in Steam")), \(name)"))
+                        .accessibilityActions {
+                            if item.place == .conf {
+                                Button(String(localized: "Use Defaults…")) { clearing = item }
+                            }
+                        }
                 }
                 .contextMenu {
-                    if item.place == .conf {
-                        Button(String(localized: "Use Defaults…")) { clearing = item }
-                    }
-                }
-                // The context menu's action, where VoiceOver's Actions rotor finds it
-                .accessibilityActions {
                     if item.place == .conf {
                         Button(String(localized: "Use Defaults…")) { clearing = item }
                     }
@@ -634,6 +633,6 @@ private struct ResetButton: View {
         .buttonStyle(.borderless)
         .onHover { hovered = $0 }
         .help(String(localized: "Reset to Bridgeplay's Default"))
-        .accessibilityLabel("\(String(localized: "Reset to Bridgeplay's Default")), \(title)")
+        .accessibilityLabel(Text("\(String(localized: "Reset to Bridgeplay's Default")), \(title)"))
     }
 }
