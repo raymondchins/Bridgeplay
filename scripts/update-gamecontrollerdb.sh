@@ -17,7 +17,7 @@ set -eu
 
 # A pinned commit, not master: a regenerated file changes only when this line does.
 # To move it: gh api repos/mdqinc/SDL_GameControllerDB/commits/master -q .sha
-db_commit=ff333823a85ae896e73f4c53670932cf0f728adb
+db_commit=f510b74438d08d7dd55ed06673f473bd1cc28b85
 db_url=https://raw.githubusercontent.com/mdqinc/SDL_GameControllerDB/$db_commit/gamecontrollerdb.txt
 own="$HOME/Library/Application Support/bridgeplay/gamecontrollerdb.txt"
 # Before the app's 3.0.0 migration the file is still in the old support folder.
