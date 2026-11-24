@@ -443,7 +443,13 @@ enum PrefixTools {
             )
         }
         let files = FileManager.default
-        guard let names = try? files.contentsOfDirectory(atPath: fonts) else { return [] }
+        // The folder is there (realpath found it), so a listing that fails leaves its links unguarded.
+        let names: [String]
+        do {
+            names = try files.contentsOfDirectory(atPath: fonts)
+        } catch {
+            throw StepFailure(step: step, detail: error.localizedDescription)
+        }
         var moved: [(link: String, target: String)] = []
         for name in names {
             let link = fonts + "/" + name

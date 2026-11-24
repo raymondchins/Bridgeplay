@@ -462,6 +462,20 @@ struct PrefixToolsTests {
             == shared.appending(path: "tahoma.ttf").path(percentEncoded: false))
     }
 
+    @Test("A Fonts folder that can't be listed stops Winetricks rather than leaving its links in place")
+    func unlistableFontsFolderStopsWinetricks() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "np-fonts-\(UUID().uuidString)")
+        let prefix = WinePrefix(appID: "2075800", name: "Game", library: SteamLibrary(root: dir.appending(path: "library")), lastUsed: nil)
+        let fonts = prefix.pfx.appending(path: "drive_c/windows/Fonts")
+        try FileManager.default.createDirectory(at: fonts, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o311], ofItemAtPath: fonts.path(percentEncoded: false))
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fonts.path(percentEncoded: false))
+            try? FileManager.default.removeItem(at: dir)
+        }
+        #expect(throws: StepFailure.self) { try PrefixTools.setAsideFontLinks(in: prefix, step: "test") }
+    }
+
     @Test("A font link comes back only where no file of that name in any case took its place")
     func fontLinksComeBackOnlyToFreeNames() {
         let links = [("/f/arial.ttf", "/shared/arial.ttf"), ("/f/times.ttf", "/shared/times.ttf"),
