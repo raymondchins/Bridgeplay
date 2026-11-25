@@ -270,9 +270,19 @@ enum RunnerInstaller {
     static func launchingBuild(
         tools: [URL] = SupportPaths.Steam.ourTools(), ps: String = "/bin/ps"
     ) -> String? {
-        guard !tools.isEmpty,
-              let result = try? Shell.run(ps, ["-axww", "-o", "args="]), result.succeeded
-        else { return nil }
+        (try? launchingScript(tools: tools, ps: ps)) ?? nil
+    }
+
+    struct ProcessListFailed: Error {}
+
+    // launchingBuild, but throws when ps fails, so "no game is starting" and "could not
+    // look" stay apart.
+    static func launchingScript(
+        tools: [URL] = SupportPaths.Steam.ourTools(), ps: String = "/bin/ps"
+    ) throws -> String? {
+        guard !tools.isEmpty else { return nil }
+        guard let result = try? Shell.run(ps, ["-axww", "-o", "args="]), result.succeeded
+        else { throw ProcessListFailed() }
         // Steam starts the script as <tool>/./run.
         let lines = result.stdout.split(separator: "\n").map { line in
             var line = line.trimmingCharacters(in: .whitespaces)

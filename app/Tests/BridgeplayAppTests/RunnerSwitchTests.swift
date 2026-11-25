@@ -785,6 +785,10 @@ struct RunnerRemovalTests {
                            "/usr/bin/tail -f \(script)", "/usr/bin/vim \(script)", "/bin/sh -c cat \(script)"])
         #expect(RunnerInstaller.launchingBuild(tools: [current, legacy], ps: idle) == nil)
         #expect(RunnerInstaller.launchingBuild(tools: [current], ps: "/nonexistent/ps") == nil)
+        #expect(throws: RunnerInstaller.ProcessListFailed.self) {
+            try RunnerInstaller.launchingScript(tools: [current], ps: "/nonexistent/ps")
+        }
+        #expect(try RunnerInstaller.launchingScript(tools: [current, legacy], ps: idle) == nil)
 
         let runners = dir.appending(path: "runners")
         try fm.createDirectory(at: runners.appending(path: "crossover-27"), withIntermediateDirectories: true)

@@ -89,6 +89,13 @@ struct RunnerProcessesTests {
         #expect(unknown.build == "winecx-11.17" && !unknown.isLeftover)
 
         #expect(RunnerInstaller.activity(in: runners, processes: { _ in [] }, launching: { nil }) == nil)
+
+        // ps failing for the run scripts may hide a game that is starting: never a leftover.
+        let blind = try #require(RunnerInstaller.activity(in: runners, processes: { _ in found },
+                                                          launching: { throw RunnerInstaller.ProcessListFailed() }))
+        #expect(blind.launching && !blind.isLeftover)
+        #expect(RunnerInstaller.activity(in: runners, processes: { _ in [] },
+                                         launching: { throw RunnerInstaller.ProcessListFailed() }) == nil)
     }
 
     @Test("The refusal names what runs, and only leftovers carry an offer")
@@ -122,13 +129,13 @@ struct RunnerProcessesTests {
     func refusesToStopUnderAGame() {
         let signals = Signals()
         #expect(throws: StepFailure.self) {
-            try RunnerInstaller.stopLeftovers(steamRunning: { true }, busy: { Self.leftover },
+            try RunnerInstaller.stopLeftovers(Self.leftover, steamRunning: { true }, busy: { Self.leftover },
                                               signal: signals.add, pause: {})
         }
         var starting = Self.leftover
         starting.launching = true
         #expect(throws: StepFailure.self) {
-            try RunnerInstaller.stopLeftovers(steamRunning: { false }, busy: { starting },
+            try RunnerInstaller.stopLeftovers(Self.leftover, steamRunning: { false }, busy: { starting },
                                               signal: signals.add, pause: {})
         }
         #expect(signals.all.isEmpty)
@@ -137,7 +144,7 @@ struct RunnerProcessesTests {
     @Test("Leftovers get SIGTERM, and SIGKILL only if they outlast it")
     func stopsLeftovers() throws {
         let gentle = Signals()
-        try RunnerInstaller.stopLeftovers(steamRunning: { false },
+        try RunnerInstaller.stopLeftovers(Self.leftover, steamRunning: { false },
                                           busy: { gentle.all.isEmpty ? Self.leftover : nil },
                                           signal: gentle.add, pause: {})
         #expect(gentle.all.map(\.0) == [10, 11])
@@ -146,7 +153,7 @@ struct RunnerProcessesTests {
         // explorer.exe ignores SIGTERM and only gets SIGKILL from the second pass.
         let stubborn = Signals()
         let stuck = RunnerActivity(build: "winecx-11.17", processes: [Self.process(11, "explorer.exe")])
-        try RunnerInstaller.stopLeftovers(steamRunning: { false },
+        try RunnerInstaller.stopLeftovers(Self.leftover, steamRunning: { false },
                                           busy: { stubborn.kinds.contains(SIGKILL) ? nil : (stubborn.all.isEmpty ? Self.leftover : stuck) },
                                           signal: stubborn.add, pause: {}, patience: 3)
         #expect(stubborn.kinds == [SIGTERM, SIGTERM, SIGKILL])
@@ -154,7 +161,7 @@ struct RunnerProcessesTests {
 
         let immortal = Signals()
         let failure = try #require(throws: StepFailure.self) {
-            try RunnerInstaller.stopLeftovers(steamRunning: { false }, busy: { stuck },
+            try RunnerInstaller.stopLeftovers(Self.leftover, steamRunning: { false }, busy: { stuck },
                                               signal: immortal.add, pause: {}, patience: 2)
         }
         #expect(failure.detail.contains("explorer.exe"))
@@ -167,10 +174,51 @@ struct RunnerProcessesTests {
         var starting = Self.leftover
         starting.launching = true
         #expect(throws: StepFailure.self) {
-            try RunnerInstaller.stopLeftovers(steamRunning: { false },
+            try RunnerInstaller.stopLeftovers(Self.leftover, steamRunning: { false },
                                               busy: { signals.all.isEmpty ? Self.leftover : starting },
                                               signal: signals.add, pause: {})
         }
         #expect(signals.kinds == [SIGTERM, SIGTERM])
+    }
+
+    @Test("Only processes the user confirmed get a signal, even ones Wine starts while it stops")
+    func signalsOnlyConfirmedProcesses() throws {
+        // A process on another clone that the dialog never named is left alone.
+        let other = RunnerProcess(pid: 20, name: "notepad.exe", build: "crossover-27")
+        let both = RunnerActivity(build: "winecx-11.17", processes: Self.leftover.processes + [other])
+        let skipped = Signals()
+        try RunnerInstaller.stopLeftovers(Self.leftover, steamRunning: { false },
+                                          busy: { skipped.all.isEmpty ? both : RunnerActivity(build: "crossover-27", processes: [other]) },
+                                          signal: skipped.add, pause: {})
+        #expect(skipped.all.map(\.0) == [10, 11])
+
+        // A child started during the SIGTERM wait is neither terminated nor killed.
+        let spawned = Signals()
+        let child = Self.process(30, "winedevice.exe")
+        let failure = try #require(throws: StepFailure.self) {
+            try RunnerInstaller.stopLeftovers(Self.leftover, steamRunning: { false },
+                                              busy: { spawned.all.isEmpty ? Self.leftover
+                                                      : RunnerActivity(build: "winecx-11.17", processes: [Self.process(10, "wineserver"), child]) },
+                                              signal: spawned.add, pause: {}, patience: 2)
+        }
+        #expect(!spawned.all.contains { $0.0 == 30 })
+        #expect(spawned.all.map(\.0) == [10, 11, 10])
+        #expect(failure.detail.contains("wineserver") && !failure.detail.contains("winedevice.exe"))
+
+        // Nothing confirmed still runs: no signal, and the retry looks again.
+        let none = Signals()
+        try RunnerInstaller.stopLeftovers(Self.leftover, steamRunning: { false },
+                                          busy: { RunnerActivity(build: "winecx-11.17", processes: [child]) },
+                                          signal: none.add, pause: {})
+        #expect(none.all.isEmpty)
+    }
+
+    @Test("Leftovers on two clones name both builds")
+    func namesEveryBuild() {
+        let two = RunnerActivity(build: "winecx-11.17", processes: Self.leftover.processes
+                                 + [RunnerProcess(pid: 20, name: "wineserver", build: "crossover-27")])
+        #expect(two.builds.contains("winecx-11.17") && two.builds.contains("crossover-27"))
+        #expect(two.names.components(separatedBy: "wineserver").count == 2)
+        #expect(RunnerActivity(build: "27.0.0").builds == "27.0.0")
     }
 }

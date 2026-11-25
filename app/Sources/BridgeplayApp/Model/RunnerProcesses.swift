@@ -24,6 +24,13 @@ struct RunnerActivity: Sendable, Equatable {
         return processes.map(\.name).filter { seen.insert($0).inserted }.formatted(.list(type: .and))
     }
 
+    // Every build a listed process runs from, so leftovers on two clones are named together.
+    var builds: String {
+        var seen = Set<String>()
+        let listed = processes.map(\.build).filter { seen.insert($0).inserted }
+        return (listed.isEmpty ? [build] : listed).formatted(.list(type: .and))
+    }
+
     // `plain` when no process could be named, `named` otherwise. Leftovers get a hint, and the
     // failure carries them so Status can offer to stop them.
     func refusal(step: String, plain: String, named: String) -> StepFailure {
@@ -45,16 +52,25 @@ extension RunnerInstaller {
     static func activity(
         in runners: URL = SupportPaths.runners,
         processes: (URL) -> [RunnerProcess]? = { RunnerInstaller.processes(in: $0) },
-        launching: () -> String? = { RunnerInstaller.launchingBuild() }
+        launching: () throws -> String? = { try RunnerInstaller.launchingScript() }
     ) -> RunnerActivity? {
-        let starting = launching()
+        // When ps cannot say whether a run script is live, a game may be starting: its Wine
+        // processes are then never taken for leftovers.
+        let starting: String?, maybeStarting: Bool
+        do {
+            starting = try launching()
+            maybeStarting = starting != nil
+        } catch {
+            starting = nil
+            maybeStarting = true
+        }
         guard let found = processes(runners) else {
             // ps failed: count every clone as busy, as isRunning does, without names.
             return (RunnerStore.clonedBuilds(in: runners).first ?? starting)
-                .map { RunnerActivity(build: $0, launching: starting != nil) }
+                .map { RunnerActivity(build: $0, launching: maybeStarting) }
         }
         if let first = found.first {
-            return RunnerActivity(build: first.build, processes: found, launching: starting != nil)
+            return RunnerActivity(build: first.build, processes: found, launching: maybeStarting)
         }
         return starting.map { RunnerActivity(build: $0, launching: true) }
     }
@@ -116,10 +132,12 @@ extension RunnerInstaller {
             .map { $0.hasSuffix("/") ? $0 : $0 + "/" }
     }
 
-    // Stops Wine processes a quit game left behind, never while Steam is open or a run script
-    // is starting a game. SIGTERM first: wineserver saves the prefix's registry on it, and its
+    // Stops the leftovers the user confirmed, never while Steam is open or a run script is
+    // starting a game. SIGTERM first: wineserver saves the prefix's registry on it, and its
     // clients exit once it has gone. What is still there after `patience` gets SIGKILL.
+    // A process that was not confirmed gets no signal; the retry names it again.
     static func stopLeftovers(
+        _ confirmed: RunnerActivity,
         steamRunning: () -> Bool = { SteamBundle.isRunning },
         busy: () -> RunnerActivity? = { RunnerInstaller.activity() },
         signal: (pid_t, Int32) -> Void = { _ = kill($0, $1) },
@@ -132,8 +150,10 @@ extension RunnerInstaller {
         func notStopped() -> StepFailure {
             StepFailure(step: stopStep, detail: String(localized: "Could not stop \(current.names). Restart the Mac to end the leftover processes."))
         }
+        // Only confirmed pids the last look still found under a clone get a signal.
+        current.processes = current.processes.filter(confirmed.processes.contains)
         for sig in [SIGTERM, SIGKILL] {
-            // Only pids the last look still found under a clone get a signal.
+            guard !current.processes.isEmpty else { return }
             for process in current.processes { signal(process.pid, sig) }
             for _ in 0..<patience {
                 pause()
@@ -141,7 +161,9 @@ extension RunnerInstaller {
                 if now.launching || steamRunning() { throw refused }
                 // ps failed, so nothing can be signalled safely.
                 guard !now.processes.isEmpty else { throw notStopped() }
-                current = now
+                let left = now.processes.filter(confirmed.processes.contains)
+                if left.isEmpty { return }
+                current.processes = left
             }
             AppLog.note("leftover Wine processes still running after signal \(sig): \(current.names)")
         }

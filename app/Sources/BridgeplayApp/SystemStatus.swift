@@ -233,9 +233,9 @@ final class SystemStatus {
     }
 
     func stopLeftoversAndRetry() async {
-        guard let retry = leftoverRetry else { return }
+        guard let retry = leftoverRetry, let confirmed = leftoverRunner else { return }
         await perform(from: RunnerInstaller.stopStep) { _ in
-            try await Task.detached(priority: .userInitiated) { try RunnerInstaller.stopLeftovers() }.value
+            try await Task.detached(priority: .userInitiated) { try RunnerInstaller.stopLeftovers(confirmed) }.value
             return nil
         }
         guard failure == nil else { return }

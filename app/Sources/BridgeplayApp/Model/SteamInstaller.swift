@@ -146,14 +146,18 @@ enum SteamInstaller {
         }
         func refuseRunningRunners() throws {
             let starting = launchingBuild(compatTools)
-            for id in RunnerStore.clonedBuilds(in: runners) {
+            let running = RunnerStore.clonedBuilds(in: runners).compactMap { id -> (id: String, root: URL)? in
                 let root = SupportPaths.runnerRoot(forBuild: id, runners: runners)
-                guard runnerIsRunning(root) else { continue }
-                let busy = RunnerActivity(build: id, processes: runnerProcesses(id, root), launching: starting != nil)
+                return runnerIsRunning(root) ? (id, root) : nil
+            }
+            if let first = running.first {
+                // Every busy clone's processes, so Status offers to stop all it names.
+                let busy = RunnerActivity(build: first.id, processes: running.flatMap { runnerProcesses($0.id, $0.root) },
+                                          launching: starting != nil)
                 throw busy.refusal(
                     step: step,
-                    plain: String(localized: "A game or Wine tool is running on build \(id). Quit it before updating Bridgeplay."),
-                    named: String(localized: "A game or Wine tool is running on build \(id): \(busy.names). Quit it before updating Bridgeplay."))
+                    plain: String(localized: "A game or Wine tool is running on build \(first.id). Quit it before updating Bridgeplay."),
+                    named: String(localized: "A game or Wine tool is running on build \(busy.builds): \(busy.names). Quit it before updating Bridgeplay."))
             }
             if let id = starting {
                 throw StepFailure(step: step, detail: String(localized: "A game or Wine tool is running on build \(id). Quit it before updating Bridgeplay."))

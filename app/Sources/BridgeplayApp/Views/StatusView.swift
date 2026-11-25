@@ -256,7 +256,7 @@ struct StatusView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(status.leftoverRunner.map {
-                String(localized: "Bridgeplay stops \($0.names) from build \($0.build), then tries again. Unsaved progress in a game or Wine tool that is still open is lost.")
+                String(localized: "Bridgeplay stops \($0.names) from build \($0.builds), then tries again. Unsaved progress in a game or Wine tool that is still open is lost.")
             } ?? "")
         }
         .confirmationDialog(
@@ -317,7 +317,7 @@ struct StatusView: View {
                     value: failure,
                     tone: .bad,
                     action: status.leftoverRunner != nil
-                        ? StatusAction(label: String(localized: "Stop Wine Processes")) {
+                        ? StatusAction(label: String(localized: "Stop Wine Processes"), isEnabled: status.isIdle) {
                             status.pendingConfirmation = .stopLeftovers
                         }
                         : status.failureRemedy?.settingsPane.map { pane in

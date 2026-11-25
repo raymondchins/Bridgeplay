@@ -68,7 +68,7 @@ enum SteamRepair {
             throw busy.refusal(
                 step: step,
                 plain: String(localized: "A game or Wine tool is running on build \(busy.build). Quit it before repairing Steam."),
-                named: String(localized: "A game or Wine tool is running on build \(busy.build): \(busy.names). Quit it before repairing Steam."))
+                named: String(localized: "A game or Wine tool is running on build \(busy.builds): \(busy.names). Quit it before repairing Steam."))
         }
         try refuseRunningGame()
 

@@ -112,7 +112,7 @@ enum Uninstall {
             throw busy.refusal(
                 step: step,
                 plain: String(localized: "A game or Wine tool is running on build \(busy.build). Quit it before removing Bridgeplay."),
-                named: String(localized: "A game or Wine tool is running on build \(busy.build): \(busy.names). Quit it before removing Bridgeplay."))
+                named: String(localized: "A game or Wine tool is running on build \(busy.builds): \(busy.names). Quit it before removing Bridgeplay."))
         }
         try modifications.prepare()
         let tracked = try modifications.paths()
