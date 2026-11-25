@@ -572,7 +572,7 @@ struct UninstallTests {
         let layout = try layout()
         defer { try? FileManager.default.removeItem(at: layout.root) }
         var leftovers = layout.leftovers
-        leftovers.runningBuild = { "27.0.0" }
+        leftovers.busyRunner = { RunnerActivity(build: "27.0.0") }
         let stops = Flag()
 
         let failure = try await #require(throws: StepFailure.self) {
@@ -590,7 +590,7 @@ struct UninstallTests {
         let layout = try layout()
         defer { try? FileManager.default.removeItem(at: layout.root) }
         var leftovers = layout.leftovers
-        leftovers.runningBuild = { "27.0.0" }
+        leftovers.busyRunner = { RunnerActivity(build: "27.0.0") }
         let captured = leftovers
 
         let exitCode = await RemoveEverythingCommand.perform { _ in try await remove(layout, leftovers: captured) }

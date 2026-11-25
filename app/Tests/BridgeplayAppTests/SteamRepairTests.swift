@@ -167,13 +167,13 @@ struct SteamRepairTests {
 
         func repair(manifest: ValvePackageManifest? = nil, downloads: URL,
                     stopClient: @escaping SteamInstaller.ClientStopper,
-                    runningBuild: @escaping @Sendable () -> String? = { nil },
+                    busyRunner: @escaping @Sendable () -> RunnerActivity? = { nil },
                     report: @escaping @Sendable (RepairPhase) -> Void = { _ in }) async throws {
             _ = try await SteamRepair.run(
                 manifest: manifest, app: app, innerPlist: work.appending(path: "inner.plist"), updateBlocks: [],
                 backups: work.appending(path: "support/backups"), downloads: downloads,
                 modifications: modifications, stopClient: stopClient, register: { _ in },
-                runningBuild: runningBuild, report: report)
+                busyRunner: busyRunner, report: report)
         }
     }
 
@@ -220,7 +220,7 @@ struct SteamRepairTests {
             try await steam.repair(downloads: try isolatedValveDownloads(in: work), stopClient: { _, _ in
                 log.add("stopped")
                 return true
-            }, runningBuild: { "27.0.0" }, report: { log.add($0.label) })
+            }, busyRunner: { RunnerActivity(build: "27.0.0") }, report: { log.add($0.label) })
         }
 
         #expect(refusal.detail.contains("27.0.0"))
@@ -239,8 +239,8 @@ struct SteamRepairTests {
             try await steam.repair(downloads: try isolatedValveDownloads(in: work), stopClient: { _, _ in
                 log.add("stopped")
                 return true
-            }, runningBuild: {
-                log.all.contains(RepairPhase.checking.label) ? "27.0.0" : nil
+            }, busyRunner: {
+                log.all.contains(RepairPhase.checking.label) ? RunnerActivity(build: "27.0.0") : nil
             }, report: { log.add($0.label) })
         }
 
@@ -318,7 +318,7 @@ struct SteamRepairTests {
         _ = try await SteamRepair.run(
             app: app, innerPlist: work.appending(path: "inner.plist"), updateBlocks: [],
             backups: support.appending(path: "backups"), downloads: try isolatedValveDownloads(in: work),
-            modifications: modifications, stopClient: { _, _ in false }, register: { _ in }, runningBuild: { nil })
+            modifications: modifications, stopClient: { _, _ in false }, register: { _ in }, busyRunner: { nil })
 
         #expect(try modifications.paths().isEmpty)
         try FileManager.default.moveItem(at: drive, to: work.appending(path: "disconnected"))

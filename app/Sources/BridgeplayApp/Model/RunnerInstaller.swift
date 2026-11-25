@@ -248,11 +248,7 @@ enum RunnerInstaller {
     static func isRunning(from clone: URL, ps: String = "/bin/ps") -> Bool {
         guard let result = try? Shell.run(ps, ["-axww", "-o", "comm="]), result.succeeded
         else { return true }
-        // ps prints the resolved path, and a clone can be a link to another drive.
-        let root = clone.standardizedFileURL.path(percentEncoded: false)
-        let prefixes = [root, realpath(root, nil).map { defer { free($0) }; return String(cString: $0) }]
-            .compactMap { $0 }
-            .map { $0.hasSuffix("/") ? $0 : $0 + "/" }
+        let prefixes = rootPrefixes(clone)
         return result.stdout.split(separator: "\n").contains { line in
             let command = line.trimmingCharacters(in: .whitespaces)
             return prefixes.contains { command.hasPrefix($0) }
@@ -274,9 +270,19 @@ enum RunnerInstaller {
     static func launchingBuild(
         tools: [URL] = SupportPaths.Steam.ourTools(), ps: String = "/bin/ps"
     ) -> String? {
-        guard !tools.isEmpty,
-              let result = try? Shell.run(ps, ["-axww", "-o", "args="]), result.succeeded
-        else { return nil }
+        (try? launchingScript(tools: tools, ps: ps)) ?? nil
+    }
+
+    struct ProcessListFailed: Error {}
+
+    // launchingBuild, but throws when ps fails, so "no game is starting" and "could not
+    // look" stay apart.
+    static func launchingScript(
+        tools: [URL] = SupportPaths.Steam.ourTools(), ps: String = "/bin/ps"
+    ) throws -> String? {
+        guard !tools.isEmpty else { return nil }
+        guard let result = try? Shell.run(ps, ["-axww", "-o", "args="]), result.succeeded
+        else { throw ProcessListFailed() }
         // Steam starts the script as <tool>/./run.
         let lines = result.stdout.split(separator: "\n").map { line in
             var line = line.trimmingCharacters(in: .whitespaces)

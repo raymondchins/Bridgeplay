@@ -98,6 +98,7 @@ enum SteamInstaller {
         lockFolder: URL = SupportPaths.applicationSupport,
         modifications: SteamModifications = .shared,
         runnerIsRunning: @Sendable (URL) -> Bool = { RunnerInstaller.isRunning(from: $0) },
+        runnerProcesses: (String, URL) -> [RunnerProcess] = { RunnerInstaller.processes(under: [($0, $1)]) ?? [] },
         launchingBuild: (URL) -> String? = { RunnerInstaller.launchingBuild(tools: SupportPaths.Steam.ourTools(in: $0)) },
         verifyRunner: (RunnerBuild, URL) throws -> Void = RunnerInstaller.verifyClone,
         patchRunner: (RunnerBuild, URL, URL) throws -> Void = { build, root, bridge in
@@ -144,10 +145,21 @@ enum SteamInstaller {
             throw StepFailure(step: step, detail: String(localized: "A newer Bridgeplay build is installed. Use that build to update or repair the installed files."))
         }
         func refuseRunningRunners() throws {
-            for id in RunnerStore.clonedBuilds(in: runners) where runnerIsRunning(SupportPaths.runnerRoot(forBuild: id, runners: runners)) {
-                throw StepFailure(step: step, detail: String(localized: "A game or Wine tool is running on build \(id). Quit it before updating Bridgeplay."))
+            let starting = launchingBuild(compatTools)
+            let running = RunnerStore.clonedBuilds(in: runners).compactMap { id -> (id: String, root: URL)? in
+                let root = SupportPaths.runnerRoot(forBuild: id, runners: runners)
+                return runnerIsRunning(root) ? (id, root) : nil
             }
-            if let id = launchingBuild(compatTools) {
+            if let first = running.first {
+                // Every busy clone's processes, so Status offers to stop all it names.
+                let busy = RunnerActivity(build: first.id, processes: running.flatMap { runnerProcesses($0.id, $0.root) },
+                                          launching: starting != nil)
+                throw busy.refusal(
+                    step: step,
+                    plain: String(localized: "A game or Wine tool is running on build \(first.id). Quit it before updating Bridgeplay."),
+                    named: String(localized: "A game or Wine tool is running on build \(busy.builds): \(busy.names). Quit it before updating Bridgeplay."))
+            }
+            if let id = starting {
                 throw StepFailure(step: step, detail: String(localized: "A game or Wine tool is running on build \(id). Quit it before updating Bridgeplay."))
             }
         }

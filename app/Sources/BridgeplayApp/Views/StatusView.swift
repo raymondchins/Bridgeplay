@@ -246,6 +246,20 @@ struct StatusView: View {
             Text(Uninstall.confirmation())
         }
         .confirmationDialog(
+            String(localized: "Stop the leftover Wine processes?"),
+            isPresented: asking(.stopLeftovers),
+            titleVisibility: .visible
+        ) {
+            Button("Stop Processes", role: .destructive) {
+                Task { await status.stopLeftoversAndRetry() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(status.leftoverRunner.map {
+                String(localized: "Bridgeplay stops \($0.names) from build \($0.builds), then tries again. Unsaved progress in a game or Wine tool that is still open is lost.")
+            } ?? "")
+        }
+        .confirmationDialog(
             CrossOverLicense.notActivatedTitle,
             isPresented: asking(.installUnlicensed),
             titleVisibility: .visible
@@ -302,11 +316,15 @@ struct StatusView: View {
                     title: String(localized: "Failed"),
                     value: failure,
                     tone: .bad,
-                    action: status.failureRemedy?.settingsPane.map { pane in
-                        StatusAction(label: Remedy.settingsButton) {
-                            Remedy.openSettings(pane)
+                    action: status.leftoverRunner != nil
+                        ? StatusAction(label: String(localized: "Stop Wine Processes"), isEnabled: status.isIdle) {
+                            status.pendingConfirmation = .stopLeftovers
                         }
-                    },
+                        : status.failureRemedy?.settingsPane.map { pane in
+                            StatusAction(label: Remedy.settingsButton) {
+                                Remedy.openSettings(pane)
+                            }
+                        },
                     menu: ErrorReport.actions(failure, in: "Status")
                 )
             } else if let outcome = status.outcome {

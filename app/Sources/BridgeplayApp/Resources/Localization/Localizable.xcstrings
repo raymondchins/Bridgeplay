@@ -1420,6 +1420,28 @@
         }
       }
     },
+    "A game is starting or Steam is open, so Bridgeplay stopped nothing." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un gioco è in avvio o Steam è aperto, quindi Bridgeplay non ha arrestato nulla."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запускается игра или открыт Steam, поэтому Bridgeplay ничего не завершил."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有游戏正在启动或 Steam 已打开，因此 Bridgeplay 没有停止任何进程。"
+          }
+        }
+      }
+    },
     "A game or Wine tool is running on build %@. Quit it before removing Bridgeplay." : {
       "localizations" : {
         "it" : {
@@ -1482,6 +1504,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "有游戏或 Wine 工具正在使用构建版本 %@。请先退出，再更新 Bridgeplay。"
+          }
+        }
+      }
+    },
+    "A game or Wine tool is running on build %@: %@. Quit it before removing Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un gioco o uno strumento di Wine è in esecuzione sulla build %1$@: %2$@. Chiudilo prima di rimuovere Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Игра или инструмент Wine запущены в сборке %1$@: %2$@. Завершите их перед удалением Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有游戏或 Wine 工具正在使用构建版本 %1$@：%2$@。请先退出，再移除 Bridgeplay。"
+          }
+        }
+      }
+    },
+    "A game or Wine tool is running on build %@: %@. Quit it before repairing Steam." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un gioco o uno strumento di Wine è in esecuzione sulla build %1$@: %2$@. Chiudilo prima di riparare Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Игра или инструмент Wine запущены в сборке %1$@: %2$@. Завершите их перед восстановлением Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有游戏或 Wine 工具正在使用构建版本 %1$@：%2$@。请先退出，再修复 Steam。"
+          }
+        }
+      }
+    },
+    "A game or Wine tool is running on build %@: %@. Quit it before updating Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un gioco o uno strumento di Wine è in esecuzione sulla build %1$@: %2$@. Chiudilo prima di aggiornare Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Игра или инструмент Wine запущены в сборке %1$@: %2$@. Завершите их перед обновлением Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有游戏或 Wine 工具正在使用构建版本 %1$@：%2$@。请先退出，再更新 Bridgeplay。"
           }
         }
       }
@@ -4107,6 +4195,28 @@
         }
       }
     },
+    "Bridgeplay stops %@ from build %@, then tries again. Unsaved progress in a game or Wine tool that is still open is lost." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay arresta %1$@ della build %2$@, poi riprova. I progressi non salvati di un gioco o di uno strumento di Wine ancora aperto andranno persi."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay завершит %1$@ из сборки %2$@ и попробует снова. Несохранённый прогресс в ещё открытой игре или инструменте Wine будет потерян."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 会停止构建版本 %2$@ 中的 %1$@，然后重试。仍处于打开状态的游戏或 Wine 工具中未保存的进度将会丢失。"
+          }
+        }
+      }
+    },
     "Bridgeplay successfully installed." : {
       "localizations" : {
         "it" : {
@@ -5467,6 +5577,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法移除容器模板 %@：%@ 请刷新后重试。"
+          }
+        }
+      }
+    },
+    "Could not stop %@. Restart the Mac to end the leftover processes." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile arrestare %@. Riavvia il Mac per chiudere i processi rimasti."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось завершить %@. Перезагрузите Mac, чтобы закрыть оставшиеся процессы."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法停止 %@。请重启 Mac 以结束遗留的进程。"
           }
         }
       }
@@ -10002,6 +10134,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 处没有文件。"
+          }
+        }
+      }
+    },
+    "No game is starting, so it is probably left over from a game that quit." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun gioco è in avvio, quindi probabilmente è rimasto da un gioco già chiuso."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ни одна игра не запускается, так что, скорее всего, он остался от уже закрытой игры."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前没有游戏正在启动，这个进程很可能是已退出的游戏遗留下来的。"
+          }
+        }
+      }
+    },
+    "No game is starting, so they are probably left over from a game that quit." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun gioco è in avvio, quindi probabilmente sono rimasti da un gioco già chiuso."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ни одна игра не запускается, так что, скорее всего, они остались от уже закрытой игры."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前没有游戏正在启动，这些进程很可能是已退出的游戏遗留下来的。"
           }
         }
       }
@@ -15025,6 +15201,50 @@
         }
       }
     },
+    "Stop Processes" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arresta processi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершить процессы"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止进程"
+          }
+        }
+      }
+    },
+    "Stop Wine Processes" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arresta processi Wine"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершить процессы Wine"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止 Wine 进程"
+          }
+        }
+      }
+    },
     "Stop getting beta updates?" : {
       "localizations" : {
         "it" : {
@@ -15047,6 +15267,28 @@
         }
       }
     },
+    "Stop the leftover Wine processes?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrestare i processi Wine rimasti?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершить оставшиеся процессы Wine?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要停止遗留的 Wine 进程吗？"
+          }
+        }
+      }
+    },
     "Stopping Steam" : {
       "localizations" : {
         "it" : {
@@ -15065,6 +15307,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在停止 Steam"
+          }
+        }
+      }
+    },
+    "Stopping leftover Wine processes" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arresto dei processi Wine rimasti"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершение оставшихся процессов Wine"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在停止遗留的 Wine 进程"
           }
         }
       }

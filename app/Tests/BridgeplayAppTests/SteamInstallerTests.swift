@@ -113,6 +113,7 @@ struct SteamInstallerTests {
         refusedResets: [String] = [],
         runnerIsRunning: (@Sendable (URL) -> Bool)? = nil,
         launchingBuild: (URL) -> String? = { _ in nil },
+        runnerProcesses: (String, URL) -> [RunnerProcess] = { _, _ in [] },
         stopClient: SteamInstaller.ClientStopper? = nil,
         verifyRunner: (RunnerBuild, URL) throws -> Void = { _, _ in },
         register: SteamInstaller.BundleRegistrar? = nil,
@@ -134,6 +135,7 @@ struct SteamInstallerTests {
             lockFolder: fixture.work,
             modifications: fixture.modifications,
             runnerIsRunning: runnerIsRunning ?? { _ in running },
+            runnerProcesses: runnerProcesses,
             launchingBuild: launchingBuild,
             verifyRunner: verifyRunner,
             patchRunner: { _, _, _ in },
@@ -1004,6 +1006,31 @@ struct SteamInstallerTests {
         #expect(error.detail.contains("99.0.0.12345"))
         #expect(calls.stops == 0, "Steam was asked to quit under a running game")
         #expect(!FileManager.default.fileExists(atPath: fixture.deployedDylib.path))
+    }
+
+    @Test("Leftovers on two clones are all named, so stopping them stops only what was named")
+    func namesLeftoversOnEveryClone() async throws {
+        let work = try scratchDirectory("install-leftovers")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let fixture = try await self.fixture(into: work)
+        let runners = fixture.support.appending(path: "runners")
+        for build in ["98.0.0.1", "99.0.0.2"] {
+            try FileManager.default.createDirectory(
+                at: SupportPaths.clonedRoot(forBuild: build, runners: runners).appending(path: "lib/wine"),
+                withIntermediateDirectories: true)
+        }
+        let calls = Calls()
+        let error = try #require(throws: StepFailure.self) {
+            try install(fixture, calls: calls, running: true, runnerProcesses: { build, _ in
+                [RunnerProcess(pid: build == "98.0.0.1" ? 10 : 20, name: build == "98.0.0.1" ? "wineserver" : "notepad.exe", build: build)]
+            })
+        }
+        let busy = try #require(error.busyRunner)
+        #expect(busy.isLeftover)
+        #expect(busy.processes.map(\.pid) == [10, 20])
+        #expect(error.detail.contains("wineserver") && error.detail.contains("notepad.exe"))
+        #expect(error.detail.contains("98.0.0.1") && error.detail.contains("99.0.0.2"))
+        #expect(calls.stops == 0)
     }
 
     @Test("A recognized runner folder with invalid binaries is refused before deployment")
