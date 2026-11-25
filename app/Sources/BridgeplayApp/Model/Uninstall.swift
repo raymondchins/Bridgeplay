@@ -72,7 +72,7 @@ enum Uninstall {
         var steamRunning: @Sendable () -> Bool
         // The password of Bridgeplay's signing keychain, kept in the login keychain.
         var forgetSigning: @Sendable () -> Void = {}
-        var runningBuild: @Sendable () -> String? = { nil }
+        var busyRunner: @Sendable () -> RunnerActivity? = { nil }
 
         static var live: Leftovers {
             Leftovers(
@@ -83,7 +83,7 @@ enum Uninstall {
                 files: [SupportPaths.homeDir],
                 steamRunning: { SteamBundle.isRunningForThisUser },
                 forgetSigning: { LocalSigning.forgetPrivateKeychain() },
-                runningBuild: { RunnerInstaller.runningBuild() })
+                busyRunner: { RunnerInstaller.activity() })
         }
     }
 
@@ -108,8 +108,11 @@ enum Uninstall {
         let lock = try DeploymentContent.acquireInstallationLock(in: lockFolder, steamFolder: nil)
         defer { lock.release() }
         // Quitting Steam can take a running game with it, and its runner is deleted below.
-        if let build = leftovers.runningBuild() {
-            throw StepFailure(step: step, detail: String(localized: "A game or Wine tool is running on build \(build). Quit it before removing Bridgeplay."))
+        if let busy = leftovers.busyRunner() {
+            throw busy.refusal(
+                step: step,
+                plain: String(localized: "A game or Wine tool is running on build \(busy.build). Quit it before removing Bridgeplay."),
+                named: String(localized: "A game or Wine tool is running on build \(busy.build): \(busy.names). Quit it before removing Bridgeplay."))
         }
         try modifications.prepare()
         let tracked = try modifications.paths()
@@ -148,7 +151,7 @@ enum Uninstall {
                     } else {
                         _ = try await SteamRepair.run(app: target, innerPlist: innerPlist,
                                                      updateBlocks: updateBlocks, modifications: modifications,
-                                                     runningBuild: { nil },
+                                                     busyRunner: { nil },
                                                      report: { report(.restoring($0)) })
                     }
                 } catch { restored = false }

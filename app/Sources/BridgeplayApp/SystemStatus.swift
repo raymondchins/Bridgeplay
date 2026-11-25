@@ -131,6 +131,10 @@ final class SystemStatus {
     @ObservationIgnored private var highlightReset: Task<Void, Never>?
     private(set) var failure: String?
     private(set) var failureRemedy: Remedy?
+    // Leftover Wine processes behind the failure, which Status offers to stop before it tries
+    // the run again (#4777).
+    private(set) var leftoverRunner: RunnerActivity?
+    @ObservationIgnored private var leftoverRetry: (@MainActor () async -> Void)?
 
     private var runInFlight = false
     // Tests replace the refresh so a run does not modify the real Steam/support folders
@@ -153,6 +157,7 @@ final class SystemStatus {
         case toolUnlicensed
         case removeBuild
         case removeEverything
+        case stopLeftovers
 
         var id: Self { self }
     }
@@ -197,17 +202,44 @@ final class SystemStatus {
     func setFailure(_ message: String) {
         failure = message
         failureRemedy = nil
+        clearLeftovers()
     }
 
     func setFailure(_ error: Error) {
         let report = FailureReport([error])
         failure = report?.message
         failureRemedy = report?.remedy
+        clearLeftovers()
     }
 
     func clearFailure() {
         failure = nil
         failureRemedy = nil
+        clearLeftovers()
+    }
+
+    private func clearLeftovers() {
+        leftoverRunner = nil
+        leftoverRetry = nil
+    }
+
+    // Only leftovers with Steam closed: stopping Wine under an open Steam can take a game with it.
+    private func offerStoppingLeftovers(_ error: Error, retry: (@MainActor () async -> Void)?) async {
+        guard let retry, let busy = (error as? StepFailure)?.busyRunner, busy.isLeftover else { return }
+        let steamOpen = await Task.detached(priority: .utility) { SteamBundle.isRunning }.value
+        guard !steamOpen, failure != nil else { return }
+        leftoverRunner = busy
+        leftoverRetry = retry
+    }
+
+    func stopLeftoversAndRetry() async {
+        guard let retry = leftoverRetry else { return }
+        await perform(from: RunnerInstaller.stopStep) { _ in
+            try await Task.detached(priority: .userInitiated) { try RunnerInstaller.stopLeftovers() }.value
+            return nil
+        }
+        guard failure == nil else { return }
+        await retry()
     }
 
     var usableCrossOver: CrossOverInstall? {
@@ -499,6 +531,7 @@ final class SystemStatus {
     func perform(
         from first: String,
         holdBack: (Error) -> Bool = { _ in false },
+        retryAfterStoppingLeftovers retry: (@MainActor () async -> Void)? = nil,
         _ body: (_ progress: @escaping @Sendable (String) -> Void) async throws -> String?
     ) async {
         guard !runInFlight else {
@@ -523,6 +556,7 @@ final class SystemStatus {
             AppLog.note("run failed, trying again: \(error.localizedDescription)")
         } catch {
             record(error)
+            await offerStoppingLeftovers(error, retry: retry)
         }
 
         await refreshAfterRun(self)
@@ -680,7 +714,10 @@ final class SystemStatus {
             return
         }
         sealWarning = nil
-        await perform(from: InstallPhase.checkingPayload.label, holdBack: holdBack) { progress in
+        var retry: (@MainActor () async -> Void)?
+        if !unattended { retry = { @MainActor in await self.installIntoSteam() } }
+        await perform(from: InstallPhase.checkingPayload.label, holdBack: holdBack,
+                      retryAfterStoppingLeftovers: retry) { progress in
             let lock = try DeploymentContent.acquireInstallationLock()
             defer { lock.release() }
             let stopClient = unattended ? SteamInstaller.leaveTheClient : SteamInstaller.stopTheClient
@@ -955,7 +992,8 @@ final class SystemStatus {
     }
 
     func repairSteam() async {
-        await perform(from: RepairPhase.checking.label) { progress in
+        await perform(from: RepairPhase.checking.label,
+                      retryAfterStoppingLeftovers: { await self.repairSteam() }) { progress in
             let lock = try DeploymentContent.acquireInstallationLock()
             defer { lock.release() }
             let result = try await SteamRepair.run(report: { progress($0.label) })
@@ -985,7 +1023,8 @@ final class SystemStatus {
     }
 
     func removeEverything() async {
-        await perform(from: UninstallPhase.stoppingClient.label) { progress in
+        await perform(from: UninstallPhase.stoppingClient.label,
+                      retryAfterStoppingLeftovers: { await self.removeEverything() }) { progress in
             defaultToolRetryPending = false
             let result = try await Uninstall.run(leftovers: .live) { progress($0.label) }
 

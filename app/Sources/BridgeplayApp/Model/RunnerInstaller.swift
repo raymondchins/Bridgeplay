@@ -248,11 +248,7 @@ enum RunnerInstaller {
     static func isRunning(from clone: URL, ps: String = "/bin/ps") -> Bool {
         guard let result = try? Shell.run(ps, ["-axww", "-o", "comm="]), result.succeeded
         else { return true }
-        // ps prints the resolved path, and a clone can be a link to another drive.
-        let root = clone.standardizedFileURL.path(percentEncoded: false)
-        let prefixes = [root, realpath(root, nil).map { defer { free($0) }; return String(cString: $0) }]
-            .compactMap { $0 }
-            .map { $0.hasSuffix("/") ? $0 : $0 + "/" }
+        let prefixes = rootPrefixes(clone)
         return result.stdout.split(separator: "\n").contains { line in
             let command = line.trimmingCharacters(in: .whitespaces)
             return prefixes.contains { command.hasPrefix($0) }
