@@ -34,6 +34,9 @@ typedef struct {
     char app[PATH_MAX];
 } np_prefix_state_t;
 
+// Appids with a manifest in any library folder, up to max. Returns how many it wrote.
+size_t np_prefix_installed_apps(const char *steam_root, uint32_t *appids, size_t max);
+
 // Fills `st` for `appid` as `tool` would run it.
 void np_prefix_state(uint32_t appid, const char *tool, const np_prefix_roots_t *roots,
                      np_prefix_state_t *st);

@@ -154,6 +154,34 @@ int np_compat_runs_tool(const char *cmd);
 // True when the app is set to run with a Bridgeplay compatibility tool.
 int np_compat_app_runs_tool(uint32_t appid);
 
+// Steam gives a compat-tool app its platform override (what makes the library show Play
+// rather than Install) in YldCheckIfAppNeedsPlatformCompatibility, and tells the library
+// once its logon compat job has run. A client that logs on before the hooks land skips
+// that job, because the layer is still off, and the library keeps showing Install. On such
+// a client every Windows-only app Steam asks about is checked again from a client job.
+#define NP_COMPAT_PLATFORM_APPS_MAX     8192
+#define NP_COMPAT_PLATFORM_CHECK_BATCH  64
+
+// YldCheckIfAppNeedsPlatformCompatibility, SetAppPlatformOverride and
+// LaunchLogOnCompatProcessingJob. The catch-up stays off unless all three resolve.
+void np_compat_set_platform_fns(uintptr_t check_platform, uintptr_t set_override,
+                                uintptr_t launch_logon);
+
+// Called with every app BIsCompatibilityToolEnabled is asked about. Queues each
+// Windows-only app once per session.
+void np_compat_note_app(void *compat_mgr, uint32_t appid);
+
+// The same for apps Steam has not asked about yet, such as installed ones.
+void np_compat_note_apps(const uint32_t *appids, size_t count);
+
+// From a client job: launches the logon compat job when the client skipped it. Returns 1
+// the one time it does.
+int np_compat_platform_catch_up(void);
+
+// Runs the client's check for up to NP_COMPAT_PLATFORM_CHECK_BATCH queued apps after a
+// catch-up. Call it from a client job, never from inside a hook. Returns how many it checked.
+int np_compat_check_noted_apps(void);
+
 // Command line template for the tool's toolmanifest.vdf commandline value.
 const char *np_compat_tool_commandline(void);
 

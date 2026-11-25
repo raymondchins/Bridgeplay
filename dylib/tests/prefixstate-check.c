@@ -215,6 +215,29 @@ int main(void) {
     state(480, "notproton-fex-41073");
     check("an unknown phase is ignored", "", st.rebuild);
 
+    printf("== installed apps ==\n");
+    put_text("Steam/steamapps/appmanifest_1422450.acf", "\"AppState\"\n{\n}\n");
+    put_text("Steam/steamapps/appmanifest_ 7.acf", "");
+    put_text("Steam/steamapps/appmanifest_8.acf.bak", "");
+    put_text("Steam/steamapps/appmanifest_0.acf", "");
+    put_text("Steam/steamapps/appmanifest_99999999999.acf", "");
+    char steam_root[PATH_MAX + 8];
+    snprintf(steam_root, sizeof steam_root, "%s/Steam", root);
+    uint32_t ids[8];
+    size_t found = np_prefix_installed_apps(steam_root, ids, 8);
+    // Directory order is the file system's, so sort before comparing.
+    for (size_t i = 1; i < found; i++)
+        for (size_t j = i; j && ids[j - 1] > ids[j]; j--) {
+            uint32_t t = ids[j]; ids[j] = ids[j - 1]; ids[j - 1] = t;
+        }
+    char list[64] = "";
+    for (size_t i = 0; i < found; i++)
+        snprintf(list + strlen(list), sizeof list - strlen(list), "%s%u", i ? "," : "", ids[i]);
+    check("every library's manifests are read, and nothing that only looks like one",
+          "480,620,800,1422450", list);
+    check("the list stops at its limit", "1",
+          np_prefix_installed_apps(steam_root, ids, 1) == 1 ? "1" : "more");
+
     char small[16];
     check("an answer that does not fit is refused", "-1",
           np_prefix_state_json(480, &st, small, sizeof small) < 0 ? "-1" : small);
