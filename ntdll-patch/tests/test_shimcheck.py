@@ -29,7 +29,7 @@ class Shipped(unittest.TestCase):
     def test_every_shipped_payload_reads_its_pinned_wm(self):
         rc, out = quiet([])
         self.assertEqual(rc, 0, out)
-        self.assertEqual(out.count('\nok   ') + out.startswith('ok   '), 20, out)
+        self.assertEqual(out.count('\nok   ') + out.startswith('ok   '), 22, out)
 
 
 class BeforeTheFix(unittest.TestCase):
@@ -71,7 +71,7 @@ class BeforeTheFix(unittest.TestCase):
             rc, out = quiet(['--root', str(d)])
             self.assertEqual(rc, 1, out)
             self.assertIn('FAIL detour32-winecx-11.17.bin: for ntdll cc8a9035cea0, the detour call at +0x68 gets wm=ebp', out)
-            self.assertIn('19 of 20', out)
+            self.assertIn('21 of 22', out)
 
 
 class Unreadable(unittest.TestCase):
@@ -149,7 +149,7 @@ class Pins(unittest.TestCase):
             self.assertIn('FAIL detour32-winecx-11.17.bin: FreeEngineWinecx.swift (winecx-11.17) '
                           'patches the i386Windows ntdll abababababab, but this payload was built '
                           'for cc8a9035cea0', out)
-            self.assertIn('19 of 20', out)
+            self.assertIn('21 of 22', out)
 
     def test_commented_out_clean_hash_is_not_read(self):
         old = 'cc8a9035cea0e26c5d333ef220f1becefc27ae44d2cdcdaea3278e8739d26fd9'

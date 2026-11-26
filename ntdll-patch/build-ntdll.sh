@@ -54,6 +54,13 @@ FEX41073_PATCHED_X86_64=2b47ed8c19d1d15d0f82519d39d64bf34113b285c4ada325bb64c5e5
 FEX41073_PATCHED_I386=3f4b0d9589c1f374e3c2fd135263f2bf3c8300e09dd010fd778936dd71e894ad
 FEX41073_PATCHED_AARCH64=2efb13f3303adc2c8ee61b93e027e4e94730a2e6b0162c7e6aebd4104200f07c
 
+FEX41303_CLEAN_X86_64=ef878e75661de8d955a42dc2fc76a84ca95574d48923dfc7f3f7db04a4d4f2b6
+FEX41303_CLEAN_I386=4e8d8b4b54da99252423c7967d779d34976620a56bedaec38529d1f4b710f26a
+FEX41303_CLEAN_AARCH64=3c2d6459113d4418a1135d7d5afe3a47c4a8c017aec389a987efa991bfeceda8
+FEX41303_PATCHED_X86_64=503c4a6f71822b212bcfaaf210ba76e838998fa2c61957a64e5c0da3f9b3a6e9
+FEX41303_PATCHED_I386=c35063d7fda866cd019a8ed1f6014c022a34a74d17037fc5c7f0732f58701f64
+FEX41303_PATCHED_AARCH64=deb1e2dec774ae0b9504f88edd17f02c682d1f78e4839d874d62408a80cf3167
+
 install=0
 [ "${1:-}" = "--install" ] && install=1
 
@@ -72,6 +79,7 @@ flavor_of() {
             "$FEX_CLEAN_AARCH64")      echo fex; return 0 ;;
             "$FEX41069_CLEAN_AARCH64") echo fex-41069; return 0 ;;
             "$FEX41073_CLEAN_AARCH64") echo fex-41073; return 0 ;;
+            "$FEX41303_CLEAN_AARCH64") echo fex-41303; return 0 ;;
         esac
     done
     for cand in "$CX_ROOT/lib/wine/x86_64-windows/ntdll.dll.notproton-orig" \
@@ -85,7 +93,7 @@ flavor_of() {
         esac
     done
     die "no ntdll under $CX_ROOT/lib/wine matches a pinned build
-       pass FLAVOR=rosetta, rosetta-41069, rosetta-41073, cx26, fex, fex-41069 or fex-41073 to choose the pins anyway"
+       pass FLAVOR=rosetta, rosetta-41069, rosetta-41073, cx26, fex, fex-41069, fex-41073 or fex-41303 to choose the pins anyway"
 }
 
 if [ -z "${FLAVOR:-}" ]; then
@@ -103,7 +111,9 @@ case "$FLAVOR" in
                    BUILD=27.0.0.41069-fex ;;
     fex-41073)     tools="x86_64-w64-mingw32-gcc i686-w64-mingw32-gcc clang ld.lld"
                    BUILD=27.0.0.41073-fex ;;
-    *)             die "unknown flavor $FLAVOR, expected rosetta, rosetta-41069, rosetta-41073, cx26, fex, fex-41069 or fex-41073" ;;
+    fex-41303)     tools="x86_64-w64-mingw32-gcc i686-w64-mingw32-gcc clang ld.lld"
+                   BUILD=27.0.0.41303-fex ;;
+    *)             die "unknown flavor $FLAVOR, expected rosetta, rosetta-41069, rosetta-41073, cx26, fex, fex-41069, fex-41073 or fex-41303" ;;
 esac
 
 for t in $tools; do
@@ -204,6 +214,15 @@ case "$FLAVOR" in
             "$FEX41073_CLEAN_I386"    "$FEX41073_PATCHED_I386"
         patch_one aarch64-windows build64.sh fex-41073 detour64-fex-41073.bin \
             "$FEX41073_CLEAN_AARCH64" "$FEX41073_PATCHED_AARCH64"
+        ;;
+    fex-41303)
+        ARCHES="x86_64-windows i386-windows aarch64-windows"
+        patch_one x86_64-windows  build.sh   fex-41303 detour2-fex-41303.bin \
+            "$FEX41303_CLEAN_X86_64"  "$FEX41303_PATCHED_X86_64"
+        patch_one i386-windows    build32.sh fex-41303 detour32-fex-41303.bin \
+            "$FEX41303_CLEAN_I386"    "$FEX41303_PATCHED_I386"
+        patch_one aarch64-windows build64.sh fex-41303 detour64-fex-41303.bin \
+            "$FEX41303_CLEAN_AARCH64" "$FEX41303_PATCHED_AARCH64"
         ;;
 esac
 

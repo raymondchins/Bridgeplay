@@ -177,6 +177,33 @@ PINNED = {
          'exports': {'LdrGetDllHandle': 0x180043818, 'LdrLoadDll': 0x180041344,
                      'NtProtectVirtualMemory': 0x180066f60, 'NtOpenFile': 0x180066bc0,
                      'NtReadFile': 0x180066620, 'NtClose': 0x180066740}},
+    # CrossOver Preview 20261111 ARM64 (27.0.0.41303)
+    'ef878e75661de8d955a42dc2fc76a84ca95574d48923dfc7f3f7db04a4d4f2b6':
+        {'hookRVA': 0x34a99, 'stolen': '488b842410010000', 'caveRVA': 0xb5000, 'caveSize': 4096,
+         'resume': 0x34aa1, 'wm': 'rbx', 'load_path': 0x98,
+         'payload': '100a4ef52474809c22413951b811df05d437333406e5bf4e7c94f948fad2a01b',
+         'exports': {'LdrGetDllHandle': 0x17002f460, 'LdrLoadDll': 0x17002ced0,
+                     'NtProtectVirtualMemory': 0x170055f44, 'NtOpenFile': 0x170055ba4,
+                     'NtReadFile': 0x170055604, 'NtClose': 0x170055724}},
+    '4e8d8b4b54da99252423c7967d779d34976620a56bedaec38529d1f4b710f26a':
+        {'hookRVA': 0x2ef8d, 'stolen': '8b4514a802', 'caveRVA': 0x6b3a5, 'caveSize': 3163,
+         'resume': 0x2ef92, 'wm': 'edi', 'load_path': -0x40,
+         'payload': '0490e724191cf0cc2d5383a582d1c354c481d675025988e2666bff18a68fab95',
+         'exports': {'LdrGetDllHandle': 0x7bc2a7b0, 'LdrLoadDll': 0x7bc288e0,
+                     'NtProtectVirtualMemory': 0x7bc4da64, 'NtOpenFile': 0x7bc4d894,
+                     'NtReadFile': 0x7bc4d5c4, 'NtClose': 0x7bc4d654}},
+    '3c2d6459113d4418a1135d7d5afe3a47c4a8c017aec389a987efa991bfeceda8':
+        {'caveRVA': 0x101db5, 'caveSize': 57931,
+         'sites': [{'hookRVA': 0x486ec, 'stolen': '1f2003d5', 'resume': 0x486f0,
+                    'wm': 'x27', 'load_path': -0x98},
+                   {'hookRVA': 0xa7fec, 'stolen': '1f2003d5', 'resume': 0xa7ff0,
+                    'wm': 'x22', 'load_path': -0x88}],
+         'guest': {'LdrLoadDll': 0xa0338, 'LdrGetDllHandle': 0xa0338,
+                   'NtProtectVirtualMemory': 0xed964},
+         'payload': '3f81623754fac27bf4a33856a7c80b30d4a9756710d1c55e388b718893e47d48',
+         'exports': {'LdrGetDllHandle': 0x1800438a0, 'LdrLoadDll': 0x1800413cc,
+                     'NtProtectVirtualMemory': 0x180067130, 'NtOpenFile': 0x180066d90,
+                     'NtReadFile': 0x1800667f0, 'NtClose': 0x180066910}},
     # WineHQ 11.15 (wine-devel-11.15-osx64.tar.xz)
     # CEILING: the shipped x86_64 payload is built from detour.c before 160968c (it still jumps
     # to lsteamclient's DllMain), so build.sh's fresh 832-byte payload (dc4d86de...) differs.
