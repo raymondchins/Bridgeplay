@@ -160,8 +160,9 @@ That `libSDL2-2.0.0.dylib` is SDL 2.32.10 (zlib license, `NOTICE`) with
 `winemac-patch/sdl2-iousb-xinput.patch` (USB XInput `0xFF/0x5D/0x01` pads via IOKit
 `IOUSBLib`), signed ad hoc: a SwiftPM release build
 runs `strip` on every unsigned Mach-O resource, which would change its bytes and break the
-pin. To rebuild it, apply the patch to the release tarball (strip the `/private/tmp/...`
-prefix from its paths, `patch -p0`), then
+pin. To rebuild it, apply both patches in order from the SDL source root of the release
+tarball (`patch -p1 < winemac-patch/sdl2-iokit-gamepad-collection.patch`, then
+`patch -p1 < winemac-patch/sdl2-iousb-xinput.patch`), then
 `cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DSDL_STATIC=OFF -DSDL_TEST=OFF`,
 build, and `codesign -fs -`. The result exports the same 837 symbols and links the same
 frameworks as the 2.32.8 build it replaced. The PE half `winebus.sys` is unchanged: it starts the SDL bus
@@ -525,14 +526,14 @@ rebuilt Mach-O file needs its line there updated too; `SignedPinTests` fails unt
 | `d3dx9_36-winecx-11.17-i386.dll` | `d3dx9-patch/` | `5eec69a49afa6debbc8e5020bab5f44e2d0c2897e393be40c33d9cbd766dd893` | `FreeEngineWinecx.v1117.d3dx` |
 | `version-rockstar-shim.dll` | `rockstar-shim/` | `deedb5d799330a3e274fe5cc7f569536280a2420543ef12145fcaa8fcbb7f6d4` | `FreeEngineWinecx.v1117.rockstar` |
 | `dxgi-dxvk-macos-1.10.3.dll` | DXVK-macOS v1.10.3-20230507 `x64/dxgi.dll`, unmodified | `e74f5c985fe98f38f1a096258ef35d62e03a64df7096837965c7383e3cfe153d` | `FreeEngineWinecx.v1117.rockstar` |
-| `version-int2e-shim.dll` | `int2e-shim/` | `c56866e08d5d61dbd9a92c3a23e1f475b9b19cae940f11d40c94be3b0fbf6cc2` | `FreeEngineWinecx.v1117.int2e` |
+| `version-int2e-shim.dll` | `int2e-shim/` | `78cfe78a53775c27ec5b7318567fe1da2031360cdd88850ef0b0cf8af091be2a` | `FreeEngineWinecx.v1117.int2e` |
 | `d3d12-stub.dll` | `d3d12-stub/` | `d802d04ae9fb18a3dda90984bb11def0bda89b4d929b6297fe026b6cf883d1db` | `FreeEngineWinecx.v1117.dxmt` |
 | `winemac-winecx-11.17.so` | `winemac-patch/winecx-11.17-d3dmetal-retina.patch` | `aa192f846ad15d56de200fc92752eaf2d455700846ae2cf1ccc7b27b535f1c00` | `FreeEngineWinecx.v1117.macDriver` |
 | `winebus-winecx-11.17.so` | Controllers (SDL2 build) | `6223c035c824c90708abbc3e733f8d1d6ed6b8b4e9a3e1a5c813493ceba50473` | `FreeEngineWinecx.v1117.gamepad` |
 | `winebus-winecx-11.17.sys` | `winebus-patch/` | `da108d1c3788fa32807ef08c4d26d8a89812c230317ffa7ba5111e126bda607c` | `FreeEngineWinecx.v1117.gamepad` |
 | `winemac-winecx-11.15.so` | `winemac-patch/winecx-d3dmetal-retina.patch` | `76d8f93839386f37e8badf0c82bb31b5ead22ac580f17896f9d2a729af0fc147` | `FreeEngineWinecx.v1115.macDriver` |
 | `winebus-winecx-11.15.so` | Controllers (SDL2 build) | `1bc53184f5d026ab84a26cf6ef721348fc3b028c019ff969e69eb6cf9b9d1af9` | `FreeEngineWinecx.v1115.gamepad` |
-| `libSDL2-2.0.0.dylib` | SDL 2.32.10, `winemac-patch/sdl2-iokit-gamepad-collection.patch`, `winemac-patch/sdl2-iousb-xinput.patch` | `a47d447104a56e7f3bd884908fa0ccb16968f5693706f1dfd212b046be389498` | `FreeEngineWinecx` `sdl` (both releases) |
+| `libSDL2-2.0.0.dylib` | SDL 2.32.10, `winemac-patch/sdl2-iokit-gamepad-collection.patch`, `winemac-patch/sdl2-iousb-xinput.patch` | `a9ea6bdf384e5090d8478bf92b9f5637de0037aaaeb0183928d2fb48258e61e5` | `FreeEngineWinecx` `sdl` (both releases) |
 | `cabextract` | cabextract 1.12, `scripts/build-cabextract.sh` | `8c8f3b80ce8998b952df3638abcacd44161793646376fa549d9f33ab8aeea171` | `PrefixTools.cabextractSHA256`, `SignedPin` (Winetricks PATH, not laid into engines) |
 | `winemac-winehq-11.15.so` | `winemac-patch/dxmt_export.c` | `d95fe40b6321ba8a34933a6b394af6d75547220a7168896c357af3a32377b08f` | `FreeEngine` `macDriver` |
 | `detour2-41069.bin` | `ntdll-patch/build.sh` (41069) | `660ea7c935620e620a45a46e552c0a3de9292e031bf93ef676968154d45e78d5` | `NtdllPatcher.byBuild` |

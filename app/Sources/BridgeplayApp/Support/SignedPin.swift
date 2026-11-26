@@ -14,8 +14,8 @@ enum SignedPin {
         "8c8f3b80ce8998b952df3638abcacd44161793646376fa549d9f33ab8aeea171":
             "d8ac10ff9343a991c7a8d8de6f9576db29c0febe0a0f9ebc807c7a12cfd4d034",
         // libSDL2-2.0.0.dylib (ditambah driver USB XInput IOKit IOUSBLib)
-        "a47d447104a56e7f3bd884908fa0ccb16968f5693706f1dfd212b046be389498":
-            "59cf0d0ca18cb0f2afb2d490a02f52692dd8f1fb6c1af52ea1808bb9d00aec12",
+        "a9ea6bdf384e5090d8478bf92b9f5637de0037aaaeb0183928d2fb48258e61e5":
+            "39978ee73e205fdf9c6a8daf6b0a61a535b29bd14b99b6c0eefbf9aa65993fa0",
         // win32u-winecx-11.17.so
         "b012382d09b2ff1b3c0750d93867f72dd04a7c902bc4179be406b6c558ab162d":
             "656c033cb8aa1c8b55117d68047e0d4c39aa0be90db60f366d54a1059abb2988",

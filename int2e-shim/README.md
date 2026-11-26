@@ -5,9 +5,9 @@ Car Parking Multiplayer 2's `UnityPlayer.dll`, `gamefixes/4252340.conf`) execute
 `int 0x2e` (`cd 2e`) syscalls instead of calling `ntdll` exports.
 
 The app installs it as `lib/notproton-backends/int2e-shim/x86_64-windows/version.dll` (WineCX
-11.17). When a game's conf or launch environment sets `INT2E_SHIM=1`, `compat_run.sh` stages it
+11.17). When a game's conf sets `INT2E_SHIM=1` (or the launch options set `BRIDGEPLAY_INT2E_SHIM=1`), `compat_run.sh` stages it
 into `$WINEPREFIX/drive_c/windows/system32/version.dll` and adds `version=n,b` to
-`WINEDLLOVERRIDES`. When `INT2E_SHIM` is off and `system32/version.dll` still carries the
+`WINEDLLOVERRIDES`. The DLL pins itself in memory, so the vectored handler never outlives it. When `INT2E_SHIM` is off and `system32/version.dll` still carries the
 `int2e-shim: ` marker, Wine's stock `version.dll` is restored. A user-provided native
 `version.dll` in `system32` is left untouched, and `ROCKSTAR_SHIM=1` skips `int2e-shim` so
 neither overrides the other's `version=n,b`.

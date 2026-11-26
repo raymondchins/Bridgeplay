@@ -111,6 +111,12 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
     if (reason == DLL_PROCESS_ATTACH)
     {
         DisableThreadLibraryCalls(inst);
+        /* VEH tidak otomatis terlepas saat DLL di-unload; pin modul agar handler tidak menunjuk memori bebas. */
+        {
+            HMODULE pinned;
+            GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                               (LPCWSTR)DllMain, &pinned);
+        }
         g_stub_page = (unsigned char *)VirtualAlloc(
             NULL, MAX_STUBS * STUB_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
         if (g_stub_page)

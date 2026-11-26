@@ -145,7 +145,7 @@ enum FreeEngineWinecx {
     // signed ad hoc, since a release build strips unsigned Mach-O resources and would break the pin.
     private static let sdl = WinecxBundledFile(
         resource: "libSDL2-2.0.0", ext: "dylib", path: "lib/libSDL2-2.0.0.dylib",
-        sha256: "a47d447104a56e7f3bd884908fa0ccb16968f5693706f1dfd212b046be389498")
+        sha256: "a9ea6bdf384e5090d8478bf92b9f5637de0037aaaeb0183928d2fb48258e61e5")
 
     // runtime 4.7.3: winecx e0aa380 (Wine 11.17), built by winecx-gptk 0bf3eab, minos 26.0.
     // Over 4.5.125 it carries the later msync fixes, kernelbase's FlsGetValue2 for Unity
@@ -294,7 +294,7 @@ enum FreeEngineWinecx {
         int2e: [
             WinecxBundledFile(resource: "version-int2e-shim", ext: "dll",
                               path: "lib/notproton-backends/int2e-shim/x86_64-windows/version.dll",
-                              sha256: "c56866e08d5d61dbd9a92c3a23e1f475b9b19cae940f11d40c94be3b0fbf6cc2"),
+                              sha256: "78cfe78a53775c27ec5b7318567fe1da2031360cdd88850ef0b0cf8af091be2a"),
         ],
         runner: RunnerBuild(
             bundleVersion: "winecx-11.17",

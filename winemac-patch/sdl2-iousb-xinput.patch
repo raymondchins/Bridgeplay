@@ -24,10 +24,10 @@ index cabb69a..352a9e0 100644
  extern SDL_JoystickDriver SDL_HAIKU_JoystickDriver;
 diff --git a/src/joystick/darwin/SDL_iousbxinput.c b/src/joystick/darwin/SDL_iousbxinput.c
 new file mode 100644
-index 0000000..c350fac
+index 0000000..f3f3543
 --- /dev/null
 +++ b/src/joystick/darwin/SDL_iousbxinput.c
-@@ -0,0 +1,870 @@
+@@ -0,0 +1,932 @@
 +/*
 +  Driver SDL2 macOS untuk gamepad USB XInput (0xFF/0x5D/0x01) melalui IOKit IOUSBLib.
 +  Digunakan agar dongle/kontroler XInput (seperti 8BitDo Ultimate 2C Wireless) terbaca oleh
@@ -37,6 +37,7 @@ index 0000000..c350fac
 +
 +#ifdef SDL_JOYSTICK_IOKIT
 +
++#include "SDL_atomic.h"
 +#include "SDL_events.h"
 +#include "SDL_joystick.h"
 +#include "SDL_timer.h"
@@ -58,6 +59,9 @@ index 0000000..c350fac
 +#ifndef kIOMainPortDefault
 +#define kIOMainPortDefault kIOMasterPortDefault
 +#endif
++
++#define IOUSBXINPUT_QUEUE_LEN 32
++#define IOUSBXINPUT_REPORT_LEN 20
 +
 +typedef struct iousb_xinput_device
 +{
@@ -88,12 +92,14 @@ index 0000000..c350fac
 +    pthread_t thread;
 +    pthread_mutex_t lock;
 +    int thread_started;
-+    volatile int stop_thread;
++    SDL_atomic_t stop_thread;   /* diset Close, dibaca thread pembaca */
++    SDL_atomic_t reader_done;   /* diset thread pembaca saat keluar */
 +    SDL_bool removed;
-+    SDL_bool has_report;
-+    SDL_bool axes_zero_set;
-+    uint8_t report[64];
-+    uint32_t report_len;
++    SDL_bool axes_seeded;
++    /* Antrean laporan agar transisi tombol singkat tidak hilang di antara dua poll SDL */
++    uint8_t queue[IOUSBXINPUT_QUEUE_LEN][IOUSBXINPUT_REPORT_LEN];
++    uint32_t q_head;
++    uint32_t q_count;
 +};
 +
 +static IONotificationPortRef g_notif_port = NULL;
@@ -285,6 +291,21 @@ index 0000000..c350fac
 +    SDL_PrivateJoystickAdded(item->instance_id);
 +}
 +
++/* Tandai perangkat sebagai dicabut dan beri tahu SDL (dipanggil dari thread SDL saja) */
++static void tandai_dicabut(iousb_xinput_device *cur)
++{
++    SDL_JoystickID removed_id = cur->instance_id;
++    cur->removed = SDL_TRUE;
++    if (cur->hwdata) {
++        pthread_mutex_lock(&cur->hwdata->lock);
++        cur->hwdata->removed = SDL_TRUE;
++        cur->hwdata->item = NULL;
++        pthread_mutex_unlock(&cur->hwdata->lock);
++        cur->hwdata = NULL;
++    }
++    SDL_PrivateJoystickRemoved(removed_id);
++}
++
 +static void proses_antrean_hotplug(void)
 +{
 +    io_service_t service;
@@ -297,16 +318,7 @@ index 0000000..c350fac
 +                iousb_xinput_device *cur;
 +                for (cur = g_devices; cur; cur = cur->next) {
 +                    if (!cur->removed && cur->registry_id == reg_id) {
-+                        SDL_JoystickID removed_id = cur->instance_id;
-+                        cur->removed = SDL_TRUE;
-+                        if (cur->hwdata) {
-+                            pthread_mutex_lock(&cur->hwdata->lock);
-+                            cur->hwdata->removed = SDL_TRUE;
-+                            cur->hwdata->item = NULL;
-+                            pthread_mutex_unlock(&cur->hwdata->lock);
-+                            cur->hwdata = NULL;
-+                        }
-+                        SDL_PrivateJoystickRemoved(removed_id);
++                        tandai_dicabut(cur);
 +                    }
 +                }
 +            }
@@ -360,13 +372,18 @@ index 0000000..c350fac
 +        return SDL_SetError("Gagal mendaftarkan notifikasi tambah IOUSBInterface (0x%x)", kr);
 +    }
 +
++    /* Tanpa pelacakan pencabutan, perangkat yang dicabut akan tetap terdaftar: gagalkan Init */
 +    matching_rem = IOServiceMatching(kIOUSBInterfaceClassName);
-+    if (matching_rem) {
-+        if (IOServiceAddMatchingNotification(
-+                g_notif_port, kIOTerminatedNotification, matching_rem,
-+                on_iokit_notif, NULL, &g_terminated_iter) != KERN_SUCCESS) {
-+            g_terminated_iter = IO_OBJECT_NULL;
-+        }
++    if (!matching_rem ||
++        IOServiceAddMatchingNotification(
++            g_notif_port, kIOTerminatedNotification, matching_rem,
++            on_iokit_notif, NULL, &g_terminated_iter) != KERN_SUCCESS) {
++        g_terminated_iter = IO_OBJECT_NULL;
++        IOObjectRelease(g_added_iter);
++        g_added_iter = IO_OBJECT_NULL;
++        IONotificationPortDestroy(g_notif_port);
++        g_notif_port = NULL;
++        return SDL_SetError("Gagal mendaftarkan notifikasi pencabutan IOUSBInterface");
 +    }
 +
 +    g_initialized = SDL_TRUE;
@@ -393,6 +410,22 @@ index 0000000..c350fac
 +        return;
 +    }
 +    proses_antrean_hotplug();
++
++    /* Perangkat yang thread pembacanya melaporkan error permanen dianggap dicabut */
++    {
++        iousb_xinput_device *dev;
++        for (dev = g_devices; dev; dev = dev->next) {
++            if (!dev->removed && dev->hwdata) {
++                SDL_bool dead;
++                pthread_mutex_lock(&dev->hwdata->lock);
++                dead = dev->hwdata->removed;
++                pthread_mutex_unlock(&dev->hwdata->lock);
++                if (dead) {
++                    tandai_dicabut(dev);
++                }
++            }
++        }
++    }
 +
 +    /* Bersihkan simpul perangkat yang sudah dicabut dari daftar */
 +    while (*prev) {
@@ -477,25 +510,30 @@ index 0000000..c350fac
 +    struct joystick_hwdata *hw = (struct joystick_hwdata *)arg;
 +    uint8_t buf[64];
 +
-+    while (!hw->stop_thread) {
++    while (!SDL_AtomicGet(&hw->stop_thread)) {
 +        UInt32 size = hw->in_max_packet;
 +        IOReturn kr;
 +        if (size == 0 || size > sizeof(buf)) {
 +            size = sizeof(buf);
 +        }
 +        kr = (*hw->intf)->ReadPipe(hw->intf, hw->in_pipe, buf, &size);
-+        if (hw->stop_thread) {
++        if (SDL_AtomicGet(&hw->stop_thread)) {
 +            break;
 +        }
 +        if (kr == kIOReturnSuccess) {
-+            if (size >= 20 && buf[0] == 0x00) {
++            if (size >= IOUSBXINPUT_REPORT_LEN && buf[0] == 0x00) {
 +                pthread_mutex_lock(&hw->lock);
-+                memcpy(hw->report, buf, size);
-+                hw->report_len = size;
-+                hw->has_report = SDL_TRUE;
++                if (hw->q_count == IOUSBXINPUT_QUEUE_LEN) {
++                    /* Antrean penuh: buang laporan terlama */
++                    hw->q_head = (hw->q_head + 1) % IOUSBXINPUT_QUEUE_LEN;
++                    hw->q_count--;
++                }
++                memcpy(hw->queue[(hw->q_head + hw->q_count) % IOUSBXINPUT_QUEUE_LEN], buf, IOUSBXINPUT_REPORT_LEN);
++                hw->q_count++;
 +                pthread_mutex_unlock(&hw->lock);
 +            }
 +        } else if (kr == kIOReturnAborted || kr == kIOReturnNoDevice || kr == kIOReturnNotResponding || kr == kIOReturnNotOpen) {
++            /* Error permanen: Detect() akan menandai perangkat dicabut agar SDL melepas joystick */
 +            pthread_mutex_lock(&hw->lock);
 +            hw->removed = SDL_TRUE;
 +            pthread_mutex_unlock(&hw->lock);
@@ -505,6 +543,7 @@ index 0000000..c350fac
 +            usleep(5000);
 +        }
 +    }
++    SDL_AtomicSet(&hw->reader_done, 1);
 +    return NULL;
 +}
 +
@@ -614,8 +653,14 @@ index 0000000..c350fac
 +    struct joystick_hwdata *hw = joystick->hwdata;
 +    uint8_t packet[8];
 +    IOReturn kr;
++    SDL_bool is_removed = SDL_TRUE;
 +
-+    if (!hw || hw->removed || !hw->intf) {
++    if (hw) {
++        pthread_mutex_lock(&hw->lock);
++        is_removed = hw->removed;
++        pthread_mutex_unlock(&hw->lock);
++    }
++    if (!hw || is_removed || !hw->intf) {
 +        return SDL_SetError("Getar gagal: perangkat tidak terhubung");
 +    }
 +    if (!hw->out_pipe) {
@@ -647,7 +692,13 @@ index 0000000..c350fac
 +static Uint32 IOUSBXINPUT_JoystickGetCapabilities(SDL_Joystick *joystick)
 +{
 +    struct joystick_hwdata *hw = joystick->hwdata;
-+    if (hw && !hw->removed && hw->out_pipe) {
++    SDL_bool is_removed = SDL_TRUE;
++    if (hw) {
++        pthread_mutex_lock(&hw->lock);
++        is_removed = hw->removed;
++        pthread_mutex_unlock(&hw->lock);
++    }
++    if (hw && !is_removed && hw->out_pipe) {
 +        return SDL_JOYCAP_RUMBLE;
 +    }
 +    return 0;
@@ -677,39 +728,9 @@ index 0000000..c350fac
 +    return SDL_Unsupported();
 +}
 +
-+static void IOUSBXINPUT_JoystickUpdate(SDL_Joystick *joystick)
++/* Terjemahkan satu laporan XInput (20 byte) menjadi event SDL */
++static void terapkan_laporan(SDL_Joystick *joystick, const uint8_t *buf)
 +{
-+    struct joystick_hwdata *hw = joystick->hwdata;
-+    uint8_t buf[64];
-+    uint32_t len = 0;
-+    SDL_bool has_data = SDL_FALSE;
-+    SDL_bool is_removed = SDL_FALSE;
-+
-+    if (!hw) {
-+        return;
-+    }
-+
-+    if (!hw->axes_zero_set && joystick->axes && joystick->naxes >= 6) {
-+        /* Atur titik nol trigger sesudah SDL mengalokasikan array axes */
-+        joystick->axes[2].zero = -32768;
-+        joystick->axes[5].zero = -32768;
-+        hw->axes_zero_set = SDL_TRUE;
-+    }
-+
-+    pthread_mutex_lock(&hw->lock);
-+    is_removed = hw->removed;
-+    if (hw->has_report && hw->report_len >= 20) {
-+        memcpy(buf, hw->report, hw->report_len);
-+        len = hw->report_len;
-+        has_data = SDL_TRUE;
-+        hw->has_report = SDL_FALSE;
-+    }
-+    pthread_mutex_unlock(&hw->lock);
-+
-+    if (is_removed || !has_data || len < 20 || buf[0] != 0x00) {
-+        return;
-+    }
-+
 +    /* Terjemahkan D-pad ke hat 0 */
 +    {
 +        Uint8 hat = SDL_HAT_CENTERED;
@@ -765,6 +786,42 @@ index 0000000..c350fac
 +    }
 +}
 +
++static void IOUSBXINPUT_JoystickUpdate(SDL_Joystick *joystick)
++{
++    struct joystick_hwdata *hw = joystick->hwdata;
++    uint8_t reports[IOUSBXINPUT_QUEUE_LEN][IOUSBXINPUT_REPORT_LEN];
++    uint32_t count = 0, i;
++    SDL_bool is_removed = SDL_FALSE;
++
++    if (!hw) {
++        return;
++    }
++
++    if (!hw->axes_seeded) {
++        /* Dasarkan titik nol trigger pada nilai lepas (-32768) lewat jalur axis SDL, sebelum
++           sampel perangkat pertama; trigger yang sedang ditahan tidak menggeser titik nol. */
++        SDL_PrivateJoystickAxis(joystick, 2, -32768);
++        SDL_PrivateJoystickAxis(joystick, 5, -32768);
++        hw->axes_seeded = SDL_TRUE;
++    }
++
++    pthread_mutex_lock(&hw->lock);
++    is_removed = hw->removed;
++    while (hw->q_count > 0) {
++        memcpy(reports[count++], hw->queue[hw->q_head], IOUSBXINPUT_REPORT_LEN);
++        hw->q_head = (hw->q_head + 1) % IOUSBXINPUT_QUEUE_LEN;
++        hw->q_count--;
++    }
++    pthread_mutex_unlock(&hw->lock);
++
++    if (is_removed) {
++        return;
++    }
++    for (i = 0; i < count; i++) {
++        terapkan_laporan(joystick, reports[i]);
++    }
++}
++
 +static void IOUSBXINPUT_JoystickClose(SDL_Joystick *joystick)
 +{
 +    struct joystick_hwdata *hw = joystick->hwdata;
@@ -778,11 +835,16 @@ index 0000000..c350fac
 +        hw->item = NULL;
 +    }
 +
-+    hw->stop_thread = 1;
-+    if (hw->intf && hw->in_pipe) {
-+        (*hw->intf)->AbortPipe(hw->intf, hw->in_pipe);
-+    }
++    SDL_AtomicSet(&hw->stop_thread, 1);
 +    if (hw->thread_started) {
++        /* AbortPipe hanya membatalkan transaksi yang sedang berjalan; ulangi sampai thread
++           pembaca keluar agar pembacaan yang baru dimulai setelah permintaan henti ikut batal. */
++        while (!SDL_AtomicGet(&hw->reader_done)) {
++            if (hw->intf && hw->in_pipe) {
++                (*hw->intf)->AbortPipe(hw->intf, hw->in_pipe);
++            }
++            usleep(1000);
++        }
 +        pthread_join(hw->thread, NULL);
 +        hw->thread_started = 0;
 +    }

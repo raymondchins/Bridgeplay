@@ -1247,7 +1247,8 @@ stage_int2e_shim() {
   src="$backend_root/int2e-shim/x86_64-windows/version.dll"
   stock="$CX_ROOT/lib/wine/x86_64-windows/version.dll"
   dst="$WINEPREFIX/drive_c/windows/system32/version.dll"
-  want_int2e=${INT2E_SHIM:-${NOTPROTON_INT2E_SHIM:-$gamefix_int2e_shim}}
+  # BRIDGEPLAY_INT2E_SHIM di launch options dipetakan ke NOTPROTON_INT2E_SHIM di awal skrip.
+  want_int2e=${NOTPROTON_INT2E_SHIM:-$gamefix_int2e_shim}
 
   if [ "$want_int2e" = 1 ]; then
     if [ "$gamefix_rockstar_shim" = 1 ]; then
@@ -1281,10 +1282,13 @@ stage_int2e_shim() {
       graphics_log "int2e-shim: could not stage version.dll into system32"
     fi
   elif int2e_shim_copy "$src" "$dst"; then
-    if [ -f "$stock" ] && [ ! -L "$stock" ] && stage_backend_file "$stock" "$dst"; then
+    # Salinan shim dipertahankan bila pemulihan gagal: version.dll wajib ada di system32.
+    if [ ! -f "$stock" ] || [ -L "$stock" ]; then
+      graphics_log "int2e-shim: no stock version.dll in this engine, the staged copy is left in system32"
+    elif stage_backend_file "$stock" "$dst"; then
       graphics_log "int2e-shim: restored stock version.dll in system32"
-    elif rm -f "$dst" 2>> "$log"; then
-      graphics_log "int2e-shim: removed version.dll from system32"
+    else
+      graphics_log "int2e-shim: could not restore stock version.dll, the staged copy is left in system32"
     fi
   fi
 }
