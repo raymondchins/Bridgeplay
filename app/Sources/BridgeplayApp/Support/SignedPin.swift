@@ -13,9 +13,9 @@ enum SignedPin {
         // cabextract (PrefixTools, for Winetricks)
         "8c8f3b80ce8998b952df3638abcacd44161793646376fa549d9f33ab8aeea171":
             "d8ac10ff9343a991c7a8d8de6f9576db29c0febe0a0f9ebc807c7a12cfd4d034",
-        // libSDL2-2.0.0.dylib
-        "aeeec088bf51f9eac0dbd8e26ae994c7b8568fb42fc676835d6dc2109fc559d1":
-            "2e2a0912e0b1831986684a26e68e2b195e8e7d3ae2a0e7dce7084bd23827065c",
+        // libSDL2-2.0.0.dylib (ditambah driver USB XInput IOKit IOUSBLib)
+        "a47d447104a56e7f3bd884908fa0ccb16968f5693706f1dfd212b046be389498":
+            "59cf0d0ca18cb0f2afb2d490a02f52692dd8f1fb6c1af52ea1808bb9d00aec12",
         // win32u-winecx-11.17.so
         "b012382d09b2ff1b3c0750d93867f72dd04a7c902bc4179be406b6c558ab162d":
             "656c033cb8aa1c8b55117d68047e0d4c39aa0be90db60f366d54a1059abb2988",

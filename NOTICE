@@ -264,7 +264,8 @@ in winebus.so (docs/WINECX.md):
   app/Sources/BridgeplayApp/Resources/libSDL2-2.0.0.dylib
       Simple DirectMedia Layer 2.32.10 (SDL-release-2.32.10-0-g5d2495703),
       https://github.com/libsdl-org/SDL/tree/release-2.32.10, built x86_64 with
-      winemac-patch/sdl2-iokit-gamepad-collection.patch and signed ad hoc.
+      winemac-patch/sdl2-iokit-gamepad-collection.patch and
+      winemac-patch/sdl2-iousb-xinput.patch, and signed ad hoc.
       Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>.
       zlib license, https://github.com/libsdl-org/SDL/blob/release-2.32.10/LICENSE.txt
 

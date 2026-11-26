@@ -273,6 +273,10 @@ static void np_init(void) {
 
     clear_relaunch_markers();
 
+    // Nonaktifkan libusb di libSDL3 Steam agar tidak mengunci antarmuka USB XInput (0xFF/0x5D/0x01) secara eksklusif;
+    // Game di macOS tetap membutuhkan akses langsung ke dongle/gamepad USB karena Steam Mac tidak menyediakan virtual gamepad.
+    setenv("SDL_HIDAPI_LIBUSB", "0", 0);
+
     NP_LOG("np_init: loaded into %s (pid %d) Bridgeplay %s (%d), NotProton %s",
            pn, getpid(), BRIDGEPLAY_VERSION, BRIDGEPLAY_BUILD, NOTPROTON_VERSION);
 

@@ -137,11 +137,12 @@ enum FreeEngineWinecx {
     ]
 
     // SDL 2.32.10 (zlib license, NOTICE) built x86_64 with winemac-patch/sdl2-iokit-gamepad-collection.patch
-    // (pads whose gamepad is a secondary HID collection, e.g. GameSir G7 Pro over Bluetooth),
+    // (pads whose gamepad is a secondary HID collection, e.g. GameSir G7 Pro over Bluetooth) and
+    // winemac-patch/sdl2-iousb-xinput.patch (dukungan kontroler/dongle USB XInput 0xFF/0x5D/0x01 via IOKit IOUSBLib),
     // signed ad hoc, since a release build strips unsigned Mach-O resources and would break the pin.
     private static let sdl = WinecxBundledFile(
         resource: "libSDL2-2.0.0", ext: "dylib", path: "lib/libSDL2-2.0.0.dylib",
-        sha256: "aeeec088bf51f9eac0dbd8e26ae994c7b8568fb42fc676835d6dc2109fc559d1")
+        sha256: "a47d447104a56e7f3bd884908fa0ccb16968f5693706f1dfd212b046be389498")
 
     // runtime 4.7.3: winecx e0aa380 (Wine 11.17), built by winecx-gptk 0bf3eab, minos 26.0.
     // Over 4.5.125 it carries the later msync fixes, kernelbase's FlsGetValue2 for Unity

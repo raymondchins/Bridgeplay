@@ -25,9 +25,11 @@ static fn_posix_spawn orig_posix_spawnp;
 
 // The SDL block list stops Steam from seeing a second, generic copy of the Steam Controller.
 // This solves double input issues.
+// SDL_HIDAPI_LIBUSB=0 khusus untuk proses Steam agar game/Wine tetap dapat memakai libusb bila diperlukan.
 static const char *const np_steam_only_keys[] = {
     NP_INSERT_KEY,
     "SDL_JOYSTICK_BLACKLIST_DEVICES=",
+    "SDL_HIDAPI_LIBUSB=",
 };
 
 static int np_is_steam_only(const char *entry) {

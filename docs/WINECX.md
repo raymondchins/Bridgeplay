@@ -155,7 +155,9 @@ SDL's bus then presents the pad as a gamepad (`is_gamepad 1`), the device XInput
 dyld resolves the leaf name through the caller's `LC_RPATH`s, and `winebus.so` carries
 `@loader_path/../../` (the CI adds it to every unix module), so the library sits in `lib/`.
 That `libSDL2-2.0.0.dylib` is SDL 2.32.10 (zlib license, `NOTICE`) with
-`winemac-patch/sdl2-iokit-gamepad-collection.patch`, signed ad hoc: a SwiftPM release build
+`winemac-patch/sdl2-iokit-gamepad-collection.patch` and
+`winemac-patch/sdl2-iousb-xinput.patch` (USB XInput `0xFF/0x5D/0x01` pads via IOKit
+`IOUSBLib`), signed ad hoc: a SwiftPM release build
 runs `strip` on every unsigned Mach-O resource, which would change its bytes and break the
 pin. To rebuild it, apply the patch to the release tarball (strip the `/private/tmp/...`
 prefix from its paths, `patch -p0`), then
@@ -528,7 +530,7 @@ rebuilt Mach-O file needs its line there updated too; `SignedPinTests` fails unt
 | `winebus-winecx-11.17.sys` | `winebus-patch/` | `da108d1c3788fa32807ef08c4d26d8a89812c230317ffa7ba5111e126bda607c` | `FreeEngineWinecx.v1117.gamepad` |
 | `winemac-winecx-11.15.so` | `winemac-patch/winecx-d3dmetal-retina.patch` | `76d8f93839386f37e8badf0c82bb31b5ead22ac580f17896f9d2a729af0fc147` | `FreeEngineWinecx.v1115.macDriver` |
 | `winebus-winecx-11.15.so` | Controllers (SDL2 build) | `1bc53184f5d026ab84a26cf6ef721348fc3b028c019ff969e69eb6cf9b9d1af9` | `FreeEngineWinecx.v1115.gamepad` |
-| `libSDL2-2.0.0.dylib` | SDL 2.32.10, `winemac-patch/sdl2-iokit-gamepad-collection.patch` | `aeeec088bf51f9eac0dbd8e26ae994c7b8568fb42fc676835d6dc2109fc559d1` | `FreeEngineWinecx` `sdl` (both releases) |
+| `libSDL2-2.0.0.dylib` | SDL 2.32.10, `winemac-patch/sdl2-iokit-gamepad-collection.patch`, `winemac-patch/sdl2-iousb-xinput.patch` | `a47d447104a56e7f3bd884908fa0ccb16968f5693706f1dfd212b046be389498` | `FreeEngineWinecx` `sdl` (both releases) |
 | `cabextract` | cabextract 1.12, `scripts/build-cabextract.sh` | `8c8f3b80ce8998b952df3638abcacd44161793646376fa549d9f33ab8aeea171` | `PrefixTools.cabextractSHA256`, `SignedPin` (Winetricks PATH, not laid into engines) |
 | `winemac-winehq-11.15.so` | `winemac-patch/dxmt_export.c` | `d95fe40b6321ba8a34933a6b394af6d75547220a7168896c357af3a32377b08f` | `FreeEngine` `macDriver` |
 | `detour2-41069.bin` | `ntdll-patch/build.sh` (41069) | `660ea7c935620e620a45a46e552c0a3de9292e031bf93ef676968154d45e78d5` | `NtdllPatcher.byBuild` |

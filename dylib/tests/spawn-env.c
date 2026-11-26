@@ -121,6 +121,11 @@ int main(void) {
                     (char *)"SDL_GAMECONTROLLER_IGNORE_DEVICES=0x045e/0x028e", NULL };
     survives(sdl, NULL, "other SDL lists stay");
 
+    // Pastikan SDL_HIDAPI_LIBUSB ikut dihapus saat proses anak selain Steam dijalankan.
+    char *libusb_block[] = { (char *)"SDL_HIDAPI_LIBUSB=0",
+                             (char *)"PATH=/bin", NULL };
+    survives(libusb_block, once, "SDL_HIDAPI_LIBUSB goes without the insert");
+
     if (failures) {
         printf("==> spawn env: %d check(s) failed\n", failures);
         return 1;
