@@ -41,6 +41,7 @@ static bool hook_CCompatManager_BIsEnabled(void *self, uint32_t appid) {
     }
     np_compat_force_enable(self);
     np_compat_register_crossover(self);
+    np_compat_note_app(self, appid);
     return orig(self, appid);
 }
 

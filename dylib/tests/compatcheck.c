@@ -1119,6 +1119,135 @@ static void shortcut_exe_cases(void) {
     free_world(&w);
 }
 
+// A manager big enough for the enabled flag and the logon flag right after it.
+static uint8_t platform_mgr[0x1000];
+static int checks_run, overrides_dropped, logon_launches, check_after_drop;
+static uint32_t last_checked;
+
+static uint32_t stub_app_platforms(void *mgr, uint32_t appid) {
+    (void)mgr;
+    if (appid >= 1000) return 0;
+    return appid >= 500 ? COMPAT_PLATFORM_WINDOWS | COMPAT_PLATFORM_MACOS : COMPAT_PLATFORM_WINDOWS;
+}
+
+static void stub_set_override(void *mgr, uint32_t appid, const char *from, const char *to) {
+    (void)mgr;
+    if (!from[0] && !to[0]) { overrides_dropped++; last_checked = appid; }
+}
+
+static void stub_check(void *mgr, uint32_t appid) {
+    if (last_checked == appid) check_after_drop++;
+    checks_run++;
+    // The real check asks BIsCompatibilityToolEnabled about the app, through the hook.
+    np_compat_note_app(mgr, appid);
+}
+
+static void stub_launch_logon(void *mgr) {
+    logon_launches++;
+    ((uint8_t *)mgr)[0x811] = 1;
+}
+
+static void reset_platform_state(void) {
+    memset(g_platform_seen, 0, sizeof g_platform_seen);
+    g_platform_seen_count = g_platform_queued = 0;
+    atomic_store(&g_platform_mgr, NULL);
+    atomic_store(&g_platform_mode, PLATFORM_UNDECIDED);
+    memset(platform_mgr, 0, sizeof platform_mgr);
+    checks_run = overrides_dropped = logon_launches = check_after_drop = 0;
+    last_checked = 0;
+}
+
+static void platform_cases(void) {
+    g_enabled_off = 0x810;
+    np_compat_set_valid_platforms_fn((uintptr_t)stub_app_platforms);
+
+    for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
+    code[0] = 0xA9BE4FF4u;                          // stp x20, x19, [sp, #-0x20]!
+    code[1] = 0x52800028u;                          // mov w8, #1
+    code[2] = 0x39000000u | (0x20u << 10) | 8;      // strb w8, [x0, #0x20]
+    np_compat_set_platform_fns((uintptr_t)stub_check, (uintptr_t)stub_set_override,
+                               (uintptr_t)code);
+    reset_platform_state();
+    np_compat_note_app(platform_mgr, 1);
+    check(g_platform_queued == 0, "a logon flag store too early in the object turns the catch-up off");
+
+    code[2] = 0x39000000u | (0x811u << 10) | 31;    // strb wzr, [x0, #0x811]
+    check(probe_logon_flag((uintptr_t)code) == 0, "a store of zero is not the logon flag");
+    code[2] = 0x39000000u | (0x811u << 10) | (1u << 5) | 8;  // strb w8, [x1, #0x811]
+    check(probe_logon_flag((uintptr_t)code) == 0, "a store through another register is not it");
+
+    code[2] = 0x39000000u | (0x811u << 10) | 8;     // strb w8, [x0, #0x811]
+    np_compat_set_platform_fns((uintptr_t)stub_check, (uintptr_t)stub_set_override,
+                               (uintptr_t)code);
+    check(g_logon_flag_off == 0x811, "the logon flag is read from the job's first store");
+    np_compat_set_platform_fns((uintptr_t)stub_check, (uintptr_t)stub_set_override,
+                               (uintptr_t)stub_launch_logon);
+    g_logon_flag_off = 0x811;
+
+    // A client whose logon job ran is left alone.
+    reset_platform_state();
+    platform_mgr[0x810] = 1;
+    platform_mgr[0x811] = 1;
+    np_compat_note_app(platform_mgr, 1);
+    check(np_compat_platform_catch_up() == 0 && logon_launches == 0,
+          "a client that ran its logon compat job gets no catch-up");
+    check(np_compat_check_noted_apps() == 0 && checks_run == 0,
+          "a client that ran its logon compat job has nothing checked");
+    np_compat_note_app(platform_mgr, 2);
+    check(g_platform_queued == 1, "nothing is queued once the client is known to be fine");
+
+    // The layer is still off at the first look: the hooks never forced it, so no catch-up.
+    reset_platform_state();
+    np_compat_note_app(platform_mgr, 1);
+    check(np_compat_platform_catch_up() == 0 && logon_launches == 0,
+          "a client whose layer is off gets no catch-up");
+
+    // Without SetAppPlatformOverride the catch-up stays off altogether.
+    reset_platform_state();
+    platform_mgr[0x810] = 1;
+    g_set_platform_override = NULL;
+    np_compat_note_app(platform_mgr, 1);
+    check(g_platform_queued == 0 && np_compat_platform_catch_up() == 0,
+          "a missing function turns the catch-up off");
+    g_set_platform_override = stub_set_override;
+
+    // One that logged on with the layer off.
+    reset_platform_state();
+    platform_mgr[0x810] = 1;
+    check(np_compat_platform_catch_up() == 0, "no catch-up before any manager is seen");
+    np_compat_note_app(platform_mgr, 1);
+    np_compat_note_app(platform_mgr, 1);
+    np_compat_note_app(platform_mgr, 600);
+    np_compat_note_app(platform_mgr, 2000);
+    check(g_platform_queued == 1, "only a Windows-only app is queued, and once");
+    check(np_compat_platform_catch_up() == 1 && logon_launches == 1,
+          "a client that skipped its logon compat job has it launched");
+    check(np_compat_platform_catch_up() == 0 && logon_launches == 1, "the job is launched once");
+    uint32_t installed[] = { 2, 3, 1, 600 };
+    np_compat_note_apps(installed, 4);
+    check(g_platform_queued == 3, "installed Windows-only apps join the queue");
+    check(np_compat_check_noted_apps() == 3 && checks_run == 3 && overrides_dropped == 3,
+          "every queued app has its override dropped and is checked");
+    check(check_after_drop == 3, "each check follows the drop of that app's override");
+    check(g_platform_queued == 0, "an app the check asks about is not queued again");
+    check(np_compat_check_noted_apps() == 0, "an empty queue checks nothing");
+
+    // The batch limit spreads a big library over several jobs.
+    reset_platform_state();
+    platform_mgr[0x810] = 1;
+    np_compat_note_app(platform_mgr, 1);
+    np_compat_platform_catch_up();
+    for (uint32_t id = 10; id < 10 + NP_COMPAT_PLATFORM_CHECK_BATCH + 5; id++)
+        np_compat_note_app(platform_mgr, id);
+    check(np_compat_check_noted_apps() == NP_COMPAT_PLATFORM_CHECK_BATCH,
+          "one job checks at most a batch");
+    check(np_compat_check_noted_apps() == 6, "the next job checks the rest");
+
+    reset_platform_state();
+    g_enabled_off = COMPAT_MANAGER_ENABLED_OFF;
+    g_get_valid_platforms = NULL;
+}
+
 int main(void) {
     confirm_layout();   // the reference layout, unless a case says otherwise
     concurrent_fallback_cases();
@@ -1132,6 +1261,7 @@ int main(void) {
     tool_launch_cases();
     stale_tool_cases();
     installed_fn_cases();
+    platform_cases();
     shortcut_probe_cases();
     shortcut_exe_cases();
 

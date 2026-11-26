@@ -4,8 +4,12 @@
 #include "../core/macho.h"
 #include "../feats/webui.h"
 #include "../feats/compat.h"
+#include "../feats/prefixstate.h"
 #include "../feats/usershortcuts.h"
+#include "../util/file.h"
 #include "../util/log.h"
+#include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -132,6 +136,22 @@ int np_hooks_install_steamui(const struct mach_header_64 *mh, intptr_t slide,
     return landed;
 }
 
+// After a catch-up, installed games are checked too: Steam asks about only some of them on
+// its own, and the rest would show Install until someone opened their page.
+static int compat_platform_job(void) {
+    if (np_compat_platform_catch_up()) {
+        static uint32_t installed[NP_COMPAT_PLATFORM_APPS_MAX];
+        const char *home = np_home_dir();
+        char steam[PATH_MAX];
+        if (home) {
+            snprintf(steam, sizeof steam, "%s/Library/Application Support/Steam", home);
+            size_t n = np_prefix_installed_apps(steam, installed, NP_COMPAT_PLATFORM_APPS_MAX);
+            np_compat_note_apps(installed, n);
+        }
+    }
+    return np_compat_check_noted_apps();
+}
+
 int np_hooks_install_all(const struct mach_header_64 *mh, intptr_t slide,
                          np_resolve_result_t *resolved, int *total_out) {
     np_hooks_compat_set_helpers(
@@ -141,6 +161,10 @@ int np_hooks_install_all(const struct mach_header_64 *mh, intptr_t slide,
         np_lookup_address(resolved, "CCompatManager::SetCompatToolMapping"),
         np_lookup_address(resolved, "CCompatManager::FindMapping"),
         np_lookup_address(resolved, "CCompatManager::GetWildcardMapping"));
+    np_compat_set_platform_fns(
+        np_lookup_address(resolved, "CCompatManager::YldCheckIfAppNeedsPlatformCompatibility"),
+        np_lookup_address(resolved, "CCompatManager::SetAppPlatformOverride"),
+        np_lookup_address(resolved, "CCompatManager::LaunchLogOnCompatProcessingJob"));
 
     uintptr_t register_tool = np_lookup_address(resolved, "CCompatManager::YldRegisterTool");
     uintptr_t tool_start, tool_end = 0;
@@ -166,6 +190,9 @@ int np_hooks_install_all(const struct mach_header_64 *mh, intptr_t slide,
 
     np_webui_init(mh, slide, register_fn, dispatch_fn,
                   np_lookup_address(resolved, "CWebUIMsgJob::SendResponse"));
+    // The page polls a route every couple of seconds, so its jobs are where the
+    // platform checks the hooks could not run get done.
+    np_webui_on_job(compat_platform_job);
     np_webui_dump_routes();
     np_hooks_webui_bind(mh, slide, register_fn, dispatch_fn);
 

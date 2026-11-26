@@ -32,6 +32,9 @@ uintptr_t np_webui_new_message(uintptr_t vptr);
 // Invalidates a route so the page refetches rather than showing stale data.
 int np_webui_notify(const char *name, uintptr_t message);
 
+// Runs `fn` at the start of every route job, on the client's job thread.
+void np_webui_on_job(int (*fn)(void));
+
 // Fills `response` from `request`. The return value is the result the page sees,
 // where 1 is success.
 typedef int (*np_webui_handler_fn)(uintptr_t request, uintptr_t response);

@@ -148,6 +148,30 @@
       }
     },
     {
+      "name": "CCompatManager::YldCheckIfAppNeedsPlatformCompatibility",
+      "aob_hex": "",
+      "anchor": {
+        "kind": "string",
+        "value": "CCompatManager::YldCheckIfAppNeedsPlatformCompatibility"
+      }
+    },
+    {
+      "name": "CCompatManager::SetAppPlatformOverride",
+      "aob_hex": "",
+      "anchor": {
+        "kind": "string",
+        "value": "CCompatManager::SetAppPlatformOverride"
+      }
+    },
+    {
+      "name": "CCompatManager::LaunchLogOnCompatProcessingJob",
+      "aob_hex": "",
+      "anchor": {
+        "kind": "string",
+        "value": "LaunchLogOnCompatProcessingJob"
+      }
+    },
+    {
       "name": "CCompatManager::FindMapping",
       "func_addr_this_build": "0x6a7d44",
       "aob_hex": "FF 83 00 D1 FD 7B 01 A9 FD 43 00 91 A1 C3 1F B8 E1 00 00 34 00 E0 0F 91 A1 13 00 D1",

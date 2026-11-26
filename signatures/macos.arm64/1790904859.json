@@ -147,6 +147,33 @@
       "func_addr_this_build": "0x6a3cb4"
     },
     {
+      "name": "CCompatManager::YldCheckIfAppNeedsPlatformCompatibility",
+      "aob_hex": "",
+      "anchor": {
+        "kind": "string",
+        "value": "CCompatManager::YldCheckIfAppNeedsPlatformCompatibility"
+      },
+      "func_addr_this_build": "0x6c3ef8"
+    },
+    {
+      "name": "CCompatManager::SetAppPlatformOverride",
+      "aob_hex": "",
+      "anchor": {
+        "kind": "string",
+        "value": "CCompatManager::SetAppPlatformOverride"
+      },
+      "func_addr_this_build": "0x6c4814"
+    },
+    {
+      "name": "CCompatManager::LaunchLogOnCompatProcessingJob",
+      "aob_hex": "",
+      "anchor": {
+        "kind": "string",
+        "value": "LaunchLogOnCompatProcessingJob"
+      },
+      "func_addr_this_build": "0x6c5db8"
+    },
+    {
       "name": "CCompatManager::FindMapping",
       "aob_hex": "FF 83 00 D1 FD 7B 01 A9 FD 43 00 91 A1 C3 1F B8 ?? ?? ?? ?? 00 E0 0F 91 A1 13 00 D1 ?? ?? ?? ??",
       "anchor": {

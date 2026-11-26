@@ -946,6 +946,134 @@ bool np_compat_would_force(void *compat_mgr, uint32_t appid) {
     return (platforms & COMPAT_PLATFORM_WINDOWS) && !(platforms & COMPAT_PLATFORM_MACOS);
 }
 
+typedef void (*fn_CheckPlatform)(void *compat_mgr, uint32_t appid);
+typedef void (*fn_SetPlatformOverride)(void *compat_mgr, uint32_t appid, const char *from,
+                                       const char *to);
+typedef void (*fn_LaunchLogOn)(void *compat_mgr);
+static fn_CheckPlatform g_check_platform;
+static fn_SetPlatformOverride g_set_platform_override;
+static fn_LaunchLogOn g_launch_logon;
+static uint32_t g_logon_flag_off;
+
+// LaunchLogOnCompatProcessingJob opens with a store of 1 into the flag that says it ran.
+static uint32_t probe_logon_flag(uintptr_t launch_logon) {
+    for (uintptr_t pc = launch_logon; pc < launch_logon + 0x20; pc += 4) {
+        uint32_t w = *(const uint32_t *)pc;
+        // STRB Wt,[X0,#imm], not of WZR
+        if ((w & 0xFFC003E0u) == 0x39000000u && (w & 0x1Fu) != 31) {
+            uint32_t off = (w >> 10) & 0xFFFu;
+            return off >= 0x100 ? off : 0;
+        }
+    }
+    return 0;
+}
+
+void np_compat_set_platform_fns(uintptr_t check_platform, uintptr_t set_override,
+                                uintptr_t launch_logon) {
+    g_check_platform = (fn_CheckPlatform)check_platform;
+    g_set_platform_override = (fn_SetPlatformOverride)set_override;
+    g_launch_logon = (fn_LaunchLogOn)launch_logon;
+    g_logon_flag_off = launch_logon ? probe_logon_flag(launch_logon) : 0;
+    if (launch_logon && !g_logon_flag_off)
+        NP_WARN("np_compat_set_platform_fns: no logon flag store at 0x%lx, the platform "
+                "catch-up stays off", (unsigned long)launch_logon);
+}
+
+// Appids whose platforms have been read, as an open-addressed set (0 is empty), and the
+// Windows-only ones among them still waiting for their check.
+static uint32_t g_platform_seen[NP_COMPAT_PLATFORM_APPS_MAX * 2];
+static uint32_t g_platform_queue[NP_COMPAT_PLATFORM_APPS_MAX];
+static size_t g_platform_seen_count, g_platform_queued;
+// Written by the hook on Steam's threads, read by the drain on the job thread.
+static _Atomic(void *) g_platform_mgr;
+// PLATFORM_UNDECIDED until the first job looks, then PLATFORM_NORMAL or PLATFORM_CATCH_UP.
+static _Atomic int g_platform_mode;
+static pthread_mutex_t g_platform_lock = PTHREAD_MUTEX_INITIALIZER;
+
+enum { PLATFORM_UNDECIDED, PLATFORM_NORMAL, PLATFORM_CATCH_UP };
+
+// 1 when appid was added, 0 when it was there already or the set is full.
+static int platform_seen_add(uint32_t appid) {
+    const size_t slots = sizeof g_platform_seen / sizeof *g_platform_seen;
+    size_t i = (appid * 2654435761u) % slots;
+    for (size_t n = 0; n < slots; n++, i = (i + 1) % slots) {
+        if (g_platform_seen[i] == appid) return 0;
+        if (g_platform_seen[i]) continue;
+        if (g_platform_seen_count >= NP_COMPAT_PLATFORM_APPS_MAX) return 0;
+        g_platform_seen[i] = appid;
+        g_platform_seen_count++;
+        return 1;
+    }
+    return 0;
+}
+
+static int platform_fns_ready(void) {
+    return g_check_platform && g_set_platform_override && g_launch_logon && g_logon_flag_off;
+}
+
+void np_compat_note_app(void *compat_mgr, uint32_t appid) {
+    if (!platform_fns_ready() || !compat_mgr || !appid) return;
+    if (atomic_load(&g_platform_mode) == PLATFORM_NORMAL) return;
+    // An app whose appinfo is not loaded yet reports no platform, and is read again
+    // the next time Steam asks about it.
+    uint32_t platforms = np_compat_valid_platforms(compat_mgr, appid);
+    atomic_store(&g_platform_mgr, compat_mgr);
+    pthread_mutex_lock(&g_platform_lock);
+    if (platforms && platform_seen_add(appid) && (platforms & COMPAT_PLATFORM_WINDOWS) &&
+        !(platforms & COMPAT_PLATFORM_MACOS) && g_platform_queued < NP_COMPAT_PLATFORM_APPS_MAX)
+        g_platform_queue[g_platform_queued++] = appid;
+    pthread_mutex_unlock(&g_platform_lock);
+}
+
+void np_compat_note_apps(const uint32_t *appids, size_t count) {
+    void *mgr = atomic_load(&g_platform_mgr);
+    for (size_t i = 0; i < count; i++)
+        np_compat_note_app(mgr, appids[i]);
+}
+
+int np_compat_platform_catch_up(void) {
+    void *mgr = atomic_load(&g_platform_mgr);
+    if (!mgr || atomic_load(&g_platform_mode) != PLATFORM_UNDECIDED) return 0;
+    const uint8_t *base = (const uint8_t *)mgr;
+    // The page's first jobs run after logon. A client that logged on with the layer still
+    // off never launched its logon compat job, so its queued changes are never posted.
+    int decided = !base[np_compat_enabled_off()] || base[g_logon_flag_off]
+                      ? PLATFORM_NORMAL : PLATFORM_CATCH_UP;
+    int undecided = PLATFORM_UNDECIDED;
+    // Two jobs can look at once; only the one that decides goes on.
+    if (!atomic_compare_exchange_strong(&g_platform_mode, &undecided, decided) ||
+        decided == PLATFORM_NORMAL)
+        return 0;
+    NP_LOG("np_compat_platform_catch_up: Steam logged on before the compat layer was on, "
+           "launching its logon compat job");
+    g_launch_logon(mgr);
+    return 1;
+}
+
+int np_compat_check_noted_apps(void) {
+    if (atomic_load(&g_platform_mode) != PLATFORM_CATCH_UP) return 0;
+    uint32_t batch[NP_COMPAT_PLATFORM_CHECK_BATCH];
+    size_t n = 0;
+    void *mgr;
+    pthread_mutex_lock(&g_platform_lock);
+    mgr = atomic_load(&g_platform_mgr);
+    while (n < NP_COMPAT_PLATFORM_CHECK_BATCH && g_platform_queued)
+        batch[n++] = g_platform_queue[--g_platform_queued];
+    pthread_mutex_unlock(&g_platform_lock);
+    if (!n || !mgr) return 0;
+
+    // An override Steam already holds is not set again, so the library never hears about
+    // it. Dropping it first makes the check set it anew and tell the library. The check
+    // asks BIsCompatibilityToolEnabled about the same app, which is already seen, so the
+    // hook queues nothing. Each job pops its own batch, so overlapping jobs share no app.
+    for (size_t i = 0; i < n; i++) {
+        g_set_platform_override(mgr, batch[i], "", "");
+        g_check_platform(mgr, batch[i]);
+    }
+    NP_LOG("np_compat_check_noted_apps: checked the platform of %zu Windows-only app(s)", n);
+    return (int)n;
+}
+
 typedef void *(*fn_FindMapping)(void *compat_mgr, uint32_t appid);
 static fn_FindMapping g_find_mapping;
 

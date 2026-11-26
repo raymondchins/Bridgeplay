@@ -417,8 +417,16 @@ static uintptr_t vtable_from_factory(uintptr_t factory, int *slot_out, int *run_
     return 0;
 }
 
+static int (*g_on_job)(void);
+
+void np_webui_on_job(int (*fn)(void)) {
+    g_on_job = fn;
+}
+
 // Every route shares one job class, so one handler serves them all
 static int64_t job_handler(uintptr_t job, uintptr_t ctx) {
+    if (g_on_job) g_on_job();
+
     uintptr_t request  = *(const uintptr_t *)(ctx + 8);
     uintptr_t response = *(const uintptr_t *)(ctx + 16);
     uintptr_t job_vptr = *(const uintptr_t *)job;

@@ -2,6 +2,7 @@
 // (prefix_machine, notproton-build) so the page can say what a launch would say.
 #include "prefixstate.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/file.h>
@@ -287,6 +288,31 @@ static void json_bool(json_t *j, const char *key, int value) {
     json_raw(j, j->len > 1 ? ",\"" : "\"");
     json_raw(j, key);
     json_raw(j, value ? "\":true" : "\":false");
+}
+
+size_t np_prefix_installed_apps(const char *steam_root, uint32_t *appids, size_t max) {
+    libraries_t libs;
+    read_libraries(steam_root, &libs);
+    size_t n = 0;
+    for (int i = 0; i < libs.count && n < max; i++) {
+        char dir[PATH_MAX];
+        snprintf(dir, sizeof dir, "%s/steamapps", libs.paths[i]);
+        DIR *d = opendir(dir);
+        if (!d) continue;
+        struct dirent *e;
+        while (n < max && (e = readdir(d))) {
+            const char *digits = e->d_name + sizeof "appmanifest_" - 1;
+            if (strncmp(e->d_name, "appmanifest_", sizeof "appmanifest_" - 1) != 0 ||
+                *digits < '0' || *digits > '9') continue;
+            char *end;
+            errno = 0;
+            unsigned long id = strtoul(digits, &end, 10);
+            if (errno || strcmp(end, ".acf") != 0 || !id || id > UINT32_MAX) continue;
+            appids[n++] = (uint32_t)id;
+        }
+        closedir(d);
+    }
+    return n;
 }
 
 void np_prefix_state(uint32_t appid, const char *tool, const np_prefix_roots_t *roots,
