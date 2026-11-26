@@ -110,6 +110,7 @@ lib/wine/x86_64-unix/winecoreaudio.so             11.17 only: render buffer (win
 lib/wine/{x86_64,i386}-windows/mmdevapi.dll       11.17 only: follows the system's default device, replacing the archive's (Default audio device)
 lib/notproton-backends/nvapi-shim/x86_64-windows/nvapi64.dll       11.17 only (nvapi-shim/)
 lib/notproton-backends/rockstar-shim/x86_64-windows/{version,dxgx}.dll   11.17 only (rockstar-shim/)
+lib/notproton-backends/int2e-shim/x86_64-windows/version.dll         11.17 only (int2e-shim/)
 lib/notproton-backends/d3d12-stub/x86_64-windows/d3d12.dll         11.17 only (d3d12-stub/)
 lib/libSDL2-2.0.0.dylib                           SDL 2.32.10, x86_64, for winebus.so (Controllers)
 ```
@@ -524,6 +525,7 @@ rebuilt Mach-O file needs its line there updated too; `SignedPinTests` fails unt
 | `d3dx9_36-winecx-11.17-i386.dll` | `d3dx9-patch/` | `5eec69a49afa6debbc8e5020bab5f44e2d0c2897e393be40c33d9cbd766dd893` | `FreeEngineWinecx.v1117.d3dx` |
 | `version-rockstar-shim.dll` | `rockstar-shim/` | `deedb5d799330a3e274fe5cc7f569536280a2420543ef12145fcaa8fcbb7f6d4` | `FreeEngineWinecx.v1117.rockstar` |
 | `dxgi-dxvk-macos-1.10.3.dll` | DXVK-macOS v1.10.3-20230507 `x64/dxgi.dll`, unmodified | `e74f5c985fe98f38f1a096258ef35d62e03a64df7096837965c7383e3cfe153d` | `FreeEngineWinecx.v1117.rockstar` |
+| `version-int2e-shim.dll` | `int2e-shim/` | `c56866e08d5d61dbd9a92c3a23e1f475b9b19cae940f11d40c94be3b0fbf6cc2` | `FreeEngineWinecx.v1117.int2e` |
 | `d3d12-stub.dll` | `d3d12-stub/` | `d802d04ae9fb18a3dda90984bb11def0bda89b4d929b6297fe026b6cf883d1db` | `FreeEngineWinecx.v1117.dxmt` |
 | `winemac-winecx-11.17.so` | `winemac-patch/winecx-11.17-d3dmetal-retina.patch` | `aa192f846ad15d56de200fc92752eaf2d455700846ae2cf1ccc7b27b535f1c00` | `FreeEngineWinecx.v1117.macDriver` |
 | `winebus-winecx-11.17.so` | Controllers (SDL2 build) | `6223c035c824c90708abbc3e733f8d1d6ed6b8b4e9a3e1a5c813493ceba50473` | `FreeEngineWinecx.v1117.gamepad` |

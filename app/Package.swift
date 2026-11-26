@@ -74,6 +74,7 @@ let package = Package(
                 .copy("Resources/version-rockstar-shim.dll"),
                 .copy("Resources/dxgi-dxvk-macos-1.10.3.dll"),
                 .copy("Resources/d3d12-stub.dll"),
+                .copy("Resources/version-int2e-shim.dll"),
                 .copy("Resources/libSDL2-2.0.0.dylib"),
                 .copy("Resources/cabextract"),
                 .copy("Resources/detour2-41073.bin"),

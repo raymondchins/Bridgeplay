@@ -385,6 +385,7 @@ gamefix_nvapi=""
 gamefix_dlss_fg=""
 gamefix_args=""
 gamefix_rockstar_shim=""
+gamefix_int2e_shim=""
 
 gamefix_log() {
   echo "gamefix: $*" >> "$log" 2>&1 || true
@@ -415,7 +416,7 @@ gamefix_reason() {
   case "$1" in
     BACKEND)
       case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
-    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|GAME_MODE|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK|ROCKSTAR_SHIM|FPS_LIMIT_OFF)
+    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|GAME_MODE|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK|ROCKSTAR_SHIM|INT2E_SHIM|FPS_LIMIT_OFF)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     FRAMEGEN)
       # 1 is the 2x of the first release.
@@ -516,6 +517,7 @@ load_gamefixes() {
       NVAPI) gamefix_nvapi=$value; gamefix_log "NVAPI=$value from the $from conf" ;;
       DLSS_FG) gamefix_dlss_fg=$value; gamefix_log "DLSS_FG=$value from the $from conf" ;;
       ROCKSTAR_SHIM) gamefix_rockstar_shim=$value; gamefix_log "ROCKSTAR_SHIM=$value from the $from conf" ;;
+      INT2E_SHIM) gamefix_int2e_shim=$value; gamefix_log "INT2E_SHIM=$value from the $from conf" ;;
       STDOUT_NULL) gamefix_apply_env NOTPROTON_STDOUT_NULL "$value" "$from" ;;
       VSYNC) gamefix_apply_env NOTPROTON_VSYNC "$value" "$from" ;;
       GAME_MODE) gamefix_apply_env NOTPROTON_GAME_MODE "$value" "$from" ;;
@@ -596,9 +598,9 @@ managed_dlls() {
     printf '%s\n' dxgi d3d11 d3d10core
     ! d3dmetal_engine || printf '%s\n' d3d10 d3d12
     for dir in "$backend_root"/*/x86_64-windows "$backend_root"/*/i386-windows; do
-      # nvapi-shim, rockstar-shim and d3d12-stub are not Direct3D backends; their DLLs are
-      # handled with NVAPI, ROCKSTAR_SHIM and dxmt below.
-      case "$dir" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*|"$backend_root"/rockstar-shim/*|"$backend_root"/d3d12-stub/*) continue ;; esac
+      # nvapi-shim, rockstar-shim, int2e-shim, and d3d12-stub are not Direct3D backends; their DLLs are
+      # handled with NVAPI, ROCKSTAR_SHIM, INT2E_SHIM and dxmt below.
+      case "$dir" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*|"$backend_root"/rockstar-shim/*|"$backend_root"/int2e-shim/*|"$backend_root"/d3d12-stub/*) continue ;; esac
       [ ! -d "$dir" ] || backend_dlls "$dir"
     done
   } | sort -u
@@ -822,7 +824,7 @@ restore_stock_dll() {
   ! cmp -s "$stock" "$3" || return 0
   # d3d12-stub counts here, so a stub the backend no longer wants goes back to Wine's d3d12.
   for theirs in "$backend_root"/*/"$1"/*.[dD][lL][lL]; do
-    case "$theirs" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*|"$backend_root"/rockstar-shim/*) continue ;; esac
+    case "$theirs" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*|"$backend_root"/rockstar-shim/*|"$backend_root"/int2e-shim/*) continue ;; esac
     [ -f "$theirs" ] || continue
     base=${theirs##*/}
     [ "$(printf '%s' "${base%.*}" | tr '[:upper:]' '[:lower:]')" = "$2" ] || continue
@@ -1229,6 +1231,61 @@ stage_rockstar_shim() {
   if [ "$dxgi_wanted" = 1 ] && [ -n "$win64" ] && rockstar_shim_copy "$shim/dxgx.dll" "$win64/dxgi.dll"; then
     gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}dxgi=n,b"
     graphics_log "rockstar-shim: DXVK's dxgi staged beside the game exe, dxgi=n,b"
+  fi
+}
+
+# Salinan version.dll milik int2e-shim dikenali dari penanda "int2e-shim: ".
+int2e_shim_copy() {
+  [ -f "$2" ] && [ ! -L "$2" ] || return 1
+  { [ -f "$1" ] && cmp -s "$1" "$2"; } || LC_ALL=C grep -qaF 'int2e-shim: ' "$2"
+}
+
+# Memasang int2e-shim sebagai system32/version.dll (override version=n,b) bila INT2E_SHIM=1,
+# dan memulihkan version.dll bawaan Wine jika opsi dimatikan atau mesin tidak menyertakannya.
+stage_int2e_shim() {
+  [ "$verb" = waitforexitandrun ] && [ -n "${WINEPREFIX:-}" ] || return 0
+  src="$backend_root/int2e-shim/x86_64-windows/version.dll"
+  stock="$CX_ROOT/lib/wine/x86_64-windows/version.dll"
+  dst="$WINEPREFIX/drive_c/windows/system32/version.dll"
+  want_int2e=${INT2E_SHIM:-${NOTPROTON_INT2E_SHIM:-$gamefix_int2e_shim}}
+
+  if [ "$want_int2e" = 1 ]; then
+    if [ "$gamefix_rockstar_shim" = 1 ]; then
+      graphics_log "int2e-shim: skipped because ROCKSTAR_SHIM=1"
+      return 0
+    fi
+    if [ ! -f "$src" ]; then
+      graphics_log "int2e-shim: not in this engine, INT2E_SHIM=1 does nothing"
+      return 0
+    fi
+    [ -d "${dst%/*}" ] || return 0
+    is_safe=0
+    if [ ! -e "$dst" ] && [ ! -L "$dst" ]; then
+      is_safe=1
+    elif int2e_shim_copy "$src" "$dst"; then
+      is_safe=1
+    elif [ -f "$dst" ] && [ ! -L "$dst" ]; then
+      if { [ -f "$stock" ] && cmp -s "$stock" "$dst"; } \
+        || [ "$(dd if="$dst" bs=1 skip=64 count=16 2>/dev/null)" = "Wine builtin DLL" ]; then
+        is_safe=1
+      fi
+    fi
+    if [ "$is_safe" != 1 ]; then
+      graphics_log "int2e-shim: system32/version.dll is not Wine's builtin, left alone"
+      return 0
+    fi
+    if stage_backend_file "$src" "$dst"; then
+      gamefix_dlloverrides="${gamefix_dlloverrides:+$gamefix_dlloverrides;}version=n,b"
+      graphics_log "int2e-shim: staged version.dll into system32, version=n,b"
+    else
+      graphics_log "int2e-shim: could not stage version.dll into system32"
+    fi
+  elif int2e_shim_copy "$src" "$dst"; then
+    if [ -f "$stock" ] && [ ! -L "$stock" ] && stage_backend_file "$stock" "$dst"; then
+      graphics_log "int2e-shim: restored stock version.dll in system32"
+    elif rm -f "$dst" 2>> "$log"; then
+      graphics_log "int2e-shim: removed version.dll from system32"
+    fi
   fi
 }
 
@@ -3236,6 +3293,7 @@ select_backend "$1"
 activate_backend || true
 record_backend || true
 stage_rockstar_shim || true
+stage_int2e_shim || true
 # An engine without lib/notproton-backends (CrossOver) picks its graphics itself, from
 # CX_GRAPHICS_BACKEND, so the log names that choice, not the dxmt-builtin placeholder.
 if [ "$backend" = dxmt-builtin ]; then

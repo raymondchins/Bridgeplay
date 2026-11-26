@@ -314,6 +314,22 @@ struct FreeEngineWinecxTests {
         }
     }
 
+    // int2e-shim: 11.17 menyertakan proxy version.dll untuk game yang mengeksekusi int 0x2e langsung.
+    @Test("int2e-shim ships with the app and is pinned for 11.17",
+          arguments: FreeEngineWinecx.releases.map(\.build))
+    func int2eShim(id: String) throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
+        let expected: Set<String> = release.build == "winecx-11.17"
+            ? ["lib/notproton-backends/int2e-shim/x86_64-windows/version.dll"] : []
+        #expect(Set(release.int2e.map(\.path)) == expected)
+        let table = FreeEngineWinecx.expectedFiles(release)
+        for file in release.int2e {
+            let bundled = try #require(Bundle.module.url(forResource: file.resource, withExtension: file.ext))
+            #expect(Digest.sha256IfPresent(bundled) == file.sha256, "\(file.resource)")
+            #expect(table[file.path] == file.sha256, "\(file.path)")
+        }
+    }
+
     @Test("Each free engine is current, outdated or missing on its own pins")
     func perEngineState() throws {
         let winehqBuild = try #require(SupportedRunners.build(id: FreeEngine.current.build))
