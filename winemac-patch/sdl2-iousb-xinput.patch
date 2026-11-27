@@ -1,0 +1,962 @@
+diff --git a/src/joystick/SDL_joystick.c b/src/joystick/SDL_joystick.c
+index e968288..1ef1c15 100644
+--- a/src/joystick/SDL_joystick.c
++++ b/src/joystick/SDL_joystick.c
+@@ -72,6 +72,7 @@ static SDL_JoystickDriver *SDL_joystick_drivers[] = {
+ #endif
+ #ifdef SDL_JOYSTICK_IOKIT
+     &SDL_DARWIN_JoystickDriver,
++    &SDL_IOUSBXINPUT_JoystickDriver,
+ #endif
+ #if (defined(__MACOSX__) || defined(__IPHONEOS__) || defined(__TVOS__)) && !defined(SDL_JOYSTICK_DISABLED)
+     &SDL_IOS_JoystickDriver,
+diff --git a/src/joystick/SDL_sysjoystick.h b/src/joystick/SDL_sysjoystick.h
+index cabb69a..352a9e0 100644
+--- a/src/joystick/SDL_sysjoystick.h
++++ b/src/joystick/SDL_sysjoystick.h
+@@ -237,6 +237,7 @@ typedef struct _SDL_JoystickDriver
+ extern SDL_JoystickDriver SDL_ANDROID_JoystickDriver;
+ extern SDL_JoystickDriver SDL_BSD_JoystickDriver;
+ extern SDL_JoystickDriver SDL_DARWIN_JoystickDriver;
++extern SDL_JoystickDriver SDL_IOUSBXINPUT_JoystickDriver;
+ extern SDL_JoystickDriver SDL_DUMMY_JoystickDriver;
+ extern SDL_JoystickDriver SDL_EMSCRIPTEN_JoystickDriver;
+ extern SDL_JoystickDriver SDL_HAIKU_JoystickDriver;
+diff --git a/src/joystick/darwin/SDL_iousbxinput.c b/src/joystick/darwin/SDL_iousbxinput.c
+new file mode 100644
+index 0000000..f3f3543
+--- /dev/null
++++ b/src/joystick/darwin/SDL_iousbxinput.c
+@@ -0,0 +1,932 @@
++/*
++  Driver SDL2 macOS untuk gamepad USB XInput (0xFF/0x5D/0x01) melalui IOKit IOUSBLib.
++  Digunakan agar dongle/kontroler XInput (seperti 8BitDo Ultimate 2C Wireless) terbaca oleh
++  Wine (winebus SDL bus) tanpa perlu kext/driver pihak ketiga.
++*/
++#include "../../SDL_internal.h"
++
++#ifdef SDL_JOYSTICK_IOKIT
++
++#include "SDL_atomic.h"
++#include "SDL_events.h"
++#include "SDL_joystick.h"
++#include "SDL_timer.h"
++#include "../SDL_sysjoystick.h"
++#include "../SDL_joystick_c.h"
++
++#include <CoreFoundation/CoreFoundation.h>
++#include <IOKit/IOCFPlugIn.h>
++#include <IOKit/IOKitLib.h>
++#include <IOKit/IOMessage.h>
++#include <IOKit/usb/IOUSBLib.h>
++#include <pthread.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++#ifndef kIOMainPortDefault
++#define kIOMainPortDefault kIOMasterPortDefault
++#endif
++
++#define IOUSBXINPUT_QUEUE_LEN 32
++#define IOUSBXINPUT_REPORT_LEN 20
++
++typedef struct iousb_xinput_device
++{
++    uint64_t registry_id;
++    uint32_t location_id;
++    uint16_t vendor_id;
++    uint16_t product_id;
++    uint16_t bcd_device;
++    int player_index;
++    char *name;
++    char path[64];
++    SDL_JoystickGUID guid;
++    SDL_JoystickID instance_id;
++    io_service_t service;
++    io_object_t termination_notif;
++    SDL_bool removed;
++    struct joystick_hwdata *hwdata;
++    struct iousb_xinput_device *next;
++} iousb_xinput_device;
++
++struct joystick_hwdata
++{
++    iousb_xinput_device *item;
++    IOUSBInterfaceInterface190 **intf;
++    uint8_t in_pipe;
++    uint8_t out_pipe;
++    uint16_t in_max_packet;
++    pthread_t thread;
++    pthread_mutex_t lock;
++    int thread_started;
++    SDL_atomic_t stop_thread;   /* diset Close, dibaca thread pembaca */
++    SDL_atomic_t reader_done;   /* diset thread pembaca saat keluar */
++    SDL_bool removed;
++    SDL_bool axes_seeded;
++    /* Antrean laporan agar transisi tombol singkat tidak hilang di antara dua poll SDL */
++    uint8_t queue[IOUSBXINPUT_QUEUE_LEN][IOUSBXINPUT_REPORT_LEN];
++    uint32_t q_head;
++    uint32_t q_count;
++};
++
++static IONotificationPortRef g_notif_port = NULL;
++static io_iterator_t g_added_iter = IO_OBJECT_NULL;
++static io_iterator_t g_terminated_iter = IO_OBJECT_NULL;
++static iousb_xinput_device *g_devices = NULL;
++static SDL_bool g_initialized = SDL_FALSE;
++
++/* Ambil properti bilangan bulat langsung dari objek IOKit */
++static int ambil_int_self(io_registry_entry_t entry, CFStringRef key, int *out)
++{
++    CFTypeRef ref = IORegistryEntryCreateCFProperty(entry, key, kCFAllocatorDefault, 0);
++    int ok = 0;
++    if (!ref) {
++        return 0;
++    }
++    if (CFGetTypeID(ref) == CFNumberGetTypeID()) {
++        ok = CFNumberGetValue((CFNumberRef)ref, kCFNumberIntType, out);
++    }
++    CFRelease(ref);
++    return ok;
++}
++
++/* Cari properti bilangan bulat pada entry atau induk USB-nya */
++static int ambil_int_parent(io_registry_entry_t entry, CFStringRef key, int *out)
++{
++    CFTypeRef ref = IORegistryEntrySearchCFProperty(
++        entry, kIOServicePlane, key, kCFAllocatorDefault,
++        kIORegistryIterateParents | kIORegistryIterateRecursively);
++    int ok = 0;
++    if (!ref) {
++        return 0;
++    }
++    if (CFGetTypeID(ref) == CFNumberGetTypeID()) {
++        ok = CFNumberGetValue((CFNumberRef)ref, kCFNumberIntType, out);
++    }
++    CFRelease(ref);
++    return ok;
++}
++
++/* Cari properti string UTF-8 pada entry atau induk USB-nya */
++static void ambil_str_parent(io_registry_entry_t entry, CFStringRef key, char *buf, size_t cap)
++{
++    CFTypeRef ref;
++    buf[0] = '\0';
++    ref = IORegistryEntrySearchCFProperty(
++        entry, kIOServicePlane, key, kCFAllocatorDefault,
++        kIORegistryIterateParents | kIORegistryIterateRecursively);
++    if (!ref) {
++        return;
++    }
++    if (CFGetTypeID(ref) == CFStringGetTypeID()) {
++        CFStringGetCString((CFStringRef)ref, buf, (CFIndex)cap, kCFStringEncodingUTF8);
++    }
++    CFRelease(ref);
++}
++
++/* Cek apakah antarmuka USB memakai protokol Xbox 360 XInput (0xFF/0x5D/0x01) */
++static SDL_bool apakah_xinput_interface(io_service_t service)
++{
++    int cls = -1, sub = -1, proto = -1;
++    ambil_int_self(service, CFSTR(kUSBInterfaceClass), &cls);
++    ambil_int_self(service, CFSTR(kUSBInterfaceSubClass), &sub);
++    ambil_int_self(service, CFSTR(kUSBInterfaceProtocol), &proto);
++    return (cls == 0xFF && sub == 0x5D && proto == 0x01) ? SDL_TRUE : SDL_FALSE;
++}
++
++static void lepas_item(iousb_xinput_device *item)
++{
++    if (!item) {
++        return;
++    }
++    if (item->hwdata) {
++        item->hwdata->item = NULL;
++        item->hwdata->removed = SDL_TRUE;
++        item->hwdata = NULL;
++    }
++    if (item->termination_notif != IO_OBJECT_NULL) {
++        IOObjectRelease(item->termination_notif);
++        item->termination_notif = IO_OBJECT_NULL;
++    }
++    if (item->service != IO_OBJECT_NULL) {
++        IOObjectRelease(item->service);
++        item->service = IO_OBJECT_NULL;
++    }
++    SDL_free(item->name);
++    SDL_free(item);
++}
++
++static iousb_xinput_device *dapatkan_item_aktif(int device_index)
++{
++    iousb_xinput_device *cur = g_devices;
++    int idx = 0;
++    while (cur) {
++        if (!cur->removed) {
++            if (idx == device_index) {
++                return cur;
++            }
++            idx++;
++        }
++        cur = cur->next;
++    }
++    return NULL;
++}
++
++static void tambahkan_device_dari_service(io_service_t service)
++{
++    uint64_t reg_id = 0;
++    int vid = 0, pid = 0, ver = 0, loc = 0;
++    char mfg[128], prod[128];
++    iousb_xinput_device *cur;
++    iousb_xinput_device *item;
++    iousb_xinput_device **tail;
++
++    if (!apakah_xinput_interface(service)) {
++        return;
++    }
++
++    if (IORegistryEntryGetRegistryEntryID(service, &reg_id) != KERN_SUCCESS) {
++        return;
++    }
++
++    /* Hindari duplikasi jika perangkat sudah terdaftar dan masih aktif */
++    for (cur = g_devices; cur; cur = cur->next) {
++        if (!cur->removed && cur->registry_id == reg_id) {
++            return;
++        }
++    }
++
++    ambil_int_parent(service, CFSTR(kUSBVendorID), &vid);
++    ambil_int_parent(service, CFSTR(kUSBProductID), &pid);
++    ambil_int_parent(service, CFSTR(kUSBDeviceReleaseNumber), &ver);
++    if (!ambil_int_parent(service, CFSTR("locationID"), &loc)) {
++        loc = (int)(reg_id & 0xffffffffU);
++    }
++
++    ambil_str_parent(service, CFSTR("kUSBVendorString"), mfg, sizeof(mfg));
++    if (!mfg[0]) {
++        ambil_str_parent(service, CFSTR("USB Vendor Name"), mfg, sizeof(mfg));
++    }
++    ambil_str_parent(service, CFSTR("kUSBProductString"), prod, sizeof(prod));
++    if (!prod[0]) {
++        ambil_str_parent(service, CFSTR("USB Product Name"), prod, sizeof(prod));
++    }
++    if (!prod[0]) {
++        SDL_strlcpy(prod, "Xbox 360 Controller", sizeof(prod));
++    }
++
++    item = (iousb_xinput_device *)SDL_calloc(1, sizeof(*item));
++    if (!item) {
++        return;
++    }
++
++    item->registry_id = reg_id;
++    item->location_id = (uint32_t)loc;
++    item->vendor_id = (uint16_t)vid;
++    item->product_id = (uint16_t)pid;
++    item->bcd_device = (uint16_t)ver;
++    item->player_index = -1;
++    item->name = SDL_CreateJoystickName(item->vendor_id, item->product_id, mfg, prod);
++    if (!item->name) {
++        SDL_free(item);
++        return;
++    }
++
++    /* Gunakan penanda driver 'x' agar GUID stabil dan tidak bentrok dengan IOHID */
++    item->guid = SDL_CreateJoystickGUID(
++        SDL_HARDWARE_BUS_USB, item->vendor_id, item->product_id, item->bcd_device,
++        mfg, prod, 'x', 0);
++
++    if (SDL_ShouldIgnoreJoystick(item->name, item->guid)) {
++        SDL_free(item->name);
++        SDL_free(item);
++        return;
++    }
++
++    SDL_snprintf(item->path, sizeof(item->path), "iousbxinput#%08x#%llx",
++                 (unsigned)item->location_id, (unsigned long long)item->registry_id);
++    IOObjectRetain(service);
++    item->service = service;
++    item->instance_id = SDL_GetNextJoystickInstanceID();
++
++    tail = &g_devices;
++    while (*tail) {
++        tail = &(*tail)->next;
++    }
++    *tail = item;
++
++    SDL_PrivateJoystickAdded(item->instance_id);
++}
++
++/* Tandai perangkat sebagai dicabut dan beri tahu SDL (dipanggil dari thread SDL saja) */
++static void tandai_dicabut(iousb_xinput_device *cur)
++{
++    SDL_JoystickID removed_id = cur->instance_id;
++    cur->removed = SDL_TRUE;
++    if (cur->hwdata) {
++        pthread_mutex_lock(&cur->hwdata->lock);
++        cur->hwdata->removed = SDL_TRUE;
++        cur->hwdata->item = NULL;
++        pthread_mutex_unlock(&cur->hwdata->lock);
++        cur->hwdata = NULL;
++    }
++    SDL_PrivateJoystickRemoved(removed_id);
++}
++
++static void proses_antrean_hotplug(void)
++{
++    io_service_t service;
++
++    /* Proses pencabutan perangkat lebih dahulu sebelum penambahan */
++    if (g_terminated_iter != IO_OBJECT_NULL) {
++        while ((service = IOIteratorNext(g_terminated_iter)) != IO_OBJECT_NULL) {
++            uint64_t reg_id = 0;
++            if (IORegistryEntryGetRegistryEntryID(service, &reg_id) == KERN_SUCCESS) {
++                iousb_xinput_device *cur;
++                for (cur = g_devices; cur; cur = cur->next) {
++                    if (!cur->removed && cur->registry_id == reg_id) {
++                        tandai_dicabut(cur);
++                    }
++                }
++            }
++            IOObjectRelease(service);
++        }
++    }
++
++    if (g_added_iter != IO_OBJECT_NULL) {
++        while ((service = IOIteratorNext(g_added_iter)) != IO_OBJECT_NULL) {
++            tambahkan_device_dari_service(service);
++            IOObjectRelease(service);
++        }
++    }
++}
++
++/* Callback dummy IOKit; antrean iterator dikuras secara sinkron di Init/Detect tanpa butuh CFRunLoop */
++static void on_iokit_notif(void *refcon, io_iterator_t iterator)
++{
++    (void)refcon;
++    (void)iterator;
++}
++
++static int IOUSBXINPUT_JoystickInit(void)
++{
++    CFMutableDictionaryRef matching_add;
++    CFMutableDictionaryRef matching_rem;
++    kern_return_t kr;
++
++    if (g_initialized) {
++        return 0;
++    }
++
++    g_notif_port = IONotificationPortCreate(kIOMainPortDefault);
++    if (!g_notif_port) {
++        return SDL_SetError("Gagal membuat IONotificationPort untuk USB XInput");
++    }
++
++    matching_add = IOServiceMatching(kIOUSBInterfaceClassName);
++    if (!matching_add) {
++        IONotificationPortDestroy(g_notif_port);
++        g_notif_port = NULL;
++        return SDL_SetError("Gagal membuat kamus matching IOUSBInterface");
++    }
++
++    kr = IOServiceAddMatchingNotification(
++        g_notif_port, kIOFirstMatchNotification, matching_add,
++        on_iokit_notif, NULL, &g_added_iter);
++    if (kr != KERN_SUCCESS) {
++        IONotificationPortDestroy(g_notif_port);
++        g_notif_port = NULL;
++        return SDL_SetError("Gagal mendaftarkan notifikasi tambah IOUSBInterface (0x%x)", kr);
++    }
++
++    /* Tanpa pelacakan pencabutan, perangkat yang dicabut akan tetap terdaftar: gagalkan Init */
++    matching_rem = IOServiceMatching(kIOUSBInterfaceClassName);
++    if (!matching_rem ||
++        IOServiceAddMatchingNotification(
++            g_notif_port, kIOTerminatedNotification, matching_rem,
++            on_iokit_notif, NULL, &g_terminated_iter) != KERN_SUCCESS) {
++        g_terminated_iter = IO_OBJECT_NULL;
++        IOObjectRelease(g_added_iter);
++        g_added_iter = IO_OBJECT_NULL;
++        IONotificationPortDestroy(g_notif_port);
++        g_notif_port = NULL;
++        return SDL_SetError("Gagal mendaftarkan notifikasi pencabutan IOUSBInterface");
++    }
++
++    g_initialized = SDL_TRUE;
++    proses_antrean_hotplug();
++    return 0;
++}
++
++static int IOUSBXINPUT_JoystickGetCount(void)
++{
++    iousb_xinput_device *cur;
++    int count = 0;
++    for (cur = g_devices; cur; cur = cur->next) {
++        if (!cur->removed) {
++            count++;
++        }
++    }
++    return count;
++}
++
++static void IOUSBXINPUT_JoystickDetect(void)
++{
++    iousb_xinput_device **prev = &g_devices;
++    if (!g_initialized) {
++        return;
++    }
++    proses_antrean_hotplug();
++
++    /* Perangkat yang thread pembacanya melaporkan error permanen dianggap dicabut */
++    {
++        iousb_xinput_device *dev;
++        for (dev = g_devices; dev; dev = dev->next) {
++            if (!dev->removed && dev->hwdata) {
++                SDL_bool dead;
++                pthread_mutex_lock(&dev->hwdata->lock);
++                dead = dev->hwdata->removed;
++                pthread_mutex_unlock(&dev->hwdata->lock);
++                if (dead) {
++                    tandai_dicabut(dev);
++                }
++            }
++        }
++    }
++
++    /* Bersihkan simpul perangkat yang sudah dicabut dari daftar */
++    while (*prev) {
++        iousb_xinput_device *cur = *prev;
++        if (cur->removed) {
++            *prev = cur->next;
++            lepas_item(cur);
++        } else {
++            prev = &cur->next;
++        }
++    }
++}
++
++static const char *IOUSBXINPUT_JoystickGetDeviceName(int device_index)
++{
++    iousb_xinput_device *item = dapatkan_item_aktif(device_index);
++    return item ? item->name : NULL;
++}
++
++static const char *IOUSBXINPUT_JoystickGetDevicePath(int device_index)
++{
++    iousb_xinput_device *item = dapatkan_item_aktif(device_index);
++    return item ? item->path : NULL;
++}
++
++static int IOUSBXINPUT_JoystickGetDeviceSteamVirtualGamepadSlot(int device_index)
++{
++    (void)device_index;
++    return -1;
++}
++
++static int IOUSBXINPUT_JoystickGetDevicePlayerIndex(int device_index)
++{
++    iousb_xinput_device *item = dapatkan_item_aktif(device_index);
++    return item ? item->player_index : -1;
++}
++
++static void kirim_led_pemain(IOUSBInterfaceInterface190 **intf, uint8_t out_pipe, int player_index)
++{
++    uint8_t cmd[3];
++    if (!intf || !out_pipe) {
++        return;
++    }
++    cmd[0] = 0x01;
++    cmd[1] = 0x03;
++    cmd[2] = (uint8_t)(0x06 + (player_index >= 0 ? (player_index % 4) : 0));
++    (*intf)->WritePipe(intf, out_pipe, cmd, sizeof(cmd));
++}
++
++static void IOUSBXINPUT_JoystickSetDevicePlayerIndex(int device_index, int player_index)
++{
++    iousb_xinput_device *item = dapatkan_item_aktif(device_index);
++    if (!item) {
++        return;
++    }
++    item->player_index = player_index;
++    if (item->hwdata && item->hwdata->intf && item->hwdata->out_pipe) {
++        kirim_led_pemain(item->hwdata->intf, item->hwdata->out_pipe, player_index);
++    }
++}
++
++static SDL_JoystickGUID IOUSBXINPUT_JoystickGetDeviceGUID(int device_index)
++{
++    iousb_xinput_device *item = dapatkan_item_aktif(device_index);
++    if (!item) {
++        SDL_JoystickGUID empty;
++        SDL_zero(empty);
++        return empty;
++    }
++    return item->guid;
++}
++
++static SDL_JoystickID IOUSBXINPUT_JoystickGetDeviceInstanceID(int device_index)
++{
++    iousb_xinput_device *item = dapatkan_item_aktif(device_index);
++    return item ? item->instance_id : 0;
++}
++
++/* Thread pembaca laporan interrupt USB secara blokir agar loop SDL tidak macet */
++static void *reader_thread_fn(void *arg)
++{
++    struct joystick_hwdata *hw = (struct joystick_hwdata *)arg;
++    uint8_t buf[64];
++
++    while (!SDL_AtomicGet(&hw->stop_thread)) {
++        UInt32 size = hw->in_max_packet;
++        IOReturn kr;
++        if (size == 0 || size > sizeof(buf)) {
++            size = sizeof(buf);
++        }
++        kr = (*hw->intf)->ReadPipe(hw->intf, hw->in_pipe, buf, &size);
++        if (SDL_AtomicGet(&hw->stop_thread)) {
++            break;
++        }
++        if (kr == kIOReturnSuccess) {
++            if (size >= IOUSBXINPUT_REPORT_LEN && buf[0] == 0x00) {
++                pthread_mutex_lock(&hw->lock);
++                if (hw->q_count == IOUSBXINPUT_QUEUE_LEN) {
++                    /* Antrean penuh: buang laporan terlama */
++                    hw->q_head = (hw->q_head + 1) % IOUSBXINPUT_QUEUE_LEN;
++                    hw->q_count--;
++                }
++                memcpy(hw->queue[(hw->q_head + hw->q_count) % IOUSBXINPUT_QUEUE_LEN], buf, IOUSBXINPUT_REPORT_LEN);
++                hw->q_count++;
++                pthread_mutex_unlock(&hw->lock);
++            }
++        } else if (kr == kIOReturnAborted || kr == kIOReturnNoDevice || kr == kIOReturnNotResponding || kr == kIOReturnNotOpen) {
++            /* Error permanen: Detect() akan menandai perangkat dicabut agar SDL melepas joystick */
++            pthread_mutex_lock(&hw->lock);
++            hw->removed = SDL_TRUE;
++            pthread_mutex_unlock(&hw->lock);
++            break;
++        } else {
++            /* Hindari pemakaian CPU 100% jika terjadi error sementara */
++            usleep(5000);
++        }
++    }
++    SDL_AtomicSet(&hw->reader_done, 1);
++    return NULL;
++}
++
++static int IOUSBXINPUT_JoystickOpen(SDL_Joystick *joystick, int device_index)
++{
++    iousb_xinput_device *item = dapatkan_item_aktif(device_index);
++    IOCFPlugInInterface **plug = NULL;
++    IOUSBInterfaceInterface190 **intf = NULL;
++    SInt32 score = 0;
++    kern_return_t kr;
++    HRESULT hr;
++    IOReturn ur;
++    UInt8 num_endpoints = 0;
++    UInt8 in_pipe = 0, out_pipe = 0;
++    UInt16 in_max = 0;
++    struct joystick_hwdata *hw;
++
++    if (!item || item->service == IO_OBJECT_NULL) {
++        return SDL_SetError("Perangkat USB XInput tidak tersedia");
++    }
++
++    kr = IOCreatePlugInInterfaceForService(
++        item->service, kIOUSBInterfaceUserClientTypeID, kIOCFPlugInInterfaceID, &plug, &score);
++    if (kr != kIOReturnSuccess || !plug) {
++        return SDL_SetError("Gagal membuat IOCFPlugIn untuk USB XInput (0x%x)", kr);
++    }
++
++    hr = (*plug)->QueryInterface(
++        plug, CFUUIDGetUUIDBytes(kIOUSBInterfaceInterfaceID190), (LPVOID *)&intf);
++    (*plug)->Release(plug);
++    if (hr != S_OK || !intf) {
++        return SDL_SetError("Gagal memperoleh IOUSBInterfaceInterface190 (0x%x)", (unsigned)hr);
++    }
++
++    ur = (*intf)->USBInterfaceOpen(intf);
++    if (ur != kIOReturnSuccess) {
++        (*intf)->Release(intf);
++        return SDL_SetError("Gagal membuka antarmuka USB XInput secara eksklusif (0x%x)", ur);
++    }
++
++    if ((*intf)->GetNumEndpoints(intf, &num_endpoints) != kIOReturnSuccess) {
++        (*intf)->USBInterfaceClose(intf);
++        (*intf)->Release(intf);
++        return SDL_SetError("Gagal membaca jumlah endpoint USB XInput");
++    }
++
++    for (UInt8 p = 1; p <= num_endpoints; p++) {
++        UInt8 dir = 0, num = 0, ttype = 0, interval = 0;
++        UInt16 maxpkt = 0;
++        if ((*intf)->GetPipeProperties(intf, p, &dir, &num, &ttype, &maxpkt, &interval) == kIOReturnSuccess) {
++            if (ttype == kUSBInterrupt) {
++                if (dir == kUSBIn && !in_pipe) {
++                    in_pipe = p;
++                    in_max = maxpkt;
++                } else if (dir == kUSBOut && !out_pipe) {
++                    out_pipe = p;
++                }
++            }
++        }
++    }
++
++    if (!in_pipe) {
++        (*intf)->USBInterfaceClose(intf);
++        (*intf)->Release(intf);
++        return SDL_SetError("Endpoint interrupt IN tidak ditemukan pada USB XInput");
++    }
++
++    hw = (struct joystick_hwdata *)SDL_calloc(1, sizeof(*hw));
++    if (!hw) {
++        (*intf)->USBInterfaceClose(intf);
++        (*intf)->Release(intf);
++        return SDL_OutOfMemory();
++    }
++
++    pthread_mutex_init(&hw->lock, NULL);
++    hw->item = item;
++    hw->intf = intf;
++    hw->in_pipe = in_pipe;
++    hw->out_pipe = out_pipe;
++    hw->in_max_packet = in_max;
++
++    joystick->hwdata = hw;
++    joystick->naxes = 6;
++    joystick->nbuttons = 11;
++    joystick->nhats = 1;
++    joystick->epowerlevel = SDL_JOYSTICK_POWER_UNKNOWN;
++
++    item->hwdata = hw;
++    kirim_led_pemain(intf, out_pipe, item->player_index);
++
++    if (pthread_create(&hw->thread, NULL, reader_thread_fn, hw) != 0) {
++        item->hwdata = NULL;
++        joystick->hwdata = NULL;
++        pthread_mutex_destroy(&hw->lock);
++        SDL_free(hw);
++        (*intf)->USBInterfaceClose(intf);
++        (*intf)->Release(intf);
++        return SDL_SetError("Gagal membuat thread pembaca USB XInput");
++    }
++    hw->thread_started = 1;
++
++    return 0;
++}
++
++static int IOUSBXINPUT_JoystickRumble(SDL_Joystick *joystick, Uint16 low_frequency_rumble, Uint16 high_frequency_rumble)
++{
++    struct joystick_hwdata *hw = joystick->hwdata;
++    uint8_t packet[8];
++    IOReturn kr;
++    SDL_bool is_removed = SDL_TRUE;
++
++    if (hw) {
++        pthread_mutex_lock(&hw->lock);
++        is_removed = hw->removed;
++        pthread_mutex_unlock(&hw->lock);
++    }
++    if (!hw || is_removed || !hw->intf) {
++        return SDL_SetError("Getar gagal: perangkat tidak terhubung");
++    }
++    if (!hw->out_pipe) {
++        return SDL_Unsupported();
++    }
++
++    SDL_zeroa(packet);
++    packet[0] = 0x00;
++    packet[1] = 0x08;
++    packet[2] = 0x00;
++    packet[3] = (uint8_t)(low_frequency_rumble >> 8);
++    packet[4] = (uint8_t)(high_frequency_rumble >> 8);
++
++    kr = (*hw->intf)->WritePipe(hw->intf, hw->out_pipe, packet, sizeof(packet));
++    if (kr != kIOReturnSuccess) {
++        return SDL_SetError("Gagal mengirim paket getar USB (0x%x)", kr);
++    }
++    return 0;
++}
++
++static int IOUSBXINPUT_JoystickRumbleTriggers(SDL_Joystick *joystick, Uint16 left_rumble, Uint16 right_rumble)
++{
++    (void)joystick;
++    (void)left_rumble;
++    (void)right_rumble;
++    return SDL_Unsupported();
++}
++
++static Uint32 IOUSBXINPUT_JoystickGetCapabilities(SDL_Joystick *joystick)
++{
++    struct joystick_hwdata *hw = joystick->hwdata;
++    SDL_bool is_removed = SDL_TRUE;
++    if (hw) {
++        pthread_mutex_lock(&hw->lock);
++        is_removed = hw->removed;
++        pthread_mutex_unlock(&hw->lock);
++    }
++    if (hw && !is_removed && hw->out_pipe) {
++        return SDL_JOYCAP_RUMBLE;
++    }
++    return 0;
++}
++
++static int IOUSBXINPUT_JoystickSetLED(SDL_Joystick *joystick, Uint8 red, Uint8 green, Uint8 blue)
++{
++    (void)joystick;
++    (void)red;
++    (void)green;
++    (void)blue;
++    return SDL_Unsupported();
++}
++
++static int IOUSBXINPUT_JoystickSendEffect(SDL_Joystick *joystick, const void *data, int size)
++{
++    (void)joystick;
++    (void)data;
++    (void)size;
++    return SDL_Unsupported();
++}
++
++static int IOUSBXINPUT_JoystickSetSensorsEnabled(SDL_Joystick *joystick, SDL_bool enabled)
++{
++    (void)joystick;
++    (void)enabled;
++    return SDL_Unsupported();
++}
++
++/* Terjemahkan satu laporan XInput (20 byte) menjadi event SDL */
++static void terapkan_laporan(SDL_Joystick *joystick, const uint8_t *buf)
++{
++    /* Terjemahkan D-pad ke hat 0 */
++    {
++        Uint8 hat = SDL_HAT_CENTERED;
++        if (buf[2] & 0x01) {
++            hat |= SDL_HAT_UP;
++        }
++        if (buf[2] & 0x02) {
++            hat |= SDL_HAT_DOWN;
++        }
++        if (buf[2] & 0x04) {
++            hat |= SDL_HAT_LEFT;
++        }
++        if (buf[2] & 0x08) {
++            hat |= SDL_HAT_RIGHT;
++        }
++        if ((hat & SDL_HAT_UP) && (hat & SDL_HAT_DOWN)) {
++            hat &= (Uint8)~(SDL_HAT_UP | SDL_HAT_DOWN);
++        }
++        if ((hat & SDL_HAT_LEFT) && (hat & SDL_HAT_RIGHT)) {
++            hat &= (Uint8)~(SDL_HAT_LEFT | SDL_HAT_RIGHT);
++        }
++        SDL_PrivateJoystickHat(joystick, 0, hat);
++    }
++
++    /* Terjemahkan tombol XInput standar */
++    SDL_PrivateJoystickButton(joystick, 0, (buf[3] & 0x10) ? SDL_PRESSED : SDL_RELEASED);  /* A */
++    SDL_PrivateJoystickButton(joystick, 1, (buf[3] & 0x20) ? SDL_PRESSED : SDL_RELEASED);  /* B */
++    SDL_PrivateJoystickButton(joystick, 2, (buf[3] & 0x40) ? SDL_PRESSED : SDL_RELEASED);  /* X */
++    SDL_PrivateJoystickButton(joystick, 3, (buf[3] & 0x80) ? SDL_PRESSED : SDL_RELEASED);  /* Y */
++    SDL_PrivateJoystickButton(joystick, 4, (buf[3] & 0x01) ? SDL_PRESSED : SDL_RELEASED);  /* LB */
++    SDL_PrivateJoystickButton(joystick, 5, (buf[3] & 0x02) ? SDL_PRESSED : SDL_RELEASED);  /* RB */
++    SDL_PrivateJoystickButton(joystick, 6, (buf[2] & 0x20) ? SDL_PRESSED : SDL_RELEASED);  /* Back */
++    SDL_PrivateJoystickButton(joystick, 7, (buf[2] & 0x10) ? SDL_PRESSED : SDL_RELEASED);  /* Start */
++    SDL_PrivateJoystickButton(joystick, 8, (buf[3] & 0x04) ? SDL_PRESSED : SDL_RELEASED);  /* Guide */
++    SDL_PrivateJoystickButton(joystick, 9, (buf[2] & 0x40) ? SDL_PRESSED : SDL_RELEASED);  /* L3 */
++    SDL_PrivateJoystickButton(joystick, 10, (buf[2] & 0x80) ? SDL_PRESSED : SDL_RELEASED); /* R3 */
++
++    /* Terjemahkan analog stick dan trigger (sumbu Y dibalik sesuai konvensi SDL) */
++    {
++        Sint16 lx = (Sint16)((Uint16)buf[6] | ((Uint16)buf[7] << 8));
++        Sint16 ly = (Sint16)((Uint16)buf[8] | ((Uint16)buf[9] << 8));
++        Sint16 rx = (Sint16)((Uint16)buf[10] | ((Uint16)buf[11] << 8));
++        Sint16 ry = (Sint16)((Uint16)buf[12] | ((Uint16)buf[13] << 8));
++        Sint16 lt = (Sint16)(((int)buf[4] * 257) - 32768);
++        Sint16 rt = (Sint16)(((int)buf[5] * 257) - 32768);
++
++        SDL_PrivateJoystickAxis(joystick, 0, lx);
++        SDL_PrivateJoystickAxis(joystick, 1, (Sint16)(-(int)ly - 1));
++        SDL_PrivateJoystickAxis(joystick, 2, lt);
++        SDL_PrivateJoystickAxis(joystick, 3, rx);
++        SDL_PrivateJoystickAxis(joystick, 4, (Sint16)(-(int)ry - 1));
++        SDL_PrivateJoystickAxis(joystick, 5, rt);
++    }
++}
++
++static void IOUSBXINPUT_JoystickUpdate(SDL_Joystick *joystick)
++{
++    struct joystick_hwdata *hw = joystick->hwdata;
++    uint8_t reports[IOUSBXINPUT_QUEUE_LEN][IOUSBXINPUT_REPORT_LEN];
++    uint32_t count = 0, i;
++    SDL_bool is_removed = SDL_FALSE;
++
++    if (!hw) {
++        return;
++    }
++
++    if (!hw->axes_seeded) {
++        /* Dasarkan titik nol trigger pada nilai lepas (-32768) lewat jalur axis SDL, sebelum
++           sampel perangkat pertama; trigger yang sedang ditahan tidak menggeser titik nol. */
++        SDL_PrivateJoystickAxis(joystick, 2, -32768);
++        SDL_PrivateJoystickAxis(joystick, 5, -32768);
++        hw->axes_seeded = SDL_TRUE;
++    }
++
++    pthread_mutex_lock(&hw->lock);
++    is_removed = hw->removed;
++    while (hw->q_count > 0) {
++        memcpy(reports[count++], hw->queue[hw->q_head], IOUSBXINPUT_REPORT_LEN);
++        hw->q_head = (hw->q_head + 1) % IOUSBXINPUT_QUEUE_LEN;
++        hw->q_count--;
++    }
++    pthread_mutex_unlock(&hw->lock);
++
++    if (is_removed) {
++        return;
++    }
++    for (i = 0; i < count; i++) {
++        terapkan_laporan(joystick, reports[i]);
++    }
++}
++
++static void IOUSBXINPUT_JoystickClose(SDL_Joystick *joystick)
++{
++    struct joystick_hwdata *hw = joystick->hwdata;
++    if (!hw) {
++        return;
++    }
++
++    joystick->hwdata = NULL;
++    if (hw->item) {
++        hw->item->hwdata = NULL;
++        hw->item = NULL;
++    }
++
++    SDL_AtomicSet(&hw->stop_thread, 1);
++    if (hw->thread_started) {
++        /* AbortPipe hanya membatalkan transaksi yang sedang berjalan; ulangi sampai thread
++           pembaca keluar agar pembacaan yang baru dimulai setelah permintaan henti ikut batal. */
++        while (!SDL_AtomicGet(&hw->reader_done)) {
++            if (hw->intf && hw->in_pipe) {
++                (*hw->intf)->AbortPipe(hw->intf, hw->in_pipe);
++            }
++            usleep(1000);
++        }
++        pthread_join(hw->thread, NULL);
++        hw->thread_started = 0;
++    }
++    if (hw->intf) {
++        (*hw->intf)->USBInterfaceClose(hw->intf);
++        (*hw->intf)->Release(hw->intf);
++        hw->intf = NULL;
++    }
++    pthread_mutex_destroy(&hw->lock);
++    SDL_free(hw);
++}
++
++static void IOUSBXINPUT_JoystickQuit(void)
++{
++    while (g_devices) {
++        iousb_xinput_device *next = g_devices->next;
++        lepas_item(g_devices);
++        g_devices = next;
++    }
++
++    if (g_added_iter != IO_OBJECT_NULL) {
++        IOObjectRelease(g_added_iter);
++        g_added_iter = IO_OBJECT_NULL;
++    }
++    if (g_terminated_iter != IO_OBJECT_NULL) {
++        IOObjectRelease(g_terminated_iter);
++        g_terminated_iter = IO_OBJECT_NULL;
++    }
++    if (g_notif_port) {
++        IONotificationPortDestroy(g_notif_port);
++        g_notif_port = NULL;
++    }
++    g_initialized = SDL_FALSE;
++}
++
++static SDL_bool IOUSBXINPUT_JoystickGetGamepadMapping(int device_index, SDL_GamepadMapping *out)
++{
++    if (!dapatkan_item_aktif(device_index)) {
++        return SDL_FALSE;
++    }
++
++    /* Pemetaan otomatis standar Xbox 360 agar langsung dianggap GameController */
++    out->a.kind = EMappingKind_Button;
++    out->a.target = 0;
++    out->b.kind = EMappingKind_Button;
++    out->b.target = 1;
++    out->x.kind = EMappingKind_Button;
++    out->x.target = 2;
++    out->y.kind = EMappingKind_Button;
++    out->y.target = 3;
++    out->leftshoulder.kind = EMappingKind_Button;
++    out->leftshoulder.target = 4;
++    out->rightshoulder.kind = EMappingKind_Button;
++    out->rightshoulder.target = 5;
++    out->back.kind = EMappingKind_Button;
++    out->back.target = 6;
++    out->start.kind = EMappingKind_Button;
++    out->start.target = 7;
++    out->guide.kind = EMappingKind_Button;
++    out->guide.target = 8;
++    out->leftstick.kind = EMappingKind_Button;
++    out->leftstick.target = 9;
++    out->rightstick.kind = EMappingKind_Button;
++    out->rightstick.target = 10;
++
++    out->dpup.kind = EMappingKind_Hat;
++    out->dpup.target = SDL_HAT_UP;
++    out->dpdown.kind = EMappingKind_Hat;
++    out->dpdown.target = SDL_HAT_DOWN;
++    out->dpleft.kind = EMappingKind_Hat;
++    out->dpleft.target = SDL_HAT_LEFT;
++    out->dpright.kind = EMappingKind_Hat;
++    out->dpright.target = SDL_HAT_RIGHT;
++
++    out->leftx.kind = EMappingKind_Axis;
++    out->leftx.target = 0;
++    out->lefty.kind = EMappingKind_Axis;
++    out->lefty.target = 1;
++    out->lefttrigger.kind = EMappingKind_Axis;
++    out->lefttrigger.target = 2;
++    out->rightx.kind = EMappingKind_Axis;
++    out->rightx.target = 3;
++    out->righty.kind = EMappingKind_Axis;
++    out->righty.target = 4;
++    out->righttrigger.kind = EMappingKind_Axis;
++    out->righttrigger.target = 5;
++
++    return SDL_TRUE;
++}
++
++SDL_JoystickDriver SDL_IOUSBXINPUT_JoystickDriver = {
++    IOUSBXINPUT_JoystickInit,
++    IOUSBXINPUT_JoystickGetCount,
++    IOUSBXINPUT_JoystickDetect,
++    IOUSBXINPUT_JoystickGetDeviceName,
++    IOUSBXINPUT_JoystickGetDevicePath,
++    IOUSBXINPUT_JoystickGetDeviceSteamVirtualGamepadSlot,
++    IOUSBXINPUT_JoystickGetDevicePlayerIndex,
++    IOUSBXINPUT_JoystickSetDevicePlayerIndex,
++    IOUSBXINPUT_JoystickGetDeviceGUID,
++    IOUSBXINPUT_JoystickGetDeviceInstanceID,
++    IOUSBXINPUT_JoystickOpen,
++    IOUSBXINPUT_JoystickRumble,
++    IOUSBXINPUT_JoystickRumbleTriggers,
++    IOUSBXINPUT_JoystickGetCapabilities,
++    IOUSBXINPUT_JoystickSetLED,
++    IOUSBXINPUT_JoystickSendEffect,
++    IOUSBXINPUT_JoystickSetSensorsEnabled,
++    IOUSBXINPUT_JoystickUpdate,
++    IOUSBXINPUT_JoystickClose,
++    IOUSBXINPUT_JoystickQuit,
++    IOUSBXINPUT_JoystickGetGamepadMapping
++};
++
++#endif /* SDL_JOYSTICK_IOKIT */

@@ -8,7 +8,7 @@ functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
 	load_gamefixes consume_sidebar_quick_settings resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available dxmt_without_d3d12 \
 	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
-	activate_backend record_backend rockstar_shim_copy rockstar_put_back rockstar_dxgi_copy rockstar_note rockstar_shim_lock_fd rockstar_shim_in_use rockstar_shim_folders stage_rockstar_shim compose_dll_overrides; do
+	activate_backend record_backend rockstar_shim_copy rockstar_put_back rockstar_dxgi_copy rockstar_note rockstar_shim_lock_fd rockstar_shim_in_use rockstar_shim_folders stage_rockstar_shim int2e_shim_copy stage_int2e_shim compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -113,7 +113,7 @@ launch() {
 		sh -ec '
 			eval "$public_names"
 			eval "$functions"
-			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_nvapi="" gamefix_dlss_fg="" gamefix_args="" gamefix_rockstar_shim=""
+			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_nvapi="" gamefix_dlss_fg="" gamefix_args="" gamefix_rockstar_shim="" gamefix_int2e_shim=""
 			backend_root="$CX_ROOT/lib/notproton-backends"
 			load_gamefixes || true
 			consume_sidebar_quick_settings || true
@@ -123,6 +123,7 @@ launch() {
 			activate_backend || true
 			record_backend || true
 			stage_rockstar_shim || true
+			stage_int2e_shim || true
 			graphics_log "backend=$backend ($backend_from)"
 			compose_dll_overrides
 			eval "$bridge_line"
@@ -1560,6 +1561,54 @@ rockstar_launch waitforexitandrun "$case_dir/game/game.exe"
 has "an engine without rockstar-shim says so" "rockstar-shim: not in this engine" "$case_dir/log"
 case "$(got WINEDLLOVERRIDES)" in *version=*) v=yes ;; *) v=no ;; esac
 is "and adds no override" "no" "$v"
+
+echo "== INT2E_SHIM stages int2e-shim/ into system32 and restores stock when off"
+int2e_case() {
+	new_case
+	full_engine
+	engine int2e-shim/x86_64-windows/version.dll
+	printf 'stock x86_64-windows version\n' > "$case_dir/engine/lib/wine/x86_64-windows/version.dll"
+	printf 'stock x86_64-windows version\n' > "$case_dir/data/pfx/drive_c/windows/system32/version.dll"
+	int2e_src="$case_dir/engine/lib/notproton-backends/int2e-shim/x86_64-windows/version.dll"
+	printf 'MZ this build int2e-shim: VEH active\n' > "$int2e_src"
+}
+int2e_case
+user_conf 'BACKEND=dxmt' 'INT2E_SHIM=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "INT2E_SHIM=1 stages version.dll into system32" "yes" \
+	"$(cmp -s "$int2e_src" "$case_dir/data/pfx/drive_c/windows/system32/version.dll" && echo yes || echo no)"
+case "$(got WINEDLLOVERRIDES)" in *';version=n,b'*) v=yes ;; *) v=no ;; esac
+is "INT2E_SHIM=1 adds version=n,b" "yes" "$v"
+case "$(got WINEDLLOVERRIDES)" in *'version=b'*) v=yes ;; *) v=no ;; esac
+is "int2e-shim is not treated as a backend DLL" "no" "$v"
+
+user_conf 'BACKEND=dxmt'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "without INT2E_SHIM stock version.dll is restored" "stock x86_64-windows version" \
+	"$(sys system32 version)"
+
+int2e_case
+printf 'custom native version\n' > "$case_dir/data/pfx/drive_c/windows/system32/version.dll"
+user_conf 'BACKEND=dxmt' 'INT2E_SHIM=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "custom system32 version.dll is left untouched" "custom native version" "$(sys system32 version)"
+has "custom system32 version.dll logs reason" "int2e-shim: system32/version.dll is not Wine's builtin, left alone" "$case_dir/log"
+
+int2e_case
+user_conf 'BACKEND=dxmt' 'INT2E_SHIM=2'
+launch waitforexitandrun "$case_dir/game/game.exe"
+has "invalid INT2E_SHIM value is rejected" "rejected INT2E_SHIM: not 0 or 1" "$case_dir/log"
+is "invalid INT2E_SHIM keeps stock version.dll" "stock x86_64-windows version" "$(sys system32 version)"
+
+cpm2_conf="$(dirname "$SRC")/../../gamefixes/4252340.conf"
+if [ -f "$cpm2_conf" ]; then
+	int2e_case
+	cp "$cpm2_conf" "$case_dir/support/gamefixes-default/4242.conf"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	is "gamefixes/4252340.conf selects dxmt" "dxmt" "$(got backend)"
+	is "gamefixes/4252340.conf stages int2e-shim" "yes" \
+		"$(cmp -s "$int2e_src" "$case_dir/data/pfx/drive_c/windows/system32/version.dll" && echo yes || echo no)"
+fi
 
 if [ "$fails" -eq 0 ]; then
 	echo "==> gamefixescheck: all assertions hold"

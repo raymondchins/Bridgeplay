@@ -89,13 +89,16 @@ struct WinecxRelease: Sendable {
     // dxmt backend on a D3DMetal engine, so games that try D3D12 first fall back to D3D11
     // instead of crashing in Apple's d3d12 (#2513). Empty where it is not shipped.
     let dxmt: [WinecxBundledFile]
+    // int2e-shim/: version.dll proxy untuk INT2E_SHIM=1 (meneruskan syscall int 0x2e ke Wine).
+    // Kosong pada rilis yang tidak menyertakannya.
+    let int2e: [WinecxBundledFile]
     // The runner build this release unpacks to, keyed by its pinned loader, and the ntdll
     // detours for it (NtdllPatcher.byBuild).
     let runner: RunnerBuild
     let ntdllPatches: [NtdllPatch]
 
     // The app's own files, every category above.
-    var bundled: [WinecxBundledFile] { gamepad + network + nvidia + audio + d3dx + loader + rockstar + dxmt }
+    var bundled: [WinecxBundledFile] { gamepad + network + nvidia + audio + d3dx + loader + rockstar + dxmt + int2e }
 }
 
 enum FreeEngineWinecx {
@@ -137,11 +140,12 @@ enum FreeEngineWinecx {
     ]
 
     // SDL 2.32.10 (zlib license, NOTICE) built x86_64 with winemac-patch/sdl2-iokit-gamepad-collection.patch
-    // (pads whose gamepad is a secondary HID collection, e.g. GameSir G7 Pro over Bluetooth),
+    // (pads whose gamepad is a secondary HID collection, e.g. GameSir G7 Pro over Bluetooth) and
+    // winemac-patch/sdl2-iousb-xinput.patch (dukungan kontroler/dongle USB XInput 0xFF/0x5D/0x01 via IOKit IOUSBLib),
     // signed ad hoc, since a release build strips unsigned Mach-O resources and would break the pin.
     private static let sdl = WinecxBundledFile(
         resource: "libSDL2-2.0.0", ext: "dylib", path: "lib/libSDL2-2.0.0.dylib",
-        sha256: "aeeec088bf51f9eac0dbd8e26ae994c7b8568fb42fc676835d6dc2109fc559d1")
+        sha256: "a9ea6bdf384e5090d8478bf92b9f5637de0037aaaeb0183928d2fb48258e61e5")
 
     // runtime 4.7.3: winecx e0aa380 (Wine 11.17), built by winecx-gptk 0bf3eab, minos 26.0.
     // Over 4.5.125 it carries the later msync fixes, kernelbase's FlsGetValue2 for Unity
@@ -286,6 +290,12 @@ enum FreeEngineWinecx {
                               path: "lib/notproton-backends/d3d12-stub/x86_64-windows/d3d12.dll",
                               sha256: "d802d04ae9fb18a3dda90984bb11def0bda89b4d929b6297fe026b6cf883d1db"),
         ],
+        // version.dll: int2e-shim/build.sh.
+        int2e: [
+            WinecxBundledFile(resource: "version-int2e-shim", ext: "dll",
+                              path: "lib/notproton-backends/int2e-shim/x86_64-windows/version.dll",
+                              sha256: "78cfe78a53775c27ec5b7318567fe1da2031360cdd88850ef0b0cf8af091be2a"),
+        ],
         runner: RunnerBuild(
             bundleVersion: "winecx-11.17",
             releaseVersion: "WineCX 11.17",
@@ -379,6 +389,7 @@ enum FreeEngineWinecx {
         loader: [],
         rockstar: [],
         dxmt: [],
+        int2e: [],
         // The hash-pinned loader is what makes it free, so a CrossOver install can never be
         // taken for it.
         runner: RunnerBuild(
