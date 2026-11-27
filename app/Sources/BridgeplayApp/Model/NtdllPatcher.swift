@@ -367,6 +367,55 @@ enum NtdllPatcher {
                 imageBase: 0x1_8000_0000
             ),
         ],
+        "27.0.0.41303-fex": [
+            NtdllPatch(
+                arch: .x86_64Windows,
+                payloadResource: "detour2-fex-41303",
+                payloadSHA256: "100a4ef52474809c22413951b811df05d437333406e5bf4e7c94f948fad2a01b",
+                caveRVA: 0xb5000,
+                payloadRVA: 0xb5000,
+                hooks: [
+                    NtdllHook(rva: 0x34a99, stolen: [0x48, 0x8b, 0x84, 0x24, 0x10, 0x01, 0x00, 0x00]),
+                ],
+                caveSize: 0x1000,
+                cavePad: 0x00,
+                machine: 0x8664,
+                magic: 0x20b,
+                imageBase: 0x1_7000_0000,
+                placement: .section
+            ),
+            NtdllPatch(
+                arch: .i386Windows,
+                payloadResource: "detour32-fex-41303",
+                payloadSHA256: "0490e724191cf0cc2d5383a582d1c354c481d675025988e2666bff18a68fab95",
+                caveRVA: 0x6b3a5,
+                payloadRVA: 0x6b3b0,
+                hooks: [
+                    NtdllHook(rva: 0x2ef8d, stolen: [0x8b, 0x45, 0x14, 0xa8, 0x02]),
+                ],
+                caveSize: 3163,
+                cavePad: 0xcc,
+                machine: 0x14c,
+                magic: 0x10b,
+                imageBase: 0x7bc0_0000
+            ),
+            NtdllPatch(
+                arch: .aarch64Windows,
+                payloadResource: "detour64-fex-41303",
+                payloadSHA256: "3f81623754fac27bf4a33856a7c80b30d4a9756710d1c55e388b718893e47d48",
+                caveRVA: 0x101db5,
+                payloadRVA: 0x101dc0,
+                hooks: [
+                    NtdllHook(rva: 0x486ec, stolen: [0x1f, 0x20, 0x03, 0xd5]),
+                    NtdllHook(rva: 0xa7fec, stolen: [0x1f, 0x20, 0x03, 0xd5]),
+                ],
+                caveSize: 57931,
+                cavePad: 0xcc,
+                machine: 0xaa64,
+                magic: 0x20b,
+                imageBase: 0x1_8000_0000
+            ),
+        ],
     ].merging(FreeEngineWinecx.releases.map { ($0.runner.id, $0.ntdllPatches) }) { pinned, _ in pinned }
 
     static func patches(for build: RunnerBuild) -> [NtdllPatch] {

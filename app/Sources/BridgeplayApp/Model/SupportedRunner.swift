@@ -101,7 +101,8 @@ enum SupportedRunners {
     static let toolPreference = [
         legacyToolName, "bridgeplay-proton-fex", "bridgeplay-proton-fex-rosetta", "bridgeplay-proton-preview",
         "bridgeplay-proton-fex-41069", "bridgeplay-proton-fex-rosetta-41069", "bridgeplay-proton-preview-41069",
-        "bridgeplay-proton-fex-41073", "bridgeplay-proton-fex-rosetta-41073", "bridgeplay-proton-preview-41073", "bridgeplay-proton-26.3", "bridgeplay-proton-winecx-11.17",
+        "bridgeplay-proton-fex-41073", "bridgeplay-proton-fex-rosetta-41073", "bridgeplay-proton-preview-41073",
+        "bridgeplay-proton-fex-41303", "bridgeplay-proton-fex-rosetta-41303", "bridgeplay-proton-26.3", "bridgeplay-proton-winecx-11.17",
         "bridgeplay-proton-winecx", "bridgeplay-proton-winehq",
     ]
 
@@ -308,6 +309,27 @@ enum SupportedRunners {
             ],
             isPreview: true
         ),
+        RunnerBuild(
+            bundleVersion: "27.0.0.41303",
+            releaseVersion: "20261111",
+            flavor: "fex",
+            loaderSHA256: "db0d2b367d1d8e9030e49894188240c939be1ab5ea1de79605d87fb95af1c505",
+            cleanNtdll: [
+                .x86_64Windows: "ef878e75661de8d955a42dc2fc76a84ca95574d48923dfc7f3f7db04a4d4f2b6",
+                .i386Windows: "4e8d8b4b54da99252423c7967d779d34976620a56bedaec38529d1f4b710f26a",
+                .aarch64Windows: "3c2d6459113d4418a1135d7d5afe3a47c4a8c017aec389a987efa991bfeceda8",
+            ],
+            patchedNtdll: [
+                .x86_64Windows: "503c4a6f71822b212bcfaaf210ba76e838998fa2c61957a64e5c0da3f9b3a6e9",
+                .i386Windows: "c35063d7fda866cd019a8ed1f6014c022a34a74d17037fc5c7f0732f58701f64",
+                .aarch64Windows: "deb1e2dec774ae0b9504f88edd17f02c682d1f78e4839d874d62408a80cf3167",
+            ],
+            tools: [
+                CompatTool(name: "bridgeplay-proton-fex-41303", flavor: .fex, display: "CrossOver 2026 11 11-ARM64 - FEX"),
+                CompatTool(name: "bridgeplay-proton-fex-rosetta-41303", flavor: .rosetta, display: "CrossOver 2026 11 11-ARM64 - Rosetta"),
+            ],
+            isPreview: true
+        ),
     ] + FreeEngineWinecx.runnerBuilds
 
     static func build(loaderSHA256 hash: String) -> RunnerBuild? {
@@ -323,7 +345,7 @@ enum SupportedRunners {
     }
 
     // The CrossOver versions to tell someone to use, for a row already titled CrossOver:
-    // "26.3 or Preview 20260821, 20261006, or 20261015". Free engines aren't CrossOver.
+    // "26.3 or Preview 20260821, 20261006, 20261015, or 20261111". Free engines aren't CrossOver.
     static var crossOverVersions: String {
         let crossOver = all.filter { !$0.isFree }
         let releases = versions(of: crossOver.filter { !$0.isPreview })
