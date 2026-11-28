@@ -263,6 +263,16 @@ class RunTests(unittest.TestCase):
                 self.assertNotIn("an older run", saved)
                 self.assertEqual(len(ab.log_runs(sorted(dest.glob("*.log")))), 1)
 
+    def test_bench_dir_matches_the_shim(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            current, legacy = Path(tmp) / "bridgeplay", Path(tmp) / "notproton"
+            self.assertEqual(ab.bench_dir_for("7", [current, legacy]), current / "launchers/7/bench")
+            (legacy / "launchers").mkdir(parents=True)
+            self.assertEqual(ab.bench_dir_for("7", [current, legacy]), legacy / "launchers/7/bench")
+            # The current folder without launchers yet still wins, as in the shim.
+            current.mkdir()
+            self.assertEqual(ab.bench_dir_for("7", [current, legacy]), current / "launchers/7/bench")
+
     def test_drive_times_out(self):
         with tempfile.TemporaryDirectory() as tmp:
             steam = Path(tmp) / "Steam"

@@ -287,8 +287,9 @@ def run_log_for(appid, steam_root):
 
 
 def bench_dir_for(appid, support_dirs):
+    # The shim's choice: the current folder when it exists, the old one only without it.
     for support in support_dirs:
-        if (support / "launchers").is_dir():
+        if support.is_dir():
             return support / "launchers" / appid / "bench"
     return support_dirs[0] / "launchers" / appid / "bench"
 
