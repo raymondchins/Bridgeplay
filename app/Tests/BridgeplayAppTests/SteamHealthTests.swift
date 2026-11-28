@@ -38,6 +38,21 @@ struct SteamHealthTests {
         #expect(SteamHealth.parse(Data("not json".utf8)) == nil)
     }
 
+    @Test("The pause list's keys: why the start is passive and the entry that paused it")
+    func parsesPauseList() throws {
+        let listed = try #require(SteamHealth.parse(Data(#"{"mode": "passive", "mode_reason": "pause_list", "pause_list": "ok", "pause_list_serial": 1800000000, "pause_note": "Steam beta closes at start.", "pause_fixed_in": "0.7.70", "pause_url": "https://example.invalid/1"}"#.utf8)))
+        #expect(listed.pausedByList)
+        #expect(listed.pauseList == "ok")
+        #expect(listed.pauseListSerial == 1_800_000_000)
+        #expect(listed.pauseFixedIn == "0.7.70")
+        #expect(listed.pauseURL == "https://example.invalid/1")
+        let strikes = try #require(SteamHealth.parse(Data(#"{"mode": "passive", "mode_reason": "strikes", "pause_fixed_in": ""}"#.utf8)))
+        #expect(!strikes.pausedByList)
+        #expect(strikes.pauseFixedIn == nil)
+        // A dylib from before the list
+        #expect(try #require(SteamHealth.parse(Data(Self.health(mode: "passive").utf8))).modeReason == nil)
+    }
+
     @Test("Live while its Steam runs, last start while the builds match and no Steam runs, stale otherwise, missing without a file")
     func freshness() throws {
         let dir = try Self.folder()

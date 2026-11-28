@@ -66,6 +66,25 @@ one notification says so. Deleting `boot.json` clears the count ("Try Again"). A
 `health.json` (`steam_osx`) and `health-web.json` (Steam Helper, the compat UI gates) say what
 the last start did; `BRIDGEPLAY_BREAKER_QUIET=1` skips the notification.
 
+The signed pause list ([pause-list/README.md](../pause-list/README.md), `dylib/feats/pauselist.c`,
+`make pauselistcheck`) makes a start passive the same way when it names this Steam build, with
+nothing counted. It is off until its public key is in `dylib/feats/pauselist_key.h`;
+`BRIDGEPLAY_PAUSE_LIST=0` ignores it.
+
+`health.json`, which the app's Status reads (`SteamHealth.swift`):
+
+| Key | Value |
+|---|---|
+| `written`, `pid` | Unix seconds, and the `steam_osx` that wrote it |
+| `patch_build`, `steam_build`, `channel` | `BRIDGEPLAY_BUILD`; the client's manifest `version` (`0` when unreadable); `package/beta`, else `stable` (`unknown` when odd) |
+| `sigdb_build` | the signature database's build |
+| `mode`, `strikes` | `active`, `passive` or `off`; bad starts counted on this Steam and Bridgeplay build |
+| `mode_reason` | empty while active, else `paused` (the app's Pause), `strikes` or `pause_list` |
+| `signatures_resolved`, `signatures_required`, `hooks_installed`, `hooks_total`, `layout_known` | what the install found |
+| `pause_list` | the cached list: `ok`, `expired`, `none`, `invalid`, `ignored` or `unkeyed` |
+| `pause_list_serial`, `pause_list_expires` | its serial and expiry, `0` without a readable list |
+| `pause_note`, `pause_fixed_in`, `pause_url` | the entry that paused this start; empty otherwise |
+
 ## Checks
 
 | Command | Runs |

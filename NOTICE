@@ -234,7 +234,8 @@ this repository, with their licences beside them in the archive.
 
 These third party files carry their original notices from the project authors.
 Their license texts ship in the app and the installer as LICENSE.jsoncpp
-(JsonCpp, compiled into steam.exe) and LICENSE.cjson (cJSON, compiled into
+(JsonCpp, compiled into steam.exe), LICENSE.cjson (cJSON, compiled into
+notproton.dylib) and LICENSE.orlp-ed25519 (Ed25519, also compiled into
 notproton.dylib):
 
   steam-shim/jsoncpp.cpp             JsonCpp, public domain / MIT (header)
@@ -242,6 +243,9 @@ notproton.dylib):
   steam-shim/json/json-forwards.h    JsonCpp, public domain / MIT (header)
   vendor/cJSON.c                     cJSON 1.7.19, MIT (header)
   vendor/cJSON.h                     cJSON 1.7.19, MIT (header)
+  vendor/ed25519/*                   Ed25519 by Orson Peters, zlib (LICENSE.orlp-ed25519),
+                                     https://github.com/orlp/ed25519, as vendored by
+                                     Sparkle 2.10.1 (sparkle-project/ed25519 7fa6712e)
 
 Winetricks gets cabextract from the app bundle (most verbs unpack Microsoft cabinets):
 

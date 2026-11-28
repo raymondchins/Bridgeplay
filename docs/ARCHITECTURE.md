@@ -21,6 +21,7 @@ each folder is, which process it ends up in, and where new code belongs.
 | `native-launch/` (`np-native`), `native-shim/` (`libnp_gamepad.dylib`) | Native Mac games | A Steam launch option re-execs the game with the shim inserted |
 | `helpers/` | Small CLIs the dylib and run script call (`iconmaker`, `appinfo`) | Application Support |
 | `gamefixes/` | Per-game defaults read by the run script | Bundled in the app payload and the installer |
+| `pause-list/` | The signed list of Steam builds on which Bridgeplay stays off | Signed by `.github/workflows/pause-list.yml` onto the `pause-list` release; the dylib fetches it at Steam start |
 | `installer/` | `Bridgeplay-Installer.zip`: GPTK, DXMT, DXVK and default configs, plus the older `Install.command` | Zipped by `scripts/package-installer.sh` |
 | `bridge/`, `scripts/`, `fonts/`, `compat/`, `vendor/` | Build tooling, the Proton font build, the compatibility table, vendored code | Build time only |
 

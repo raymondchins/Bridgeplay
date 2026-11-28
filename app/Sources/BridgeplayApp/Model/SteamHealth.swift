@@ -22,6 +22,17 @@ struct SteamHealth: Equatable, Sendable {
     var hooksInstalled: Int?
     var hooksTotal: Int?
     var layoutKnown: Bool?
+    // Why a start isn't active: "paused", "strikes" or "pause_list". Older dylibs leave it out.
+    var modeReason: String?
+    // The signed pause list (dylib/feats/pauselist.h): "ok", "expired", "none", "invalid",
+    // "ignored" or "unkeyed", and the entry that paused this start.
+    var pauseList: String?
+    var pauseListSerial: Int?
+    var pauseNote: String?
+    var pauseFixedIn: String?
+    var pauseURL: String?
+
+    var pausedByList: Bool { mode == .passive && modeReason == "pause_list" }
 
     static func parse(_ data: Data) -> SteamHealth? {
         guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
@@ -39,6 +50,12 @@ struct SteamHealth: Equatable, Sendable {
         health.hooksInstalled = HealthJSON.int(json["hooks_installed"])
         health.hooksTotal = HealthJSON.int(json["hooks_total"])
         health.layoutKnown = HealthJSON.bool(json["layout_known"])
+        health.modeReason = HealthJSON.string(json["mode_reason"])
+        health.pauseList = HealthJSON.string(json["pause_list"])
+        health.pauseListSerial = HealthJSON.int(json["pause_list_serial"])
+        health.pauseNote = HealthJSON.string(json["pause_note"])
+        health.pauseFixedIn = HealthJSON.string(json["pause_fixed_in"])
+        health.pauseURL = HealthJSON.string(json["pause_url"])
         return health
     }
 

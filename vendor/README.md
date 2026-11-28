@@ -6,6 +6,14 @@
 by the signature database loader. When updating, compare with the current cJSON release and
 its security fixes.
 
+## Ed25519
+
+`ed25519/`: Orson Peters' Ed25519 (SUPERCOP ref10), zlib licensed (`LICENSE.orlp-ed25519`), as
+Sparkle 2.10.1 vendors it (sparkle-project/ed25519 at `7fa6712ef5d581a6981ec2b08ee623314cd1d1c4`,
+Sparkle's `Vendor/ed25519-sparkle/src`). Files are unchanged; `seed.c`, `add_scalar.c` and
+`key_exchange.c` are left out. The dylib builds only the verification files (`ED25519_SRCS` in
+the Makefile) to check the pause list; `sign.c` and `keypair.c` are for `pauselistcheck`.
+
 ## JsonCpp
 
 `steam-shim/jsoncpp.cpp` and `steam-shim/json/`, the amalgamated JsonCpp 1.6.5
