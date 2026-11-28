@@ -95,7 +95,7 @@ run 0 exfat
 has "exFAT is warned about in the log" "compatdata is on exfat, not APFS" "$work/log"
 is "an existing prefix on exFAT does not notify" "" "$(cat "$work/notes")"
 run 1 exfat
-has "a new prefix on exFAT notifies" "This Steam library is not on APFS|It is formatted exfat." "$work/notes"
+has "a new prefix on exFAT notifies" "This Steam library is not on APFS|Games on exfat may freeze or fail to start." "$work/notes"
 run 1 ""
 has "an unknown file system is logged" "volume: compatdata on unknown" "$work/log"
 is "an unknown file system does not notify" "" "$(cat "$work/notes")"

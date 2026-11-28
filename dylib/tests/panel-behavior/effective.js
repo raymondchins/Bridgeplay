@@ -118,8 +118,8 @@ t0.ok(!!legacyFx && legacyFx.g.BRIDGEPLAY_RETINA === '1',
       `a home with only the pre-3.0 support folder is still read (${legacyFx && JSON.stringify(legacyFx.g)})`);
 failed += t0.failed;
 
-const LABELS = ['DLSS', 'Advertise AVX2 to Rosetta', 'MSync', 'High Resolution',
-                'Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)'];
+const LABELS = ['DLSS', 'AVX2', 'MSync', 'High Resolution',
+                'Direct input'];
 globalThis.MSCXFx = fx;
 for (const form of Object.keys(FORMS)) {
   const { render: P, written } = panel(emit, form);
@@ -142,8 +142,8 @@ for (const form of Object.keys(FORMS)) {
   let ns = fg(1778820);
   t.ok(lab(ns, 'Mode').props.selectedOption === '2' && lab(ns, 'Quality').props.selectedOption === 'quality' &&
        lab(ns, 'Engine').props.selectedOption === 'metalfx' &&
-       lab(ns, 'Protect UI (keeps static HUD and menus sharp)').props.checked === false &&
-       lab(ns, 'Fast-motion fallback (skips frames that would smear)').props.checked === false,
+       lab(ns, 'Keep HUD and menus sharp').props.checked === false &&
+       lab(ns, 'Skip blurry frames in fast motion').props.checked === false,
        'the global FRAMEGEN keys show through, 1 as 2x');
   t.ok(lab(fg(1778821), 'Mode').props.selectedOption === '0' && !lab(fg(1778821), 'Quality'),
        'a per-app FRAMEGEN=0 turns it off and hides the rest');

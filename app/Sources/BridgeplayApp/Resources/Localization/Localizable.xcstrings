@@ -4163,6 +4163,30 @@
         }
       }
     },
+    "Bridgeplay confirmed %@ blocks this game on Mac. It may quit at launch or block online play. Playing online risks an account ban." : {
+      "comment" : "Run script dialog; %@ is the anti-cheat a maintainer confirmed for this game, such as Easy Anti-Cheat.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay ha verificato che %@ blocca il gioco su Mac. Potrebbe chiudersi all’avvio o bloccare il gioco online. Giocando online rischi il ban dell’account."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay подтвердил: %@ мешает игре работать на Mac. Она может закрыться при запуске или не пустить в сетевую игру. За игру по сети возможна блокировка аккаунта."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 已确认 %@ 会阻碍此游戏在 Mac 上运行。游戏可能在启动时退出或无法联网。联网游玩有封号风险。"
+          }
+        }
+      }
+    },
     "Bridgeplay could not copy a file into this game's prefix. Open this prefix's bridgeplay-run.log for details." : {
       "comment" : "Run script alert.",
       "extractionState" : "manual",
@@ -7347,30 +7371,6 @@
         }
       }
     },
-    "Do you want to rebuild the prefix for %@? Your save games will be preserved and not lost." : {
-      "comment" : "Run script dialog; %@ reads like \"CrossOver 25, running through Rosetta\".",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vuoi ricostruire il prefisso per %@? I tuoi salvataggi verranno conservati e non andranno persi."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пересобрать префикс для %@? Ваши сохранения останутся на месте и не потеряются."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要为 %@ 重建游戏容器吗？你的游戏存档会被保留，不会丢失。"
-          }
-        }
-      }
-    },
     "Don't Ask About This Game" : {
       "localizations" : {
         "it" : {
@@ -8231,6 +8231,30 @@
         }
       }
     },
+    "FEX cannot run Direct3D 12. The game may quit or show a black screen. In Steam Compatibility, select the Rosetta tool for this CrossOver version." : {
+      "comment" : "Run script notification.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FEX non supporta Direct3D 12. Il gioco potrebbe chiudersi o mostrare uno schermo nero. In Compatibilità su Steam, scegli lo strumento Rosetta di questa versione di CrossOver."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FEX не поддерживает Direct3D 12. Игра может закрыться или показать чёрный экран. В разделе совместимости Steam выберите инструмент Rosetta этой версии CrossOver."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FEX 不支持 Direct3D 12。游戏可能退出或黑屏。请在 Steam 的兼容性设置中选择此 CrossOver 版本的 Rosetta 工具。"
+          }
+        }
+      }
+    },
     "Failed" : {
       "localizations" : {
         "it" : {
@@ -8521,6 +8545,54 @@
         }
       }
     },
+    "First-time setup can take a few minutes. The screen may stay black while graphics load." : {
+      "comment" : "Run script notification.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il primo avvio può richiedere qualche minuto. Lo schermo può restare nero mentre si carica la grafica."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Первый запуск может занять несколько минут. Пока загружается графика, экран может оставаться чёрным."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次设置可能需要几分钟。加载图形时可能会暂时黑屏。"
+          }
+        }
+      }
+    },
+    "For best performance, get Game Porting Toolkit from Apple. In Bridgeplay, open Status and click Rescan. Your saves and games stay in place." : {
+      "comment" : "Run script notification.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per prestazioni migliori, scarica Game Porting Toolkit da Apple. In Bridgeplay, apri Stato e ripeti la scansione. Giochi e salvataggi restano al loro posto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для лучшей производительности скачайте Game Porting Toolkit у Apple. В Bridgeplay откройте раздел состояния и повторите сканирование. Игры и сохранения останутся на месте."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为获得最佳性能，请从 Apple 下载 Game Porting Toolkit。在 Bridgeplay 的“状态”中点“重新扫描”。游戏和存档会保留在原处。"
+          }
+        }
+      }
+    },
     "For every game" : {
       "localizations" : {
         "it" : {
@@ -8781,6 +8853,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "游戏时显示帧率和 GPU 信息。"
+          }
+        }
+      }
+    },
+    "Free about 2 GB on the Steam library drive, then rebuild the prefix in Bridgeplay." : {
+      "comment" : "Run script alert.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Libera circa 2 GB sul disco della libreria Steam, poi ricrea il prefisso in Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Освободите около 2 ГБ на диске библиотеки Steam и пересоздайте префикс в Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Steam 库所在磁盘上腾出约 2 GB 空间，然后在 Bridgeplay 中重建游戏容器。"
           }
         }
       }
@@ -9089,6 +9185,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "游戏可能可以运行，但会缺少部分功能。"
+          }
+        }
+      }
+    },
+    "Games on %@ may freeze or fail to start. Move this game to a Steam library on an APFS drive." : {
+      "comment" : "Run script notification; %@ is the file system, such as exfat.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Su %@ i giochi potrebbero bloccarsi o non avviarsi. Sposta il gioco in una libreria Steam su un disco APFS."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На %@ игры могут зависать или не запускаться. Переместите игру в библиотеку Steam на диске APFS."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 %@ 上，游戏可能卡住或无法启动。请将此游戏移至 APFS 磁盘上的 Steam 库。"
           }
         }
       }
@@ -10507,30 +10627,6 @@
         }
       }
     },
-    "It is formatted %@. Games run from it may hang or fail to start. Move the game to a library on an APFS drive for the best results." : {
-      "comment" : "Run script notification; %@ is the file system, such as exfat.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "È formattata in %@. I giochi avviati da qui possono bloccarsi o non partire. Per risultati migliori, sposta il gioco in una libreria su un disco APFS."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Она отформатирована в %@. Игры из неё могут зависать или не запускаться. Для лучших результатов переместите игру в библиотеку на диске APFS."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它的格式为 %@。从中运行的游戏可能会卡住或无法启动。为获得最佳效果，请将游戏移到 APFS 磁盘上的库中。"
-          }
-        }
-      }
-    },
     "It may go against Steam's terms." : {
       "localizations" : {
         "it" : {
@@ -10549,78 +10645,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这也可能违反 Steam 的条款。"
-          }
-        }
-      }
-    },
-    "It runs best with Apple's Game Porting Toolkit. Get it from Apple, then press Rescan in Bridgeplay's Status. Your games and saves stay as they are." : {
-      "comment" : "Run script notification.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Funziona meglio con il Game Porting Toolkit di Apple. Scaricalo da Apple, poi premi Rescan in Stato di Bridgeplay. Giochi e salvataggi restano come sono."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Лучше всего она работает с Game Porting Toolkit от Apple. Загрузите его с сайта Apple и нажмите Rescan в разделе «Статус» Bridgeplay. Игры и сохранения останутся как есть."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它在 Apple 的 Game Porting Toolkit 下运行最佳。从 Apple 获取它，然后在 Bridgeplay 的“状态”中按 Rescan。你的游戏和存档保持不变。"
-          }
-        }
-      }
-    },
-    "It uses %@, kernel anti-cheat that needs a Windows driver. Wine cannot load it, so the game will most likely quit at start. Playing online with it is at your own risk." : {
-      "comment" : "Run script dialog; %@ is the anti-cheat and its file, such as Ricochet (Randgrid.sys).",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usa %@, un anti-cheat a livello kernel che richiede un driver di Windows. Wine non può caricarlo, quindi molto probabilmente il gioco si chiuderà all'avvio. Giocarci online è a tuo rischio."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Она использует %@ — античит на уровне ядра, которому нужен драйвер Windows. Wine не может его загрузить, поэтому игра, скорее всего, закроется при запуске. Играть в неё по сети — на ваш риск."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它使用 %@，这是一种需要 Windows 驱动程序的内核级反作弊。Wine 无法加载它，因此游戏很可能在启动时退出。联网游玩风险自负。"
-          }
-        }
-      }
-    },
-    "It uses %@, which the Bridgeplay maintainers found this game cannot run with on macOS, so it will most likely quit at start or refuse to play online. Playing online with it is at your own risk." : {
-      "comment" : "Run script dialog; %@ is the anti-cheat a maintainer confirmed for this game, such as Easy Anti-Cheat.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usa %@, con cui i manutentori di Bridgeplay hanno verificato che questo gioco non può funzionare su macOS, quindi molto probabilmente si chiuderà all'avvio o non permetterà di giocare online. Giocarci online è a tuo rischio."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Она использует %@, и разработчики Bridgeplay выяснили, что с ним эта игра не работает на macOS, поэтому она, скорее всего, закроется при запуске или не пустит в сетевую игру. Играть в неё по сети — на ваш риск."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它使用 %@，Bridgeplay 维护者已确认此游戏在 macOS 上无法与之一起运行，因此游戏很可能在启动时退出或拒绝联网游玩。联网游玩风险自负。"
           }
         }
       }
@@ -15022,26 +15046,26 @@
         }
       }
     },
-    "Rebuild your prefix for %@? Your save games will be preserved and not lost." : {
+    "Rebuild the prefix for %@? Your saves will be kept." : {
       "comment" : "Run script dialog; %@ reads like \"CrossOver 25, running through Rosetta\".",
       "extractionState" : "manual",
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ricostruire il prefisso per %@? I tuoi salvataggi verranno conservati e non andranno persi."
+            "value" : "Ricreare il prefisso per %@? I salvataggi verranno conservati."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пересобрать префикс для %@? Ваши сохранения останутся на месте и не потеряются."
+            "value" : "Пересоздать префикс для %@? Сохранения останутся на месте."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "为 %@ 重建游戏容器吗？你的游戏存档会被保留，不会丢失。"
+            "value" : "为 %@ 重建游戏容器？存档将保留。"
           }
         }
       }
@@ -17340,6 +17364,30 @@
         }
       }
     },
+    "Set up CrossOver for %@ in Bridgeplay, or choose another compatibility tool in Steam." : {
+      "comment" : "Run script alert; %@ is the compatibility tool's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configura CrossOver per %@ in Bridgeplay oppure scegli un altro strumento di compatibilità su Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройте CrossOver для %@ в Bridgeplay или выберите другой инструмент совместимости в Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Bridgeplay 中为 %@ 设置 CrossOver，或在 Steam 中选择其他兼容性工具。"
+          }
+        }
+      }
+    },
     "Set up compatibility tool" : {
       "localizations" : {
         "it" : {
@@ -18106,30 +18154,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "部分文件仍留在旧文件夹中"
-          }
-        }
-      }
-    },
-    "Something appears to have gone wrong the last time you ran this game! Rebuilding the prefix may fix it." : {
-      "comment" : "Run script dialog.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sembra che qualcosa sia andato storto l'ultima volta che hai avviato questo gioco! Ricostruire il prefisso potrebbe risolvere."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Похоже, при последнем запуске этой игры что-то пошло не так! Пересборка префикса может это исправить."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上次运行此游戏时似乎出了问题！重建游戏容器可能会解决。"
           }
         }
       }
@@ -20475,30 +20499,6 @@
         }
       }
     },
-    "The CrossOver build behind %@ is not set up. Set it up in Bridgeplay, or pick another compatibility tool for this game." : {
-      "comment" : "Run script alert; %@ is the compatibility tool's name.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La build di CrossOver dietro %@ non è configurata. Configurala in Bridgeplay o scegli un altro strumento di compatibilità per questo gioco."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сборка CrossOver, на которой работает %@, не настроена. Настройте её в Bridgeplay или выберите для этой игры другой инструмент совместимости."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 所用的 CrossOver 构建版本尚未设置。请在 Bridgeplay 中设置，或为此游戏选择其他兼容工具。"
-          }
-        }
-      }
-    },
     "The Fonts folder in %@ is a link to another folder, so Bridgeplay didn't run Winetricks. Replace the link with a regular Fonts folder, then try again." : {
       "localizations" : {
         "it" : {
@@ -20875,30 +20875,6 @@
         }
       }
     },
-    "The first launch sets the game up and prepares its graphics. It can take a few minutes, and the screen may stay black until it is ready." : {
-      "comment" : "Run script notification.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il primo avvio configura il gioco e ne prepara la grafica. Può richiedere qualche minuto e lo schermo può restare nero finché non è pronto."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "При первом запуске игра настраивается и готовит графику. Это может занять несколько минут, и до готовности экран может оставаться чёрным."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "首次启动会设置游戏并准备图形，可能需要几分钟。准备完成前屏幕可能一直是黑的。"
-          }
-        }
-      }
-    },
     "The first launch takes longer" : {
       "localizations" : {
         "it" : {
@@ -20987,6 +20963,30 @@
         }
       }
     },
+    "The game did not launch or rebuild its prefix. Move Bridgeplay to Applications, open it, click Install, then launch the game again." : {
+      "comment" : "Run script alert.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il gioco non si è avviato e il prefisso non è stato ricreato. Sposta Bridgeplay in Applicazioni, aprilo, fai clic su Installa e riavvia il gioco."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Игра не запустилась, префикс не пересоздан. Переместите Bridgeplay в «Программы», откройте его, нажмите «Установить» и снова запустите игру."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏未启动，游戏容器也未重建。将 Bridgeplay 移到“应用程序”，打开后点“安装”，然后重新启动游戏。"
+          }
+        }
+      }
+    },
     "The game's prefix could not be set up" : {
       "comment" : "Run script dialog title.",
       "extractionState" : "manual",
@@ -21051,6 +21051,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已安装版本的记录无效。"
+          }
+        }
+      }
+    },
+    "The last launch failed. Rebuilding the prefix may help." : {
+      "comment" : "Run script dialog.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ultimo avvio non è riuscito. Ricreare il prefisso potrebbe aiutare."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прошлый запуск не удался. Возможно, поможет пересоздание префикса."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次启动失败。重建游戏容器可能有帮助。"
           }
         }
       }
@@ -21161,30 +21185,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "修补后的 %@ ntdll 哈希值为 %@，但构建版本 %@ 预期为 %@。未写入任何内容。"
-          }
-        }
-      }
-    },
-    "The prefix wasn't rebuilt and the game wasn't launched, because the Bridgeplay app was moved or deleted since it was installed, or was installed from a disk image or Downloads. Move Bridgeplay to Applications, open it and click Install again, then launch the game." : {
-      "comment" : "Run script alert.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il prefisso non è stato ricostruito e il gioco non è stato avviato, perché l'app Bridgeplay è stata spostata o eliminata dopo l'installazione, oppure è stata installata da un'immagine disco o da Download. Sposta Bridgeplay in Applicazioni, aprila e fai di nuovo clic su Installa, poi avvia il gioco."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Префикс не пересобран, и игра не запущена, потому что приложение Bridgeplay было перемещено или удалено после установки либо установлено из образа диска или папки «Загрузки». Переместите Bridgeplay в «Программы», откройте его и снова нажмите «Установить», затем запустите игру."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "游戏容器未重建，游戏也未启动，因为 Bridgeplay 应用在安装后被移动或删除，或者是从磁盘映像或“下载”文件夹安装的。请将 Bridgeplay 移到“应用程序”文件夹，打开它并再次点击“安装”，然后启动游戏。"
           }
         }
       }
@@ -21821,6 +21821,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此操作会将 Steam 恢复原状，但不会移除 Bridgeplay 使用的支持组件。"
+          }
+        }
+      }
+    },
+    "To run the game, enter this command in Terminal, then launch again: softwareupdate --install-rosetta --agree-to-license" : {
+      "comment" : "Run script alert; keep the command as it is.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per avviare il gioco, esegui questo comando nel Terminale e riprova: softwareupdate --install-rosetta --agree-to-license"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выполните команду в Терминале и снова запустите игру: softwareupdate --install-rosetta --agree-to-license"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在终端中输入此命令，然后重新启动游戏：softwareupdate --install-rosetta --agree-to-license"
+          }
+        }
+      }
+    },
+    "To use D3DMetal, select the Rosetta tool for this CrossOver version in Steam Compatibility." : {
+      "comment" : "Run script notification.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per usare D3DMetal, scegli lo strumento Rosetta di questa versione di CrossOver in Compatibilità su Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для D3DMetal выберите инструмент Rosetta этой версии CrossOver в разделе совместимости Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要使用 D3DMetal，请在 Steam 的兼容性设置中选择此 CrossOver 版本的 Rosetta 工具。"
           }
         }
       }
@@ -23079,30 +23127,6 @@
         }
       }
     },
-    "Windows games need Rosetta 2, and this Mac does not have it (a macOS update can remove it). Install it in Terminal with: softwareupdate --install-rosetta --agree-to-license, then launch the game again." : {
-      "comment" : "Run script alert; keep the command as it is.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I giochi Windows richiedono Rosetta 2 e questo Mac non ce l'ha (un aggiornamento di macOS può rimuoverlo). Installalo nel Terminale con: softwareupdate --install-rosetta --agree-to-license, poi avvia di nuovo il gioco."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Играм для Windows нужна Rosetta 2, а на этом Mac её нет (обновление macOS может её удалить). Установите её в Терминале командой: softwareupdate --install-rosetta --agree-to-license, затем снова запустите игру."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Windows 游戏需要 Rosetta 2，但这台 Mac 上没有（macOS 更新可能会将其移除）。请在“终端”中运行以下命令安装：softwareupdate --install-rosetta --agree-to-license，然后再次启动游戏。"
-          }
-        }
-      }
-    },
     "Windows games." : {
       "localizations" : {
         "it" : {
@@ -23191,6 +23215,30 @@
         }
       }
     },
+    "Wine cannot load the Windows driver for %@. The game will likely quit at launch. Playing online risks an account ban." : {
+      "comment" : "Run script dialog; %@ is the anti-cheat and its file, such as Ricochet (Randgrid.sys).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine non può caricare il driver Windows di %@. Il gioco probabilmente si chiuderà all’avvio. Giocando online rischi il ban dell’account."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine не может загрузить драйвер Windows для %@. Игра, скорее всего, закроется при запуске. За игру по сети возможна блокировка аккаунта."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine 无法加载 %@ 的 Windows 驱动。游戏很可能在启动时退出。联网游玩有封号风险。"
+          }
+        }
+      }
+    },
     "Wine could not build a complete new prefix. The prefix has been left as it was and nothing has been lost. Try again, or use Set Up Compatibility Tool first." : {
       "localizations" : {
         "it" : {
@@ -23259,30 +23307,6 @@
         }
       }
     },
-    "Wine needs about 2 GB free to set up the game. Free some space on the drive that holds this Steam library, then rebuild the prefix in Bridgeplay." : {
-      "comment" : "Run script alert.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wine ha bisogno di circa 2 GB liberi per configurare il gioco. Libera spazio sul disco che contiene questa libreria di Steam, poi ricostruisci il prefisso in Bridgeplay."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Для настройки игры Wine нужно около 2 ГБ свободного места. Освободите место на диске с этой библиотекой Steam, затем пересоберите префикс в Bridgeplay."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wine 需要约 2 GB 可用空间来设置游戏。请在存放此 Steam 库的磁盘上释放一些空间，然后在 Bridgeplay 中重建游戏容器。"
-          }
-        }
-      }
-    },
     "Wine syntax." : {
       "localizations" : {
         "it" : {
@@ -23301,54 +23325,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Wine 语法。"
-          }
-        }
-      }
-    },
-    "Wine through FEX can't run Direct3D 12 yet, so the game may quit or stay black. For Direct3D 12, pick this CrossOver's Rosetta tool in the game's Compatibility settings in Steam." : {
-      "comment" : "Run script notification.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wine tramite FEX non supporta ancora Direct3D 12, quindi il gioco potrebbe chiudersi o restare nero. Per Direct3D 12, scegli lo strumento Rosetta di questo CrossOver nelle impostazioni Compatibilità del gioco in Steam."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wine через FEX пока не поддерживает Direct3D 12, поэтому игра может закрыться или показывать чёрный экран. Для Direct3D 12 выберите инструмент Rosetta этого CrossOver в настройках «Совместимость» игры в Steam."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通过 FEX 运行的 Wine 暂不支持 Direct3D 12，游戏可能会退出或一直黑屏。如需 Direct3D 12，请在 Steam 中该游戏的“兼容性”设置里选择此 CrossOver 的 Rosetta 兼容工具。"
-          }
-        }
-      }
-    },
-    "Wine through FEX has no D3DMetal, so the game runs without it. For D3DMetal, pick this CrossOver's Rosetta tool in the game's Compatibility settings in Steam." : {
-      "comment" : "Run script notification.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wine tramite FEX non ha D3DMetal, quindi il gioco funziona senza. Per D3DMetal, scegli lo strumento Rosetta di questo CrossOver nelle impostazioni Compatibilità del gioco in Steam."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "В Wine через FEX нет D3DMetal, поэтому игра работает без него. Для D3DMetal выберите инструмент Rosetta этого CrossOver в настройках «Совместимость» игры в Steam."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通过 FEX 运行的 Wine 没有 D3DMetal，因此游戏将在不使用它的情况下运行。如需 D3DMetal，请在 Steam 中该游戏的“兼容性”设置里选择此 CrossOver 的 Rosetta 兼容工具。"
           }
         }
       }

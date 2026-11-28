@@ -6,11 +6,11 @@ const { panel, walk, details, runner, FORMS } = require('./harness');
 const emit = process.argv[2];
 if (!emit) { console.error('usage: advanced.js <emit>'); process.exit(2); }
 
-const AVX = 'Advertise AVX2 to Rosetta';
-const RAW = 'Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)';
+const AVX = 'AVX2';
+const RAW = 'Direct input';
 const HIDRAW = 'Disable hidraw';
-const X87 = 'Reduced x87 Precision (Reducing precision improves game performance, is enabled by default in CrossOver Preview)';
-const METALFX = 'MetalFX Upscaling (Samples from the resolution the game is set to)';
+const X87 = 'Reduced x87 precision';
+const METALFX = 'MetalFX';
 const FEX_TOOLS = ['bridgeplay-proton-fex'];
 
 const globals = extra => Object.assign(Object.create(globalThis),
