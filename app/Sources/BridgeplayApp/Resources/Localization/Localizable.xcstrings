@@ -14849,6 +14849,28 @@
         }
       }
     },
+    "Steam needs attention" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam richiede attenzione"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam требует внимания"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 需要处理"
+          }
+        }
+      }
+    },
     "Steam needs repair" : {
       "localizations" : {
         "it" : {
@@ -16495,6 +16517,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已安装版本的记录无效。"
+          }
+        }
+      }
+    },
+    "The last try to put Bridgeplay back did not finish, so Steam may not start." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'ultimo tentativo di rimettere Bridgeplay non è terminato, quindi Steam potrebbe non avviarsi."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последняя попытка вернуть Bridgeplay не завершилась, поэтому Steam может не запуститься."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次恢复 Bridgeplay 的尝试未完成，Steam 可能无法启动。"
           }
         }
       }

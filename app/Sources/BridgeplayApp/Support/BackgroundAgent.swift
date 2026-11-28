@@ -113,7 +113,7 @@ enum BackgroundAgent {
             case .skip(let why):
                 note(why)
             case .notify(let notice):
-                AppLog.note("background check: telling the user, \(notice.kind), \(notice.blocker.map { "\($0)" } ?? "notify only")")
+                AppLog.note("background check: telling the user, \(notice.repair ? "repair" : "\(notice.kind)"), \(notice.blocker.map { "\($0)" } ?? "notify only")")
                 post(notice.title, notice.body)
                 defaults.set(notice.key, forKey: BackgroundCheck.toldKey)
                 lastSkip = nil

@@ -51,18 +51,25 @@ enum BackgroundCheck {
         let blocker: SteamPatchKeeper.Blocker?
         // Steam build and Bridgeplay build: a new key is a new notice.
         let key: String
+        // A failed try left the insert in a bundle it never signed.
+        var repair = false
 
         var title: String {
-            switch kind {
+            if repair { return String(localized: "Steam needs attention") }
+            return switch kind {
             case .removedBySteam: String(localized: "Steam updated")
             case .outdated: String(localized: "Bridgeplay update for Steam")
             }
         }
 
         var body: String {
-            let lead = switch kind {
-            case .removedBySteam: String(localized: "Steam's update removed Bridgeplay, so Windows games won't start.")
-            case .outdated: String(localized: "This version of Bridgeplay has newer files for Steam.")
+            let lead = if repair {
+                String(localized: "The last try to put Bridgeplay back did not finish, so Steam may not start.")
+            } else {
+                switch kind {
+                case .removedBySteam: String(localized: "Steam's update removed Bridgeplay, so Windows games won't start.")
+                case .outdated: String(localized: "This version of Bridgeplay has newer files for Steam.")
+                }
             }
             let next = switch blocker {
             case nil, .lastTryFailed?: String(localized: "Open Bridgeplay to put it back.")
@@ -107,6 +114,13 @@ enum BackgroundCheck {
         guard !inputs.health.paused, !inputs.keeperPaused else { return .skip(.paused) }
         guard !breakerTripped(inputs.health) else { return .skip(.breakerTripped) }
         guard !inputs.installBlocked else { return .skip(.installBlocked) }
+        // Reads as installed, but Steam may not start: told once, and the failure stands until
+        // the signature is good again (SteamPatchKeeper.failureStands).
+        if inputs.lastTryFailed, case .installed = inputs.deployment {
+            let notice = Notice(kind: .outdated, blocker: .lastTryFailed,
+                                key: "repair|\(inputs.steamBuild ?? "?")|\(inputs.bundledVersion)", repair: true)
+            return inputs.told == notice.key ? .skip(.alreadyTold) : .notify(notice)
+        }
         guard let kind = SteamPatchKeeper.kind(of: inputs.deployment, previouslyDeployed: inputs.previouslyDeployed)
         else { return .skip(.nothingToDo) }
         let key = noticeKey(kind, steamBuild: inputs.steamBuild, bundledVersion: inputs.bundledVersion)

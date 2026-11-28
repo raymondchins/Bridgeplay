@@ -147,6 +147,19 @@ struct BackgroundCheckTests {
         }
     }
 
+    @Test("A failed try that left Steam's signature broken is told once, as a repair")
+    func brokenSeal() {
+        let installed = SteamDeployment.installed(version: Self.version)
+        guard case .notify(let notice) = BackgroundCheck.decide(inputs(.reapply, deployment: installed, lastTryFailed: true))
+        else { Issue.record("no notice"); return }
+        #expect(notice.repair && notice.blocker == .lastTryFailed)
+        #expect(notice.body.contains("Steam may not start"))
+        #expect(BackgroundCheck.decide(inputs(.reapply, deployment: installed, told: notice.key, lastTryFailed: true))
+            == .skip(.alreadyTold))
+        // Once the signature is good again the agent passes no failure: nothing to do.
+        #expect(BackgroundCheck.decide(inputs(.reapply, deployment: installed)) == .skip(.nothingToDo))
+    }
+
     @Test("A try that Steam interrupted is not a failure")
     func interruptedTry() {
         #expect(!BackgroundCheck.tryFailed(exitStatus: 0, steamRunningAfter: false))
