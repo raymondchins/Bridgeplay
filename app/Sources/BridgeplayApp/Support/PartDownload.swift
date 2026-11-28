@@ -32,13 +32,13 @@ final class PartFile: @unchecked Sendable {
     private init?(for archive: URL, sha256: String, ownIfBusy: Bool) throws {
         let shared = Self.path(for: archive)
         try FileManager.default.createDirectory(at: archive.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if let handle = Self.openLocked(shared) {
+        if let handle = try Self.openLocked(shared) {
             (url, self.handle, isPrivate) = (shared, handle, false)
         } else {
             guard ownIfBusy else { return nil }
             let own = archive.deletingLastPathComponent()
                 .appending(path: ".\(archive.lastPathComponent).\(UUID().uuidString).part")
-            guard let handle = Self.openLocked(own) else { throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: own.path]) }
+            guard let handle = try Self.openLocked(own) else { throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: own.path]) }
             (url, self.handle, isPrivate) = (own, handle, true)
         }
         pin = url.appendingPathExtension("pin")
@@ -49,11 +49,17 @@ final class PartFile: @unchecked Sendable {
 
     // O_EXLOCK: one writer per part across processes (the app and its CLI), released on close.
     // Nil only when another process holds it; a volume without locks opens it unlocked.
-    private static func openLocked(_ url: URL) -> FileHandle? {
+    // Any other failure (a full disk, no permission) is thrown with its errno, so callers can
+    // tell a full disk from a busy part.
+    private static func openLocked(_ url: URL) throws -> FileHandle? {
         let path = url.path(percentEncoded: false)
         var fd = Darwin.open(path, O_RDWR | O_CREAT | O_EXLOCK | O_NONBLOCK | O_CLOEXEC, 0o644)
         if fd < 0, errno == ENOTSUP || errno == EOPNOTSUPP { fd = Darwin.open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644) }
-        guard fd >= 0 else { return nil }
+        guard fd >= 0 else {
+            let code = errno
+            if code == EWOULDBLOCK || code == EAGAIN { return nil }
+            throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO, userInfo: [NSFilePathErrorKey: path])
+        }
         return FileHandle(fileDescriptor: fd, closeOnDealloc: true)
     }
 

@@ -109,6 +109,24 @@ struct ResumableDownloadTests {
         #expect(!exists(PartFile.path(for: got)))
     }
 
+    @Test("A part that cannot be created throws why, rather than waiting on a lock")
+    func unwritablePartThrowsItsErrno() async throws {
+        let work = try scratchDirectory("resume")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: work.path(percentEncoded: false))
+            try? FileManager.default.removeItem(at: work)
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: work.path(percentEncoded: false))
+        let started = Date()
+        do {
+            _ = try await PartFile.open(for: work.appending(path: "package.tar"), sha256: sha)
+            Issue.record("a part was opened in a read-only folder")
+        } catch let error as POSIXError {
+            #expect(error.code == .EACCES)
+        }
+        #expect(Date().timeIntervalSince(started) < 0.5, "it waited as if the part were busy")
+    }
+
     @Test("A cancelled download keeps its bytes, and the next run resumes them")
     func cancelledDownloadResumesLater() async throws {
         let work = try scratchDirectory("resume")
