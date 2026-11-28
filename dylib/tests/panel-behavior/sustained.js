@@ -7,7 +7,7 @@ const { panel, walk, details, runner, FORMS } = require('./harness');
 const emit = process.argv[2];
 if (!emit) { console.error('usage: sustained.js <emit>'); process.exit(2); }
 
-const LABEL = 'Lower when hot';
+const LABEL = 'Lower FPS when the Mac runs hot';
 const NONE = { g: {}, a: {}, e: {}, d: {} };
 
 let failed = 0;

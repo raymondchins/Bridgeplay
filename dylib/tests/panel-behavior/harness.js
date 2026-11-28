@@ -13,7 +13,12 @@ const expand = (s, caps) => s.replace(/[\u0001-\u0008\u0013-\u0016]/g, c => {
   return caps[c];
 });
 
-const mk = (type, props) => ({ type, props });
+// A label with an info tip (I() in the panel) is read as its text, so checks match labels
+// as words; the whole label, with its button and tip, stays at props.tip (tips.js).
+const tipped = l => !!l && typeof l === 'object' && l.props && l.props.className === 'MSCXLbl';
+const mk = (type, props) => tipped(props && props.label) ?
+  { type, props: Object.assign({}, props, { label: props.label.props.children[0], tip: props.label }) } :
+  { type, props };
 const react = { jsx: mk, jsxs: mk, Fragment: 'Fragment' };
 // Steam's SliderField, which the panel finds by the name its export's source carries rather
 // than by the export's letters
