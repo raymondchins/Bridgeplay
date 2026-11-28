@@ -864,6 +864,7 @@ static void stale_tool_cases(void) {
 
     put(current, "flavor", "rosetta\n");
     put(current, "run", "#!/bin/sh\n# bridgeplay CrossOver compatibility tool shim\n");
+    put(current, "bridgeplay-alerts.tsv", "key\ten\n");
     put(renamed, "flavor", "rosetta\n");
     put(renamed, "run", "#!/bin/sh\n# notproton CrossOver compatibility tool shim\n");
     put(legacy, "run", "#!/bin/sh\n# notproton CrossOver compatibility tool shim\nset -e\n");

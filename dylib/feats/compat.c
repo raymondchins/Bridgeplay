@@ -822,7 +822,7 @@ static void remove_tool(const char *tools_dir, const char *name) {
     char path[768];
 
     static const char *const files[] = {
-        "compatibilitytool.vdf", "toolmanifest.vdf", "run", "flavor", "build",
+        "compatibilitytool.vdf", "toolmanifest.vdf", "run", "bridgeplay-alerts.tsv", "flavor", "build",
     };
 
     for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++) {
