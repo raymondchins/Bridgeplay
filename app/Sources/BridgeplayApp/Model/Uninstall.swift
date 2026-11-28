@@ -90,8 +90,8 @@ enum Uninstall {
 
         static var live: Leftovers {
             Leftovers(
-                gamefixes: SupportPaths.gamefixes,
-                legacyGamefixes: SupportPaths.legacyApplicationSupport.appending(path: "gamefixes"),
+                gamefixes: UninstallPaths.liveGamefixes.current,
+                legacyGamefixes: UninstallPaths.liveGamefixes.legacy,
                 keptGamefixes: SupportPaths.keptGamefixes,
                 steamConfig: SteamDefaultTool.config,
                 defaultToolBackup: SteamDefaultTool.backup,
@@ -332,13 +332,18 @@ enum Uninstall {
         return removed
     }
 
+    // A folder with anything in it besides Finder's .DS_Store is worth keeping.
+    static func hasGamefixes(_ folder: URL) -> Bool {
+        let entries = (try? FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false))) ?? []
+        return entries.contains { $0 != ".DS_Store" }
+    }
+
     // The user's own overrides are theirs: they are moved out of the folder about to be
     // deleted rather than deleted with it. An empty folder is not worth keeping. A previous
     // removal's copy is never overwritten; this one gets a dated name beside it.
     static func keepGamefixes(_ gamefixes: URL, in kept: URL, now: Date = Date()) throws -> URL? {
         let files = FileManager.default
-        let entries = (try? files.contentsOfDirectory(atPath: gamefixes.path(percentEncoded: false))) ?? []
-        guard entries.contains(where: { $0 != ".DS_Store" }) else { return nil }
+        guard hasGamefixes(gamefixes) else { return nil }
         var destination = kept
         if files.fileExists(atPath: destination.path(percentEncoded: false)) {
             let format = DateFormatter()

@@ -17,7 +17,7 @@ struct UninstallPlanTests {
 
     private struct Fixture {
         let root: URL
-        let paths: UninstallPaths
+        var paths: UninstallPaths
         let library: SteamLibrary
         var support: URL { root.appending(path: "home/Library/Application Support/bridgeplay") }
         var legacySupport: URL { root.appending(path: "home/Library/Application Support/notproton") }
@@ -129,6 +129,20 @@ struct UninstallPlanTests {
         #expect(!names.contains("com.example.other.plist"))
         #expect(!names.contains("100") && !names.contains("200"))
         #expect(!names.contains("bridgeplay-gamefixes"))
+    }
+
+    @Test("Before a first removal the plan lists the folder that will hold the user's game fixes")
+    func planShowsPendingKeptGamefixes() throws {
+        var fixture = try fixture(modified: true)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        try FileManager.default.removeItem(at: fixture.paths.keptGamefixes)
+        #expect(!plan(fixture).keeps.contains { $0.url == fixture.paths.keptGamefixes })
+
+        let legacy = fixture.legacySupport.appending(path: "gamefixes")
+        try write("mine\n", legacy.appending(path: "42.conf"))
+        fixture.paths.gamefixSources = [fixture.support.appending(path: "gamefixes"), legacy]
+        let item = try #require(plan(fixture).keeps.first { $0.url == fixture.paths.keptGamefixes })
+        #expect(item.note == "Your game fixes")
     }
 
     @Test("Prefixes are offered with their sizes and stay unless picked")

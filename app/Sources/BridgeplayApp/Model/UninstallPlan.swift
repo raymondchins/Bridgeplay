@@ -25,6 +25,8 @@ struct UninstallPaths: Sendable {
     var owned: [URL]
     var launchAgents: URL
     var keptGamefixes: URL
+    // Where the user's game fixes are now (current and pre-3.0 name); removal moves them to `keptGamefixes`.
+    var gamefixSources: [URL] = []
     var libraries: [SteamLibrary]
     var userdata: URL
     // The app and the files macOS keeps for it; they stay until the app is in the Trash.
@@ -51,6 +53,7 @@ struct UninstallPaths: Sendable {
             ],
             launchAgents: home.appending(path: "Library/LaunchAgents"),
             keptGamefixes: SupportPaths.keptGamefixes,
+            gamefixSources: [liveGamefixes.current, liveGamefixes.legacy],
             libraries: PrefixStore.libraries(),
             userdata: SupportPaths.Steam.userData.appending(path: "userdata"),
             appFiles: [
@@ -63,6 +66,11 @@ struct UninstallPaths: Sendable {
             users: URL(filePath: "/Users"),
             userName: NSUserName(),
             modifications: .shared)
+    }
+
+    // The folders Uninstall.run moves into `keptGamefixes`.
+    static var liveGamefixes: (current: URL, legacy: URL) {
+        (SupportPaths.gamefixes, SupportPaths.legacyApplicationSupport.appending(path: "gamefixes"))
     }
 
     // Login items Bridgeplay could have left. It adds none today; older or hand-made ones go too.
@@ -177,7 +185,13 @@ struct UninstallPlan: Sendable {
         // The kept folder, and the dated ones earlier removals left beside it.
         let folder = paths.keptGamefixes.deletingLastPathComponent()
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.plainPath)) ?? []
-        kept += names.filter { $0.hasPrefix(paths.keptGamefixes.lastPathComponent) }.sorted()
+        var keptNames = names.filter { $0.hasPrefix(paths.keptGamefixes.lastPathComponent) }
+        // Removal creates the folder by moving current or legacy fixes there, so show it before it exists.
+        if !keptNames.contains(paths.keptGamefixes.lastPathComponent),
+           paths.gamefixSources.contains(where: Uninstall.hasGamefixes) {
+            keptNames.append(paths.keptGamefixes.lastPathComponent)
+        }
+        kept += keptNames.sorted()
             .map { UninstallItem(url: folder.appending(path: $0), note: String(localized: "Your game fixes")) }
         kept += paths.appFiles.filter(UninstallPaths.exists).map {
             UninstallItem(url: $0, note: String(localized: "Trash it after it quits"))
