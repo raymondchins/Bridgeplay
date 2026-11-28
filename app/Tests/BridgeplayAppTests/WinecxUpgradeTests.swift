@@ -239,6 +239,30 @@ struct WinecxUpgradeTests {
         #expect(try follow(dir) == .unchanged)
     }
 
+    @Test("A move cut short after config.vdf was written clears its marker, then leaves the user's choice")
+    func followClearsFinishedMove() throws {
+        let dir = try scratchDirectory("winecx-default-finished")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appending(path: "config.vdf")
+        let backup = dir.appending(path: "backups/steam-default-tool.json")
+        // What a quit between config.vdf and the final record leaves behind.
+        try Self.vdf([("0", Self.new)]).write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: backup.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(SteamDefaultTool.Backup(previous: nil, applied: Self.new, moving: Self.old))
+            .write(to: backup)
+        try FileManager.default.createDirectory(
+            at: dir.appending(path: "compatibilitytools.d/\(Self.new)"), withIntermediateDirectories: true)
+
+        #expect(try follow(dir) == .unchanged)
+        let saved = try #require(SteamDefaultTool.readBackup(backup))
+        #expect(saved.applied == Self.new)
+        #expect(saved.moving == nil)
+        // The user picks the older release afterwards: it stays.
+        try Self.vdf([("0", Self.old)]).write(to: file, atomically: true, encoding: .utf8)
+        #expect(try follow(dir) == .unchanged)
+        #expect(try String(contentsOf: file, encoding: .utf8) == Self.vdf([("0", Self.old)]))
+    }
+
     @Test("A move whose record can't be written puts the default back and is tried again")
     func followUndoesWithoutRecord() throws {
         let dir = try scratchDirectory("winecx-default-unrecorded")

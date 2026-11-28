@@ -312,8 +312,22 @@ enum SteamDefaultTool {
             where error.domain == NSCocoaErrorDomain && error.code == CocoaError.fileReadNoSuchFile.rawValue {
             return .unchanged
         }
+        let saved = readBackup(backup)
+        // A quit after config.vdf was written but before the record was finished leaves
+        // `moving` set. The default no longer names that tool, so the move is over: clear the
+        // marker, or a user who picks the older tool later would be moved again.
+        if var finished = saved, let moving = finished.moving, self.current(in: text)?.name != moving {
+            finished.moving = nil
+            do {
+                try write(finished, to: backup)
+                AppLog.note("default tool: finished the record of the move from \(moving)")
+            } catch {
+                AppLog.note("default tool: could not finish the record of the move from \(moving): \(error.localizedDescription)")
+            }
+            return .unchanged
+        }
         guard let result = movingWinecxDefault(
-            text, from: older, previous: previous, to: current, backup: readBackup(backup))
+            text, from: older, previous: previous, to: current, backup: saved)
         else { return .unchanged }
         guard !steamRunning() else { return .steamRunning }
         // A backup that still names the older tool would move a user who picks it back later, so
