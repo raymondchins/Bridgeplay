@@ -39,6 +39,7 @@ SRCS := \
 	dylib/feats/quicksettings.c \
 	dylib/core/loader.c \
 	dylib/core/macho.c \
+	dylib/core/clientgate.c \
 	dylib/resolver/anchor.c \
 	dylib/resolver/aob.c \
 	dylib/resolver/resolver.c \
@@ -88,7 +89,7 @@ DEPS := $(OBJS:.o=.d)
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
-        compatsvc-check prefixstate-check breakercheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck \
+        compatsvc-check prefixstate-check breakercheck clientgatecheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck \
         gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
@@ -287,6 +288,15 @@ prefixstate-check:
 	$(PREFIXSTATE_CHECK)
 
 COMPATSVC_CHECK := $(OUT_DIR)/compatsvc-check
+
+CLIENTGATECHECK := $(OUT_DIR)/clientgatecheck
+
+# Steam's first lookup into steamclient.dylib waits for the hooks, whichever thread installs them.
+clientgatecheck:
+	@if [ ! -f dylib/tests/clientgatecheck.c ]; then $(call SKIP,clientgatecheck,dylib/tests/clientgatecheck.c); exit 0; fi; \
+	mkdir -p $(OUT_DIR) && \
+	$(TEST_CC) -O1 -o $(CLIENTGATECHECK) dylib/tests/clientgatecheck.c && \
+	$(CLIENTGATECHECK)
 
 BREAKERCHECK := $(OUT_DIR)/breakercheck
 
@@ -1008,7 +1018,7 @@ np-inventory-check:
 # overlay-shim-tests is left out: it needs a Metal GPU and real frame timing.
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
-	activatecheck breakercheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
+	activatecheck breakercheck clientgatecheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck launchercheck \
 	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
 	app-tests native-installercheck

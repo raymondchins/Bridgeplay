@@ -530,6 +530,54 @@ static void enabled_cases(void) {
     check(np_compat_probe_enabled_off(0) == 0, "no function is refused");
 }
 
+// The manager's switch getter: slot 0 of the one primary vtable holding BIsEnabled, and only
+// when it reads the flag the BIsEnabled probe found. Steam builds every installed app's
+// system configuration through it before anything else turns the layer on (Update Required).
+static void switch_getter_cases(void) {
+    const uint32_t ret = 0xD65F03C0u;
+    uint32_t getter[2] = { 0x39400000u | (0x810u << 10), ret };
+
+    g_enabled_probed = 0;
+    g_enabled_off = 0x810;
+    check(!np_compat_is_flag_getter(getter), "an unprobed flag offset swaps nothing");
+
+    for (int i = 0; i < CODE_WORDS; i++) code[i] = NOP;
+    code[0] = mov_x0(21);
+    code[1] = ldrb(21, 0x810, 8);
+    check(np_compat_probe_enabled_off((uintptr_t)code) == 1, "the flag at 0x810 probes clean");
+    check(np_compat_is_flag_getter(getter), "LDRB W0,[X0,#flag]; RET is the switch getter");
+    uint32_t other[2] = { 0x39400000u | (0x800u << 10), ret };
+    check(!np_compat_is_flag_getter(other), "a getter of another byte is refused");
+    uint32_t no_ret[2] = { getter[0], NOP };
+    check(!np_compat_is_flag_getter(no_ret), "a longer body is refused");
+    uint32_t wrong_reg[2] = { getter[0] | 1u, ret };
+    check(!np_compat_is_flag_getter(wrong_reg), "a load into another register is refused");
+
+    const uintptr_t text = 0x100000;
+    const size_t text_size = 0x10000;
+    const uint64_t method = text + 0x200, info = 0x900000;
+    uint64_t vt[] = { 0x5, 0, info, text + 0x10, text + 0x20, text + 0x30, method,
+                      text + 0x40, 0 };
+    check(np_compat_vtable_slot0(vt, sizeof vt / sizeof *vt, method, text, text_size) == 3,
+          "slot 0 follows the offset-to-top and the type info");
+    check(np_compat_vtable_slot0(vt, sizeof vt / sizeof *vt, text + 0x999, text, text_size) == -1,
+          "a method no vtable holds finds nothing");
+
+    uint64_t secondary[] = { 0x5, (uint64_t)-8, info, text + 0x10, method };
+    check(np_compat_vtable_slot0(secondary, 5, method, text, text_size) == -1,
+          "a secondary vtable (nonzero offset-to-top) is refused");
+
+    uint64_t twice[] = { 0, info, text + 0x10, method, 0, info + 8, text + 0x50, method };
+    check(np_compat_vtable_slot0(twice, 8, method, text, text_size) == -1,
+          "two vtables holding the method are refused rather than guessed between");
+
+    uint64_t at_start[] = { text + 0x10, method };
+    check(np_compat_vtable_slot0(at_start, 2, method, text, text_size) == -1,
+          "a run of code pointers with no header is refused");
+    g_enabled_probed = 0;
+    g_enabled_off = COMPAT_MANAGER_ENABLED_OFF;
+}
+
 // A manager holding `count` entries, the one at `named_slot` carrying the tool name.
 static uint8_t manager[0x400];
 static uint8_t entries[(COMPAT_MANAGER_TOOLS_HEADROOM + 64) * (COMPAT_TOOL_STRIDE + 64)];
@@ -1255,6 +1303,7 @@ int main(void) {
     head_cases();
     oslist_cases();
     enabled_cases();
+    switch_getter_cases();
     manager_cases();
     registration_cases();
     tool_list_cases();

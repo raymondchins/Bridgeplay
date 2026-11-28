@@ -5,6 +5,9 @@
 #include <stddef.h>
 #include <mach-o/loader.h>
 
+// 0 with the image's header and slide when an image whose path contains `name` is loaded.
+int np_find_image(const char *name, const struct mach_header_64 **out_mh,
+                  intptr_t *out_slide);
 int np_await_image(const char *name, int timeout_ms,
                          const struct mach_header_64 **out_mh, intptr_t *out_slide);
 

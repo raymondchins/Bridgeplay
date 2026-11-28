@@ -188,8 +188,14 @@ int np_hooks_install_all(const struct mach_header_64 *mh, intptr_t slide,
                                              "CWebUIJobDispatcher::RegisterHandler");
     uintptr_t dispatch_fn = np_lookup_address(resolved, "CWebUITransport::DispatchJob");
 
-    np_webui_init(mh, slide, register_fn, dispatch_fn,
-                  np_lookup_address(resolved, "CWebUIMsgJob::SendResponse"));
+    // Not retried: a missing accessor or a registry that is no registry come from this
+    // client's code, and a second install would patch the hooks below twice. Counted with
+    // the hooks instead, so health.json shows a WebUI the compat routes cannot reach.
+    int webui = np_webui_init(mh, slide, register_fn, dispatch_fn,
+                              np_lookup_address(resolved, "CWebUIMsgJob::SendResponse"));
+    if (!webui)
+        NP_ERR("hooks: the client's WebUI registry was not found, so Bridgeplay's routes "
+               "stay off for this session");
     // The page polls a route every couple of seconds, so its jobs are where the
     // platform checks the hooks could not run get done.
     np_webui_on_job(compat_platform_job);
@@ -201,6 +207,13 @@ int np_hooks_install_all(const struct mach_header_64 *mh, intptr_t slide,
                                 resolved, &total);
 
     np_hooks_compat_publish_originals();
+    // Counted like the others, so health.json shows a switch getter that did not take.
+    total++;
+    landed += np_hooks_compat_enabled_slot(mh, slide,
+        np_lookup_address(resolved, "CCompatManager::BIsCompatibilityToolEnabled"));
+
+    total++;
+    landed += webui != 0;
 
     if (total_out)
         *total_out = total;
