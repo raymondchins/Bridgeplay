@@ -515,6 +515,22 @@ static void notify_listed(const np_pl_entry_t *e) {
     notify("Paused for this Steam build", body);
 }
 
+static int g_off_modes = NP_BREAKER_OFF_MODES;
+
+// With the off modes disabled a start the breaker would have made passive stays active, and is
+// recorded as a normal start, so a healthy one clears its strikes.
+static void keep_active(np_boot_verdict_t verdict, np_boot_t *next, np_mode_t *mode,
+                        int *first_trip) {
+    if (*mode == NP_MODE_ACTIVE)
+        return;
+    NP_WARN("breaker: %s start kept active, the off modes are disabled",
+            *mode == NP_MODE_OFF ? "a paused" : "a passive");
+    *mode = NP_MODE_ACTIVE;
+    *first_trip = 0;
+    if (verdict == NP_BOOT_RECORD && stage_is(next, NP_STAGE_PASSIVE))
+        set_str(next->stage, sizeof next->stage, NP_STAGE_BOOT);
+}
+
 np_mode_t np_breaker_start(void) {
     g_decided = 1;
     g_mode = NP_MODE_ACTIVE;
@@ -532,9 +548,9 @@ np_mode_t np_breaker_start(void) {
     snprintf(key, sizeof key, "%s:%d", build, BRIDGEPLAY_BUILD);
 
     long long now = (long long)time(NULL);
-    int paused = is_paused();
+    int paused = g_off_modes && is_paused();
     np_pl_result_t list = { .status = NP_PL_UNKEYED };
-    if (support_dir(dir, sizeof dir) == 0)
+    if (g_off_modes && support_dir(dir, sizeof dir) == 0)
         np_pause_list_start(dir, strtoull(build, NULL, 10), channel, BRIDGEPLAY_BUILD, paused,
                             now, &list);
 
@@ -557,6 +573,8 @@ np_mode_t np_breaker_start(void) {
     int first_trip = 0;
     np_mode_t mode;
     np_boot_verdict_t verdict = np_boot_decide(have ? &prev : NULL, &env, &next, &mode, &first_trip);
+    if (!g_off_modes)
+        keep_active(verdict, &next, &mode, &first_trip);
     int strikes = have && strcmp(prev.key, key) == 0 ? prev.strikes : 0;
     if (verdict == NP_BOOT_RECORD) {
         strikes = next.strikes;
@@ -628,6 +646,8 @@ static np_mode_t      g_peek_mode = NP_MODE_ACTIVE;
 
 // Steam Helper follows the start steam_osx recorded; anything unreadable means active.
 static void peek_mode(void) {
+    if (!g_off_modes)
+        return;
     if (is_paused()) {
         g_peek_mode = NP_MODE_OFF;
         return;

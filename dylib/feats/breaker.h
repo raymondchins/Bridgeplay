@@ -21,6 +21,16 @@ typedef enum {
     NP_MODE_OFF,       // paused by the user
 } np_mode_t;
 
+// Pause, the strikes and the pause list all start Steam with no hooks. That Steam configures
+// every installed Windows game for macOS and removes its content (Update Required, then a
+// deletion on update), so all three stay off: the paused file and the list are ignored and a
+// start past the strikes stays active. The app hides Pause to match
+// (SteamHealthStore.offModesEnabled).
+// CEILING: off modes disabled outright — re-enable once a paused start keeps the compat layer in.
+#ifndef NP_BREAKER_OFF_MODES
+#define NP_BREAKER_OFF_MODES 0
+#endif
+
 #define NP_BOOT_STRIKES_MAX     2
 #define NP_BOOT_HEALTHY_SECONDS 120
 

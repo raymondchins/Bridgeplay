@@ -152,7 +152,12 @@ static int start(char how) {
 static np_mode_t helper_mode(void) {
     fflush(stdout);
     pid_t pid = fork();
-    if (pid == 0) _exit((int)np_breaker_mode());
+    if (pid == 0) {
+        // A fresh Steam Helper: this process may have peeked already (np_health_web).
+        g_peek_once = (pthread_once_t)PTHREAD_ONCE_INIT;
+        g_peek_mode = NP_MODE_ACTIVE;
+        _exit((int)np_breaker_mode());
+    }
     int st = 0;
     waitpid(pid, &st, 0);
     return WIFEXITED(st) ? (np_mode_t)WEXITSTATUS(st) : (np_mode_t)-1;
@@ -342,6 +347,7 @@ static int health_is(const char *mode, int strikes, int hooks) {
 
 static void runtime_cases(void) {
     printf("starts\n");
+    g_off_modes = 1;
     CHECK("a first start is active", start('c') == NP_MODE_ACTIVE);
     CHECK("health.json says what it installed", health_is("active", 0, 9));
     CHECK("it died, so the second start carries a strike", start('c') == NP_MODE_ACTIVE && boot_strikes() == 1);
@@ -483,6 +489,26 @@ static void lock_cases(void) {
           locked_start(-1, &early) == 1 && early);
 }
 
+// The shipped setting: a paused file, the strikes or a stale passive report never start Steam
+// without the hooks, because that Steam removes Windows games' content.
+static void off_modes_disabled_cases(void) {
+    printf("off modes disabled\n");
+    g_off_modes = 0;
+    drop(support, NP_BOOT_FILE);
+    put(support, NP_PAUSED_FILE, "");
+    CHECK("a paused file is ignored and the insert stays", start('c') == NP_MODE_ACTIVE);
+    CHECK("Steam Helper ignores the paused file", helper_mode() == NP_MODE_ACTIVE);
+    drop(support, NP_PAUSED_FILE);
+    CHECK("a second bad start stays active", start('c') == NP_MODE_ACTIVE && boot_strikes() == 1);
+    CHECK("past the strikes it stays active and is counted as a normal start",
+          start('c') == NP_MODE_ACTIVE && boot_strikes() == 2 && boot_stage_is("client") &&
+          health_is("active", 2, 9));
+    CHECK("a healthy start clears the strikes", start('h') == NP_MODE_ACTIVE && boot_strikes() == 0);
+    put(support, NP_HEALTH_FILE, "{\"mode\":\"passive\"}");
+    CHECK("Steam Helper ignores a passive report", helper_mode() == NP_MODE_ACTIVE);
+    drop(support, NP_HEALTH_FILE);
+}
+
 static int scrub(const char *path, const struct stat *st, int flag, struct FTW *ftw) {
     (void)st; (void)flag; (void)ftw;
     if (strncmp(path, root, strlen(root)) != 0) return -1;
@@ -508,6 +534,7 @@ int main(void) {
     chunk_cases();
     web_retry_case();
     lock_cases();
+    off_modes_disabled_cases();
 
     // Only temp files could be left, and none may be.
     int strays = 0;

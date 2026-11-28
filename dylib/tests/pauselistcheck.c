@@ -565,7 +565,18 @@ int main(int argc, char **argv) {
     put(pkg, "beta", "publicbeta\n");
 
     pure_cases();
+    // These cases test the list itself; the shipped build ignores it (NP_BREAKER_OFF_MODES).
+    g_off_modes = 1;
     runtime_cases();
+
+    printf("off modes disabled\n");
+    g_off_modes = 0;
+    {
+        int before = count_lines(root, "curl-calls");
+        CHECK("the shipped build starts active", start() == NP_MODE_ACTIVE);
+        usleep(300 * 1000);
+        CHECK("and fetches no list", count_lines(root, "curl-calls") == before);
+    }
 
     int strays = 0;
     DIR *dh = opendir(support);
