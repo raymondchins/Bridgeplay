@@ -712,11 +712,12 @@ private struct WizardRow: View {
 // Steam's risks in one line, with the full points a click away.
 private struct RisksNote: View {
     @Binding var expanded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Button {
-                withAnimation(SetupAssistantView.rowSpring) { expanded.toggle() }
+                withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : SetupAssistantView.rowSpring) { expanded.toggle() }
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "exclamationmark.triangle")
@@ -725,9 +726,10 @@ private struct RisksNote: View {
                     Text(String(localized: "Risks: Valve doesn't support this, and anti-cheat games may not start.").keepingLastWordsTogether)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
-                    Image(systemName: "chevron.right")
+                    // Under Reduce Motion the chevron swaps without turning.
+                    Image(systemName: reduceMotion && expanded ? "chevron.down" : "chevron.right")
                         .font(.system(size: 9, weight: .bold))
-                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                        .rotationEffect(.degrees(!reduceMotion && expanded ? 90 : 0))
                 }
                 .contentShape(Rectangle())
             }

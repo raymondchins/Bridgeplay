@@ -35,7 +35,7 @@ enum SetupChecks {
     }
 
     static func size(_ bytes: Int64) -> String {
-        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        bytes.formatted(.byteCount(style: .file))
     }
 
     static let storageSettings = URL(string: "x-apple.systempreferences:com.apple.settings.Storage")!
