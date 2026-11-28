@@ -435,6 +435,9 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 #define NP_L_FL_TITLE "npL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\"," \
     "\"帧率限制（与显示器同步，不会更改其刷新率）\",\"Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)\")"
 #define NP_L_FL_SWITCH "npL(\"Enable frame limit\",\"启用帧率限制\",\"Attiva limite di fotogrammi\")"
+#define NP_L_FL_COOL "npL(\"Cool and steady (Lowers the frame limit while the Mac runs hot)\"," \
+    "\"凉爽稳定（Mac 发热时降低帧率上限）\",\"Fresco e stabile (abbassa il limite di fotogrammi quando il Mac \\u00e8 caldo)\"," \
+    "\"Прохладно и стабильно (снижает ограничение частоты кадров, пока Mac сильно нагрет)\")"
 #define NP_L_SQ_TITLE "npL(\"Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)\"," \
     "\"缩放过滤（当游戏绘制的像素少于屏幕时生效，例如关闭高分辨率时）\"," \
     "\"Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)\")"
@@ -535,12 +538,13 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
        is on, so a value from the game, which knows that display, is kept up to 360 even when \
        Fx.fm, read when Steam loaded this page, is lower. display and half from earlier releases show as the rate they give, 0 or no value \
        as no limit. Without Steam's slider, a menu in steps of 5 stands in. npKey and npSet are for \
-       MSCXApply, which sets the value even while the switch dims the slider. */ \
+       MSCXApply, which sets the value even while the switch dims the slider. ex is one more row \
+       under the switch (Cool and steady, BRIDGEPLAY_SUSTAINED, for Wine games). */ \
     "fm=+Fx.fm>=15&&+Fx.fm<=360?+Fx.fm:60," \
     "lf=x=>{x=(x||\"\").toLowerCase();return x===\"display\"?fm:x===\"half\"?Math.max(15,Math.round(fm/2)):" \
     "/^\\d+$/.test(x)&&+x>=10&&+x<=360?Math.min(fm,Math.max(15,+x)):0}," \
     "SL=" SLIDER "," \
-    "FL=(l,dl)=>{const n=lf(ev(\"BRIDGEPLAY_FPS_LIMIT\")),off=!n||ev(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",v=n||fm," \
+    "FL=(l,dl,ex)=>{const n=lf(ev(\"BRIDGEPLAY_FPS_LIMIT\")),off=!n||ev(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",v=n||fm," \
     "set=(x,top)=>{x=Math.min(top||fm,Math.max(15,Math.round(+x)));if(!(x>=15))return;const b=dv(\"BRIDGEPLAY_FPS_LIMIT\");" \
     "s([[\"BRIDGEPLAY_FPS_LIMIT\",/^\\d+$/.test(b)&&+b===x?\"\":String(x)]])}," \
     "tog=on=>{const d=!on,b=dv(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",ps=[[\"BRIDGEPLAY_FPS_LIMIT_OFF\",d?(b?\"\":\"1\"):(b?\"0\":\"\")]];" \
@@ -552,7 +556,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "(0," RT ".jsx)(" BARREL ".m,{rgOptions:R.sort((a,b)=>a-b).map(x=>({data:x,label:x+\" FPS\"})),selectedOption:v," \
     "disabled:off,npKey:\"BRIDGEPLAY_FPS_LIMIT\",npSet:x=>set(x,360),onChange:o=>{off||set(o.data)}})})," \
     "(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:dl,checked:!off,npKey:\"BRIDGEPLAY_FPS_LIMIT_OFF\"," \
-    "onChange:tog})]},\"fpl\")}," \
+    "onChange:tog}),ex]},\"fpl\")}," \
     /* The filter Core Animation scales the game's frames to the screen with. 0 leaves it as \
        Wine (nearest with High Resolution off) or a native game (linear) sets it. */ \
     "sq=x=>{x=(x||\"\").toLowerCase();return/^(linear|nearest|integer)$/.test(x)?x:\"0\"}," \
@@ -590,7 +594,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "OV=[\"CX_GRAPHICS_BACKEND\",\"MTL_HUD_ENABLED\",\"D3DM_ENABLE_METALFX\",\"DXMT_ENABLE_NVEXT\"," \
     "\"ROSETTA_ADVERTISE_AVX\",\"WINEMSYNC\",\"BRIDGEPLAY_RETINA\",\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"DXMT_CONFIG\"," \
     "\"BRIDGEPLAY_FRAMEGEN\",\"BRIDGEPLAY_FRAMEGEN_QUALITY\",\"BRIDGEPLAY_FRAMEGEN_UI\",\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"," \
-    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\",\"BRIDGEPLAY_FPS_LIMIT_OFF\",\"BRIDGEPLAY_SCALING_FILTER\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
+    "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\",\"BRIDGEPLAY_FPS_LIMIT_OFF\",\"BRIDGEPLAY_SCALING_FILTER\",\"BRIDGEPLAY_NVAPI\",\"BRIDGEPLAY_SUSTAINED\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
     "if(nat)return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
     "PO(" NP_L_PO_TITLE "," NP_L_PO_OPTIONS ")," \
@@ -609,18 +613,22 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "(0," RT ".jsxs)(" BARREL ".XY,{label:npL(\"Graphics\",\"图形\",\"Grafica\"),children:[" \
     "(0," RT ".jsx)(" BARREL ".m,{rgOptions:B,selectedOption:b," \
     "onChange:v=>s([[\"CX_GRAPHICS_BACKEND\",v.data],[\"BRIDGEPLAY_BACKEND\",\"\"]]" \
-    ".concat(\"\"===v.data||\"d3dmetal\"===v.data?[]:[[\"D3DM_ENABLE_METALFX\",\"\"]])" \
+    ".concat(\"\"===v.data||\"d3dmetal\"===v.data?[]:[[\"D3DM_ENABLE_METALFX\",\"\"],[\"BRIDGEPLAY_NVAPI\",\"\"]])" \
     ".concat(\"\"===v.data||\"dxmt\"===v.data?[]:" \
     "[[\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"\"],[\"DXMT_CONFIG\",fx(\"\")]])" \
     ".concat(\"dxmt\"===v.data?[]:[[\"DXMT_ENABLE_NVEXT\",\"\"]]))})," \
     "dm&&T([\"D3DM_ENABLE_METALFX\"],\"DLSS\",\"1\")," \
+    /* NVAPI=1 is a shipped default; off writes BRIDGEPLAY_NVAPI=0, which wins over every conf. */ \
+    "dm&&T([\"BRIDGEPLAY_NVAPI\"],npL(\"Report an NVIDIA GPU (Needed for DLSS. Turn off if the game crashes or looks wrong)\"," \
+    "\"报告为 NVIDIA GPU（DLSS 需要。游戏崩溃或画面异常时关闭）\"," \
+    "\"Segnala una GPU NVIDIA (serve per DLSS. Disattiva se il gioco si blocca o si vede male)\"),\"1\",\"0\")," \
     "\"dxmt\"===b&&T([\"DXMT_ENABLE_NVEXT\"],\"DLSS\",\"1\")," \
     "!fex&&X(\"ROSETTA_ADVERTISE_AVX\",npL(\"Advertise AVX2 to Rosetta\",\"向 Rosetta 声明 AVX2 支持\",\"Segnala AVX2 a Rosetta\"))," \
     "T([\"WINEMSYNC\"],\"MSync\",\"1\",\"0\")," \
     "T([\"BRIDGEPLAY_RETINA\"],npL(\"High Resolution\",\"高分辨率\",\"Alta risoluzione\"),\"1\",\"0\")" \
     "]},\"gfx\")," \
     "PO(" NP_L_PO_TITLE "," NP_L_PO_OPTIONS ")," \
-    "FL(" NP_L_FL_TITLE "," NP_L_FL_SWITCH ")," \
+    "FL(" NP_L_FL_TITLE "," NP_L_FL_SWITCH ",T([\"BRIDGEPLAY_SUSTAINED\"]," NP_L_FL_COOL ",\"1\",\"0\"))," \
     "SQ(" NP_L_SQ_TITLE ",[" \
     "{data:\"0\",label:npL(\"Automatic (Wine keeps pixels sharp with High Resolution off)\"," \
     "\"自动（关闭高分辨率时 Wine 保持像素锐利）\",\"Automatico (con Alta risoluzione disattivata Wine mantiene i pixel nitidi)\")}," \
@@ -1214,6 +1222,7 @@ static const char *const fx_bridgeplay_keys[] = {
     "BRIDGEPLAY_RETINA", "BRIDGEPLAY_FRAMEGEN", "BRIDGEPLAY_FRAMEGEN_QUALITY",
     "BRIDGEPLAY_FRAMEGEN_UI", "BRIDGEPLAY_FRAMEGEN_FALLBACK", "BRIDGEPLAY_FRAMEGEN_ENGINE",
     "BRIDGEPLAY_PERF_OVERLAY", "BRIDGEPLAY_FPS_LIMIT", "BRIDGEPLAY_FPS_LIMIT_OFF", "BRIDGEPLAY_SCALING_FILTER",
+    "BRIDGEPLAY_NVAPI", "BRIDGEPLAY_SUSTAINED",
 };
 
 // The BRIDGEPLAY_ name whose suffix follows prefix in key ("" for the run script's short
@@ -1272,7 +1281,7 @@ static int fx_word(const char *v, size_t max) {
 static int fx_safe(const char *v) { return fx_word(v, 16); }
 
 typedef struct { char key[32]; char val[20]; } fx_pair_t;
-typedef struct { fx_pair_t p[16]; size_t n; } fx_set_t;
+typedef struct { fx_pair_t p[24]; size_t n; } fx_set_t;
 
 static void fx_set(fx_set_t *set, const char *key, const char *val) {
     for (size_t i = 0; i < set->n; i++)

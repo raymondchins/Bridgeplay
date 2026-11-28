@@ -118,6 +118,18 @@ import Testing
         #expect(GameDefaults.setting(.nvapi, to: "1", in: off, shipped: shipped) == GameDefaults.header + "\n")
     }
 
+    // Report an NVIDIA GPU in Steam Properties writes BRIDGEPLAY_NVAPI per game, over every conf.
+    @Test func reportAnNvidiaGpuHasAPerGameLaunchOption() {
+        #expect(GameDefaults.Setting.nvapi.launchKeys == ["BRIDGEPLAY_NVAPI", "NOTPROTON_NVAPI"])
+        #expect(GameDefaults.launchOverrides("BRIDGEPLAY_NVAPI=0 %command%") == [.nvapi])
+        #expect(GameDefaults.launchOverrides("NOTPROTON_NVAPI=0 %command%") == [.nvapi])
+        #expect(GameDefaults.launchOverrides("%command% BRIDGEPLAY_NVAPI=0").isEmpty)
+        // A conf takes either spelling, as the run script does.
+        #expect(GameDefaults.value(.nvapi, in: "BRIDGEPLAY_NVAPI=0\n") == "0")
+        #expect(GameDefaults.confOverrides("BRIDGEPLAY_NVAPI=0\n") == [.nvapi])
+        #expect(GameDefaults.setting(.nvapi, to: "1", in: "BRIDGEPLAY_NVAPI=0\n") == GameDefaults.header + "\nNVAPI=1\n")
+    }
+
     @Test func resetRemovesTheLineWhateverItSays() {
         let text = "# mine\nBACKEND=dxvk\nFRAMEGEN=3\n"
         #expect(GameDefaults.setting(.backend, to: nil, in: text) == "# mine\nFRAMEGEN=3\n")

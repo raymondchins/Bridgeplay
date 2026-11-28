@@ -26,7 +26,7 @@
  * DYLD_INSERT_LIBRARIES is composed, never replaced:
  *   gamepad shim (~/.bridgeplay/libnp_gamepad.dylib, unless NP_PAD_MODE=off)
  *   overlay shim (only when BRIDGEPLAY_FRAMEGEN, BRIDGEPLAY_PERF_OVERLAY,
- *   BRIDGEPLAY_FPS_LIMIT or BRIDGEPLAY_SCALING_FILTER is set and not 0/off, the
+ *   BRIDGEPLAY_FPS_LIMIT, BRIDGEPLAY_SCALING_FILTER or BRIDGEPLAY_BENCH is set and not 0/off, the
  *   limit only while BRIDGEPLAY_FPS_LIMIT_OFF is not 1)
  *   DYLD_INSERT_LIBRARIES given through the sources above
  *   DYLD_INSERT_LIBRARIES and STEAM_DYLD_INSERT_LIBRARIES received from Steam
@@ -564,16 +564,17 @@ int main(int argc, char **argv)
 		if (file_exists(pad_shim) || (pad_mode && *pad_mode))
 			libs_add(&L, pad_shim); /* warns and skips when missing */
 	}
-	/* frame generation, the performance overlay, the frame rate limit and the scaling
-	   filter live in the overlay shim */
+	/* frame generation, the performance overlay, the frame rate limit, the scaling
+	   filter and frame-time capture live in the overlay shim */
 	const char *framegen = getenv("NOTPROTON_FRAMEGEN");
 	const char *perf = getenv("NOTPROTON_PERF_OVERLAY");
 	const char *limit = getenv("NOTPROTON_FPS_LIMIT");
 	const char *limit_off = getenv("NOTPROTON_FPS_LIMIT_OFF");
 	const char *filter = getenv("NOTPROTON_SCALING_FILTER");
+	const char *bench = getenv("NOTPROTON_BENCH");
 	int limited = limit && *limit && !is_off(limit) && !(limit_off && strcmp(limit_off, "1") == 0);
 	if (home && ((framegen && *framegen && !is_off(framegen)) || (perf && *perf && !is_off(perf)) ||
-	             limited || (filter && *filter && !is_off(filter)))) {
+	             limited || (filter && *filter && !is_off(filter)) || (bench && *bench && !is_off(bench)))) {
 		char *support = current_or_legacy(home, SUPPORT_REL, LEGACY_SUPPORT_REL, dir_exists);
 		libs_add(&L, join3(support, OVERLAY_SHIM_REL, ""));
 	}

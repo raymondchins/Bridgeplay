@@ -287,6 +287,8 @@ static int stage_claimed(Class seen, Class *held, const char *stage)
 	return 1;
 }
 
+static int bench_wanted(void); // bench.m
+
 // Frame generation (NOTPROTON_FRAMEGEN=1), one translation unit with the shim
 #include "framegen.m"
 #include "displaymode.m"
@@ -296,6 +298,7 @@ static int stage_claimed(Class seen, Class *held, const char *stage)
 #include "scalefilter.m"
 #include "cursor.m"
 #include "sidebar.m"
+#include "bench.m"
 
 static void encoder_mark(id encoder, NSUInteger format, id<MTLCommandBuffer> buffer)
 {
@@ -1078,6 +1081,8 @@ static id hook_next_drawable(id layer, SEL selector)
 		framegen_note_drawable(layer, drawable);
 	}
 	if (drawable != nil) {
+		if (bench_state == 1)
+			bench_note_frame(layer);
 		perfhud_note_frame(layer);
 		scalefilter_note(layer);
 		sidebar_note_layer(layer);
@@ -1149,6 +1154,7 @@ __attribute__((constructor)) static void overlay_shim_load(void)
 	}
 
 	_dyld_register_func_for_add_image(image_added);
+	int benching = bench_init();
 	framegen_init();
 
 	int hooked = interpose(layer, "setPixelFormat:", (IMP)hook_set_pixel_format,
@@ -1159,6 +1165,7 @@ __attribute__((constructor)) static void overlay_shim_load(void)
 	const char *vsync = getenv("NOTPROTON_VSYNC");
 	// A frame rate limit paces to the display, so it waits for the display as VSYNC does
 	int limited = framelimit_init();
+	limited |= framelimit_sustained_init();
 	int quick = sidebar_init();
 	force_vsync = vsync != NULL && strcmp(vsync, "1") == 0;
 	// The quick settings can set a limit while the game runs, so the hook is in place then too
@@ -1169,7 +1176,7 @@ __attribute__((constructor)) static void overlay_shim_load(void)
 	// The overlay times frames from nextDrawable, which otherwise waits for lsteamclient's
 	// np_overlay_shim_install: a native game or one without the Steam API never calls it
 	int filtered = scalefilter_init();
-	if (perfhud_init() || limited || filtered || quick)
+	if (perfhud_init() || limited || filtered || quick || benching)
 		hook_layer_drawable(layer);
 
 	shim_log("overlay_shim_load: pid=%d exe=%s layer_hooks=%d overlay=%s\n", getpid(),

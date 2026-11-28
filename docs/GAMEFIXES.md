@@ -37,8 +37,8 @@ whitespace around a line. There are no inline comments: everything after the fir
 is the value. The files are never run as shell code. A file over 64 KiB is ignored. A line
 is rejected, and the rejection logged, when:
 
-- the key is not on the list below (`RETINA`, `STDOUT_NULL`, `VSYNC`, `GAME_MODE`, `HIDE_WINE_EXPORTS`,
-  `FRAMEGEN`, the `FRAMEGEN_*` keys, `PERF_OVERLAY`, `FPS_LIMIT`, `FPS_LIMIT_OFF` and `SCALING_FILTER` also
+- the key is not on the list below (`RETINA`, `STDOUT_NULL`, `VSYNC`, `GAME_MODE`, `HIDE_WINE_EXPORTS`, `NVAPI`,
+  `FRAMEGEN`, the `FRAMEGEN_*` keys, `PERF_OVERLAY`, `FPS_LIMIT`, `FPS_LIMIT_OFF`, `SCALING_FILTER`, `SUSTAINED`, `EXE` and `EXE_FROM` also
   accept their `BRIDGEPLAY_` name, such as `BRIDGEPLAY_RETINA=1`; `BACKEND` does not)
 - the value contains a backtick, `$(`, a quote or a control character, or is over 1024 characters
 
@@ -57,9 +57,10 @@ is rejected, and the rejection logged, when:
 | `FRAMEGEN_ENGINE` | `own`, `metalfx` | Same as `BRIDGEPLAY_FRAMEGEN_ENGINE`: the built-in optical flow (`own`, the default) or MetalFX frame interpolation |
 | `FPS_LIMIT` | `15` to `360`; also read: `0`, `display`, `half`, `10` to `14` | Same as `BRIDGEPLAY_FPS_LIMIT`: overlay-shim holds the game to that many frames per second, never below 15 nor above the refresh rate of the display the game is on, and turns display sync on as `VSYNC=1` does, so frames land on refreshes. It never changes the display's refresh rate. A number at or above the display's rate is display sync alone. Frame generation adds its frames on top. The settings write whole numbers from a slider; values from earlier releases still work: `display` is the display's rate, `half` half of it, `10` to `14` count as 15, and `0` is no limit. No limit by default. Works on the game's Metal layer (D3DMetal, DXMT, DXVK through MoltenVK, native Metal games), not on OpenGL |
 | `FPS_LIMIT_OFF` | `0`, `1` | Same as `BRIDGEPLAY_FPS_LIMIT_OFF`, the Enable frame limit switch turned off: `1` lifts the limit and keeps `FPS_LIMIT`, so switching it back on (`0`) restores the same value |
+| `SUSTAINED` | `0`, `1` | Same as `BRIDGEPLAY_SUSTAINED`, **Cool and steady** in the game's Steam Properties › Bridgeplay, under the frame rate limit. `1` makes overlay-shim lower the frame rate limit while macOS reports the Mac as hot: to 3/4 of it at thermal state serious and 1/2 at critical (of the display's rate when no limit is set), at a rate the display divides evenly and never below 30, so frame times stay even instead of swinging as the chip slows down. It goes back to the limit as set once the Mac has been cooler for 30 seconds, and never raises a limit. A step turns display sync on as any limit does. The overlay shows the lowered cap; the run log has an `overlay_shim sustained:` line for each step. Off (`0`) by default. Metal layers only, as `FPS_LIMIT` |
 | `SCALING_FILTER` | `0`, `linear`, `nearest`, `integer` | Same as `BRIDGEPLAY_SCALING_FILTER`: the filter Core Animation scales the game's frames up to the screen with, when the game draws fewer pixels than the screen (High Resolution off, the default, draws half a Retina display's pixels; a game set below its window's resolution). `0` (the default) leaves it as it is: Wine's Mac driver uses nearest while High Resolution is off, so Windows games are pixel-doubled, and native games get macOS's linear. `linear` smooths, `nearest` keeps every pixel sharp at any scale. `integer` is nearest at an exact whole-number scale and linear otherwise. It runs after the game and after DXMT's MetalFX upscaling, and changes nothing when the frame already matches the screen. Metal layers only (D3DMetal, DXMT, DXVK through MoltenVK, native Metal games), not OpenGL |
 | `PERF_OVERLAY` | `0`, `fps`, `summary`, `detailed` | Same as `BRIDGEPLAY_PERF_OVERLAY`: Bridgeplay's performance overlay, drawn by overlay-shim in the top-left corner. `fps` is the frame rate alone, `summary` one row with frame time, CPU, GPU, memory and battery, `detailed` a panel with a frame-time graph. Off (`0`) by default. It sits on the game's Metal layer (D3DMetal, DXMT, DXVK through MoltenVK, native Metal games), not on OpenGL. `MTL_HUD_ENABLED=1` shows Apple's Metal HUD instead of it |
-| `NVAPI` | `0`, `1` | `1` turns on Apple's `nvapi64` and `nvngx` (DLSS on MetalFX) on an engine with a linked Game Porting Toolkit, for `d3dmetal` only. On WineCX 11.17, Bridgeplay's `nvapi-shim` goes in front of Apple's nvapi to report a newer driver, and `NOTPROTON_NGX_SIGNER` lets Streamline accept Apple's `nvngx` (`ngx-signer-patch/`); 11.15 ships neither, so Streamline games there can still lack DLSS. It also makes D3DMetal report an NVIDIA GeForce RTX 4090 (`D3DM_VENDOR_ID=0x10de`, `D3DM_DEVICE_ID=0x2684`, `D3DM_DEVICE_DESCRIPTION`; a `D3DM_*` from a conf or the launch options wins) and a driver version of 32.0.15.9541 (`NOTPROTON_DRIVER_VERSION`), since games offer DLSS only on an NVIDIA adapter. Without the key, the run script treats it as `0`. Bridgeplay's `gamefixes-default/default.conf` sets `NVAPI=1`, so it is on for every game unless a later conf says `NVAPI=0`. It has no launch-option spelling. An nvapi that answers sends some games down NVIDIA-only paths, which is the reason to turn it off |
+| `NVAPI` | `0`, `1` | `1` turns on Apple's `nvapi64` and `nvngx` (DLSS on MetalFX) on an engine with a linked Game Porting Toolkit, for `d3dmetal` only. On WineCX 11.17, Bridgeplay's `nvapi-shim` goes in front of Apple's nvapi to report a newer driver, and `NOTPROTON_NGX_SIGNER` lets Streamline accept Apple's `nvngx` (`ngx-signer-patch/`); 11.15 ships neither, so Streamline games there can still lack DLSS. It also makes D3DMetal report an NVIDIA GeForce RTX 4090 (`D3DM_VENDOR_ID=0x10de`, `D3DM_DEVICE_ID=0x2684`, `D3DM_DEVICE_DESCRIPTION`; a `D3DM_*` from a conf or the launch options wins) and a driver version of 32.0.15.9541 (`NOTPROTON_DRIVER_VERSION`), since games offer DLSS only on an NVIDIA adapter. Without the key, the run script treats it as `0`. Bridgeplay's `gamefixes-default/default.conf` sets `NVAPI=1`, so it is on for every game unless a later conf says `NVAPI=0`. Per game, **Report an NVIDIA GPU** in the game's Steam Properties › Bridgeplay (shown for D3DMetal) writes `BRIDGEPLAY_NVAPI=0` or `1` into its launch options, which wins over every conf; the switch writes nothing when it matches the confs, and picking DXMT, DXVK or WineD3D drops it. An nvapi that answers sends some games down NVIDIA-only paths (crashes, wrong rendering), which is the reason to turn it off |
 | `DLSS_FG` | `0`, `1` | With `NVAPI=1` on `d3dmetal`, `1` sets `CX_ACTIVE_GRAPHICS_BACKEND=d3dmetal` so WineCX reports hardware GPU scheduling, which DLSS frame generation requires. Experimental and off by default (`gamefixes-default/default.conf` leaves it out): [frankea/Whisky#231](https://github.com/frankea/Whisky/pull/231) saw MetalFX frame interpolation on an M5 with D3DMetal 4.0b2 hang WindowServer |
 | `STDOUT_NULL` | `0`, `1` | `1` starts the game without a stdout handle, as Steam on Windows does. Source 2 treats any stdout as a console build (`Plat_IsConsoleApplication`) and then skips NGX, so Deadlock offers no DLSS |
 | `VSYNC` | `0`, `1` | `1` makes the game's Metal layer wait for the display even when the game turns vsync off, like forcing vsync in the NVIDIA control panel. For games that lock vsync off with frame generation on (Resident Evil Requiem) and tear above the refresh rate |
@@ -205,6 +206,39 @@ place yet is tried again for about a minute. One left from an earlier Steam sess
 have been another Steam account's, is dropped. The Metal HUD, when a game starts with it,
 stays the only overlay and the overlay row is locked. Controllers cannot open or move through
 the quick settings. `BRIDGEPLAY_QUICK_SETTINGS=0` in the launch options turns them off.
+
+## Frame-time capture
+
+`BRIDGEPLAY_BENCH=1 %command%` in a game's launch options (native games too) makes overlay-shim
+write the time between the game's frames, one line per frame in milliseconds, to
+`~/Library/Application Support/bridgeplay/launchers/<appid>/bench/<UTC time>-<pid>.csv`, flushed
+once a second. Frame generation stays off while it is set, so each frame counted is one the game
+rendered. The frame rate limit still applies and is noted in the file's header, with the chip and
+the macOS version. The newest 20 captures per game are kept. It is a launch option only, not a conf
+key. A process that never draws writes no file.
+
+`scripts/bench-summary.py <file or bench folder>` prints the average frame rate, the 1% and 0.1%
+lows (the frame rate over the slowest 1% and 0.1% of frames), frame-time percentiles and stutters
+(frames over 50 ms). `--skip 10` leaves out the first 10 seconds, `--json` prints JSON. Gaps of a
+second or more (loading, the game in the background) are left out and counted as pauses.
+
+`scripts/bench-ab.py` compares two settings or backends for one game. Collect each side's
+captures (and, for launch times, the `time:` lines of `bridgeplay-run.log`) in its own folder,
+then run `scripts/bench-ab.py compare A/ --vs B/`. It leaves out the first run of each side
+(`--warmup 1`) and the first 10 seconds of each capture (`--skip 10`), needs 3 runs per side
+after that (`--min-runs 3`), and compares the median frame time, 1% low, average frame rate,
+time to game start and time to first frame. A change counts only when a bootstrap over runs
+puts its 95% interval clear of zero and the median moved by at least 1% (`--min-effect 1`).
+It warns when the chip, macOS or frame rate limit differ between sides.
+
+To collect the runs, set the game's launch options for side A by hand (with
+`BRIDGEPLAY_BENCH=1`), then `scripts/bench-ab.py run --appid <id> --label A --out runs --runs 4
+--launch-steam`. Each run opens `steam://rungameid/<id>`, waits until the run log says the game
+exited (quit it, or let its benchmark finish), copies the new captures and that run's log to
+`runs/A/`, and cools down 30 seconds. Then set B's options and repeat with `--label B`. For ABAB
+order, use `--runs 1` and alternate. Without `--launch-steam` it opens nothing. It only reads
+Steam's files, and finds the run log through `libraryfolders.vdf`, so games on other library
+folders work.
 
 ## Native macOS games
 

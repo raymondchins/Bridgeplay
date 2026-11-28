@@ -127,7 +127,7 @@ launch() {
 			compose_dll_overrides
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
-				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE NOTPROTON_PERF_OVERLAY NOTPROTON_FPS_LIMIT NOTPROTON_FPS_LIMIT_OFF NOTPROTON_SCALING_FILTER CX_GRAPHICS_BACKEND \
+				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE NOTPROTON_PERF_OVERLAY NOTPROTON_FPS_LIMIT NOTPROTON_FPS_LIMIT_OFF NOTPROTON_SCALING_FILTER NOTPROTON_SUSTAINED CX_GRAPHICS_BACKEND \
 				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_GAME_MODE NOTPROTON_HIDE_WINE_EXPORTS NOTPROTON_ROCKSTAR_DXGI CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
@@ -471,6 +471,30 @@ is "beside Apple's nvapi as the nvapi.dll placeholder it loads" "apple nvapi64" 
 user_conf 'NVAPI=0'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "NVAPI=0 disables it again" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
+# Report an NVIDIA GPU in Steam Properties: BRIDGEPLAY_NVAPI in the launch options wins per game.
+nv_off="d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=d;$trio"
+nv_on="d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64=n,b;nvngx=b;$trio"
+user_conf 'NVAPI=1'
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_NVAPI=0
+is "the launch option BRIDGEPLAY_NVAPI=0 wins over a conf NVAPI=1" "$nv_off" "$(got WINEDLLOVERRIDES)"
+is "and D3DMetal keeps Apple's adapter" "<unset> <unset>" "$(got D3DM_VENDOR_ID) $(got NOTPROTON_NGX_SIGNER)"
+has "and the log names the launch options" "NVAPI=0 from the launch options" "$case_dir/log"
+user_conf 'NVAPI=0'
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_NVAPI=1
+is "BRIDGEPLAY_NVAPI=1 wins over a conf NVAPI=0" "$nv_on" "$(got WINEDLLOVERRIDES)"
+is "and reports the NVIDIA adapter" "0x10de 0x2684" "$(got D3DM_VENDOR_ID) $(got D3DM_DEVICE_ID)"
+user_conf 'NVAPI=1'
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_NVAPI=0 BRIDGEPLAY_NVAPI=1
+is "NOTPROTON_NVAPI wins when both spellings are set" "$nv_off" "$(got WINEDLLOVERRIDES)"
+: > "$case_dir/log"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_NVAPI=yes
+is "a launch option that is not 0 or 1 leaves the conf's NVAPI" "$nv_on" "$(got WINEDLLOVERRIDES)"
+has "and says so" "BRIDGEPLAY_NVAPI in the launch options ignored: not 0 or 1" "$case_dir/log"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_NVAPI=
+is "an empty launch option leaves the conf's NVAPI" "$nv_on" "$(got WINEDLLOVERRIDES)"
+user_conf 'BRIDGEPLAY_NVAPI=0'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a conf takes the BRIDGEPLAY_NVAPI name" "$nv_off" "$(got WINEDLLOVERRIDES)"
 # The shipped Diablo IV conf over the shipped NVAPI=1 for every game.
 d4_conf="$(dirname "$SRC")/../../gamefixes/2344520.conf"
 if [ -f "$d4_conf" ]; then
@@ -754,6 +778,32 @@ for bad in 5 9 361 400 1000 max 30fps -30; do
 	has "FPS_LIMIT=$bad is refused" "rejected FPS_LIMIT: not 0, display, half or 10 to 360" "$case_dir/log"
 	is "a refused FPS_LIMIT=$bad leaves no limit" "<unset>" "$(got NOTPROTON_FPS_LIMIT)"
 done
+echo "== SUSTAINED"
+new_case
+full_engine
+user_conf 'SUSTAINED=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "SUSTAINED=1 maps to NOTPROTON_SUSTAINED" "1" "$(got NOTPROTON_SUSTAINED)"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_SUSTAINED=0
+is "a launch option turns Cool and steady off over the confs" "0" "$(got NOTPROTON_SUSTAINED)"
+new_case
+full_engine
+printf 'SUSTAINED=1\n' > "$case_dir/support/gamefixes/default.conf"
+user_conf 'BRIDGEPLAY_SUSTAINED=0'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a per-game SUSTAINED wins over Game Defaults, BRIDGEPLAY_ name and all" "0" "$(got NOTPROTON_SUSTAINED)"
+new_case
+full_engine
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "no conf leaves Cool and steady off" "<unset>" "$(got NOTPROTON_SUSTAINED)"
+for bad in 2 on yes; do
+	new_case
+	full_engine
+	user_conf "SUSTAINED=$bad"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	has "SUSTAINED=$bad is refused" "rejected SUSTAINED: not 0 or 1" "$case_dir/log"
+	is "a refused SUSTAINED=$bad leaves it off" "<unset>" "$(got NOTPROTON_SUSTAINED)"
+done
 echo "== quick-settings promoted over launch options"
 # The in-game sidebar's pending change wins over launch options for the current run. The
 # file is left in place for the next relaunch (the Steam JS poller unlinks it when it runs),
@@ -903,15 +953,22 @@ for spec in '0:none' 'off:none' 'linear:shim' 'nearest:shim' 'integer:shim'; do
 	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
 	is "NOTPROTON_SCALING_FILTER=$sfv without the Steam overlay: $want" "$want" "$got_dyld"
 done
+for spec in '0:none' 'yes:none' '1:shim'; do
+	sus=${spec%%:*} want=${spec#*:}
+	env -i PATH="$PATH" NOTPROTON_SUSTAINED="$sus" "$work/launcher/Contents/MacOS/launcher" game.exe >/dev/null 2>&1 || true
+	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
+	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
+	is "NOTPROTON_SUSTAINED=$sus without the Steam overlay: $want" "$want" "$got_dyld"
+done
 
 echo "== the launcher receives the allow-listed variables"
 set --
 out=$(env -i PATH="$PATH" forward="$forward" VKD3D_CONFIG=dxr MVK_CONFIG_LOG_LEVEL=1 \
 	STAGING_SHARED_MEMORY=1 WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 CX_FWD_COMPAT_GL_CTX=1 \
 	DXVK_HUD=fps NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 \
-	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_FPS_LIMIT=30 NOTPROTON_FPS_LIMIT_OFF=1 NOTPROTON_SCALING_FILTER=nearest NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | LC_ALL=C sort | tr '\n' ' ')
+	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_FPS_LIMIT=30 NOTPROTON_FPS_LIMIT_OFF=1 NOTPROTON_SCALING_FILTER=nearest NOTPROTON_SUSTAINED=1 NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | LC_ALL=C sort | tr '\n' ' ')
 is "VKD3D_, MVK_, STAGING_, WINE_ topology and CX_FWD_COMPAT_GL_CTX variables are forwarded" \
-	"CX_FWD_COMPAT_GL_CTX=1 DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FPS_LIMIT=30 NOTPROTON_FPS_LIMIT_OFF=1 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_SCALING_FILTER=nearest STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
+	"CX_FWD_COMPAT_GL_CTX=1 DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FPS_LIMIT=30 NOTPROTON_FPS_LIMIT_OFF=1 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 NOTPROTON_PERF_OVERLAY=summary NOTPROTON_SCALING_FILTER=nearest NOTPROTON_SUSTAINED=1 STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
 
 echo "== the wineserver directory self-heal"
 heal=$(sed -n '/^heal_wine_tmp() {$/,/^}$/p' "$SRC")

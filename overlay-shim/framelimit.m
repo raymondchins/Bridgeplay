@@ -11,6 +11,13 @@
 // a game asks for the next frame's drawable, so the CPU and GPU idle in between rather than
 // queueing frames. Frame generation's own drawables are left alone (fg_internal), so it
 // still fills in between and nothing is throttled twice.
+//
+// Cool and steady, NOTPROTON_SUSTAINED=1 (BRIDGEPLAY_SUSTAINED, SUSTAINED in confs): when macOS
+// reports the Mac as hot (thermal state serious, then critical) the limit steps down to 3/4,
+// then 1/2 of what it was (the display's rate without a limit), at a rate the display divides
+// evenly and never below 30, so frame times stay even rather than swinging as the chip slows
+// down. It steps back up once the Mac has been cooler for 30 seconds. The player's own limit is
+// kept as set and only ever lowered.
 
 #import <mach/mach_time.h>
 
@@ -33,20 +40,57 @@ static uint64_t fl_screen_asked;
 static _Atomic int fl_screen_pending;
 static _Atomic uint64_t fl_waits;
 
+// Cool and steady: the switch, and the step now in force (0 none, 1 serious, 2 critical).
+static _Atomic int fl_sustained;
+static _Atomic int fl_step;
+static _Atomic int fl_sustained_started;
+static _Atomic int fl_thermal_test;
+static os_unfair_lock fl_thermal_lock = OS_UNFAIR_LOCK_INIT;
+static double fl_cool_since;
+#define fl_sustained_floor 30
+#define fl_sustained_hold 30.0
+
 static uint64_t fl_ticks(double seconds)
 {
 	return (uint64_t)(seconds * 1e9 * fl_timebase.denom / fl_timebase.numer);
 }
 
-static int framelimit_active(void)
+// The player's own limit, set and switched on
+static int fl_own_active(void)
 {
 	return atomic_load(&fl_mode) != fl_off && !atomic_load(&fl_disabled);
 }
 
-// The cap in frames per second on a display refreshing at hz (0 when not known): fixed
-// limits as set, at least 15 and at most the display's rate, the others from the display.
+static int framelimit_active(void)
+{
+	return fl_own_active() || atomic_load(&fl_step) > 0;
+}
+
+// Cool and steady's cap for a limit of base on a display refreshing at hz (0 when not known):
+// 3/4 of base at step 1, 1/2 at step 2, as the largest rate hz divides evenly at or below that,
+// never below 30. base itself when that would not lower it, or when no such rate is 30 or more:
+// display sync is on, so a rate between divisors would alternate one and two refreshes.
+static double fl_cooled(double base, int hz, int step)
+{
+	if (step <= 0 || base <= fl_sustained_floor)
+		return base;
+	double target = fmax(base * (step >= 2 ? 0.5 : 0.75), fl_sustained_floor);
+	double rate;
+	if (hz > 0) {
+		int n = (int)ceil(hz / target - 1e-9);
+		if (n < 1 || (double)hz / n < fl_sustained_floor)
+			return base;
+		rate = (double)hz / n;
+	} else {
+		rate = round(target);
+	}
+	return rate < base ? rate : base;
+}
+
+// The player's limit in frames per second on a display refreshing at hz (0 when not known):
+// fixed limits as set, at least 15 and at most the display's rate, the others from the display.
 // 0 when only display sync applies.
-static double framelimit_rate(int hz)
+static double fl_own_rate(int hz)
 {
 	double fixed = atomic_load(&fl_fixed_fps);
 	if (fixed < fl_min_fps)
@@ -61,6 +105,20 @@ static double framelimit_rate(int hz)
 	default:
 		return 0;
 	}
+}
+
+// The cap now: the player's limit, lowered by Cool and steady's step while the Mac runs hot.
+static double framelimit_rate(int hz)
+{
+	double rate = fl_own_active() ? fl_own_rate(hz) : 0;
+	int step = atomic_load(&fl_step);
+	if (step > 0) {
+		double base = rate > 0 ? rate : hz;
+		double cooled = base > 0 ? fl_cooled(base, hz, step) : 0;
+		if (cooled > 0 && (rate <= 0 || cooled < rate))
+			rate = cooled;
+	}
+	return rate;
 }
 
 // What the overlay shows: the cap now in effect, 0 when the display rate is still unknown
@@ -117,10 +175,36 @@ static void fl_track_screen(id layer, uint64_t now)
 	});
 }
 
+static void fl_sustained_start(void);
+static void framelimit_sync_layer(id layer); // overlay_shim.m
+
+// A step that turns the limit on or off changes display sync, which is set on the main thread
+static void fl_follow_step(id layer)
+{
+	if (!atomic_load(&fl_sustained))
+		return;
+	if (!atomic_exchange(&fl_sustained_started, 1))
+		fl_sustained_start();
+	// Each layer remembers the step its display sync was last set for, so a second window
+	// drawing first after a change can't take the game's update (nothing stored is step 0).
+	int step = atomic_load(&fl_step);
+	if ((int)(intptr_t)objc_getAssociatedObject(layer, &fl_follow_step) == step)
+		return;
+	objc_setAssociatedObject(layer, &fl_follow_step, (id)(intptr_t)step, OBJC_ASSOCIATION_ASSIGN);
+	[layer retain];
+	dispatch_async(dispatch_get_main_queue(), ^{
+		framelimit_sync_layer(layer);
+		[layer release];
+	});
+}
+
 // Called on the game's thread before its nextDrawable runs.
 static void framelimit_wait(id layer)
 {
-	if (!framelimit_active() || fg_internal || layer == nil)
+	if (fg_internal || layer == nil)
+		return;
+	fl_follow_step(layer);
+	if (!framelimit_active())
 		return;
 
 	uint64_t now = mach_absolute_time();
@@ -214,8 +298,6 @@ static int framelimit_init(void)
 	return framelimit_active();
 }
 
-static void framelimit_sync_layer(id layer); // overlay_shim.m
-
 // The quick settings' limit, applied from the next frame; layer gets display sync to match.
 // Main thread.
 static int framelimit_set(const char *value, id layer)
@@ -248,6 +330,91 @@ static int framelimit_set_off(const char *value, id layer)
 		framelimit_sync_layer(layer);
 	shim_log("overlay_shim framelimit: %s from the quick settings\n", value[0] == '1' ? "switched off" : "switched on");
 	return 1;
+}
+
+// Cool and steady's step for a thermal state (0 nominal to 3 critical) at a time in seconds:
+// up at once, down only after fl_sustained_hold seconds cooler.
+static int fl_thermal_tick(int thermal, double now)
+{
+	int want = thermal >= 3 ? 2 : thermal == 2 ? 1 : 0;
+	os_unfair_lock_lock(&fl_thermal_lock);
+	int step = atomic_load(&fl_step);
+	if (want > step) {
+		step = want;
+		fl_cool_since = 0;
+	} else if (want < step) {
+		if (fl_cool_since == 0)
+			fl_cool_since = now;
+		if (now - fl_cool_since >= fl_sustained_hold) {
+			step = want;
+			fl_cool_since = 0;
+		}
+	} else {
+		fl_cool_since = 0;
+	}
+	int was = atomic_exchange(&fl_step, step);
+	os_unfair_lock_unlock(&fl_thermal_lock);
+	if (was != step) {
+		static const char *const names[] = { "nominal", "fair", "serious", "critical" };
+		double rate = framelimit_rate(atomic_load(&ph_refresh_hz));
+		char cap[32] = "no limit";
+		if (rate > 0)
+			snprintf(cap, sizeof(cap), "%.0f fps", rate);
+		else if (framelimit_active())
+			snprintf(cap, sizeof(cap), "display sync");
+		shim_log("overlay_shim sustained: thermal %s, step %d, %s\n",
+		         names[thermal < 0 ? 0 : thermal > 3 ? 3 : thermal], step, cap);
+	}
+	return step;
+}
+
+static double fl_seconds(void)
+{
+	return (double)mach_absolute_time() * fl_timebase.numer / fl_timebase.denom / 1e9;
+}
+
+// Started on the first frame, so only a process that draws reads the thermal state
+static void fl_sustained_start(void)
+{
+	dispatch_source_t timer =
+	    dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+	if (timer == NULL)
+		return;
+	dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, 0), 2 * NSEC_PER_SEC, NSEC_PER_SEC);
+	dispatch_source_set_event_handler(timer, ^{
+		if (atomic_load(&fl_thermal_test))
+			return;
+		@autoreleasepool {
+			fl_thermal_tick((int)[[NSProcessInfo processInfo] thermalState], fl_seconds());
+		}
+	});
+	dispatch_resume(timer);
+}
+
+// Reads Cool and steady's switch; returns whether it is on.
+static int framelimit_sustained_init(void)
+{
+	const char *value = getenv("NOTPROTON_SUSTAINED");
+	if (value == NULL || strcmp(value, "1") != 0)
+		return 0;
+	atomic_store(&fl_sustained, 1);
+	shim_log("overlay_shim sustained: on, the limit steps down while the Mac runs hot\n");
+	return 1;
+}
+
+// Test entries: a thermal state at a time in seconds, which stops the real readings, and the
+// cap Cool and steady gives a limit of base on a display at hz at a step
+__attribute__((visibility("default"))) int np_sustained_tick(int thermal, double seconds)
+{
+	if (!atomic_load(&fl_sustained))
+		return -1;
+	atomic_store(&fl_thermal_test, 1);
+	return fl_thermal_tick(thermal, seconds);
+}
+
+__attribute__((visibility("default"))) double np_sustained_rate(double base, int hz, int step)
+{
+	return fl_cooled(base, hz, step);
 }
 
 // Test entry: the limit in force and how often the game waited for its slot

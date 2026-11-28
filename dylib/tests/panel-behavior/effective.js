@@ -30,10 +30,10 @@ put('gamefixes/default.conf',
   'FRAMEGEN=1\nFRAMEGEN_QUALITY=quality\nFRAMEGEN_UI=0\nFRAMEGEN_FALLBACK=0\nFRAMEGEN_ENGINE=metalfx\n');
 put('gamefixes-default/1888930.conf', 'ROSETTA_ADVERTISE_AVX=1\n');
 // Bridgeplay's shipped defaults for every game sit under the user's Game Defaults.
-put('gamefixes-default/default.conf', 'MTL_HUD_ENABLED=0\nDXMT_ENABLE_NVEXT=1\nRETINA=0\n');
+put('gamefixes-default/default.conf', 'MTL_HUD_ENABLED=0\nDXMT_ENABLE_NVEXT=1\nRETINA=0\nNVAPI=1\n');
 // The run script's short keys also take the BRIDGEPLAY_ name.
 put('gamefixes/1778821.conf', 'BRIDGEPLAY_FRAMEGEN=0\nPERF_OVERLAY=summary\n');
-put('gamefixes/1778822.conf', 'BRIDGEPLAY_PERF_OVERLAY=detailed\nFPS_LIMIT=30\n');
+put('gamefixes/1778822.conf', 'BRIDGEPLAY_PERF_OVERLAY=detailed\nFPS_LIMIT=30\nBRIDGEPLAY_NVAPI=0\n');
 put('gamefixes/1778826.conf', 'BRIDGEPLAY_FPS_LIMIT=half\nSCALING_FILTER=integer\n');
 // np-native's own confs: raw variable names, export and quotes allowed, and the pre-3.0
 // NOTPROTON_ spelling still read under the BRIDGEPLAY_ name.
@@ -91,6 +91,8 @@ t0.ok(!!fx && JSON.stringify(fx.g).includes('"BRIDGEPLAY_FRAMEGEN":"1"') &&
       'the FRAMEGEN conf keys map to their variables');
 t0.ok(!!fx && fx.g.DXMT_ENABLE_NVEXT === '1' && fx.g.MTL_HUD_ENABLED === '1' && fx.g.BRIDGEPLAY_RETINA === '1',
       `the shipped global conf is read under the user's (${fx && JSON.stringify(fx.g)})`);
+t0.ok(!!fx && fx.g.BRIDGEPLAY_NVAPI === '1' && fx.a[1778822] && fx.a[1778822].BRIDGEPLAY_NVAPI === '0',
+      `NVAPI reaches the panel as BRIDGEPLAY_NVAPI, in either spelling (${fx && JSON.stringify(fx.a[1778822])})`);
 t0.ok(!!fx && !Object.prototype.hasOwnProperty.call(fx.a, 'default'),
       'the shipped default.conf is not taken for a game');
 t0.ok(!!fx && fx.d.BRIDGEPLAY_FRAMEGEN_UI === '1' && fx.d.BRIDGEPLAY_FRAMEGEN_FALLBACK === '1',
