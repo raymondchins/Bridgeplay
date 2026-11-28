@@ -84,18 +84,10 @@ struct BridgeplayApp: App {
         }
 
         CommandGroup(after: .sidebar) {
-            Button("Status") { pane = .status }
-                .keyboardShortcut("1", modifiers: .command)
-            Button("Prefixes") { pane = .prefixes }
-                .keyboardShortcut("2", modifiers: .command)
-            Button("Prefix Backups") { pane = .backups }
-                .keyboardShortcut("3", modifiers: .command)
-            Button("Guide") { pane = .guide }
-                .keyboardShortcut("4", modifiers: .command)
-            Button("Game Defaults") { pane = .gameDefaults }
-                .keyboardShortcut("5", modifiers: .command)
-            Button("Games") { pane = .games }
-                .keyboardShortcut("6", modifiers: .command)
+            ForEach(Pane.allCases) { item in
+                Button(item.label) { pane = item }
+                    .keyboardShortcut(item.shortcut, modifiers: .command)
+            }
 
             Divider()
 

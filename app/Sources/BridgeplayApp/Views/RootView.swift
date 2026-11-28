@@ -11,6 +11,11 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
+    // ⌘1 for the sidebar's first page, ⌘2 for its second, and so on.
+    var shortcut: KeyEquivalent {
+        KeyEquivalent(Character(String(Self.allCases.firstIndex(of: self)! + 1)))
+    }
+
     var label: String {
         switch self {
         case .status: String(localized: "Status")
