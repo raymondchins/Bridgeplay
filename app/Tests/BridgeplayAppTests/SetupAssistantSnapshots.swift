@@ -14,7 +14,7 @@ struct SetupAssistantSnapshots {
 
     private func render(_ view: some View, _ name: String, size: CGSize, status: SystemStatus, chrome: NSWindow.StyleMask = [.borderless]) throws {
         _ = NSApplication.shared
-        let host = NSHostingView(rootView: view.environment(status).environment(PrefixesModel()))
+        let host = NSHostingView(rootView: view.environment(status).environment(PrefixesModel()).environment(GamesModel()))
         let window = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: chrome,
                               backing: .buffered, defer: false)
         window.appearance = NSAppearance(named: .darkAqua)

@@ -137,7 +137,7 @@ There are no spacing tokens. Pick from the values in use.
   still work.
 - Bottom: the credits in 11 `fg3`, one per line (NotProton, CodeWeavers, Apple's Game Porting
   Toolkit, "Buy CrossOver"), then the library card, then the version. Keep the credits.
-- ⌘1 to ⌘5 and Help › Guide (⌘?) are in `App.swift`.
+- ⌘1 to ⌘6 follow the sidebar's order (`Pane.shortcut`); they and Help › Guide (⌘?) are in `App.swift`.
 
 ## Motion
 
@@ -344,7 +344,6 @@ Inconsistencies in today's UI. Don't copy them. Fix each in its own PR and remov
 | 10 | Mixed case: "Has issues" beside "Smooth"; "Last used" beside "Private Size"; "Enable frame limit" instead of "Enable Frame Limit" | `PlayReportCard`, `PrefixesView`, `webpatch.c`, `GuideView` |
 | 11 | Engine rows are not localized ("Download & Set Up", "Rescan") | `StatusView.crossOverSection` |
 | 12 | Languages: app 4; Steam tab 3; game English; `Install.command` Indonesian | `webpatch.c`, `sidebar.m`, `installer/` |
-| 13 | ⌘1 to ⌘5 are not in the sidebar's order | `App.swift` |
 | 14 | Failures titled "Failed" or "Something went wrong"; red in the app, orange in the installer | Status, Setup Assistant, installer |
 | 15 | "Thanks!", "Prefix rebuild failed!", five "Please", one "couldn't" | `Localizable.xcstrings`, `webpatch.c` |
 | 16 | The installer's first step is a lone spinner | `InstallerView` |

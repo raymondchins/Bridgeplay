@@ -14,6 +14,7 @@ struct SetupPreviewApp: App {
 
     @State private var status = SystemStatus()
     @State private var prefixes = PrefixesModel()
+    @State private var games = GamesModel()
     // --pane gameDefaults opens the main window on that page.
     @State private var pane: Pane = {
         let arguments = CommandLine.arguments
@@ -67,6 +68,7 @@ struct SetupPreviewApp: App {
             RootView(pane: $pane)
                 .environment(status)
                 .environment(prefixes)
+                .environment(games)
                 .frame(minWidth: 800, minHeight: 600)
                 // --cycle-panes switches page every 1.5 s, for profiling page changes
                 .task {

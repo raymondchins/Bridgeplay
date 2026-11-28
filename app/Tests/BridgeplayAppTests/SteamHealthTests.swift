@@ -128,5 +128,121 @@ struct SteamHealthTests {
         #expect(SteamHealthStore.patchBuild(deployed: "4.0.85") == "85")
     }
 
+    // MARK: hero
+
+    private static let payload = PayloadState(expected: 0, present: 0, missing: [], overlayShimPresent: true,
+                                              iconmakerPresent: true, appinfoPresent: true, signatureDatabase: "fixture",
+                                              legacyCompatPresent: 0, legacyCompatExpected: 0, manifestProblem: nil)
+
+    private static func snapshot(runner: RunnerState = .ready(builds: ["crossover-26.0"]), running: Bool = false,
+                                 health: HealthReading = .none, payload: PayloadState = payload) -> StatusSnapshot {
+        StatusSnapshot(steam: .installed(version: "4.0.85"), steamRunning: running, updateBlocked: false,
+                       crossOver: [], runner: runner, payload: payload, steamRunningHere: running, health: health)
+    }
+
+    private static func reading(_ mode: SteamHealth.Mode, _ freshness: HealthReading.Freshness,
+                                hooks: (Int, Int) = (12, 12), paused: Bool = false) -> HealthReading {
+        var health = SteamHealth()
+        health.mode = mode
+        health.hooksInstalled = hooks.0
+        health.hooksTotal = hooks.1
+        return HealthReading(health: health, paused: paused, freshness: freshness)
+    }
+
+    @Test("Ready with CrossOver alone and no free engine; Open Steam while Steam is closed")
+    func readyWithoutFreeEngine() {
+        let closed = HeroState.make(Self.snapshot(), offModes: true)
+        #expect(closed.headline == "Ready to play")
+        #expect(closed.ready)
+        #expect(closed.actions == [.openSteam, .pause])
+        let open = HeroState.make(Self.snapshot(running: true, health: Self.reading(.active, .live)), offModes: true)
+        #expect(open.ready)
+        #expect(open.actions == [.pause])
+    }
+
+    @Test("With the off modes disabled there is no Pause, and a paused file or passive report is ignored")
+    func offModesDisabled() {
+        #expect(!SteamHealthStore.offModesEnabled)
+        #expect(HeroState.make(Self.snapshot()).actions == [.openSteam])
+        #expect(HeroState.make(Self.snapshot(running: true, health: Self.reading(.active, .live))).actions.isEmpty)
+        let paused = HeroState.make(Self.snapshot(running: true, health: Self.reading(.active, .live, paused: true)))
+        #expect(paused.headline == "Ready to play")
+        #expect(paused.actions.isEmpty)
+        #expect(HeroState.make(Self.snapshot(health: HealthReading(paused: true))).ready)
+        #expect(HeroState.make(Self.snapshot(health: Self.reading(.passive, .lastStart))).ready)
+        let partly = HeroState.make(Self.snapshot(running: true, health: Self.reading(.active, .live, hooks: (10, 12))))
+        #expect(partly.headline == "Partly working")
+        #expect(partly.actions.isEmpty)
+    }
+
+    @Test("Almost ready names what is missing")
+    func almostReady() {
+        #expect(HeroState.make(Self.snapshot(runner: .none)).detail == "Install an engine below.")
+        #expect(HeroState.make(Self.snapshot(runner: .unpatched(builds: ["x"], problems: []))).detail == "Set up the engine again below.")
+        var broken = Self.payload
+        broken.signatureDatabase = nil
+        let state = HeroState.make(Self.snapshot(payload: broken))
+        #expect(state.headline == "Almost ready")
+        #expect(state.detail.hasPrefix("Reinstall into Steam"))
+    }
+
+    @Test("Paused, passive after bad starts, partly working and not confirmed each have their own hero")
+    func steamStates() {
+        let paused = HeroState.make(Self.snapshot(health: HealthReading(paused: true)), offModes: true)
+        #expect(paused.headline == "Paused in Steam")
+        #expect(paused.actions == [.resume])
+        #expect(!paused.ready)
+        let pendingPause = HeroState.make(Self.snapshot(running: true, health: Self.reading(.active, .live, paused: true)), offModes: true)
+        #expect(pendingPause.headline == "Pausing at restart")
+        #expect(pendingPause.detail == "Still on until Steam restarts.")
+        #expect(pendingPause.actions == [.resume])
+        // Resumed: this Steam is still off, the next start is not
+        let pendingResume = HeroState.make(Self.snapshot(running: true, health: Self.reading(.off, .live)), offModes: true)
+        #expect(pendingResume.detail == "Restart Steam to resume.")
+        #expect(pendingResume.actions == [.pause])
+        #expect(HeroState.make(Self.snapshot(health: Self.reading(.off, .lastStart)), offModes: true).ready)
+
+        let passive = HeroState.make(Self.snapshot(health: Self.reading(.passive, .lastStart)), offModes: true)
+        #expect(passive.headline == "Turned off")
+        #expect(passive.actions == [.tryAgain])
+        // A passive verdict from another Steam build says nothing
+        #expect(HeroState.make(Self.snapshot(health: Self.reading(.passive, .stale)), offModes: true).ready)
+
+        var listed = Self.reading(.passive, .lastStart)
+        listed.health?.modeReason = "pause_list"
+        let listedHero = HeroState.make(Self.snapshot(health: listed), offModes: true)
+        #expect(listedHero.headline == "Paused for this build")
+        #expect(listedHero.detail.contains("Bridgeplay fix"))
+        #expect(listedHero.actions.isEmpty)
+        listed.health?.pauseFixedIn = "0.7.70"
+        #expect(HeroState.make(Self.snapshot(health: listed), offModes: true).detail.contains("Update to Bridgeplay 0.7.70"))
+        // Bridgeplay updated past the entry: that report is from another build and says nothing
+        listed.freshness = .stale
+        #expect(HeroState.make(Self.snapshot(health: listed), offModes: true).ready)
+
+        let partly = HeroState.make(Self.snapshot(running: true, health: Self.reading(.active, .live, hooks: (10, 12))), offModes: true)
+        #expect(partly.headline == "Partly working")
+        #expect(!partly.ready)
+
+        let unconfirmed = HeroState.make(Self.snapshot(running: true, health: Self.reading(.active, .stale)), offModes: true)
+        #expect(unconfirmed.headline == "Not confirmed")
+        // A report left by the previous start says nothing about this running Steam
+        let earlier = HeroState.make(Self.snapshot(running: true, health: Self.reading(.active, .lastStart)), offModes: true)
+        #expect(earlier.headline == "Not confirmed")
+        #expect(!earlier.ready)
+        // No health file at all (a dylib from before it): today's answer
+        #expect(HeroState.make(Self.snapshot(running: true), offModes: true).ready)
+    }
 }
 
+extension SteamHealthTests {
+    @Test("Web gates count only from this Steam start")
+    func webGates() {
+        var reading = Self.reading(.active, .live)
+        reading.health?.written = Date(timeIntervalSince1970: 1000)
+        reading.web = SteamWebHealth(written: Date(timeIntervalSince1970: 900), gatesApplied: 3, gatesTotal: 5)
+        #expect(HeroState.make(Self.snapshot(running: true, health: reading)).ready)
+        reading.web?.written = Date(timeIntervalSince1970: 1001)
+        #expect(HeroState.make(Self.snapshot(running: true, health: reading)).headline == "Partly working")
+    }
+}

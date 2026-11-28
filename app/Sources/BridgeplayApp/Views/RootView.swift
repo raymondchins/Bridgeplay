@@ -3,6 +3,7 @@ import BridgeplayUI
 
 enum Pane: String, CaseIterable, Identifiable, Hashable {
     case status
+    case games
     case gameDefaults
     case prefixes
     case backups
@@ -10,9 +11,15 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
+    // ⌘1 for the sidebar's first page, ⌘2 for its second, and so on.
+    var shortcut: KeyEquivalent {
+        KeyEquivalent(Character(String(Self.allCases.firstIndex(of: self)! + 1)))
+    }
+
     var label: String {
         switch self {
         case .status: String(localized: "Status")
+        case .games: String(localized: "Games")
         case .gameDefaults: String(localized: "Game Defaults")
         case .prefixes: String(localized: "Prefixes")
         case .backups: String(localized: "Prefix Backups")
@@ -23,6 +30,7 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
     var symbol: String {
         switch self {
         case .status: "checklist"
+        case .games: "gamecontroller"
         case .gameDefaults: "slider.horizontal.3"
         case .prefixes: "externaldrive"
         case .backups: "externaldrive.badge.timemachine"
@@ -112,7 +120,8 @@ struct RootView: View {
             } detail: {
                 Group {
                     switch pane {
-                    case .status: StatusView()
+                    case .status: StatusView(openPane: { pane = $0 })
+                    case .games: GamesView()
                     case .gameDefaults: GameDefaultsView()
                     case .prefixes: PrefixesView()
                     case .backups: BackupsView()
@@ -169,6 +178,8 @@ struct RootView: View {
                 Text("Game Porting Toolkit by Apple")
             }
             Text("[Buy CrossOver](https://www.codeweavers.com/crossover) to support Wine.")
+                // Wraps in a longer language rather than ending in "…" in a short window
+                .fixedSize(horizontal: false, vertical: true)
         }
         .font(BP.sans(11))
         .lineSpacing(2)

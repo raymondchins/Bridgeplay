@@ -551,6 +551,28 @@
         }
       }
     },
+    "%@ is available below." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ è disponibile qui sotto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ доступен ниже."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已可用，见下方。"
+          }
+        }
+      }
+    },
     "%@ is available. Games keep %@ until you update." : {
       "localizations" : {
         "it" : {
@@ -2498,6 +2520,50 @@
         }
       }
     },
+    "Alerts when Steam drops Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avvisa quando Steam rimuove Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сообщает, когда Steam удаляет Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 移除 Bridgeplay 时提醒。"
+          }
+        }
+      }
+    },
+    "Alerts while Bridgeplay is closed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avvisi anche con Bridgeplay chiuso."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оповещения, когда Bridgeplay закрыт."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 关闭时也会提醒。"
+          }
+        }
+      }
+    },
     "Allow Bridgeplay in App Management" : {
       "localizations" : {
         "it" : {
@@ -2538,6 +2604,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "允许客户端更新"
+          }
+        }
+      }
+    },
+    "Allow it in Login Items." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consentilo in Elementi login."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешите в «Объектах входа»."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在“登录项”中允许。"
           }
         }
       }
@@ -2740,24 +2828,24 @@
         }
       }
     },
-    "Another tool changed Steam. Repair Steam to use Bridgeplay." : {
+    "Another tool changed it. Repair Steam." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un altro strumento ha modificato Steam. Ripara Steam per usare Bridgeplay."
+            "value" : "Un altro strumento l'ha modificato. Ripara Steam."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Другая программа изменила Steam. Восстановите Steam, чтобы использовать Bridgeplay."
+            "value" : "Его изменила другая программа. Восстановите Steam."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "其他工具修改了 Steam。请修复 Steam 后再使用 Bridgeplay。"
+            "value" : "另一工具修改了它。请修复 Steam。"
           }
         }
       }
@@ -3000,6 +3088,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "会要求输入 Mac 密码。"
+          }
+        }
+      }
+    },
+    "Auto-Restore" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristino automatico"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автовосстановление"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动恢复"
+          }
+        }
+      }
+    },
+    "Auto-Share Reports" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Condivisione automatica"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автоотправка отчётов"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动分享报告"
           }
         }
       }
@@ -3334,6 +3466,28 @@
         }
       }
     },
+    "Background Check" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controllo in background"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фоновая проверка"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后台检查"
+          }
+        }
+      }
+    },
     "Balanced" : {
       "localizations" : {
         "it" : {
@@ -3444,6 +3598,28 @@
         }
       }
     },
+    "Block Steam Updates" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blocca aggiornamenti di Steam"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Блокировать обновления Steam"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阻止 Steam 更新"
+          }
+        }
+      }
+    },
     "Block Steam client updates" : {
       "localizations" : {
         "it" : {
@@ -3550,6 +3726,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在阻止 Steam 客户端更新"
+          }
+        }
+      }
+    },
+    "Blocking updates can keep Bridgeplay working, but Steam will miss security fixes." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloccare gli aggiornamenti può mantenere Bridgeplay compatibile, ma Steam perderà le correzioni di sicurezza."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Блокировка обновлений может сохранить совместимость с Bridgeplay, но Steam перестанет получать исправления безопасности."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阻止更新可能有助于 Bridgeplay 继续运行，但 Steam 将无法获得安全修复。"
           }
         }
       }
@@ -3685,6 +3883,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 组件"
+          }
+        }
+      }
+    },
+    "Bridgeplay Log" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log di Bridgeplay"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Журнал Bridgeplay"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 日志"
           }
         }
       }
@@ -5467,6 +5687,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提前关闭。"
+          }
+        }
+      }
+    },
+    "Closed until you open it, or until one of these is set for the game." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiuso finché non lo apri o finché una di queste impostazioni non è attiva per il gioco."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свёрнуто, пока вы его не откроете или пока одна из этих настроек не задана для игры."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在你展开它，或为该游戏设置了其中某一项之前，保持收起。"
+          }
+        }
+      }
+    },
+    "Compatibility List" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elenco di compatibilità"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Список совместимости"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容性列表"
           }
         }
       }
@@ -7608,6 +7872,28 @@
         }
       }
     },
+    "FAQ" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Domande frequenti"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Частые вопросы"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "常见问题"
+          }
+        }
+      }
+    },
     "Failed" : {
       "localizations" : {
         "it" : {
@@ -8374,6 +8660,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "游戏版本与测试版"
+          }
+        }
+      }
+    },
+    "Games" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giochi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Игры"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏"
+          }
+        }
+      }
+    },
+    "Games may run with some features missing." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I giochi potrebbero funzionare con alcune funzioni mancanti."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Игры могут работать, но без части функций."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏可能可以运行，但会缺少部分功能。"
           }
         }
       }
@@ -9170,28 +9500,6 @@
         }
       }
     },
-    "Install Bridgeplay into Steam below, or run the Setup Assistant." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Installa Bridgeplay in Steam qui sotto, oppure avvia l'Assistente di configurazione."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Установите Bridgeplay в Steam ниже или запустите Ассистент настройки."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请在下方将 Bridgeplay 安装到 Steam，或运行设置助理。"
-          }
-        }
-      }
-    },
     "Install Bridgeplay into Steam." : {
       "localizations" : {
         "it" : {
@@ -9236,24 +9544,24 @@
         }
       }
     },
-    "Install Steam, or choose where your copy is." : {
+    "Install Steam or choose its folder." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Installa Steam, oppure scegli dove si trova la tua copia."
+            "value" : "Installa Steam o scegli la sua cartella."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Установите Steam или укажите, где лежит ваша копия."
+            "value" : "Установите Steam или выберите его папку."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请安装 Steam，或选择你的 Steam 所在位置。"
+            "value" : "安装 Steam 或选择其文件夹。"
           }
         }
       }
@@ -9280,46 +9588,68 @@
         }
       }
     },
-    "Install the WineCX engine below to finish." : {
+    "Install an engine below." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Installa il motore WineCX qui sotto per completare."
+            "value" : "Installa un motore qui sotto."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Чтобы завершить, установите ниже движок WineCX."
+            "value" : "Установите движок ниже."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在下方安装 WineCX 引擎以完成设置。"
+            "value" : "在下方安装一个引擎。"
           }
         }
       }
     },
-    "Install the newer Bridgeplay into Steam below." : {
+    "Install below or run Setup Assistant." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Installa in Steam qui sotto la versione più recente di Bridgeplay."
+            "value" : "Installa qui sotto o avvia l'Assistente."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Установите ниже более новую версию Bridgeplay в Steam."
+            "value" : "Установите ниже или запустите Ассистент."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在下方将较新版本的 Bridgeplay 安装到 Steam。"
+            "value" : "在下方安装，或运行设置助理。"
+          }
+        }
+      }
+    },
+    "Install it into Steam below." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installala in Steam qui sotto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установите её в Steam ниже."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在下方将其安装到 Steam。"
           }
         }
       }
@@ -10050,6 +10380,28 @@
         }
       }
     },
+    "Launch a Windows game with Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avvia un gioco Windows con Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустите игру для Windows через Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 Bridgeplay 启动一个 Windows 游戏。"
+          }
+        }
+      }
+    },
     "Launch options, account %@" : {
       "localizations" : {
         "it" : {
@@ -10420,6 +10772,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在查找备份"
+          }
+        }
+      }
+    },
+    "Looking for games" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricerca dei giochi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поиск игр"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在查找游戏"
           }
         }
       }
@@ -11282,6 +11656,28 @@
         }
       }
     },
+    "Newer build in Steam" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Build più recente in Steam"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В Steam более новая сборка"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 中有更新的版本"
+          }
+        }
+      }
+    },
     "No Backups" : {
       "localizations" : {
         "it" : {
@@ -11344,6 +11740,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂无游戏容器"
+          }
+        }
+      }
+    },
+    "No Windows Games" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun gioco Windows"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет игр для Windows"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无 Windows 游戏"
           }
         }
       }
@@ -11722,6 +12140,50 @@
         }
       }
     },
+    "Not confirmed" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non confermato"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не подтверждено"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未确认"
+          }
+        }
+      }
+    },
+    "Not in this build." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non in questa build."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет в этой сборке."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此版本不可用。"
+          }
+        }
+      }
+    },
     "Not included. DXMT still works." : {
       "localizations" : {
         "it" : {
@@ -11810,18 +12272,18 @@
         }
       }
     },
-    "Not set up yet" : {
+    "Not set up" : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non ancora configurato"
+            "value" : "Non configurato"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ещё не настроено"
+            "value" : "Не настроено"
           }
         },
         "zh-Hans" : {
@@ -11942,6 +12404,28 @@
         }
       }
     },
+    "Notify Only" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo avvisi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Только уведомлять"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅通知"
+          }
+        }
+      }
+    },
     "OK" : {
       "localizations" : {
         "it" : {
@@ -12008,6 +12492,28 @@
         }
       }
     },
+    "Off from Steam's next start." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattivato dal prossimo avvio di Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выключится при следующем запуске Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Steam 下次启动起关闭。"
+          }
+        }
+      }
+    },
     "On" : {
       "localizations" : {
         "it" : {
@@ -12048,6 +12554,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "默认开启。Mac 版 Steam 没有适用于 Windows 游戏的虚拟手柄，所以游戏自己读取手柄。仅在需要 Steam Input 的按键映射时才关闭。"
+          }
+        }
+      }
+    },
+    "On from Steam's next start." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attivo dal prossimo avvio di Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включится при следующем запуске Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Steam 下次启动起开启。"
+          }
+        }
+      }
+    },
+    "Online Guides" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guide online"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Онлайн-руководства"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在线指南"
           }
         }
       }
@@ -12228,6 +12778,28 @@
         }
       }
     },
+    "Open Login Items" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri Elementi login"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть объекты входа"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开登录项"
+          }
+        }
+      }
+    },
     "Open Steam" : {
       "localizations" : {
         "it" : {
@@ -12250,24 +12822,24 @@
         }
       }
     },
-    "Open Steam and press Play on any Windows game." : {
+    "Open Steam and press Play." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apri Steam e premi Gioca su un qualsiasi gioco Windows."
+            "value" : "Apri Steam e premi Gioca."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Откройте Steam и нажмите «Играть» в любой Windows-игре."
+            "value" : "Откройте Steam и нажмите «Играть»."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开 Steam，然后在任意 Windows 游戏上点击“开始游戏”。"
+            "value" : "打开 Steam 并按“开始游戏”。"
           }
         }
       }
@@ -12334,6 +12906,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 Steam 中打开"
+          }
+        }
+      }
+    },
+    "Open the newer app." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri l'app più recente."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте более новое приложение."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请打开较新的应用。"
           }
         }
       }
@@ -12538,6 +13132,28 @@
         }
       }
     },
+    "Partly working" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Funziona in parte"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Работает частично"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分可用"
+          }
+        }
+      }
+    },
     "Patch ntdll" : {
       "localizations" : {
         "it" : {
@@ -12670,6 +13286,72 @@
         }
       }
     },
+    "Paused for this build" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In pausa per questa build"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приостановлено для этой сборки"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已针对此版本暂停"
+          }
+        }
+      }
+    },
+    "Paused in Steam" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In pausa in Steam"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приостановлен в Steam"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在 Steam 中暂停"
+          }
+        }
+      }
+    },
+    "Pausing at restart" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausa al riavvio"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пауза после перезапуска"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重启后暂停"
+          }
+        }
+      }
+    },
     "Performance" : {
       "localizations" : {
         "it" : {
@@ -12732,6 +13414,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "性能叠加层（游戏中按 ⌥⌘P 打开这些设置的快捷面板）"
+          }
+        }
+      }
+    },
+    "Play" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gioca"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Играть"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始游戏"
+          }
+        }
+      }
+    },
+    "Play in Steam." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gioca in Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Играть в Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Steam 中开始游戏。"
           }
         }
       }
@@ -12802,6 +13528,28 @@
         }
       }
     },
+    "Prefix Size" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dimensione prefisso"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Размер префикса"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏容器大小"
+          }
+        }
+      }
+    },
     "Prefixes" : {
       "localizations" : {
         "it" : {
@@ -12842,6 +13590,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在准备"
+          }
+        }
+      }
+    },
+    "Press Play on any Windows game." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premi Gioca su un gioco Windows."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажмите «Играть» у любой игры для Windows."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在任意 Windows 游戏上按“开始游戏”。"
           }
         }
       }
@@ -13018,6 +13788,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "画质"
+          }
+        }
+      }
+    },
+    "Quit Steam first, then choose Try Again." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prima chiudi Steam, poi scegli Riprova."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сначала закройте Steam, затем нажмите «Повторить»."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先退出 Steam，然后选择“重试”。"
+          }
+        }
+      }
+    },
+    "Quit Steam first." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prima esci da Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сначала закройте Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先退出 Steam。"
           }
         }
       }
@@ -13726,6 +14540,72 @@
         }
       }
     },
+    "Reinstall into Steam below." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reinstalla in Steam qui sotto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переустановите в Steam ниже."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在下方重新安装到 Steam。"
+          }
+        }
+      }
+    },
+    "Release Notes" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note di rilascio"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Примечания к выпуску"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发行说明"
+          }
+        }
+      }
+    },
+    "Reload the list." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricarica l’elenco."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновить список."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新载入列表。"
+          }
+        }
+      }
+    },
     "Remains:" : {
       "localizations" : {
         "it" : {
@@ -14364,6 +15244,28 @@
         }
       }
     },
+    "Report a Problem…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala un problema…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сообщить о проблеме…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告问题…"
+          }
+        }
+      }
+    },
     "Report an NVIDIA GPU" : {
       "localizations" : {
         "it" : {
@@ -14562,6 +15464,28 @@
         }
       }
     },
+    "Restart Steam to resume." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riavvia Steam per riprendere."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапустите Steam, чтобы возобновить."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重启 Steam 以恢复。"
+          }
+        }
+      }
+    },
     "Restart Steam to update its list of compatibility tools." : {
       "localizations" : {
         "it" : {
@@ -14580,6 +15504,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请重启 Steam，以更新兼容工具列表。"
+          }
+        }
+      }
+    },
+    "Restart Steam. If it stays, send a report." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riavvia Steam. Se resta così, invia una segnalazione."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапустите Steam. Если не поможет, отправьте отчёт."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请重启 Steam。如果仍然如此，请发送报告。"
           }
         }
       }
@@ -14826,6 +15772,28 @@
         }
       }
     },
+    "Restores Bridgeplay after Steam quits." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina Bridgeplay dopo l'uscita da Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстанавливает Bridgeplay после выхода из Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 退出后恢复 Bridgeplay。"
+          }
+        }
+      }
+    },
     "Restoring Steam" : {
       "localizations" : {
         "it" : {
@@ -14866,6 +15834,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "继续"
+          }
+        }
+      }
+    },
+    "Resume to play." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riprendi per giocare."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Возобновите, чтобы играть."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复后即可游戏。"
           }
         }
       }
@@ -15332,6 +16322,28 @@
         }
       }
     },
+    "Security fixes are blocked too." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anche le correzioni di sicurezza sono bloccate."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Исправления безопасности тоже блокируются."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全修复也会被阻止。"
+          }
+        }
+      }
+    },
     "See Reports" : {
       "localizations" : {
         "it" : {
@@ -15570,6 +16582,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新设置兼容工具。"
+          }
+        }
+      }
+    },
+    "Set up the engine again below." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configura di nuovo il motore qui sotto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройте движок заново ниже."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在下方重新设置引擎。"
           }
         }
       }
@@ -16457,6 +17491,28 @@
     "Steam" : {
       "shouldTranslate" : false
     },
+    "Steam Beta" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam Beta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бета Steam"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 测试版"
+          }
+        }
+      }
+    },
     "Steam account" : {
       "localizations" : {
         "it" : {
@@ -16743,28 +17799,6 @@
         }
       }
     },
-    "Steam has a newer build" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Steam ha una build più recente"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "В Steam более новая сборка"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Steam 有较新的版本"
-          }
-        }
-      }
-    },
     "Steam has not been set up for Bridgeplay, and this account cannot change it. Install from the account that owns Steam." : {
       "localizations" : {
         "it" : {
@@ -16849,28 +17883,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Steam 退出后会重新下载。"
-          }
-        }
-      }
-    },
-    "Steam is modified" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Steam è stato modificato"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Steam изменён"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Steam 已被修改"
           }
         }
       }
@@ -17003,6 +18015,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Steam 未被修改。"
+          }
+        }
+      }
+    },
+    "Steam kept closing at startup." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam continuava a chiudersi all'avvio."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam постоянно закрывался при запуске."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 在启动时反复关闭。"
+          }
+        }
+      }
+    },
+    "Steam modified" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam modificato"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam изменён"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 已被修改"
           }
         }
       }
@@ -17531,6 +18587,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "仍然需要。请点击“安装”重试。"
+          }
+        }
+      }
+    },
+    "Still on until Steam restarts." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attivo fino al riavvio di Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Работает до перезапуска Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 重启前仍保持开启。"
           }
         }
       }
@@ -19339,28 +20417,6 @@
         }
       }
     },
-    "This copy of Bridgeplay is older than the one in Steam. Open the newer app." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questa copia di Bridgeplay è più vecchia di quella in Steam. Apri l'app più recente."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Эта копия Bridgeplay старше той, что в Steam. Откройте более новое приложение."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这份 Bridgeplay 比 Steam 中的版本旧。请打开较新的 App。"
-          }
-        }
-      }
-    },
     "This drive has no Trash" : {
       "localizations" : {
         "it" : {
@@ -19603,6 +20659,28 @@
         }
       }
     },
+    "Troubleshooting" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Risoluzione dei problemi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Устранение неполадок"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "故障排除"
+          }
+        }
+      }
+    },
     "Trust" : {
       "localizations" : {
         "it" : {
@@ -19687,6 +20765,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请在“App 管理”中开启 Bridgeplay。"
+          }
+        }
+      }
+    },
+    "Turned off" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattivato"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выключено"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关闭"
           }
         }
       }
@@ -19911,6 +21011,28 @@
         }
       }
     },
+    "Update to Bridgeplay %@, then restart Steam." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiorna a Bridgeplay %@, poi riavvia Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновите Bridgeplay до %@ и перезапустите Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新到 Bridgeplay %@，然后重启 Steam。"
+          }
+        }
+      }
+    },
     "Updated to Bridgeplay %@" : {
       "localizations" : {
         "it" : {
@@ -19951,6 +21073,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新"
+          }
+        }
+      }
+    },
+    "Updates may break Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gli aggiornamenti possono guastare Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновления могут сломать Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新可能导致 Bridgeplay 失效。"
           }
         }
       }
@@ -20457,6 +21601,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在等待游戏打开…"
+          }
+        }
+      }
+    },
+    "Waiting on a Bridgeplay fix." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In attesa di una correzione di Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ждём исправления Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待 Bridgeplay 修复。"
           }
         }
       }

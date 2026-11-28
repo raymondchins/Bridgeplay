@@ -344,6 +344,10 @@ enum SupportedRunners {
         build(id: id)?.displayVersion ?? id
     }
 
+    static func engineName(build id: String, display: String?) -> String {
+        build(id: id)?.displayVersion ?? display ?? id
+    }
+
     // The CrossOver versions to tell someone to use, for a row already titled CrossOver:
     // "26.3 or Preview 20260821, 20261006, 20261015, or 20261111". Free engines aren't CrossOver.
     static var crossOverVersions: String {

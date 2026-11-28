@@ -6,6 +6,7 @@ struct BridgeplayApp: App {
 
     @State private var status = SystemStatus()
     @State private var prefixes = PrefixesModel()
+    @State private var games = GamesModel()
     @State private var pane: Pane = .status
     @State private var showsSetup = false
     @Environment(\.openWindow) private var openWindow
@@ -16,6 +17,7 @@ struct BridgeplayApp: App {
             RootView(pane: $pane, showsSetup: showsSetup)
                 .environment(status)
                 .environment(prefixes)
+                .environment(games)
                 .frame(minWidth: 800, minHeight: 600)
                 .onChange(of: pane) { prefixes.forgetOutcome() }
                 .onChange(of: status.snapshot?.installedRunners.map(\.id)) {
@@ -34,6 +36,8 @@ struct BridgeplayApp: App {
                 // look again whenever the user comes back and every few minutes.
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                     checkSteamPatch("foreground")
+                    // Steam may have started or quit, or a game ended, while the app was behind
+                    Task { await status.refreshHealth() }
                     PlayReports.shared.scan()
                     Task { await StarPrompt.shared.check() }
                 }
@@ -58,6 +62,11 @@ struct BridgeplayApp: App {
         }
         .defaultSize(width: 900, height: 760)
         .commands { menus }
+
+        Settings {
+            SettingsView()
+                .environment(status)
+        }
     }
 
     private func checkSteamPatch(_ trigger: String) {
@@ -75,16 +84,10 @@ struct BridgeplayApp: App {
         }
 
         CommandGroup(after: .sidebar) {
-            Button("Status") { pane = .status }
-                .keyboardShortcut("1", modifiers: .command)
-            Button("Prefixes") { pane = .prefixes }
-                .keyboardShortcut("2", modifiers: .command)
-            Button("Prefix Backups") { pane = .backups }
-                .keyboardShortcut("3", modifiers: .command)
-            Button("Guide") { pane = .guide }
-                .keyboardShortcut("4", modifiers: .command)
-            Button("Game Defaults") { pane = .gameDefaults }
-                .keyboardShortcut("5", modifiers: .command)
+            ForEach(Pane.allCases) { item in
+                Button(item.label) { pane = item }
+                    .keyboardShortcut(item.shortcut, modifiers: .command)
+            }
 
             Divider()
 
@@ -93,11 +96,14 @@ struct BridgeplayApp: App {
                     switch pane {
                     case .status, .guide, .gameDefaults: await status.refresh()
                     case .prefixes, .backups: await prefixes.load()
+                    case .games:
+                        await games.load()
+                        await prefixes.load()
                     }
                 }
             }
             .keyboardShortcut("r", modifiers: .command)
-            .disabled(pane == .status || pane == .guide || pane == .gameDefaults ? !status.isIdle : prefixes.isLoading)
+            .disabled(pane == .status || pane == .guide || pane == .gameDefaults ? !status.isIdle : prefixes.isLoading || games.isLoading)
 
             Divider()
         }
@@ -109,6 +115,18 @@ struct BridgeplayApp: App {
                 openWindow(id: "main")
             }
                 .keyboardShortcut("?", modifiers: .command)
+
+            Divider()
+
+            Button("Online Guides") { HelpLinks.open(HelpLinks.guides) }
+            Button("FAQ") { HelpLinks.open(HelpLinks.faq) }
+            Button("Compatibility List") { HelpLinks.open(HelpLinks.compatibility) }
+            Button("Release Notes") { HelpLinks.open(HelpLinks.releaseNotes) }
+
+            Divider()
+
+            Button("Report a Problem…") { HelpLinks.reportProblem() }
+            Button("Reveal Log in Finder") { ErrorReport.showLog() }
         }
 
         CommandMenu("Setup") {

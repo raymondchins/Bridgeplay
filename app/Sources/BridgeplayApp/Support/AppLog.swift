@@ -41,6 +41,9 @@ enum AppLog {
             "state steam=\(describe(snapshot.steam))",
             "state steamRunning=\(snapshot.steamRunning) updatesBlocked=\(snapshot.updateBlocked)",
             "state runner=\(describe(snapshot.runner))",
+            "state steamHealth=\(snapshot.health.freshness) mode=\(snapshot.health.health?.mode.rawValue ?? "none") "
+                + "strikes=\(snapshot.health.health?.strikes ?? snapshot.health.bootStrikes ?? 0) paused=\(snapshot.health.paused) "
+                + "steamBuild=\(snapshot.health.health?.steamBuild ?? "none")",
             "state installContent=\(snapshot.installContent)",
         ]
 

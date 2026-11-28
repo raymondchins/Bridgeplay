@@ -1,4 +1,5 @@
-// The questions both the Prefixes and the Backups pages ask: Delete Permanently when a drive
+// The questions PrefixesModel asks before it acts, shared by the Games, Prefixes and Backups
+// pages: Move to Trash, Rebuild, Back Up, Clear Shader Cache, Delete Permanently when a drive
 // has no Trash, and Restore.
 
 import SwiftUI
@@ -9,6 +10,69 @@ struct PrefixDialogs: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .confirmationDialog(
+                PrefixPrompt.deleteTitle(deleting).keepingLastWordsTogether,
+                isPresented: asking { if case .delete = $0 { true } else { false } },
+                titleVisibility: .visible
+            ) {
+                Button(PrefixPrompt.deleteButton(deleting), role: .destructive) {
+                    let targets = deleting
+                    model.pendingConfirmation = nil
+                    Task { await model.delete(targets) }
+                }
+                Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
+                    .keyboardShortcut(.defaultAction)
+            } message: {
+                Text(PrefixPrompt.deleteMessage(
+                    deleting,
+                    backups: model.backups.filter { backup in deleting.contains { $0.id == backup.prefix.id } }.count).keepingLastWordsTogether)
+            }
+            .confirmationDialog(
+                PrefixPrompt.rebuildTitle(rebuilding, for: rebuildTool),
+                isPresented: asking { if case .rebuild = $0 { true } else { false } },
+                titleVisibility: .visible
+            ) {
+                Button(PrefixPrompt.rebuildWithBackupButton(rebuilding)) {
+                    model.confirmRebuild()
+                }
+                .keyboardShortcut(.defaultAction)
+                Button(PrefixPrompt.rebuildWithoutBackupButton(rebuilding)) {
+                    model.confirmRebuild(keepBackup: false)
+                }
+                Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
+            } message: {
+                Text(PrefixPrompt.rebuildMessage())
+            }
+            .confirmationDialog(
+                PrefixPrompt.backUpTitle(backingUp),
+                isPresented: asking { if case .backUp = $0 { true } else { false } },
+                titleVisibility: .visible
+            ) {
+                Button(PrefixPrompt.backUpButton(backingUp)) {
+                    let targets = backingUp
+                    model.pendingConfirmation = nil
+                    Task { await model.backUp(targets) }
+                }
+                .keyboardShortcut(.defaultAction)
+                Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
+            } message: {
+                Text(PrefixPrompt.backUpMessage(backingUp, bytes: backUpBytes))
+            }
+            .confirmationDialog(
+                PrefixPrompt.clearShaderCacheTitle(clearingCache).keepingLastWordsTogether,
+                isPresented: asking { if case .clearShaderCache = $0 { true } else { false } },
+                titleVisibility: .visible
+            ) {
+                Button(PrefixPrompt.clearShaderCacheButton(clearingCache), role: .destructive) {
+                    let targets = clearingCache
+                    model.pendingConfirmation = nil
+                    Task { await model.clearShaderCaches(targets) }
+                }
+                Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
+                    .keyboardShortcut(.defaultAction)
+            } message: {
+                Text(PrefixPrompt.clearShaderCacheMessage(bytes: model.shaderCacheBytes(clearingCache)).keepingLastWordsTogether)
+            }
             .confirmationDialog(
                 PrefixPrompt.deletePermanentlyTitle(prefixes: permanent.prefixes, backups: permanent.backups).keepingLastWordsTogether,
                 isPresented: asking { if case .deletePermanently = $0 { true } else { false } },
@@ -41,6 +105,40 @@ struct PrefixDialogs: ViewModifier {
             } message: {
                 Text(PrefixPrompt.restoreMessage().keepingLastWordsTogether)
             }
+    }
+
+    private var deleting: [WinePrefix] {
+        if case .delete(let targets) = model.pendingConfirmation { return targets }
+        return []
+    }
+
+    private var rebuilding: [WinePrefix] {
+        if case .rebuild(let targets, _) = model.pendingConfirmation { return targets }
+        return []
+    }
+
+    private var rebuildTool: InstalledTool? {
+        if case .rebuild(_, let tool) = model.pendingConfirmation { return tool }
+        return nil
+    }
+
+    private var backingUp: [WinePrefix] {
+        if case .backUp(let targets) = model.pendingConfirmation { return targets }
+        return []
+    }
+
+    private var backUpBytes: Int64? {
+        var total: Int64 = 0
+        for prefix in backingUp {
+            guard let bytes = model.usage[prefix.id]?.bytes else { return nil }
+            total += bytes
+        }
+        return total
+    }
+
+    private var clearingCache: [WinePrefix] {
+        if case .clearShaderCache(let targets) = model.pendingConfirmation { return targets }
+        return []
     }
 
     private var permanent: (prefixes: [WinePrefix], backups: [PrefixBackup]) {

@@ -24,6 +24,14 @@ final class PrefixesModel {
 
     private(set) var currentTools: [String: InstalledTool] = [:]
 
+    // The engine that last ran the prefix, named as the Games table names a launch's engine
+    // ("WineCX 11.17 Rosetta"); Steam's tool name only for a build Bridgeplay doesn't know.
+    func lastEngine(_ prefix: WinePrefix) -> String? {
+        if let tool = currentTools[prefix.id] { return SupportedRunners.engineName(build: tool.build, display: tool.display) }
+        guard let record = records[prefix.id] else { return nil }
+        return SupportedRunners.engineName(build: record.build, display: record.display)
+    }
+
     func lastTool(_ prefix: WinePrefix) -> String? {
         if let tool = currentTools[prefix.id] { return tool.display }
         guard let record = records[prefix.id] else { return nil }
