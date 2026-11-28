@@ -1,0 +1,9 @@
+The Bridgeplay compatibility data in this branch (reports/*.ndjson, compat.json,
+compat-index.json, board.md) is licensed under the Creative Commons Attribution 4.0
+International licence (CC BY 4.0).
+
+Legal code: https://creativecommons.org/licenses/by/4.0/legalcode
+
+Attribution: "Bridgeplay players, via github.com/raymondchins/Bridgeplay".
+
+The software that produces it (scripts/compat-export.py on the main branch) is GPL-3.0.

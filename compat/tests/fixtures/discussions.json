@@ -1,0 +1,391 @@
+{
+ "nodes": [
+  {
+   "number": 1004,
+   "createdAt": "2026-11-26T12:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nGood Game\n\n### Steam AppID\n\n101\n\n### Status\n\nbronze (runs, major issues)\n\n### Main problem\n\nLow frame rate or stutter\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM3\n\n### Memory (RAM)\n\n24 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### What the player says\n\n> Some stutter in big fights\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"101\",\"name\":\"Good Game\",\"status\":\"bronze\",\"chip\":\"M3\",\"memory\":\"24 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\",\"issue\":\"performance\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1042,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nGood Game\n\n### Steam AppID\n\n101\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM5 Max\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"101\",\"name\":\"Good Game\",\"status\":\"borked\",\"chip\":\"M5 Max\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "User",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1041,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nGood Game\n\n### Steam AppID\n\n101\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM5\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"101\",\"name\":\"Good Game\",\"status\":\"diamond\",\"chip\":\"M5\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1040,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "### Question\n\nDoes it run?",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1039,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nGood Game\n\n### Steam AppID\n\n101\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM5\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"101\",\"name\":\"Good Game\",\"status\":\"borked\",\"chip\":\"M5\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "User",
+    "login": "someone"
+   }
+  },
+  {
+   "number": 1030,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nMy Shortcut\n\n### Steam AppID\n\n2147483650\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM2 Pro\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"2147483650\",\"name\":\"My Shortcut\",\"status\":\"platinum\",\"chip\":\"M2 Pro\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1029,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nSteam Broke It\n\n### Steam AppID\n\n111\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM4\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":2,\"steam\":\"1794536281\",\"appid\":\"111\",\"name\":\"Steam Broke It\",\"status\":\"borked\",\"chip\":\"M4\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFAAAA0000 (thread 0124), starting debugger... ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 12s ===\n=== exit summary: exit status 0 after 12s, the game quit normally ===\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFAAAA0000 (thread 0124), starting debugger... ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1028,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nSteam Broke It\n\n### Steam AppID\n\n111\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM3\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":2,\"steam\":\"1794536281\",\"appid\":\"111\",\"name\":\"Steam Broke It\",\"status\":\"borked\",\"chip\":\"M3\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFAAAA0000 (thread 0124), starting debugger... ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 12s ===\n=== exit summary: exit status 0 after 12s, the game quit normally ===\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFAAAA0000 (thread 0124), starting debugger... ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1025,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nTuned Game\n\n### Steam AppID\n\n110\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\ndxvk\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM2 Pro\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"110\",\"name\":\"Tuned Game\",\"status\":\"platinum\",\"chip\":\"M2 Pro\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"dxvk\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\ngamefix: ARGS=-nobattleye from the user conf, added after the launch options' arguments\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\ngamefix: reading the default conf ~/Library/Application Support/bridgeplay/gamefixes-default/110.conf\ngamefix: BACKEND=dxvk from the default conf\ngamefix: ARGS=-nobattleye from the user conf, added after the launch options' arguments\ngamefix: applied NOTPROTON_VSYNC=1 from the user conf\ngamefix: applied SteamDeck=1 from the default conf\ngamefix: applied DXVK_ASYNC=1 from the user conf\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1024,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nPrivate Game\n\n### Steam AppID\n\n109\n\n### Status\n\nbronze (runs, major issues)\n\n### Main problem\n\nCrashes or freezes\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nCrossOver 25.1 at /Users/johnappleseed/Applications/CrossOver.app\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM2 Max\n\n### Memory (RAM)\n\n32 GB\n\n### macOS version\n\nmacOS 26.1.2\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### What the player says\n\n> email me at john.doe@​example.com, steam 76561198000000001 [U:1:12345], see https://x.com/johnny or @​johnny, call +1 415 555 0100, ip 192.168.1.20, files in /Users/johnappleseed/Games\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"109\",\"name\":\"Private Game\",\"status\":\"bronze\",\"chip\":\"M2 Max\",\"memory\":\"32 GB\",\"macos\":\"macOS 26.1.2\",\"version\":\"0.7.66 (83)\",\"engine\":\"CrossOver 25.1 at /Users/johnappleseed/Applications/CrossOver.app\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\",\"issue\":\"crash\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: wine: Call from 0x7bc4 to unimplemented function api-ms-win-core.dll.Foo, aborting ===\nerr:module:import_dll Library steam_api64.dll (which is needed by L\"Z:\\\\Users\\\\<user>\\\\Games\\\\x.exe\") not found\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: unknown after 300s ===\n=== exit summary: exit status 0 after 300s, the game quit normally ===\n=== exit cause: wine: Call from 0x7bc4 to unimplemented function api-ms-win-core.dll.Foo, aborting ===\n\n````\n\n</details>\n\n<details><summary>bridgeplay-wine.log, end (redacted)</summary>\n\n````text\n0130:err:module:import_dll Library steam_api64.dll (which is needed by L\"Z:\\\\Users\\\\<user>\\\\Games\\\\x.exe\") not found\nSteamUser=<redacted>\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1023,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nFixed Game\n\n### Steam AppID\n\n108\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM2\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"108\",\"name\":\"Fixed Game\",\"status\":\"platinum\",\"chip\":\"M2\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1017,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nRegressed Game\n\n### Steam AppID\n\n105\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM5\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"105\",\"name\":\"Regressed Game\",\"status\":\"borked\",\"chip\":\"M5\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00007FFF00001234 (thread 0124), starting debugger... ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 12s ===\n=== exit summary: exit status 0 after 12s, the game quit normally ===\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00007FFF00001234 (thread 0124), starting debugger... ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1016,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nRegressed Game\n\n### Steam AppID\n\n105\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM4\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"105\",\"name\":\"Regressed Game\",\"status\":\"borked\",\"chip\":\"M4\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00007FFF00001234 (thread 0124), starting debugger... ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 12s ===\n=== exit summary: exit status 0 after 12s, the game quit normally ===\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00007FFF00001234 (thread 0124), starting debugger... ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1007,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nBroken Game\n\n### Steam AppID\n\n102\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM4\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"102\",\"name\":\"Broken Game\",\"status\":\"borked\",\"chip\":\"M4\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFFFC05678 (thread 0124), starting debugger... ===\nerr:module:import_dll Library MSVCP140.dll (which is needed by L\"C:\\\\Program Files (x86)\\\\Steam\\\\steamapps\\\\common\\\\Game\\\\game.exe\") not found\nUnhandled page fault on read access to 0000000000000018 at address 00006FFFFFC05678\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 12s ===\n=== exit summary: exit status 0 after 12s, the game quit normally ===\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFFFC05678 (thread 0124), starting debugger... ===\n\n````\n\n</details>\n\n<details><summary>bridgeplay-wine.log, end (redacted)</summary>\n\n````text\n0124:err:module:import_dll Library MSVCP140.dll (which is needed by L\"C:\\\\Program Files (x86)\\\\Steam\\\\steamapps\\\\common\\\\Game\\\\game.exe\") not found\n0124:Unhandled page fault on read access to 0000000000000018 at address 00006FFFFFC05678\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1003,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nGood Game\n\n### Steam AppID\n\n101\n\n### Status\n\nsilver (playable with minor issues)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM4 Max\n\n### Memory (RAM)\n\n36 GB\n\n### macOS version\n\nmacOS 26.2\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nShared automatically by the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"101\",\"name\":\"Good Game\",\"status\":\"silver\",\"chip\":\"M4 Max\",\"memory\":\"36 GB\",\"macos\":\"macOS 26.2\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"auto\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1002,
+   "createdAt": "2026-11-25T11:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nGood Game\n\n### Steam AppID\n\n101\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM2 Pro\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"101\",\"name\":\"Good Game\",\"status\":\"platinum\",\"chip\":\"M2 Pro\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1031,
+   "createdAt": "2026-11-25T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nHard Game\n\n### Steam AppID\n\n113\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM1\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"113\",\"name\":\"Hard Game\",\"status\":\"platinum\",\"chip\":\"M1\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1019,
+   "createdAt": "2026-11-25T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nShooter Online\n\n### Steam AppID\n\n106\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM3 Max\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"106\",\"name\":\"Shooter Online\",\"status\":\"borked\",\"chip\":\"M3 Max\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: kernel anti-cheat EasyAntiCheat could not load its Windows driver, which Wine cannot run, so the game will not start ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 8s ===\n=== exit summary: exit status 0 after 8s, the game quit normally ===\n=== exit cause: kernel anti-cheat EasyAntiCheat could not load its Windows driver, which Wine cannot run, so the game will not start ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1018,
+   "createdAt": "2026-11-25T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nShooter Online\n\n### Steam AppID\n\n106\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM1 Pro\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"106\",\"name\":\"Shooter Online\",\"status\":\"borked\",\"chip\":\"M1 Pro\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: kernel anti-cheat EasyAntiCheat could not load its Windows driver, which Wine cannot run, so the game will not start ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 8s ===\n=== exit summary: exit status 0 after 8s, the game quit normally ===\n=== exit cause: kernel anti-cheat EasyAntiCheat could not load its Windows driver, which Wine cannot run, so the game will not start ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1006,
+   "createdAt": "2026-11-25T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nBroken Game\n\n### Steam AppID\n\n102\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM2\n\n### Memory (RAM)\n\n8 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"102\",\"name\":\"Broken Game\",\"status\":\"borked\",\"chip\":\"M2\",\"memory\":\"8 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFFFC0ABCD (thread 0124), starting debugger... ===\nerr:module:import_dll Library MSVCP140.dll (which is needed by L\"C:\\\\Program Files (x86)\\\\Steam\\\\steamapps\\\\common\\\\Game\\\\game.exe\") not found\nUnhandled page fault on read access to 0000000000000018 at address 00006FFFFFC0ABCD\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 12s ===\n=== exit summary: exit status 0 after 12s, the game quit normally ===\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFFFC0ABCD (thread 0124), starting debugger... ===\n\n````\n\n</details>\n\n<details><summary>bridgeplay-wine.log, end (redacted)</summary>\n\n````text\n0124:err:module:import_dll Library MSVCP140.dll (which is needed by L\"C:\\\\Program Files (x86)\\\\Steam\\\\steamapps\\\\common\\\\Game\\\\game.exe\") not found\n0124:Unhandled page fault on read access to 0000000000000018 at address 00006FFFFFC0ABCD\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1001,
+   "createdAt": "2026-11-25T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nGood Game\n\n### Steam AppID\n\n101\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM1\n\n### Memory (RAM)\n\n8 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"101\",\"name\":\"Good Game\",\"status\":\"platinum\",\"chip\":\"M1\",\"memory\":\"8 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1011,
+   "createdAt": "2026-11-24T11:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nMixed Game\n\n### Steam AppID\n\n103\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM4\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"103\",\"name\":\"Mixed Game\",\"status\":\"borked\",\"chip\":\"M4\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: unknown after 30s ===\n=== exit summary: exit status 1 after 30s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1032,
+   "createdAt": "2026-11-24T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nHard Game\n\n### Steam AppID\n\n113\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM1 Pro\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"113\",\"name\":\"Hard Game\",\"status\":\"platinum\",\"chip\":\"M1 Pro\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1010,
+   "createdAt": "2026-11-24T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nMixed Game\n\n### Steam AppID\n\n103\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM3\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"103\",\"name\":\"Mixed Game\",\"status\":\"borked\",\"chip\":\"M3\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 20s ===\n=== exit summary: exit status 1 after 20s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1005,
+   "createdAt": "2026-11-24T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nBroken Game\n\n### Steam AppID\n\n102\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM1\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"102\",\"name\":\"Broken Game\",\"status\":\"borked\",\"chip\":\"M1\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFFFC01234 (thread 0124), starting debugger... ===\nerr:module:import_dll Library MSVCP140.dll (which is needed by L\"C:\\\\Program Files (x86)\\\\Steam\\\\steamapps\\\\common\\\\Game\\\\game.exe\") not found\nUnhandled page fault on read access to 0000000000000018 at address 00006FFFFFC01234\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 12s ===\n=== exit summary: exit status 0 after 12s, the game quit normally ===\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFFFC01234 (thread 0124), starting debugger... ===\n\n````\n\n</details>\n\n<details><summary>bridgeplay-wine.log, end (redacted)</summary>\n\n````text\n0124:err:module:import_dll Library MSVCP140.dll (which is needed by L\"C:\\\\Program Files (x86)\\\\Steam\\\\steamapps\\\\common\\\\Game\\\\game.exe\") not found\n0124:Unhandled page fault on read access to 0000000000000018 at address 00006FFFFFC01234\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1009,
+   "createdAt": "2026-11-23T11:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nMixed Game\n\n### Steam AppID\n\n103\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM2\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"103\",\"name\":\"Mixed Game\",\"status\":\"platinum\",\"chip\":\"M2\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1033,
+   "createdAt": "2026-11-23T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nHard Game\n\n### Steam AppID\n\n113\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM2\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"113\",\"name\":\"Hard Game\",\"status\":\"borked\",\"chip\":\"M2\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: wine: Call from 0x7b002 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 5s ===\n=== exit summary: exit status 0 after 5s, the game quit normally ===\n=== exit cause: wine: Call from 0x7b002 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1008,
+   "createdAt": "2026-11-23T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nMixed Game\n\n### Steam AppID\n\n103\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM1\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"103\",\"name\":\"Mixed Game\",\"status\":\"platinum\",\"chip\":\"M1\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1034,
+   "createdAt": "2026-11-22T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nHard Game\n\n### Steam AppID\n\n113\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM2 Pro\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"113\",\"name\":\"Hard Game\",\"status\":\"borked\",\"chip\":\"M2 Pro\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: wine: Call from 0x7b003 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 5s ===\n=== exit summary: exit status 0 after 5s, the game quit normally ===\n=== exit cause: wine: Call from 0x7b003 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1012,
+   "createdAt": "2026-11-22T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nLonely Game\n\n### Steam AppID\n\n104\n\n### Status\n\nbronze (runs, major issues)\n\n### Main problem\n\nGraphics glitches\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM2 Pro\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"104\",\"name\":\"Lonely Game\",\"status\":\"bronze\",\"chip\":\"M2 Pro\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\",\"issue\":\"graphics\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1035,
+   "createdAt": "2026-11-21T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nHard Game\n\n### Steam AppID\n\n113\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM3\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"113\",\"name\":\"Hard Game\",\"status\":\"borked\",\"chip\":\"M3\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: wine: Call from 0x7b004 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 5s ===\n=== exit summary: exit status 0 after 5s, the game quit normally ===\n=== exit cause: wine: Call from 0x7b004 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1027,
+   "createdAt": "2026-11-21T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nSteam Broke It\n\n### Steam AppID\n\n111\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM2\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":2,\"steam\":\"1790904859\",\"appid\":\"111\",\"name\":\"Steam Broke It\",\"status\":\"platinum\",\"chip\":\"M2\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1026,
+   "createdAt": "2026-11-21T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nSteam Broke It\n\n### Steam AppID\n\n111\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM1\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":2,\"steam\":\"1790904859\",\"appid\":\"111\",\"name\":\"Steam Broke It\",\"status\":\"platinum\",\"chip\":\"M1\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1036,
+   "createdAt": "2026-11-20T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nHard Game\n\n### Steam AppID\n\n113\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM3 Pro\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"113\",\"name\":\"Hard Game\",\"status\":\"borked\",\"chip\":\"M3 Pro\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: wine: Call from 0x7b005 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 5s ===\n=== exit summary: exit status 0 after 5s, the game quit normally ===\n=== exit cause: wine: Call from 0x7b005 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1037,
+   "createdAt": "2026-11-19T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nHard Game\n\n### Steam AppID\n\n113\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM4\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"113\",\"name\":\"Hard Game\",\"status\":\"borked\",\"chip\":\"M4\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: wine: Call from 0x7b006 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 5s ===\n=== exit summary: exit status 0 after 5s, the game quit normally ===\n=== exit cause: wine: Call from 0x7b006 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1038,
+   "createdAt": "2026-11-18T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nHard Game\n\n### Steam AppID\n\n113\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.66 (83)\n\n### Mac chip\n\nM4 Pro\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"113\",\"name\":\"Hard Game\",\"status\":\"borked\",\"chip\":\"M4 Pro\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.66 (83)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: wine: Call from 0x7b007 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 5s ===\n=== exit summary: exit status 0 after 5s, the game quit normally ===\n=== exit cause: wine: Call from 0x7b007 to unimplemented function concrt140.dll._TaskCollection, aborting ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1000,
+   "createdAt": "2026-11-18T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nGood Game\n\n### Steam AppID\n\n101\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.64 (81)\n\n### Mac chip\n\nM1\n\n### Memory (RAM)\n\n8 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"101\",\"name\":\"Good Game\",\"status\":\"borked\",\"chip\":\"M1\",\"memory\":\"8 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.64 (81)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFFFC01111 (thread 0124), starting debugger... ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 12s ===\n=== exit summary: exit status 0 after 12s, the game quit normally ===\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFFFFC01111 (thread 0124), starting debugger... ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1015,
+   "createdAt": "2026-11-17T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nRegressed Game\n\n### Steam AppID\n\n105\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.64 (81)\n\n### Mac chip\n\nM3\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"105\",\"name\":\"Regressed Game\",\"status\":\"platinum\",\"chip\":\"M3\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.64 (81)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1014,
+   "createdAt": "2026-11-17T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nRegressed Game\n\n### Steam AppID\n\n105\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.64 (81)\n\n### Mac chip\n\nM2\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"105\",\"name\":\"Regressed Game\",\"status\":\"platinum\",\"chip\":\"M2\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.64 (81)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1013,
+   "createdAt": "2026-11-17T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nRegressed Game\n\n### Steam AppID\n\n105\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.64 (81)\n\n### Mac chip\n\nM1\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"105\",\"name\":\"Regressed Game\",\"status\":\"platinum\",\"chip\":\"M1\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.64 (81)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1022,
+   "createdAt": "2026-05-11T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nFixed Game\n\n### Steam AppID\n\n108\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.10 (20)\n\n### Mac chip\n\nM1\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"108\",\"name\":\"Fixed Game\",\"status\":\"borked\",\"chip\":\"M1\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.10 (20)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>Error lines from the whole log (redacted)</summary>\n\n````text\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFF00000001 (thread 0124), starting debugger... ===\n````\n\n</details>\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: failed after 12s ===\n=== exit summary: exit status 0 after 12s, the game quit normally ===\n=== exit cause: Unhandled page fault on read access to 0000000000000018 at address 00006FFF00000001 (thread 0124), starting debugger... ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1020,
+   "createdAt": "2026-05-11T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nOld Game\n\n### Steam AppID\n\n107\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.10 (20)\n\n### Mac chip\n\nM1\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"107\",\"name\":\"Old Game\",\"status\":\"platinum\",\"chip\":\"M1\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.10 (20)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  },
+  {
+   "number": 1021,
+   "createdAt": "2026-05-10T10:00:00Z",
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nOld Game\n\n### Steam AppID\n\n107\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.10 (20)\n\n### Mac chip\n\nM2\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 60 min, exit status 0\n\n### Setup at report time\n\n- lowPower: off\n- displays: 2: built-in 3456x2234 120 Hz, LG HDR 4K 3840x2160 60 Hz\n- thermal: nominal\n- power: plugged in\n- gpuCores: 40\n- retina: on\n\n```json\n{\"schema\":1,\"appid\":\"107\",\"name\":\"Old Game\",\"status\":\"platinum\",\"chip\":\"M2\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.10 (20)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nrunner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at ~/Library/Application Support/bridgeplay/engines/winecx\ngraphics: backend=d3dmetal (default)\n=== session health: healthy after 3600s ===\n=== exit summary: exit status 0 after 3600s, the game quit normally ===\n\n````\n\n</details>\n",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   }
+  }
+ ]
+}
