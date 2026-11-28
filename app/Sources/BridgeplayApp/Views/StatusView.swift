@@ -681,7 +681,21 @@ struct StatusView: View {
             )
         }
         let winecx = status.freeEngineState(FreeEngineWinecx.current.build)
-        if winecx != .current {
+        if winecx == .missing, let offer = WinecxUpgrade.offer(snapshot) {
+            // An older release is set up: it keeps running until this one is laid out.
+            let new = StatusHero.engineName(offer.to)
+            let old = StatusHero.engineName(offer.from)
+            StatusRow(
+                title: String(localized: "WineCX Engine"),
+                value: String(localized: "\(new) is available. Games keep \(old) until you update."),
+                tone: .warning,
+                action: StatusAction(
+                    label: String(localized: "Update to \(new)"),
+                    help: String(localized: "Download \(new) and set it up. \(old) stays installed."),
+                    isEnabled: status.canInstall
+                ) { Task { await status.installWinecxEngine() } }
+            )
+        } else if winecx != .current {
             let outdated = winecx == .outdated
             StatusRow(
                 title: "WineCX Engine",

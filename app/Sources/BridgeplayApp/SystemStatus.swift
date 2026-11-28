@@ -484,14 +484,28 @@ final class SystemStatus {
 
     // The caller holds the installation lock while reading the installed tools and config.vdf.
     nonisolated private static func followDefaultTool() -> SteamDefaultTool.FollowResult {
+        let installed = CompatToolList.installed().map(\.name)
+        let successors: SteamDefaultTool.FollowResult
         do {
-            let result = try SteamDefaultTool.followSuccessors(installed: CompatToolList.installed().map(\.name))
-            if result == .updated {
+            successors = try SteamDefaultTool.followSuccessors(installed: installed)
+            if successors == .updated {
                 AppLog.note("default tool: pointed Steam's compatibility tool choices at the installed successor")
             }
-            return result
         } catch {
             AppLog.note("default tool: could not follow the updated engine: \(error.localizedDescription)")
+            return .failed
+        }
+        guard successors != .steamRunning else { return successors }
+        do {
+            let winecx = try SteamDefaultTool.followCurrentWinecx(
+                current: FreeEngineWinecx.currentTool, older: FreeEngineWinecx.olderTools,
+                previous: FreeEngineWinecx.previousTool, installed: installed)
+            if winecx == .updated {
+                AppLog.note("default tool: moved Steam's default to \(FreeEngineWinecx.currentTool ?? "?")")
+            }
+            return winecx == .unchanged ? successors : winecx
+        } catch {
+            AppLog.note("default tool: could not move the default to the current WineCX: \(error.localizedDescription)")
             return .failed
         }
     }

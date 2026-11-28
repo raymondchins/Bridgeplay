@@ -22,9 +22,29 @@ enum SteamDefaultTool {
         var priority: String = SteamDefaultTool.globalPriority
     }
 
-    // What the "0" entry was before Bridgeplay first set it; nil when there was none.
+    // What the "0" entry was before Bridgeplay first set it (nil when there was none), and the
+    // tool Bridgeplay last wrote there. Backups from before `applied` was kept have none.
     struct Backup: Codable, Equatable, Sendable {
         var previous: Mapping?
+        var applied: String? = nil
+    }
+
+    static func readBackup(_ backup: URL = backup) -> Backup? {
+        (try? Data(contentsOf: backup)).flatMap { try? JSONDecoder().decode(Backup.self, from: $0) }
+    }
+
+    private static func write(_ saved: Backup, to backup: URL) throws {
+        try FileManager.default.createDirectory(at: backup.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(saved).write(to: backup, options: .atomic)
+    }
+
+    // The file only says which tool Bridgeplay wrote, so a failure here is not the write's.
+    private static func recordApplied(_ tool: String, backup: URL) {
+        var saved = readBackup(backup) ?? Backup(previous: nil)
+        saved.applied = tool
+        do { try write(saved, to: backup) } catch {
+            AppLog.note("default tool: could not record \(tool): \(error.localizedDescription)")
+        }
     }
 
     struct SteamRunning: LocalizedError {
@@ -44,10 +64,10 @@ enum SteamDefaultTool {
         // Bridgeplay first replaced theirs is kept.
         let previous = current(in: text)
         if previous.map({ !ToolName.isOurs($0.name) }) ?? true {
-            try FileManager.default.createDirectory(at: backup.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try JSONEncoder().encode(Backup(previous: previous)).write(to: backup, options: .atomic)
+            try write(Backup(previous: previous), to: backup)
         }
         try result.write(to: file, atomically: true, encoding: .utf8)
+        recordApplied(tool, backup: backup)
     }
 
     // Whether set() would write, so a caller can leave Steam open when it would not. A new
@@ -80,7 +100,7 @@ enum SteamDefaultTool {
               let mapping = current(in: text), ToolName.isOurs(mapping.name)
         else { return false }
         guard !steamRunning() else { throw SteamRunning() }
-        let saved = (try? Data(contentsOf: backup)).flatMap { try? JSONDecoder().decode(Backup.self, from: $0) }
+        let saved = readBackup(backup)
         guard let result = replacingDefault(text, with: saved?.previous), result != text else { return false }
         try WriteRefused.catching(file) { try result.write(to: file, atomically: true, encoding: .utf8) }
         return true
@@ -240,6 +260,55 @@ enum SteamDefaultTool {
         // Atomic replacement still can't rule out Steam starting between this check and the write.
         guard !steamRunning() else { return .steamRunning }
         try WriteRefused.catching(file) { try result.write(to: file, atomically: true, encoding: .utf8) }
+        return .updated
+    }
+
+    // The default moved from an older WineCX release's tool to the current one's, when
+    // Bridgeplay put the older one there: the tool it last wrote or, in a backup from before
+    // that was kept, the tool of the release that was current before (`previous`), which is
+    // what Setup wrote then. A default the user picked since stays, and so does every per-game
+    // choice: a game set to the older release by hand keeps it, and games on the default move
+    // with it. nil when nothing changes.
+    static func movingWinecxDefault(
+        _ text: String, from older: Set<String>, previous: String?, to current: String, backup: Backup?
+    ) -> String? {
+        guard let mapping = self.current(in: text), older.contains(mapping.name), let backup,
+              mapping.name == (backup.applied ?? previous)
+        else { return nil }
+        var moved = mapping
+        moved.name = current
+        guard let result = replacingDefault(text, with: moved), result != text else { return nil }
+        return result
+    }
+
+    // The same on config.vdf, once the current tool is installed and has its folder in
+    // compatibilitytools.d (RunnerSetup puts it there after the engine and runner verified).
+    // Never while Steam runs: a caller retries on .steamRunning, as for followSuccessors.
+    static func followCurrentWinecx(
+        current: String?, older: Set<String>, previous: String?, installed: [String],
+        in file: URL = config, backup: URL = backup,
+        compatTools: URL = SupportPaths.Steam.compatTools,
+        steamRunning: () -> Bool = { SteamBundle.isRunningForThisUser }
+    ) throws -> FollowResult {
+        guard let current, !older.contains(current), installed.contains(current) else { return .unchanged }
+        var isDirectory: ObjCBool = false
+        guard !current.contains("/"), FileManager.default.fileExists(
+            atPath: compatTools.appending(path: current).path(percentEncoded: false), isDirectory: &isDirectory
+        ), isDirectory.boolValue else { return .unchanged }
+        guard !steamRunning() else { return .steamRunning }
+        let text: String
+        do {
+            text = try String(contentsOf: file, encoding: .utf8)
+        } catch let error as NSError
+            where error.domain == NSCocoaErrorDomain && error.code == CocoaError.fileReadNoSuchFile.rawValue {
+            return .unchanged
+        }
+        guard let result = movingWinecxDefault(
+            text, from: older, previous: previous, to: current, backup: readBackup(backup))
+        else { return .unchanged }
+        guard !steamRunning() else { return .steamRunning }
+        try WriteRefused.catching(file) { try result.write(to: file, atomically: true, encoding: .utf8) }
+        recordApplied(current, backup: backup)
         return .updated
     }
 
