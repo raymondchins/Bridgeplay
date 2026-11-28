@@ -259,7 +259,15 @@ struct PrefixStoreTests {
         #expect(PrefixStore.directoryBytes(source, metric: .allocated) >= 4 << 20)
 
         try FileManager.default.removeItem(at: source)
-        #expect(PrefixStore.directoryBytes(clone) >= 4 << 20)
+        // APFS moves the shared extents to the clone's private count a moment after the delete,
+        // later on a busy Mac, so the size is read until it shows up (5 s at most).
+        var size = PrefixStore.directoryBytes(clone)
+        let deadline = Date().addingTimeInterval(5)
+        while size < 4 << 20, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+            size = PrefixStore.directoryBytes(clone)
+        }
+        #expect(size >= 4 << 20)
     }
 
     @Test("A symlink passed as the size root is not traversed")
