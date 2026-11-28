@@ -162,14 +162,26 @@ np_seconds 5
 is "with the leading zeros" 0.005 "$np_sec"
 np_seconds -3
 is "and a clock that went back reads as zero" 0.000 "$np_sec"
+# Each clock this Mac has: /bin/date has %N only on newer macOS, perl's Time::HiRes may be
+# missing. The run script picks among the same, so an absent one is never used there.
+ns=$(/bin/date +%s%N 2>/dev/null) || ns=""
+case "$ns" in *[!0-9]*|'') ns="" ;; esac
+[ "${#ns}" -ge 19 ] || ns=""
+best=seconds
 for np_clock in date-ns perl-hires seconds; do
+	case "$np_clock" in
+		date-ns) if [ -z "$ns" ]; then echo "  skip  date-ns: /bin/date has no %N here"; continue; fi ;;
+		perl-hires) if ! /usr/bin/perl -MTime::HiRes -e 1 2>/dev/null; then
+				echo "  skip  perl-hires: no Time::HiRes here"; continue; fi ;;
+	esac
+	[ "$best" != seconds ] || best=$np_clock
 	np_now_ms
 	case "$np_ms" in
 		[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ok "the $np_clock clock gives milliseconds" ;;
 		*) bad "the $np_clock clock gives milliseconds" "13 digits" "$np_ms" ;;
 	esac
 done
-np_clock=date-ns
+np_clock=$best
 np_now_ms
 np_t0=$np_ms
 log="$work/steps.log"
