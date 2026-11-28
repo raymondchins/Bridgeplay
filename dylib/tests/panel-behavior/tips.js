@@ -24,8 +24,9 @@ function parts(tip) {
 // Enough of an element for the handlers: attributes, a parent, a window to place the tip in.
 // Tips made with the same doc share it, as they do in one panel.
 function fakeDoc() {
-  const doc = { defaultView: { innerWidth: 800, innerHeight: 600 }, listeners: {},
-    addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); } };
+  function on(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
+  const doc = { defaultView: { innerWidth: 800, innerHeight: 600, listeners: {}, addEventListener: on },
+    listeners: {}, addEventListener: on };
   return doc;
 }
 function fakeDom(doc = fakeDoc()) {
@@ -45,7 +46,7 @@ function fakeDom(doc = fakeDoc()) {
   const ev = (extra = {}) => Object.assign({ currentTarget: w.firstChild, preventDefault() { this.prevented = true; },
     stopPropagation() { this.stopped = true; } }, extra);
   w.firstChild.parentNode = w;
-  return { w, attrs, text, ev, doc };
+  return { w, attrs, text, ev, doc, box };
 }
 
 let failed = 0;
@@ -103,6 +104,16 @@ for (const form of Object.keys(FORMS)) {
   t.ok(d.text.style.left === '100px' && d.text.style.top === '76px', `it is placed under the button (${d.text.style.left}, ${d.text.style.top})`);
   wrap.props.onMouseLeave({ currentTarget: d.w });
   t.ok(open(d) === 'p', 'a pinned tip stays when the pointer leaves');
+  const fire = (target, type) => (target.listeners[type] || []).forEach(fn => fn({ target: {} }));
+  Object.assign(d.box, { top: 150, bottom: 170 });
+  fire(d.doc, 'scroll');
+  t.ok(d.text.style.top === '176px', `it follows its button when the panel scrolls (${d.text.style.top})`);
+  Object.assign(d.doc.defaultView, { innerWidth: 300 });
+  fire(d.doc.defaultView, 'resize');
+  t.ok(d.text.style.left === '12px', `and stays in the window when it resizes (${d.text.style.left})`);
+  Object.assign(d.box, { top: 50, bottom: 70 });
+  Object.assign(d.doc.defaultView, { innerWidth: 800 });
+  fire(d.doc, 'scroll');
   button.props.onClick(d.ev());
   t.ok(open(d) === null, 'a second click hides it');
   const d2 = fakeDom(d.doc);
@@ -136,6 +147,9 @@ for (const form of Object.keys(FORMS)) {
   button.props.onClick(d.ev());
   button.props.onBlur(d.ev());
   t.ok(open(d) === null, 'blur hides it');
+  fire(d.doc, 'scroll');
+  t.ok(open(d) === null && d.doc.listeners.scroll.length === 1 && d.doc.defaultView.listeners.resize.length === 1,
+       'a closed tip stays closed on scroll, and the listeners go in once per document');
 
   // Russian, as one of the panel's languages
   const ru = panel(emit, form, Object.assign(Object.create(globalThis), { document: { documentElement: { lang: 'ru' } } }));

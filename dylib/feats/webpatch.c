@@ -670,7 +670,10 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "d.__mscxTipL||!d.addEventListener||(d.__mscxTipL=1,d.addEventListener(\"pointerdown\",e=>{" \
     "const o=d.__mscxTip;o&&o.contains&&!o.contains(e.target)&&th(d)},!0)," \
     "d.addEventListener(\"keydown\",e=>{const o=d.__mscxTip;if(e.key!==\"Escape\"||!o)return;" \
-    "if(o.isConnected===!1){d.__mscxTip=null;return}e.preventDefault();e.stopPropagation();th(d)},!0))}," \
+    "if(o.isConnected===!1){d.__mscxTip=null;return}e.preventDefault();e.stopPropagation();th(d)},!0)," \
+    /* The tip is fixed to the window: keep it by its button when the panel scrolls or the window resizes. */ \
+    "d.addEventListener(\"scroll\",()=>{const o=d.__mscxTip;o&&tp(o)},!0)," \
+    "d.defaultView&&d.defaultView.addEventListener&&d.defaultView.addEventListener(\"resize\",()=>{const o=d.__mscxTip;o&&tp(o)}))}," \
     "tp=w=>{try{const b=w.firstChild,x=w.lastChild,v=w.ownerDocument.defaultView,r=b.getBoundingClientRect()," \
     "W=v.innerWidth,Hh=v.innerHeight,L=Math.max(8,Math.min(r.left,W-x.offsetWidth-8));" \
     "let T=r.bottom+6;T+x.offsetHeight>Hh-8&&(T=Math.max(8,r.top-6-x.offsetHeight));" \
