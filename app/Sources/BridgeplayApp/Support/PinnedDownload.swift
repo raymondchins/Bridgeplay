@@ -182,7 +182,9 @@ enum PinnedDownload {
             }
         }
 
-        opened?.discard()
+        // Bytes that arrived before a drop or a refusal are still good: Try Again resumes them.
+        // Only bytes that missed the pin (reset already) leave nothing worth keeping.
+        if kinds.isSubset(of: [.mismatch]) { opened?.discard() }
         AppLog.note("\(file) refused by all \(bases.count) hosts: \(refusals.joined(separator: ". "))")
         throw StepFailure(step: step, detail: reason(kinds, from: source))
     }

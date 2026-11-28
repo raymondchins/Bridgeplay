@@ -10,6 +10,7 @@ struct ResumableDownloadTests {
 
     // https://ranged.invalid/<key>/<mode>/package.tar serves `body` with Range, an ETag and
     // Accept-Ranges. Modes: "ranges" (plain), "drop" (the first request ends halfway),
+    // "dropall" (every request ends after 8 KB),
     // "ignore" (always 200, whole body), "slow" (1 KB every 5 ms), "stall" (16 KB of it, then nothing).
     private final class Ranged: URLProtocol, @unchecked Sendable {
         static let body = Data((0..<65_536).map { UInt8(truncatingIfNeeded: $0 &* 7 &+ $0 >> 8) })
@@ -40,6 +41,11 @@ struct ResumableDownloadTests {
             case "drop" where count == 1:
                 client?.urlProtocol(self, didLoad: slice.prefix(slice.count / 2))
                 // After the bytes have landed, as a real drop would be.
+                DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(100)) { [self] in
+                    client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
+                }
+            case "dropall":
+                client?.urlProtocol(self, didLoad: slice.prefix(8192))
                 DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(100)) { [self] in
                     client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
                 }
@@ -107,6 +113,24 @@ struct ResumableDownloadTests {
         #expect(Ranged.asked(key).map(\.range) == ["", "bytes=\(Ranged.body.count / 2)-"])
         #expect(Ranged.asked(key).last?.ifRange == Ranged.etag)
         #expect(!exists(PartFile.path(for: got)))
+    }
+
+    @Test("A connection that keeps dropping until every try is spent keeps its bytes for Try Again")
+    func exhaustedRetriesResumeLater() async throws {
+        let work = try scratchDirectory("resume")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let downloads = work.appending(path: "downloads")
+        let part = PartFile.path(for: downloads.appending(path: "package.tar"))
+
+        await #expect(throws: (any Error).self) { _ = try await obtain("dropall", key: UUID().uuidString, into: downloads) }
+        let kept = size(part)
+        #expect(kept > 0 && kept < Int64(Ranged.body.count))
+        #expect(exists(part.appendingPathExtension("pin")))
+
+        let key = UUID().uuidString
+        let got = try await obtain("ranges", key: key, into: downloads)
+        #expect(try Data(contentsOf: got) == Ranged.body)
+        #expect(Ranged.asked(key).map(\.range) == ["bytes=\(kept)-"])
     }
 
     @Test("A part that cannot be created throws why, rather than waiting on a lock")
