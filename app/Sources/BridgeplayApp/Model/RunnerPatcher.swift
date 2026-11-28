@@ -29,8 +29,9 @@ enum RunnerPatcher {
         var ntdll: [WineArch] = []
         var builtins: [String] = []
         var loaders: [String] = []
+        var msync = false
 
-        var wroteNothing: Bool { ntdll.isEmpty && builtins.isEmpty && loaders.isEmpty }
+        var wroteNothing: Bool { ntdll.isEmpty && builtins.isEmpty && loaders.isEmpty && !msync }
     }
 
     static func install(
@@ -40,7 +41,36 @@ enum RunnerPatcher {
         outcome.ntdll = try installNtdll(build: build, root: root, bridge: bridge)
         outcome.builtins = try installBuiltins(root: root, bridge: bridge)
         outcome.loaders = try grantLoaderEntitlement(root: root)
+        outcome.msync = markMsync(build: build, root: root)
         return outcome
+    }
+
+    // CrossOver builds carry msync as WineCX does, and CrossOver's own Steam recipe turns it on.
+    // The marker is what compat_run.sh and the Steam panel (webpatch.c) read, so a runner whose
+    // ntdll.so files and wineservers all handle WINEMSYNC gets it; a game still turns it off
+    // with MSYNC=0 or WINEMSYNC=0. A marker that cannot be written leaves msync off, as before.
+    static func markMsync(build: RunnerBuild, root: URL) -> Bool {
+        let marker = FreeEngineWinecx.msyncMarker(in: root)
+        guard (try? FileManager.default.attributesOfItem(atPath: marker.path(percentEncoded: false))) == nil,
+              handlesMsync(root: root) else { return false }
+        return (try? Data("\(build.id)\n".utf8).write(to: marker, options: .atomic)) != nil
+    }
+
+    static func handlesMsync(root: URL) -> Bool {
+        let fm = FileManager.default
+        let wine = root.appending(path: "lib/wine")
+        let arches = ((try? fm.contentsOfDirectory(atPath: wine.path(percentEncoded: false))) ?? [])
+            .filter { $0.hasSuffix("-unix") }
+        let ntdlls = arches.map { wine.appending(path: "\($0)/ntdll.so") }
+        let servers = ["wineserver", "wineserver-arm64", "wineserver-x86"].map { root.appending(path: "bin/\($0)") }
+        let present = (ntdlls + servers).filter { fm.fileExists(atPath: $0.path(percentEncoded: false)) }
+        guard present.contains(where: { $0.lastPathComponent == "ntdll.so" }),
+              present.contains(where: { $0.lastPathComponent.hasPrefix("wineserver") }) else { return false }
+        let needle = Data("WINEMSYNC".utf8)
+        return present.allSatisfy { file in
+            guard let data = try? Data(contentsOf: file, options: .mappedIfSafe) else { return false }
+            return data.range(of: needle) != nil
+        }
     }
 
     static func verify(

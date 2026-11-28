@@ -91,7 +91,9 @@ The engine root (`…/WineCX 11.17.app/Contents/SharedSupport/CrossOver`, cloned
 `runners/crossover-winecx-11.17`; likewise for 11.15) is the archive's `Libraries/Wine`, plus:
 
 ```
-.notproton-msync                                  engine supports msync
+.notproton-msync                                  engine supports msync (also written into a
+                                                  CrossOver runner whose ntdll.so and wineservers
+                                                  handle WINEMSYNC, RunnerPatcher.markMsync)
 lib/wine/x86_64-unix/winemetal.so                 DXMT master, replacing the archive's
 lib/wine/{x86_64,i386}-windows/winemetal.dll      DXMT master, replacing the archive's
 lib/notproton-backends/dxmt/{x86_64,i386}-windows/{d3d11,d3d10core,dxgi}.dll   DXMT master, marker stripped
@@ -406,14 +408,17 @@ folder.
   ([v4.5.0](https://github.com/dappermint/winecx-gptk/releases/tag/v4.5.0),
   [v4.5.1](https://github.com/dappermint/winecx-gptk/releases/tag/v4.5.1)) list one known
   caveat: a non-reproducible Steam renderer wedge under `WINEMSYNC=1` on a heavily loaded
-  machine. The workaround is `WINEMSYNC=0`. frankea
+  machine. The workaround is `WINEMSYNC=0` (`MSYNC=0` in a gamefix or Game Defaults, or the
+  MSync toggle in Steam's panel). msync is on by default for CrossOver runners with the
+  marker too, so the caveat applies to them. frankea
   validated Steam's UI, D3D12 via D3DMetal and DXVK D3D11 on 11.15, but not a DX12 game
   launched from Steam
   ([v4.5.105-beta.1](https://github.com/frankea/Whisky/releases/tag/v4.5.105-beta.1)).
 - **msync needs the wineserver started with the same `WINEMSYNC`.** Otherwise the client
   aborts with "Server is running with WINEMSYNC but this process is not"
   (`dlls/ntdll/unix/msync.c`). `compat_run.sh` exports `WINEMSYNC` before it starts the
-  prefix's server.
+  prefix's server, and the game keeps the server the install-script helper left up only when
+  its `WINEMSYNC` matches ([warm start](DEVELOPING.md#warm-start-and-launch-stamps)).
 - **The CrossOver user profile.** A prefix built by another engine keeps its profile under
   `users/<name>`, while CrossOver-lineage Wine uses `users/crossover`
   ([frankea notes](https://github.com/frankea/Whisky/releases/tag/v4.5.105-beta.1)).

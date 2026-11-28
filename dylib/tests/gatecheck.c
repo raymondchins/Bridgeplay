@@ -99,6 +99,71 @@ static void check_fex_tools(void) {
     np_webpatch_set_fex_tools(NULL, 0);
 }
 
+// A CrossOver build whose runner has .notproton-msync shows MSync on by default, as the run
+// script runs it; a description naming msync still counts, and any other build stays off.
+static void check_engine_msync(void) {
+    const char *tmp = getenv("TMPDIR");
+    char home[512];
+    snprintf(home, sizeof(home), "%s/bridgeplay-gatecheck-XXXXXX", tmp && *tmp ? tmp : "/tmp");
+    if (!mkdtemp(home)) { wrong("no scratch home for the msync check"); return; }
+    static const char *const dirs[] = {
+        "/Library", "/Library/Application Support", "/Library/Application Support/bridgeplay",
+        "/Library/Application Support/bridgeplay/runners",
+        "/Library/Application Support/bridgeplay/runners/crossover-27.0.0.41073",
+        "/Library/Application Support/bridgeplay/runners/crossover-27.0.0.41073/CrossOver",
+    };
+    char path[1024];
+    int made = 0;
+    for (; made < (int)(sizeof(dirs) / sizeof(*dirs)); made++) {
+        snprintf(path, sizeof(path), "%s%s", home, dirs[made]);
+        if (mkdir(path, 0700) != 0) break;
+    }
+    static const char marker[] = "/Library/Application Support/bridgeplay/runners/"
+                                 "crossover-27.0.0.41073/CrossOver/.notproton-msync";
+    static const char tools[] = "/Library/Application Support/bridgeplay/tools";
+    FILE *f = NULL;
+    if (made == (int)(sizeof(dirs) / sizeof(*dirs))) {
+        snprintf(path, sizeof(path), "%s%s", home, marker);
+        if ((f = fopen(path, "w"))) fclose(f);
+        snprintf(path, sizeof(path), "%s%s", home, tools);
+        if ((f = fopen(path, "w"))) {
+            fputs("bridgeplay-proton\t27.0.0.41073\trosetta\tCrossOver 27.0.0\n"
+                  "bridgeplay-proton-26\t26.1.0.40000\trosetta\tCrossOver 26.1.0\n"
+                  "bridgeplay-proton-odd\t27.0.0_41073\trosetta\tCrossOver 27.0.0\n"
+                  "bridgeplay-proton-winecx-11.17\twinecx-11.17\trosetta\tWineCX 11.17 (msync, D3DMetal)\n", f);
+            fclose(f);
+        }
+    }
+    if (!f) {
+        wrong("the msync check could not lay out its scratch home");
+    } else {
+        const char *saved = getenv("HOME");
+        char *old = saved ? strdup(saved) : NULL;
+        setenv("HOME", home, 1);
+        static char buf[NP_FX_MAX];
+        int built = fx_build(buf, sizeof(buf));
+        if (old) { setenv("HOME", old, 1); free(old); } else unsetenv("HOME");
+        static const char *const want[] = {
+            "\"bridgeplay-proton\":{\"WINEMSYNC\":\"1\"}",
+            "\"bridgeplay-proton-26\":{\"WINEMSYNC\":\"0\"}",
+            "\"bridgeplay-proton-odd\":{\"WINEMSYNC\":\"0\"}",
+            "\"bridgeplay-proton-winecx-11.17\":{\"WINEMSYNC\":\"1\"}",
+        };
+        if (!built) wrong("the panel defaults did not build");
+        for (size_t i = 0; built && i < sizeof(want) / sizeof(*want); i++)
+            if (!strstr(buf, want[i])) wrong("the panel defaults lack %s", want[i]);
+    }
+    snprintf(path, sizeof(path), "%s%s", home, tools);
+    unlink(path);
+    snprintf(path, sizeof(path), "%s%s", home, marker);
+    unlink(path);
+    while (made-- > 0) {
+        snprintf(path, sizeof(path), "%s%s", home, dirs[made]);
+        rmdir(path);
+    }
+    if (rmdir(home) != 0) wrong("the msync check left %s behind", home);
+}
+
 static void check_captures(void) {
     int seen = 0;
     for (int c = 1; c < 256; c++) {
@@ -650,7 +715,7 @@ int main(int argc, char **argv) {
     }
 
     if (argc < 2) {
-        selfcheck(); check_captures(); check_fallback(); check_fex_tools();
+        selfcheck(); check_captures(); check_fallback(); check_fex_tools(); check_engine_msync();
         return g_wrong;
     }
 

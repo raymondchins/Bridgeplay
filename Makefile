@@ -95,7 +95,7 @@ DEPS := $(OBJS:.o=.d)
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
-        compatsvc-check prefixstate-check breakercheck clientgatecheck pauselistcheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck \
+        compatsvc-check prefixstate-check breakercheck clientgatecheck pauselistcheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck \
         gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check steamcanarycheck FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
@@ -209,6 +209,12 @@ anticheatcheck:
 launchprogresscheck:
 	@if [ ! -f dylib/tests/launchprogresscheck.sh ]; then $(call SKIP,launchprogresscheck,dylib/tests/launchprogresscheck.sh); exit 0; fi; \
 	sh dylib/tests/launchprogresscheck.sh dylib/feats/compat_run.sh
+
+# One Wine boot per Play and the launch stamps, with a fake Wine. To compare boots and step
+# times with an older script: sh dylib/tests/warmcheck.sh dylib/feats/compat_run.sh --bench <old>
+warmcheck:
+	@if [ ! -f dylib/tests/warmcheck.sh ]; then $(call SKIP,warmcheck,dylib/tests/warmcheck.sh); exit 0; fi; \
+	sh dylib/tests/warmcheck.sh dylib/feats/compat_run.sh
 
 gamedrivecheck:
 	@if [ ! -f dylib/tests/gamedrivecheck.sh ]; then $(call SKIP,gamedrivecheck,dylib/tests/gamedrivecheck.sh); exit 0; fi; \
@@ -1046,7 +1052,7 @@ steamcanarycheck:
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck breakercheck clientgatecheck pauselistcheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
-	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck launchercheck \
+	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck launchercheck \
 	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check steamcanarycheck np-native-tests native-shim-tests \
 	app-tests native-installercheck
 

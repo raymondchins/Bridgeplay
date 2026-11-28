@@ -418,5 +418,126 @@ is "leading zeros of the nanoseconds dropped" yes "$([ -d "$T/tmp/winetemp-$(sta
 chmod -R 700 "$T/tmp"
 unset -f getconf
 
+echo "== reuse of the last good launch's bundle =="
+reuse_funcs=""
+for name in own_note stamp_key bundle_inputs bundle_reusable bundle_record; do
+  body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
+  [ -n "$body" ] || { echo "FAIL: $name not found"; exit 1; }
+  reuse_funcs="$reuse_funcs
+$body"
+done
+eval "$reuse_funcs"
+np_uid=$(id -u)
+np_stamps=1
+app_id=4242
+unset SteamGameId
+R="$T/reuse"
+# A fresh engine, staged bundle files and an installed bundle that matches them, recorded.
+reuse_fresh() {
+  rm -rf "$R"
+  wine_unix="$R/engine/lib/wine/x86_64-unix"
+  mkdir -p "$wine_unix" "$R/engine/bin" "$R/engine/share/wine" "$R/support" "$R/staged/Contents/Resources"
+  printf 'ntdll' > "$wine_unix/ntdll.so"
+  printf '#!/bin/sh\n' > "$R/engine/bin/wine"
+  chmod 755 "$R/engine/bin/wine"
+  WINELOADER="$R/engine/bin/wine"
+  bundle_engine_loader=$WINELOADER
+  np_support="$R/support"
+  np_stamp_base="base"
+  loader_contents="$R/staged/Contents"
+  loader_res="$loader_contents/Resources"
+  printf 'plist gamemode=1' > "$loader_contents/Info.plist"
+  printf 'icon' > "$loader_res/game.icns"
+  loader_root="$R/launchers"
+  loader_app="$loader_root/Game.app"
+  bundle_stamp="$loader_root/.bridgeplay-bundle-stamp"
+  mkdir -p "$loader_app/Contents/MacOS" "$loader_app/Contents/Resources"
+  cp "$WINELOADER" "$loader_app/Contents/MacOS/wine"
+  printf '#!/bin/sh\n' > "$loader_app/Contents/MacOS/launcher"
+  chmod 755 "$loader_app/Contents/MacOS/launcher"
+  ln "$wine_unix/ntdll.so" "$loader_app/Contents/MacOS/ntdll.so"
+  cp "$loader_contents/Info.plist" "$loader_app/Contents/Info.plist"
+  cp "$loader_res/game.icns" "$loader_app/Contents/Resources/game.icns"
+  loader_hosts_ntdll=1
+  bundle_record "${1:-0}"
+}
+reused() { if bundle_reusable; then echo yes; else echo no; fi; }
+
+reuse_fresh
+rm -f "$bundle_stamp"
+is "no stamp: built again" no "$(reused)"
+reuse_fresh 0
+is "a recorded bundle is reused" yes "$(reused)"
+bundle_reusable || true
+is "and says Launch Services has not seen it" "0 1" "$bundle_registered $bundle_hosts"
+reuse_fresh 1
+bundle_reusable || true
+is "a registered bundle says so" 1 "$bundle_registered"
+reuse_fresh 0
+bundle_reusable || true
+is "a second check still reuses it" yes "$(reused)"
+
+reuse_fresh
+printf 'more' >> "$WINELOADER"
+is "the engine's loader changed: built again" no "$(reused)"
+reuse_fresh
+mkdir -p "$R/other"
+cp "$WINELOADER" "$R/other/wine"
+bundle_engine_loader="$R/other/wine"
+is "another engine's loader: built again" no "$(reused)"
+reuse_fresh
+printf 'more' >> "$wine_unix/ntdll.so"
+is "the engine's ntdll.so changed: built again" no "$(reused)"
+reuse_fresh
+rm "$loader_app/Contents/MacOS/ntdll.so"
+cp "$wine_unix/ntdll.so" "$loader_app/Contents/MacOS/ntdll.so"
+bundle_record 0
+is "a bundle whose ntdll.so is no longer the engine's: built again" no "$(reused)"
+
+reuse_fresh
+printf 'echo hi\n' >> "$loader_app/Contents/MacOS/launcher"
+is "a launcher file edited: built again" no "$(reused)"
+reuse_fresh
+chmod 700 "$loader_app/Contents/MacOS/launcher"
+is "a launcher file's mode changed: built again" no "$(reused)"
+reuse_fresh
+printf 'x' > "$loader_app/Contents/MacOS/extra"
+is "a file added to the bundle: built again" no "$(reused)"
+reuse_fresh
+chmod 644 "$loader_app/Contents/MacOS/wine"
+bundle_record 0
+is "a bundle loader that can't run: built again" no "$(reused)"
+
+reuse_fresh
+printf 'new icon' > "$loader_res/game.icns"
+is "a new icon: built again" no "$(reused)"
+reuse_fresh
+rm "$loader_res/game.icns"
+is "the icon gone: built again" no "$(reused)"
+reuse_fresh
+printf 'plist gamemode=0' > "$loader_contents/Info.plist"
+is "a settings change in the Info.plist: built again" no "$(reused)"
+reuse_fresh
+np_stamp_base="base changed"
+is "a new launch base (script, engine, prefix): built again" no "$(reused)"
+
+reuse_fresh
+mkdir -p "$loader_root/Other.app"
+is "another bundle beside it: built again" no "$(reused)"
+reuse_fresh
+np_stamps=0
+is "launch stamps off: built again" no "$(reused)"
+np_stamps=1
+reuse_fresh
+mv "$bundle_stamp" "$R/stamp"
+ln -s "$R/stamp" "$bundle_stamp"
+is "a stamp that is a symlink: built again" no "$(reused)"
+reuse_fresh
+sed 's/^hosts=.*/hosts=2/' "$bundle_stamp" > "$R/stamp" && cat "$R/stamp" > "$bundle_stamp"
+is "a stamp with a bad hosts value: built again" no "$(reused)"
+reuse_fresh
+sed "s|^loader=.*|loader=$R/elsewhere/wine|" "$bundle_stamp" > "$R/stamp" && cat "$R/stamp" > "$bundle_stamp"
+is "a stamp naming another loader: built again" no "$(reused)"
+
 [ "$fails" -eq 0 ] || { echo "launchercheck: $fails failed"; exit 1; }
 echo "launchercheck: all passed"

@@ -7,7 +7,7 @@ SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
 	load_gamefixes consume_sidebar_quick_settings resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available dxmt_without_d3d12 \
-	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
+	backend_record pe_word pe_words pe_rva_offset pe_imports_d3d12 imports_d3d12 select_backend stage_backend_file restore_stock_dll \
 	activate_backend record_backend rockstar_shim_copy rockstar_put_back rockstar_dxgi_copy rockstar_note rockstar_shim_lock_fd rockstar_shim_in_use rockstar_shim_folders stage_rockstar_shim compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
