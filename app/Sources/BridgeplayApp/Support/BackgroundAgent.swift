@@ -251,10 +251,12 @@ enum BackgroundAgent {
             if touched.other { look(after: afterEvent) }
         }
 
-        // Steam under any macOS account, and this user's Bridgeplay app.
+        // Steam under any macOS account, this user's Bridgeplay app and this user's games (their
+        // Wine servers), so a game quitting after Steam does not wait for the late look.
         private func waitForQuit() {
             let steam = (try? Shell.run("/usr/bin/pgrep", ["-x", "steam_osx"]))?.stdout ?? ""
             let pids = steam.split(whereSeparator: \.isNewline).compactMap { pid_t($0) } + appInstances()
+                + WineServer.pids()
             for pid in pids where exits[pid] == nil {
                 let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
                 source.setEventHandler {

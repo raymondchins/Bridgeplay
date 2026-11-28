@@ -33,7 +33,10 @@ struct WineServerTests {
         try process.run()
         defer { process.terminate(); process.waitUntilExit() }
 
-        return WineServer.isRunning(pgrep: pgrep.path(percentEncoded: false))
+        let seen = WineServer.isRunning(pgrep: pgrep.path(percentEncoded: false))
+        let pids = WineServer.pids(pgrep: pgrep.path(percentEncoded: false))
+        #expect(pids == (seen ? [process.processIdentifier] : []))
+        return seen
     }
 
     @Test("Every engine's server name counts as a running game",
