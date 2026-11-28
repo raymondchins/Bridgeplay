@@ -75,6 +75,9 @@ enum SupportPaths {
     static var appinfo: URL { support.appending(path: "appinfo") }
 
     static var packageDownloads: URL { caches.appending(path: "valve-packages") }
+    // Valve's pinned Steam bundle, fetched at setup and kept out of Caches so Restore Steam
+    // works with no network.
+    static var steamRestore: URL { support.appending(path: "steam-restore") }
 
     static var winetricksDownloads: URL { caches.appending(path: "winetricks") }
 

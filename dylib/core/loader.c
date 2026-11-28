@@ -6,6 +6,7 @@
 #include "../resolver/sigdb.h"
 #include "../core/macho.h"
 #include "../hooks/hooks.h"
+#include "../feats/breaker.h"
 #include "../feats/compat.h"
 #include "../feats/input_access.h"
 
@@ -126,6 +127,7 @@ static void install_steamui(np_sigdb_t *sigdb) {
     np_resolve_result_t resolved = {0};
     int count = np_resolve_signatures(mh, slide, sigdb, STEAMUI_DYLIB, &resolved);
     NP_LOG("install_thread: %s signatures %d/%d resolved", STEAMUI_DYLIB, count, required);
+    np_health_signatures(count, required);
 
     if (count < required)
         NP_WARN("install_thread: %s %d/%d signatures resolved; the hooks that did "
@@ -137,9 +139,13 @@ static void install_steamui(np_sigdb_t *sigdb) {
 
     NP_LOG("install_thread: %s ready, %d/%d hooks installed",
            STEAMUI_DYLIB, installed, total);
+    np_health_hooks(installed, total);
+    np_health_flush();
 
     np_free_resolution(&resolved);
 }
+
+static void install_steamclient(const struct mach_header_64 *mh, intptr_t slide);
 
 static void *install_thread(void *unused) {
     (void)unused;
@@ -156,6 +162,13 @@ static void *install_thread(void *unused) {
         return NULL;
     }
 
+    np_breaker_client_seen();
+    install_steamclient(mh, slide);
+    np_breaker_arm_healthy();
+    return NULL;
+}
+
+static void install_steamclient(const struct mach_header_64 *mh, intptr_t slide) {
     np_input_access_check();
 
     uintptr_t text_base = 0;
@@ -163,7 +176,8 @@ static void *install_thread(void *unused) {
 
     if (np_find_segment(mh, slide, "__TEXT", &text_base, &text_size) != 0) {
         NP_ERR("install_thread: no __TEXT segment in %s", STEAMCLIENT_DYLIB);
-        return NULL;
+        np_health_flush();
+        return;
     }
 
     NP_LOG("install_thread: %s __TEXT @ 0x%lx (%zu bytes) slide=0x%lx",
@@ -177,8 +191,10 @@ static void *install_thread(void *unused) {
 
     if (np_load_profile(sig_path, &sigdb) != 0) {
         NP_ERR("install_thread: cannot load signature database from %s", sig_path);
-        return NULL;
+        np_health_flush();
+        return;
     }
+    np_health_sigdb(sigdb.steam_build);
 
     np_resolve_result_t resolved = {0};
 
@@ -186,6 +202,7 @@ static void *install_thread(void *unused) {
                                                &resolved);
     int required = np_required_for_module(&sigdb, STEAMCLIENT_DYLIB);
     NP_LOG("install_thread: signatures %d/%d resolved", resolved_count, required);
+    np_health_signatures(resolved_count, required);
 
     // Safety feature :)
     if (resolved_count < required) {
@@ -194,7 +211,8 @@ static void *install_thread(void *unused) {
                resolved_count, required);
         np_free_resolution(&resolved);
         np_free_profile(&sigdb);
-        return NULL;
+        np_health_flush();
+        return;
     }
 
     np_hooks_launch_install(mh, slide);
@@ -203,6 +221,9 @@ static void *install_thread(void *unused) {
     int installed = np_hooks_install_all(mh, slide, &resolved, &total);
 
     NP_LOG("install_thread: ready, %d/%d hooks installed", installed, total);
+    np_health_hooks(installed, total);
+    np_health_layout(np_compat_layout_known());
+    np_health_flush();
 
     if (installed == 0)
         NP_WARN("install_thread: no hooks installed, check the signature database");
@@ -215,8 +236,6 @@ static void *install_thread(void *unused) {
     install_steamui(&sigdb);
 
     np_free_profile(&sigdb);
-
-    return NULL;
 }
 
 static void np_log_platform_overrides(void) {
@@ -262,6 +281,10 @@ static void np_init(void) {
         return;
     if (is_main_helper(pn)) {
         np_log_attach();
+        if (np_breaker_mode() != NP_MODE_ACTIVE) {
+            np_breaker_drop_insert();
+            return;
+        }
         np_hooks_spawn_install();
         return;
     }
@@ -269,12 +292,17 @@ static void np_init(void) {
         return;
 
     np_log_init();
-    g_active = 1;
 
     clear_relaunch_markers();
 
     NP_LOG("np_init: loaded into %s (pid %d) Bridgeplay %s (%d), NotProton %s",
            pn, getpid(), BRIDGEPLAY_VERSION, BRIDGEPLAY_BUILD, NOTPROTON_VERSION);
+
+    // Passive and paused starts install nothing; the client and its children start
+    // without the insert.
+    if (np_breaker_start() != NP_MODE_ACTIVE)
+        return;
+    g_active = 1;
 
     np_log_platform_overrides();
     np_compat_export_tools_path();
@@ -300,5 +328,6 @@ static void np_fini(void) {
         pthread_join(g_install, NULL);
     }
 
+    np_breaker_exit();
     NP_LOG("np_fini: unloading, hooks left in place for the OS to reclaim");
 }

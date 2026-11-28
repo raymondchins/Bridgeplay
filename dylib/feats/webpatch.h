@@ -31,4 +31,8 @@ void np_webpatch_set_fex_tools(const char *const *names, size_t count);
 char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
                             const char **out_shape);
 
+// The compat UI gates of this thread's last transform: how many matched, how many the shape
+// has, and whether a required one missed. Zero when no shape was found.
+void np_webpatch_last_gates(size_t *live, size_t *total, int *drifted);
+
 #endif // NOTPROTON_FEATS_WEBPATCH_H

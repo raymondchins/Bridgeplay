@@ -3,6 +3,7 @@
 // not modified, to keep the Steam bootstrap happy.
 
 #include "../feats/webpatch.h"
+#include "../feats/breaker.h"
 #include "../feats/compat.h"
 #include "../feats/compatsvc.h"
 #include "../util/file.h"
@@ -128,6 +129,12 @@ static int open_patched(const char *path) {
     char *patched = np_webpatch_transform((const uint8_t *)raw, raw_len, &patched_len,
                                           &shape);
     free(raw);
+    if (shape) {
+        size_t live = 0, total = 0;
+        int drifted = 0;
+        np_webpatch_last_gates(&live, &total, &drifted);
+        np_health_web(shape, live, total, drifted);
+    }
     if (!patched)
         return -1;
 
@@ -158,6 +165,8 @@ static int try_serve(const char *path, int oflag) {
     if (oflag & WRITE_INTENT)
         return -1;
     if (!np_webpatch_should_patch(path))
+        return -1;
+    if (np_breaker_mode() != NP_MODE_ACTIVE)
         return -1;
     return open_patched(path);
 }

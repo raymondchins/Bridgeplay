@@ -171,7 +171,7 @@ struct SteamRepairTests {
                     report: @escaping @Sendable (RepairPhase) -> Void = { _ in }) async throws {
             _ = try await SteamRepair.run(
                 manifest: manifest, app: app, innerPlist: work.appending(path: "inner.plist"), updateBlocks: [],
-                backups: work.appending(path: "support/backups"), downloads: downloads,
+                backups: work.appending(path: "support/backups"), downloads: downloads, kept: nil,
                 modifications: modifications, stopClient: stopClient, register: { _ in },
                 busyRunner: busyRunner, report: report)
         }
@@ -317,7 +317,7 @@ struct SteamRepairTests {
 
         _ = try await SteamRepair.run(
             app: app, innerPlist: work.appending(path: "inner.plist"), updateBlocks: [],
-            backups: support.appending(path: "backups"), downloads: try isolatedValveDownloads(in: work),
+            backups: support.appending(path: "backups"), downloads: try isolatedValveDownloads(in: work), kept: nil,
             modifications: modifications, stopClient: { _, _ in false }, register: { _ in }, busyRunner: { nil })
 
         #expect(try modifications.paths().isEmpty)
@@ -335,6 +335,109 @@ struct SteamRepairTests {
 
         #expect(result.partialRemoval == nil)
         #expect(!result.steamNeedsRedownload)
+    }
+
+    // MARK: - Offline restore
+
+    // A package laid out as Valve's is (a zip holding a tar.gz of the bundle), served from a
+    // folder. Unsigned: these tests are about where the bytes come from, not who signed them.
+    private func localPackage(in work: URL) throws -> (manifest: ValvePackageManifest, file: URL) {
+        let host = work.appending(path: "host")
+        let contents = host.appending(path: "Steam.app/Contents")
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        try Data("<plist/>".utf8).write(to: contents.appending(path: "Info.plist"))
+        let path = host.path(percentEncoded: false)
+        try Shell.check("/usr/bin/tar", ["-czf", path + "/inner.tar.gz", "-C", path, "Steam.app"])
+        try Shell.check("/usr/bin/zip", ["-q", "-j", path + "/package.zip", path + "/inner.tar.gz"])
+        let package = host.appending(path: "package.zip")
+        let manifest = ValvePackageManifest(
+            bases: [host], packages: [], files: [],
+            bundle: ValveBundle(file: "package.zip", sha256: try Digest.sha256(of: package),
+                                innerArchive: "inner.tar.gz", bundleName: "Steam.app"))
+        return (manifest, package)
+    }
+
+    @Test("A kept bundle stages with no host to download from")
+    func keptBundleNeedsNoNetwork() async throws {
+        let work = try scratchDirectory("repair-offline")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let (manifest, package) = try localPackage(in: work)
+        let bundle = try #require(manifest.bundle)
+        let kept = work.appending(path: "kept")
+        try FileManager.default.createDirectory(at: kept, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: package, to: kept.appending(path: bundle.file))
+
+        await #expect(throws: StepFailure.self) {
+            _ = try await SteamRepair.stage(bundle, bases: [], downloads: work.appending(path: "none"),
+                                            work: work.appending(path: "staging-none"))
+        }
+        let staged = try await SteamRepair.stage(bundle, bases: [], downloads: work.appending(path: "downloads"),
+                                                 kept: kept, work: work.appending(path: "staging"))
+        #expect(FileManager.default.fileExists(atPath: staged.appending(path: "Contents/Info.plist").path(percentEncoded: false)))
+        #expect(FileManager.default.fileExists(atPath: kept.appending(path: bundle.file).path(percentEncoded: false)))
+    }
+
+    @Test("A kept copy that misses the pin is not used")
+    func keptCopyMustMatchThePin() async throws {
+        let work = try scratchDirectory("repair-offline-pin")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let (manifest, _) = try localPackage(in: work)
+        let bundle = try #require(manifest.bundle)
+        let kept = work.appending(path: "kept")
+        try FileManager.default.createDirectory(at: kept, withIntermediateDirectories: true)
+        try Data("not Valve's".utf8).write(to: kept.appending(path: bundle.file))
+
+        #expect(SteamRepair.keptArchive(bundle, in: kept) == nil)
+        await #expect(throws: StepFailure.self) {
+            _ = try await SteamRepair.stage(bundle, bases: [], downloads: work.appending(path: "downloads"),
+                                            kept: kept, work: work.appending(path: "staging"))
+        }
+    }
+
+    @Test("Setup keeps the bundle from the download cache and drops an older one")
+    func keepsFromTheCache() async throws {
+        let work = try scratchDirectory("repair-keep-cache")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let (served, package) = try localPackage(in: work)
+        let manifest = ValvePackageManifest(bases: [], packages: [], files: [], bundle: served.bundle)
+        let bundle = try #require(manifest.bundle)
+        let downloads = work.appending(path: "downloads")
+        let kept = work.appending(path: "kept")
+        for folder in [downloads, kept] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        try FileManager.default.copyItem(at: package, to: downloads.appending(path: bundle.file))
+        try Data("an earlier pin".utf8).write(to: kept.appending(path: "older-package.zip"))
+
+        #expect(await SteamRepair.keepForOffline(manifest: manifest, kept: kept, downloads: downloads))
+        let left = try FileManager.default.contentsOfDirectory(atPath: kept.path(percentEncoded: false))
+        #expect(left == [bundle.file])
+        #expect(SteamRepair.keptArchive(bundle, in: kept) != nil)
+    }
+
+    @Test("Setup downloads the bundle when the cache lacks it")
+    func keepsByDownloading() async throws {
+        let work = try scratchDirectory("repair-keep-fetch")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let (manifest, _) = try localPackage(in: work)
+        let bundle = try #require(manifest.bundle)
+        let kept = work.appending(path: "kept")
+
+        #expect(await SteamRepair.keepForOffline(manifest: manifest, kept: kept, downloads: work.appending(path: "downloads")))
+        #expect(SteamRepair.keptArchive(bundle, in: kept) != nil)
+    }
+
+    @Test("No network at setup leaves nothing kept and fails nothing")
+    func keepWithoutNetworkIsQuiet() async throws {
+        let work = try scratchDirectory("repair-keep-offline")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let (served, _) = try localPackage(in: work)
+        let manifest = ValvePackageManifest(bases: [], packages: [], files: [], bundle: served.bundle)
+        let bundle = try #require(manifest.bundle)
+        let kept = work.appending(path: "kept")
+
+        #expect(!(await SteamRepair.keepForOffline(manifest: manifest, kept: kept, downloads: work.appending(path: "downloads"))))
+        #expect(SteamRepair.keptArchive(bundle, in: kept) == nil)
     }
 
     // MARK: - The inner plist

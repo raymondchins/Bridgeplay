@@ -1512,12 +1512,23 @@ static int fx_build(char *buf, size_t cap) {
     return 1;
 }
 
+static _Thread_local size_t g_last_gates_live, g_last_gates_total;
+static _Thread_local int    g_last_gates_drifted;
+
+void np_webpatch_last_gates(size_t *live, size_t *total, int *drifted) {
+    *live = g_last_gates_live;
+    *total = g_last_gates_total;
+    *drifted = g_last_gates_drifted;
+}
+
 char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
                             const char **out_shape) {
     const char *s = (const char *)src;
 
     if (out_shape)
         *out_shape = NULL;
+    g_last_gates_live = g_last_gates_total = 0;
+    g_last_gates_drifted = 0;
 
     const np_ui_shape_t *shape = NULL;
     for (size_t i = 0; i < NP_SHAPE_COUNT; i++) {
@@ -1634,6 +1645,9 @@ char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
                 drifted = 1;
             }
         }
+        g_last_gates_live = gate_live;
+        g_last_gates_total = shape->count;
+        g_last_gates_drifted = drifted;
         if (drifted) {
             NP_ERR("webpatch: [%s] compat UI left unpatched, a Steam update moved the "
                    "anchors", shape->name);

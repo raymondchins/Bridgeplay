@@ -57,6 +57,15 @@ Logs:
 | One game's launch and Wine output | `bridgeplay-run.log`, `bridgeplay-wine.log`; Prefixes page › a game › Open Log |
 | The app | Setup › Reveal Log in Finder |
 
+Crash-loop breaker (`dylib/feats/breaker.c`, `make breakercheck`). Each Steam start is counted
+per Steam build and Bridgeplay build in `boot.json` in the same folder. A start that ends
+before 120 s after the hooks install, with no clean quit, is a bad start. After two, Steam
+starts without Bridgeplay (no hooks, the insert dropped) until Steam or Bridgeplay updates, and
+one notification says so. Deleting `boot.json` clears the count ("Try Again"). A file named
+`paused` there turns Bridgeplay off at the next Steam start without touching `Steam.app`.
+`health.json` (`steam_osx`) and `health-web.json` (Steam Helper, the compat UI gates) say what
+the last start did; `BRIDGEPLAY_BREAKER_QUIET=1` skips the notification.
+
 ## Checks
 
 | Command | Runs |
