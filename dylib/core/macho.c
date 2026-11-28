@@ -22,17 +22,22 @@ static int image_index_by_name(const char *needle) {
     return -1;
 }
 
+int np_find_image(const char *name, const struct mach_header_64 **out_mh,
+                  intptr_t *out_slide) {
+    int idx = image_index_by_name(name);
+    if (idx < 0) return -1;
+    *out_mh    = (const struct mach_header_64 *)_dyld_get_image_header((uint32_t)idx);
+    *out_slide = _dyld_get_image_vmaddr_slide((uint32_t)idx);
+    return 0;
+}
+
 int np_await_image(const char *name, int timeout_ms,
                          const struct mach_header_64 **out_mh, intptr_t *out_slide) {
     for (int waited = 0; waited < timeout_ms; waited += 100) {
         if (g_await_stop) return -1;
 
-        int idx = image_index_by_name(name);
-        if (idx >= 0) {
-            *out_mh    = (const struct mach_header_64 *)_dyld_get_image_header((uint32_t)idx);
-            *out_slide = _dyld_get_image_vmaddr_slide((uint32_t)idx);
+        if (np_find_image(name, out_mh, out_slide) == 0)
             return 0;
-        }
         usleep(100000);
     }
     return -1;

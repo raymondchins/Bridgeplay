@@ -5,6 +5,7 @@
 #include "../resolver/resolver.h"
 #include "../resolver/sigdb.h"
 #include "../core/macho.h"
+#include "../core/clientgate.h"
 #include "../hooks/hooks.h"
 #include "../feats/breaker.h"
 #include "../feats/compat.h"
@@ -19,6 +20,7 @@
 #include <dirent.h>
 #include <mach-o/dyld.h>
 #include <crt_externs.h>
+#include <dlfcn.h>
 #include <libgen.h>
 
 #define STEAMCLIENT_DYLIB "steamclient.dylib"
@@ -108,6 +110,11 @@ static pthread_t g_install;
 static int       g_install_started;
 static int       g_active;
 
+// Kept from the steamclient install for the steamui one, which the loader thread runs.
+static np_sigdb_t g_sigdb;
+static int        g_sigdb_loaded;
+static int        g_client_ready;
+
 static void install_steamui(np_sigdb_t *sigdb) {
     int required = np_required_for_module(sigdb, STEAMUI_DYLIB);
     if (required == 0) {
@@ -163,14 +170,57 @@ static void *install_thread(void *unused) {
     }
 
     np_breaker_client_seen();
-    install_steamclient(mh, slide);
+    if (np_gate_run(mh, slide, install_steamclient, WAIT_TIMEOUT_MS))
+        NP_LOG("install_thread: steamclient hooks installed from the loader thread");
+    if (np_gate_state() != NP_GATE_DONE) {
+        NP_ERR("install_thread: the steamclient install did not finish in %d ms",
+               WAIT_TIMEOUT_MS);
+        return NULL;
+    }
+
+    np_input_access_check();
+    if (g_client_ready)
+        install_steamui(&g_sigdb);
+    if (g_sigdb_loaded)
+        np_free_profile(&g_sigdb);
     np_breaker_arm_healthy();
     return NULL;
 }
 
-static void install_steamclient(const struct mach_header_64 *mh, intptr_t slide) {
-    np_input_access_check();
+// Steam reaches steamclient.dylib only through symbols it looks up after loading it, so the
+// first lookup once the image is mapped installs the hooks (or waits for the loader thread
+// doing it) before any client code runs.
+static void install_on_lookup(const char *symbol) {
+    const struct mach_header_64 *mh = NULL;
+    intptr_t slide = 0;
+    if (np_find_image(STEAMCLIENT_DYLIB, &mh, &slide) != 0)
+        return;
+    np_breaker_client_seen();
+    if (np_gate_run(mh, slide, install_steamclient, 5000))
+        NP_LOG("install: steamclient hooks installed before Steam's lookup of %s",
+               symbol ? symbol : "(null)");
+}
 
+// A tail call, so dlsym sees Steam's return address: RTLD_NEXT and RTLD_SELF resolve
+// relative to the caller.
+static void *np_dlsym(void *handle, const char *symbol) {
+    if (g_active && np_gate_state() != NP_GATE_DONE)
+        install_on_lookup(symbol);
+    __attribute__((musttail)) return dlsym(handle, symbol);
+}
+
+#define DYLD_INTERPOSE(_replacement, _replacee) \
+    __attribute__((used)) static struct { \
+        const void *replacement; \
+        const void *replacee; \
+    } _interpose_##_replacee __attribute__((section("__DATA,__interpose"))) = { \
+        (const void *)(uintptr_t)&_replacement, \
+        (const void *)(uintptr_t)&_replacee \
+    }
+
+DYLD_INTERPOSE(np_dlsym, dlsym);
+
+static void install_steamclient(const struct mach_header_64 *mh, intptr_t slide) {
     uintptr_t text_base = 0;
     size_t text_size = 0;
 
@@ -233,9 +283,9 @@ static void install_steamclient(const struct mach_header_64 *mh, intptr_t slide)
 
     np_free_resolution(&resolved);
 
-    install_steamui(&sigdb);
-
-    np_free_profile(&sigdb);
+    g_sigdb = sigdb;
+    g_sigdb_loaded = 1;
+    g_client_ready = 1;
 }
 
 static void np_log_platform_overrides(void) {
