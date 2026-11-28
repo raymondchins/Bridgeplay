@@ -32,6 +32,7 @@ enum InstallIntoSteamCommand {
                 _ = try await ValveFetcher.run { say($0.label) }
             }
             try SteamInstaller.finish(result)
+            await SteamRepair.keepForOffline { say($0.label) }
             UserDefaults.standard.removeObject(forKey: SteamPatchKeeper.pausedKey)
             say("Bridgeplay \(ProductVersion.short) installed into Steam.")
             if let warning = result.sealWarning { say(warning) }

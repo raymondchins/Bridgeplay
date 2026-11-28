@@ -65,6 +65,7 @@ SRCS := \
 	dylib/feats/nativeplatform.c \
 	dylib/feats/displayrate.c \
 	dylib/feats/input_access.c \
+	dylib/feats/breaker.c \
 	vendor/cJSON.c
 
 OUT_DIR     := out
@@ -87,7 +88,7 @@ DEPS := $(OBJS:.o=.d)
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
-        compatsvc-check prefixstate-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck \
+        compatsvc-check prefixstate-check breakercheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck \
         gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
@@ -287,6 +288,16 @@ prefixstate-check:
 
 COMPATSVC_CHECK := $(OUT_DIR)/compatsvc-check
 
+BREAKERCHECK := $(OUT_DIR)/breakercheck
+
+# Bad Steam starts, Pause and the health files, in a scratch home.
+breakercheck:
+	@if [ ! -f dylib/tests/breakercheck.c ]; then $(call SKIP,breakercheck,dylib/tests/breakercheck.c); exit 0; fi; \
+	mkdir -p $(OUT_DIR) && \
+	$(TEST_CC) -O1 -Ivendor -o $(BREAKERCHECK) dylib/tests/breakercheck.c \
+	  dylib/util/log.c dylib/util/file.c vendor/cJSON.c && \
+	$(BREAKERCHECK)
+
 quicksettings-check:
 	@if [ ! -f dylib/tests/quicksettings-check.c ]; then $(call SKIP,quicksettings-check,dylib/tests/quicksettings-check.c); exit 0; fi; \
 	mkdir -p $(OUT_DIR) && \
@@ -472,9 +483,11 @@ spawn-env:
 
 SPAWN_LIVE := dylib/tests/spawn-live
 
+# Each case runs in a scratch home: "paused" holds the app's pause flag, "passive" a key that
+# tripped the breaker. There nothing installs and no child keeps the insert.
 spawn-live: $(TARGET)
 	@if [ ! -d $(SPAWN_LIVE) ]; then $(call SKIP,spawn-live,$(SPAWN_LIVE)); exit 0; fi; \
-	tmp=$$(mktemp -d); trap 'rm -rf $$tmp' EXIT; mkdir -p $$tmp/sub; \
+	tmp=$$(mktemp -d) || exit 1; trap 'rm -rf "$$tmp"' EXIT; mkdir -p $$tmp/sub; \
 	$(CC) -arch $(ARCH) -mmacosx-version-min=$(MIN_VER) -std=c17 -O1 -Wall -Wextra \
 	  -o $$tmp/child $(SPAWN_LIVE)/child.c || exit 1; \
 	$(CC) -arch $(ARCH) -mmacosx-version-min=$(MIN_VER) -std=c17 -O1 -Wall -Wextra \
@@ -482,20 +495,33 @@ spawn-live: $(TARGET)
 	cp $$tmp/steam_osx $$tmp/inert; cp $$tmp/child $$tmp/steam_osx_child; \
 	cp $$tmp/child $$tmp/sub/steam_osx; \
 	cp $$tmp/steam_osx "$$tmp/Steam Helper"; cp $$tmp/child "$$tmp/sub/Steam Helper"; \
+	sup="Library/Application Support/bridgeplay"; \
+	for h in active paused passive; do mkdir -p "$$tmp/$$h/$$sup" || exit 1; done; \
+	: > "$$tmp/paused/$$sup/paused"; \
+	printf '{"key":"0:%s","pid":1,"t0":1,"stage":"passive","strikes":2,"notified":1}\n' \
+	  "$$(sed -n 's/^#define BRIDGEPLAY_BUILD //p' dylib/version.h)" > "$$tmp/passive/$$sup/boot.json"; \
+	printf '{"mode":"passive"}\n' > "$$tmp/passive/$$sup/health.json"; \
 	fail=0; \
-	for spec in "inert:child:1" "steam_osx:child:0" \
-	            "steam_osx:steam_osx_child:0" "steam_osx:sub/steam_osx:1" \
-	            "steam_osx:sub/Steam Helper:1" "Steam Helper:child:0" \
-	            "Steam Helper:sub/Steam Helper:1" "Steam Helper:child:1:--type=renderer"; do \
-		drv=$${spec%%:*}; rest=$${spec#*:}; kid=$${rest%%:*}; rest=$${rest#*:}; \
+	for spec in "active:inert:child:1" "active:steam_osx:child:0" \
+	            "active:steam_osx:steam_osx_child:0" "active:steam_osx:sub/steam_osx:1" \
+	            "active:steam_osx:sub/Steam Helper:1" "active:Steam Helper:child:0" \
+	            "active:Steam Helper:sub/Steam Helper:1" "active:Steam Helper:child:1:--type=renderer" \
+	            "paused:steam_osx:sub/steam_osx:0" "paused:steam_osx:sub/Steam Helper:0" \
+	            "paused:Steam Helper:sub/Steam Helper:0" "paused:inert:child:1" \
+	            "passive:steam_osx:sub/steam_osx:0" "passive:steam_osx:sub/Steam Helper:0" \
+	            "passive:Steam Helper:sub/Steam Helper:0"; do \
+		home=$${spec%%:*}; rest=$${spec#*:}; \
+		drv=$${rest%%:*}; rest=$${rest#*:}; kid=$${rest%%:*}; rest=$${rest#*:}; \
 		want=$${rest%%:*}; arg=$${rest#*:}; [ "$$arg" = "$$rest" ] && arg=""; \
-		got=$$(DYLD_INSERT_LIBRARIES=$$PWD/$(TARGET) "$$tmp/$$drv" "$$tmp/$$kid" $$arg 2>/dev/null \
-		       | grep -c "/notproton.dylib$$") || true; \
+		got=$$(HOME="$$tmp/$$home" BRIDGEPLAY_BREAKER_QUIET=1 DYLD_INSERT_LIBRARIES=$$PWD/$(TARGET) \
+		       "$$tmp/$$drv" "$$tmp/$$kid" $$arg 2>/dev/null | grep -c "/notproton.dylib$$") || true; \
 		if [ "$$got" != "$$want" ]; then \
-			echo "$$drv $$arg -> $$kid: insert present $$got, wanted $$want"; fail=1; fi; \
+			echo "$$home: $$drv $$arg -> $$kid: insert present $$got, wanted $$want"; fail=1; fi; \
 	done; \
+	grep -q '"mode":"passive"' "$$tmp/passive/$$sup/health.json" || { echo "passive: health.json lost its mode"; fail=1; }; \
+	grep -q '"mode":"off"' "$$tmp/paused/$$sup/health.json" || { echo "paused: health.json does not say off"; fail=1; }; \
 	if [ $$fail -ne 0 ]; then exit 1; fi; \
-	echo "==> spawn live: the hook lands, steam_osx and Steam Helper keep the insert, other children do not"
+	echo "==> spawn live: the hook lands, steam_osx and Steam Helper keep the insert, other children do not; paused and passive starts drop it"
 
 APP_TESTS := app/Tests
 
@@ -982,7 +1008,7 @@ np-inventory-check:
 # overlay-shim-tests is left out: it needs a Metal GPU and real frame timing.
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
-	activatecheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
+	activatecheck breakercheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck launchercheck \
 	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
 	app-tests native-installercheck

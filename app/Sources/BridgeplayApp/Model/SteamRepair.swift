@@ -46,6 +46,7 @@ enum SteamRepair {
         updateBlocks: [URL] = UpdateBlock.paths,
         backups: URL = SupportPaths.backups,
         downloads: URL = SupportPaths.packageDownloads,
+        kept: URL? = SupportPaths.steamRestore,
         modifications: SteamModifications = .shared,
         stopClient: SteamInstaller.ClientStopper = { app, onStopping in
             try SteamBundle.stopClient(app: app, step: String(localized: "Repair Steam"), onStopping: onStopping)
@@ -72,7 +73,7 @@ enum SteamRepair {
         }
         try refuseRunningGame()
 
-        let staged = try await stage(bundle, bases: manifest.bases, downloads: downloads, report: report)
+        let staged = try await stage(bundle, bases: manifest.bases, downloads: downloads, kept: kept, report: report)
 
         report(.checking)
         try verifyValveSignature(staged)
@@ -116,15 +117,22 @@ enum SteamRepair {
         _ bundle: ValveBundle,
         bases: [URL],
         downloads: URL,
+        kept: URL? = nil,
         work suppliedWork: URL? = nil,
         report: @Sendable (RepairPhase) -> Void = { _ in }
     ) async throws -> URL {
         let files = FileManager.default
         try files.createDirectory(at: downloads, withIntermediateDirectories: true)
 
-        let archive = try await PinnedDownload.obtain(
-            file: bundle.file, sha256: bundle.sha256, bases: bases, into: downloads, step: step
-        ) { report(.downloading($0)) }
+        let archive: URL
+        if let held = kept.flatMap({ keptArchive(bundle, in: $0) }) {
+            report(.downloading(.reusing))
+            archive = held
+        } else {
+            archive = try await PinnedDownload.obtain(
+                file: bundle.file, sha256: bundle.sha256, bases: bases, into: downloads, step: step
+            ) { report(.downloading($0)) }
+        }
 
         report(.unpacking)
 
@@ -149,6 +157,52 @@ enum SteamRepair {
             )
         }
         return staged
+    }
+
+    /// The kept copy of `bundle`, only while it still matches the pin.
+    static func keptArchive(_ bundle: ValveBundle, in kept: URL) -> URL? {
+        let archive = kept.appending(path: bundle.file)
+        return Digest.sha256IfPresent(archive) == bundle.sha256 ? archive : nil
+    }
+
+    /// Keeps the pinned bundle in `kept`, from the download cache when it holds it, so Restore
+    /// Steam needs no network later. Never throws: without it Repair downloads as before.
+    @discardableResult
+    static func keepForOffline(
+        manifest suppliedManifest: ValvePackageManifest? = nil,
+        kept: URL = SupportPaths.steamRestore,
+        downloads: URL = SupportPaths.packageDownloads,
+        report: @Sendable (RepairPhase) -> Void = { _ in }
+    ) async -> Bool {
+        guard let manifest = suppliedManifest ?? (try? ValvePackageManifest.bundled()),
+              let bundle = manifest.bundle else { return false }
+        let files = FileManager.default
+        if keptArchive(bundle, in: kept) == nil {
+            do {
+                try files.createDirectory(at: kept, withIntermediateDirectories: true)
+                let cached = downloads.appending(path: bundle.file)
+                if Digest.sha256IfPresent(cached) == bundle.sha256 {
+                    let pending = kept.appending(path: bundle.file + ".bridgeplay-pending")
+                    try? files.removeItem(at: pending)
+                    try files.copyItem(at: cached, to: pending)
+                    try? files.removeItem(at: kept.appending(path: bundle.file))
+                    try files.moveItem(at: pending, to: kept.appending(path: bundle.file))
+                } else {
+                    _ = try await PinnedDownload.obtain(
+                        file: bundle.file, sha256: bundle.sha256, bases: manifest.bases, into: kept, step: step
+                    ) { report(.downloading($0)) }
+                }
+            } catch {
+                AppLog.note("repair: Valve's Steam bundle not kept for offline use: \(error.localizedDescription)")
+                return false
+            }
+        }
+        // A pin change leaves the previous bundle behind.
+        for old in (try? files.contentsOfDirectory(at: kept, includingPropertiesForKeys: nil)) ?? []
+        where old.lastPathComponent != bundle.file {
+            try? files.removeItem(at: old)
+        }
+        return keptArchive(bundle, in: kept) != nil
     }
 
     // Requirements codesign evaluates against the certificate chain itself. Text that

@@ -3,6 +3,7 @@
 // not modified, to keep the Steam bootstrap happy.
 
 #include "../feats/webpatch.h"
+#include "../feats/breaker.h"
 #include "../feats/compat.h"
 #include "../feats/compatsvc.h"
 #include "../util/file.h"
@@ -128,8 +129,17 @@ static int open_patched(const char *path) {
     char *patched = np_webpatch_transform((const uint8_t *)raw, raw_len, &patched_len,
                                           &shape);
     free(raw);
-    if (!patched)
+    size_t live = 0, total = 0;
+    int drifted = 0;
+    if (shape)
+        np_webpatch_last_gates(&live, &total, &drifted);
+    // A required gate that no longer matches leaves Steam reading the file it shipped,
+    // so no gate counts as applied.
+    if (!patched) {
+        if (shape)
+            np_health_web(shape, 0, total, drifted);
         return -1;
+    }
 
     // Only this page pays for an unregistered service, and only here is it known that the
     // page arrived. UNTRIED is not a miss: the chunk can precede the first route lookup.
@@ -141,6 +151,9 @@ static int open_patched(const char *path) {
 
     int fd = spill_to_temp(patched, patched_len);
     free(patched);
+    // The gates count as applied only once the patched bytes are what the client reads.
+    if (shape)
+        np_health_web(shape, fd < 0 ? 0 : live, total, drifted);
     if (fd < 0) {
         NP_ERR("webpatch: patched %s but staging the bytes failed, so the client reads "
                "the chunk Valve shipped", path);
@@ -158,6 +171,8 @@ static int try_serve(const char *path, int oflag) {
     if (oflag & WRITE_INTENT)
         return -1;
     if (!np_webpatch_should_patch(path))
+        return -1;
+    if (np_breaker_mode() != NP_MODE_ACTIVE)
         return -1;
     return open_patched(path);
 }

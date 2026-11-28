@@ -778,6 +778,7 @@ final class SystemStatus {
             try await Task.detached(priority: .userInitiated) {
                 try SteamInstaller.finish(result)
             }.value
+            await SteamRepair.keepForOffline { progress($0.label) }
 
             // Set last, so a step that fails above is not read as a finished install.
             sealWarning = result.sealWarning
