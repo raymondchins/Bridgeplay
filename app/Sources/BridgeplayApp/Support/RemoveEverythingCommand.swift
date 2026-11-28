@@ -83,7 +83,8 @@ enum RemoveEverythingCommand {
                 output.say("Your own game fixes were kept in \(kept.path(percentEncoded: false)).")
             }
             if let checklist = finish(result) { output.say(checklist) }
-            return result.partialRemoval == nil ? 0 : 1
+            // A prefix the user asked to trash and that is still there is unfinished work too.
+            return result.partialRemoval == nil && result.notTrashed.isEmpty ? 0 : 1
         } catch {
             AppLog.note("command line failed: \(failureMessage(error))")
             FileHandle.standardError.write(Data("\(failureMessage(error))\n".utf8))
