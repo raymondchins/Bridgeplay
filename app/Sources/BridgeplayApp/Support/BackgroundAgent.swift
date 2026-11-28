@@ -48,6 +48,7 @@ enum BackgroundAgent {
         // Held while the install runs, so the installer doesn't replace Bridgeplay under it.
         private var inUse: AppInUseLock?
         private var lastSkip: BackgroundCheck.Skip?
+        private var postFailures = 0
         private let ownBuild = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
         private let defaults = UserDefaults.standard
 
@@ -124,9 +125,16 @@ enum BackgroundAgent {
                 note(why)
             case .notify(let notice):
                 AppLog.note("background check: telling the user, \(notice.repair ? "repair" : "\(notice.kind)"), \(notice.blocker.map { "\($0)" } ?? "notify only")")
-                post(notice.title, notice.body)
-                defaults.set(notice.key, forKey: BackgroundCheck.toldKey)
                 lastSkip = nil
+                if post(notice.title, notice.body) {
+                    defaults.set(notice.key, forKey: BackgroundCheck.toldKey)
+                    postFailures = 0
+                } else if postFailures < 3 {
+                    // Not told yet: try again shortly, a few times, then on the next event.
+                    postFailures += 1
+                    look(after: afterEvent)
+                    return
+                }
             case .reapply(let kind):
                 reapply(kind)
             }
@@ -271,14 +279,21 @@ enum BackgroundAgent {
         }
 
         // The same path the run script and the breaker use, so it carries Bridgeplay's name.
-        private func post(_ title: String, _ body: String) {
+        @discardableResult
+        private func post(_ title: String, _ body: String) -> Bool {
             let open = Process()
             open.executableURL = URL(filePath: "/usr/bin/open")
             open.arguments = ["-n", "-g", "-a", Bundle.main.bundleURL.path(percentEncoded: false),
                               "--args", NotifyCommand.flag, title, body]
             open.standardOutput = FileHandle.nullDevice
             open.standardError = FileHandle.nullDevice
-            do { try open.run() } catch { AppLog.note("background check: could not post: \(error.localizedDescription)") }
+            do {
+                try open.run()
+                return true
+            } catch {
+                AppLog.note("background check: could not post: \(error.localizedDescription)")
+                return false
+            }
         }
     }
 }
