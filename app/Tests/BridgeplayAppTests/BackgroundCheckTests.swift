@@ -154,6 +154,13 @@ struct BackgroundCheckTests {
         #expect(BackgroundCheck.tryFailed(exitStatus: 1, steamRunningAfter: false))
     }
 
+    @Test("The agent's install leaves a Steam opened meanwhile running")
+    func unattendedInstall() {
+        #expect(BackgroundAgent.installArguments.first == InstallIntoSteamCommand.flag)
+        #expect(InstallIntoSteamCommand.isUnattended(["Bridgeplay"] + BackgroundAgent.installArguments))
+        #expect(!InstallIntoSteamCommand.isUnattended(["Bridgeplay", InstallIntoSteamCommand.flag]))
+    }
+
     @Test("The mode is read back, and anything unknown is off")
     func modeDefaults() {
         let defaults = scratchDefaults()

@@ -11,6 +11,8 @@ enum BackgroundAgent {
     static let flag = "--background-check"
     // launchd's KeepAlive starts it again after this, with the updated executable.
     static let restartStatus: Int32 = 75
+    // Unattended: a Steam the user opens meanwhile is left running.
+    static let installArguments = [InstallIntoSteamCommand.flag, InstallIntoSteamCommand.unattendedFlag]
 
     static func run() -> Never {
         MainActor.assumeIsolated { Loop.shared.start() }
@@ -137,7 +139,7 @@ enum BackgroundAgent {
             AppLog.note("background check: re-applying on its own, \(kind)")
             let process = Process()
             process.executableURL = executable
-            process.arguments = [InstallIntoSteamCommand.flag]
+            process.arguments = BackgroundAgent.installArguments
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
             process.terminationHandler = { done in
