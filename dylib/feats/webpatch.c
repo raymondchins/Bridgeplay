@@ -536,21 +536,21 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     ".MSCXBar>div{position:absolute;top:0;bottom:0;left:-30%;width:30%;background:#1a9fff;" \
     "animation:MSCXSlide 1.2s linear infinite}" \
     "@keyframes MSCXSlide{from{left:-30%}to{left:100%}}" \
-    /* The info tip beside a label: shown on hover, on keyboard focus and while clicked open \
-       (data-open=y); Escape or a second click hides it (data-open=n) until the pointer leaves. \
+    /* The info tip beside a label: shown while data-open is set (y: hover or keyboard focus, \
+       p: clicked); Escape, a second click or a press elsewhere hides it. \
        Fixed, so a label that clips its overflow does not cut it off; I() places it. */ \
     ".MSCXLbl{display:inline-flex;align-items:center;gap:6px}" \
     ".MSCXTipW{display:inline-flex;align-items:center}" \
     ".MSCXTipB{background:none;border:none;margin:0;padding:0 2px;color:#8b929a;font-size:14px;" \
     "line-height:1;cursor:pointer;border-radius:50%;text-transform:none}" \
-    ".MSCXTipB:hover,.MSCXTipW[data-open=y] .MSCXTipB{color:#dfe3e6}" \
+    ".MSCXTipB:hover,.MSCXTipW[data-open] .MSCXTipB{color:#dfe3e6}" \
     ".MSCXTipB:focus-visible{outline:2px solid #fff;outline-offset:1px}" \
     ".MSCXTipText{display:none;position:fixed;z-index:1000;width:max-content;max-width:280px;" \
     "padding:8px 10px;background:#3d4450;color:#dfe3e6;font-size:13px;font-weight:normal;line-height:1.4;" \
     "letter-spacing:normal;text-transform:none;text-align:left;white-space:normal;text-wrap:pretty;" \
     "border-radius:3px;box-shadow:0 6px 12px rgba(0,0,0,.4);pointer-events:none}" \
-    ".MSCXTipW:hover>.MSCXTipText,.MSCXTipB:focus-visible+.MSCXTipText,.MSCXTipW[data-open=y]>.MSCXTipText{display:block}" \
-    ".MSCXTipW[data-open=n]>.MSCXTipText{display:none}" \
+    /* Steam's checkbox label styles every span in it (display:flex), so these win outright */ \
+    ".MSCXTipW>.MSCXTipText{display:none!important}.MSCXTipW[data-open]>.MSCXTipText{display:block!important}" \
     /* Reduce Motion: the bar stays still and fades instead of sliding. The row's delay is \
        taken modulo 2.4s, the fade's full cycle, so redraws don't jump. */ \
     "@media (prefers-reduced-motion:reduce){.MSCXPanel .MSCXRow:hover{box-shadow:none}" \
@@ -662,6 +662,15 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
        sits under the button, inside the window, above it when there is no room below; the \
        second pass corrects for a transformed ancestor, which moves where fixed lands. */ \
     "tc={n:0},tw=e=>e.currentTarget.parentNode," \
+    /* One tip open per document: showing one (y on hover or keyboard focus, p when clicked) \
+       hides the last, and a press anywhere outside it hides it. */ \
+    "th=d=>{const o=d.__mscxTip;o&&o.removeAttribute(\"data-open\");d.__mscxTip=null}," \
+    "ts=(w,p)=>{const d=w.ownerDocument;d.__mscxTip&&d.__mscxTip!==w&&th(d);" \
+    "w.setAttribute(\"data-open\",p?\"p\":\"y\");d.__mscxTip=w;tp(w);" \
+    "d.__mscxTipL||!d.addEventListener||(d.__mscxTipL=1,d.addEventListener(\"pointerdown\",e=>{" \
+    "const o=d.__mscxTip;o&&o.contains&&!o.contains(e.target)&&th(d)},!0)," \
+    "d.addEventListener(\"keydown\",e=>{const o=d.__mscxTip;if(e.key!==\"Escape\"||!o)return;" \
+    "if(o.isConnected===!1){d.__mscxTip=null;return}e.preventDefault();e.stopPropagation();th(d)},!0))}," \
     "tp=w=>{try{const b=w.firstChild,x=w.lastChild,v=w.ownerDocument.defaultView,r=b.getBoundingClientRect()," \
     "W=v.innerWidth,Hh=v.innerHeight,L=Math.max(8,Math.min(r.left,W-x.offsetWidth-8));" \
     "let T=r.bottom+6;T+x.offsetHeight>Hh-8&&(T=Math.max(8,r.top-6-x.offsetHeight));" \
@@ -669,15 +678,16 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "x.style.left=2*L-q.left+\"px\";x.style.top=2*T-q.top+\"px\"}catch(e){}}," \
     "I=(l,x)=>{const id=\"MSCXTip\"+t.unAppID+\"-\"+(++tc.n);" \
     "return(0," RT ".jsxs)(\"span\",{className:\"MSCXLbl\",children:[l,(0," RT ".jsxs)(\"span\",{className:\"MSCXTipW\"," \
-    "onMouseEnter:e=>tp(e.currentTarget)," \
-    "onMouseLeave:e=>{const w=e.currentTarget;w.getAttribute(\"data-open\")===\"n\"&&w.removeAttribute(\"data-open\")},children:[" \
+    "onMouseEnter:e=>{const w=e.currentTarget;w.getAttribute(\"data-open\")!==\"p\"&&ts(w,0)}," \
+    "onMouseLeave:e=>{const w=e.currentTarget;w.getAttribute(\"data-open\")===\"y\"&&th(w.ownerDocument)},children:[" \
     "(0," RT ".jsx)(\"button\",{type:\"button\",className:\"MSCXTipB\"," \
     "\"aria-label\":npL(\"About \",\"关于\",\"Informazioni su \",\"Подробнее: \")+l,\"aria-describedby\":id," \
     "onClick:e=>{e.preventDefault();e.stopPropagation();const w=tw(e);" \
-    "w.setAttribute(\"data-open\",w.getAttribute(\"data-open\")===\"y\"?\"n\":\"y\");tp(w)}," \
-    "onKeyDown:e=>{const w=tw(e);if(e.key!==\"Escape\"||w.getAttribute(\"data-open\")===\"n\")return;" \
-    "e.preventDefault();e.stopPropagation();w.setAttribute(\"data-open\",\"n\")}," \
-    "onFocus:e=>tp(tw(e)),onBlur:e=>tw(e).removeAttribute(\"data-open\"),children:\"\\u24d8\"})," \
+    "w.getAttribute(\"data-open\")===\"p\"?th(w.ownerDocument):ts(w,1)}," \
+    "onKeyDown:e=>{const w=tw(e);if(e.key!==\"Escape\"||!w.getAttribute(\"data-open\"))return;" \
+    "e.preventDefault();e.stopPropagation();th(w.ownerDocument)}," \
+    "onFocus:e=>{const w=tw(e);try{e.currentTarget.matches(\":focus-visible\")&&ts(w,0)}catch(x){}}," \
+    "onBlur:e=>{const w=tw(e);w.getAttribute(\"data-open\")&&th(w.ownerDocument)},children:\"\\u24d8\"})," \
     "(0," RT ".jsx)(\"span\",{id,role:\"tooltip\",className:\"MSCXTipText\",children:x})]})]})}," \
     "T=(ks,l,on,off)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
     "checked:ev(ks[0])===on," \

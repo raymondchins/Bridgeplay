@@ -1,5 +1,6 @@
 // Info tips: every label that needs more than its words carries an info button, described by
-// its tip text, that opens on click, closes on Escape and a second click, and resets on blur.
+// its tip text. One tip is open at a time: hover shows it, a click pins it, and Escape, a second
+// click, blur or a press elsewhere hides it.
 'use strict';
 const { panel, walk, details, runner, FORMS } = require('./harness');
 
@@ -21,24 +22,30 @@ function parts(tip) {
 }
 
 // Enough of an element for the handlers: attributes, a parent, a window to place the tip in.
-function fakeDom() {
+// Tips made with the same doc share it, as they do in one panel.
+function fakeDoc() {
+  const doc = { defaultView: { innerWidth: 800, innerHeight: 600 }, listeners: {},
+    addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); } };
+  return doc;
+}
+function fakeDom(doc = fakeDoc()) {
   const attrs = {};
   const box = { left: 100, top: 50, bottom: 70 };
-  const view = { innerWidth: 800, innerHeight: 600 };
   const text = { offsetWidth: 280, offsetHeight: 60, style: {},
     getBoundingClientRect() { return { left: parseFloat(this.style.left), top: parseFloat(this.style.top) }; } };
   const w = {
-    ownerDocument: { defaultView: view },
+    ownerDocument: doc,
     getAttribute: k => (k in attrs ? attrs[k] : null),
     setAttribute: (k, v) => { attrs[k] = String(v); },
     removeAttribute: k => { delete attrs[k]; },
+    contains: n => n === w || n === w.firstChild,
   };
-  w.firstChild = { getBoundingClientRect: () => box };
+  w.firstChild = { getBoundingClientRect: () => box, matches: () => false };
   w.lastChild = text;
   const ev = (extra = {}) => Object.assign({ currentTarget: w.firstChild, preventDefault() { this.prevented = true; },
     stopPropagation() { this.stopped = true; } }, extra);
   w.firstChild.parentNode = w;
-  return { w, attrs, text, ev };
+  return { w, attrs, text, ev, doc };
 }
 
 let failed = 0;
@@ -81,27 +88,54 @@ for (const form of Object.keys(FORMS)) {
   t.ok(!!coolText && /3\/4/.test(coolText) && /1\/2/.test(coolText) && /30 FPS/.test(coolText) && /30 seconds/.test(coolText),
     'the heat tip states the steps, the floor and the 30 second hold');
 
-  // Click opens, a second click closes, Escape closes, blur and leaving reset.
+  // Hover shows it, a click pins it, a second click, Escape, blur or a press elsewhere hides it,
+  // and only one tip is open at a time.
   const { button, w: wrap } = parts(cool.props.tip);
   const d = fakeDom();
+  const open = x => x.attrs['data-open'] || null;
+  wrap.props.onMouseEnter({ currentTarget: d.w });
+  t.ok(open(d) === 'y', 'hover shows it');
+  wrap.props.onMouseLeave({ currentTarget: d.w });
+  t.ok(open(d) === null, 'leaving hides it');
   let e = d.ev();
   button.props.onClick(e);
-  t.ok(d.attrs['data-open'] === 'y' && e.prevented && e.stopped, 'a click opens it and does not reach the row');
+  t.ok(open(d) === 'p' && e.prevented && e.stopped, 'a click pins it and does not reach the row');
   t.ok(d.text.style.left === '100px' && d.text.style.top === '76px', `it is placed under the button (${d.text.style.left}, ${d.text.style.top})`);
-  button.props.onClick(d.ev());
-  t.ok(d.attrs['data-open'] === 'n', 'a second click closes it');
   wrap.props.onMouseLeave({ currentTarget: d.w });
-  t.ok(!('data-open' in d.attrs), 'leaving resets it, so hover shows it again');
+  t.ok(open(d) === 'p', 'a pinned tip stays when the pointer leaves');
+  button.props.onClick(d.ev());
+  t.ok(open(d) === null, 'a second click hides it');
+  const d2 = fakeDom(d.doc);
+  button.props.onClick(d.ev());
+  wrap.props.onMouseEnter({ currentTarget: d2.w });
+  t.ok(open(d) === null && open(d2) === 'y', 'showing another tip hides the open one');
+  wrap.props.onMouseLeave({ currentTarget: d2.w });
+  button.props.onClick(d.ev());
+  (d.doc.listeners.pointerdown || []).forEach(fn => fn({ target: {} }));
+  t.ok(open(d) === null, 'a press outside hides it');
+  button.props.onClick(d.ev());
+  e = d.ev({ key: 'Escape' });
+  (d.doc.listeners.keydown || []).forEach(fn => fn(e));
+  t.ok(open(d) === null && e.stopped, 'Escape anywhere hides it and is kept from the dialog');
+  button.props.onClick(d.ev());
+  d.w.isConnected = false;
+  e = d.ev({ key: 'Escape' });
+  (d.doc.listeners.keydown || []).forEach(fn => fn(e));
+  t.ok(!e.stopped && !d.doc.__mscxTip, 'a tip whose panel is gone lets Escape reach the dialog');
+  delete d.w.isConnected;
+  delete d.attrs['data-open'];
   button.props.onClick(d.ev());
   e = d.ev({ key: 'Escape' });
   button.props.onKeyDown(e);
-  t.ok(d.attrs['data-open'] === 'n' && e.stopped, 'Escape closes it and is kept from the dialog');
+  t.ok(open(d) === null && e.stopped, 'Escape hides it and is kept from the dialog');
   e = d.ev({ key: 'Escape' });
   button.props.onKeyDown(e);
   t.ok(!e.stopped, 'a second Escape goes on to the dialog');
+  button.props.onFocus(d.ev());
+  t.ok(open(d) === null, 'a focus that is not from the keyboard shows nothing');
   button.props.onClick(d.ev());
   button.props.onBlur(d.ev());
-  t.ok(!('data-open' in d.attrs), 'blur closes it');
+  t.ok(open(d) === null, 'blur hides it');
 
   // Russian, as one of the panel's languages
   const ru = panel(emit, form, Object.assign(Object.create(globalThis), { document: { documentElement: { lang: 'ru' } } }));
