@@ -129,6 +129,8 @@ echo "== alerts =="
 alert=$(extract show_alert)
 [ -n "$alert" ] || { echo "FAIL: show_alert not found in $SRC"; exit 1; }
 alert="$(extract launch_step)
+$(extract alert_language)
+$(extract alert_text)
 $alert"
 data=$(mktemp -d "$work/compatdata.XXXXXX")
 (
@@ -153,7 +155,10 @@ is "alert text reaches osascript untouched, as arguments" 'title
 a "quoted" \ message' "$(cat "$data/alert-args" 2>/dev/null)"
 
 echo "== rebuild choices =="
-arch_functions="$(extract prefix_machine)
+arch_functions="$(extract alert_language)
+$(extract alert_text)
+$(extract alert_join)
+$(extract prefix_machine)
 $(extract preview_name)
 $(extract running_name)
 $(extract tool_name)
@@ -183,6 +188,8 @@ is "a tool name's own arch suffix is not repeated" 'rebuild: This game needs its
 Do you want to rebuild the prefix for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Your save games will be preserved and not lost.' "$(arch_case aarch64-unix 'CrossOver 2026 10 15-ARM64 - Rosetta')"
 is "a matching architecture needs no rebuild" "" "$(arch_case x86_64-unix)"
 rebuild="$(extract launch_step)
+$(extract alert_language)
+$(extract alert_text)
 $(extract run_rebuild)
 $(extract rebuild_prefix)"
 mkdir -p "$work/app with spaces"
@@ -267,12 +274,15 @@ is "skipping an offered rebuild goes on with the launch" 0 "$status"
 is "a skipped rebuild retakes the lock and launches" "locked
 launched" "$(cat "$data/checks")"
 is "a skipped rebuild never calls the app" no "$([ -f "$data/arguments" ] && echo yes || echo no)"
-is "the skip button is labelled as asked" "Launch Without Rebuilding" "$(tail -3 "$data/prompt-args" | head -1)"
-is "a missing Bridgeplay icon falls back to caution" "" "$(tail -2 "$data/prompt-args" | head -1)"
-is "an offered rebuild keeps the backup choice" "" "$(tail -1 "$data/prompt-args")"
+is "the skip button is labelled as asked" "Launch Without Rebuilding" "$(tail -5 "$data/prompt-args" | head -1)"
+is "a missing Bridgeplay icon falls back to caution" "" "$(tail -4 "$data/prompt-args" | head -1)"
+is "an offered rebuild keeps the backup choice" "" "$(tail -3 "$data/prompt-args" | head -1)"
+is "the rebuild buttons are labelled in the player's language" "Rebuild Prefix
+Backup & Rebuild Prefix" "$(tail -2 "$data/prompt-args")"
+is "a translated button answers in English" yes "$(grep -q -F 'if button returned of answer is backupLabel then return "Backup & Rebuild Prefix"' "$data/prompt" && echo yes || echo no)"
 rebuild_case 'Rebuild Prefix' 0 waitforexitandrun '' keep-backup
 is "single-choice rebuild succeeds" 0 "$status"
-is "single-choice rebuild passes keep-backup to the prompt" keep-backup "$(tail -1 "$data/prompt-args")"
+is "single-choice rebuild passes keep-backup to the prompt" keep-backup "$(tail -3 "$data/prompt-args" | head -1)"
 is "single-choice rebuild keeps the original prefix" keep-backup "$(tail -1 "$data/arguments")"
 second_rebuild=1
 rebuild_case 'Rebuild Prefix' 0 waitforexitandrun '' keep-backup
@@ -359,7 +369,9 @@ $(extract crash_status)
 $(extract session_health)
 $(extract set_switch_state)
 $(extract record_session)
-$(extract offer_switch_rebuild)"
+$(extract offer_switch_rebuild)
+$(extract alert_language)
+$(extract alert_text)"
 crash_log="$work/crash.log"
 printf 'wine: Unhandled page fault on execute access to 0000000001A23DA0\n' > "$crash_log"
 clean_log="$work/clean.log"

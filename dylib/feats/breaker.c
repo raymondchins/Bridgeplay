@@ -469,8 +469,9 @@ void np_breaker_drop_insert(void) {
     unsetenv("SDL_JOYSTICK_BLACKLIST_DEVICES");
 }
 
-// Posted by the app, so it carries Bridgeplay's name. sh backgrounds open and exits at once,
-// so Steam's start never waits on LaunchServices.
+// Posted by the app, so it carries Bridgeplay's name, and in the player's language when the
+// text is a key in its Localizable.xcstrings (alertcheck). sh backgrounds open and exits at
+// once, so Steam's start never waits on LaunchServices.
 static void post_notification(const char *subtitle, const char *body) {
     char *const argv[] = {
         "/bin/sh", "-c",
