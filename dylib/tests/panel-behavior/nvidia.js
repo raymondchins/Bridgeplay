@@ -7,7 +7,7 @@ const { panel, walk, details, runner, FORMS } = require('./harness');
 const emit = process.argv[2];
 if (!emit) { console.error('usage: nvidia.js <emit>'); process.exit(2); }
 
-const LABEL = 'Report an NVIDIA GPU (Needed for DLSS. Turn off if the game crashes or looks wrong)';
+const LABEL = 'NVIDIA GPU for DLSS';
 const SHIPPED = { g: { BRIDGEPLAY_NVAPI: '1' }, a: {}, e: {}, d: {} };
 
 let failed = 0;

@@ -407,15 +407,15 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 #define NP_CX_VERDICT_CSS \
     ".MSCXVerdictHead{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#8b929a}" \
     ".MSCXVerdictMain{font-size:15px;color:#fff;text-wrap:balance}" \
-    ".MSCXVerdictDim{font-size:13px;color:#8b929a;text-wrap:pretty}" \
-    ".MSCXVerdictNote{font-size:14px;color:#e8c46d;text-wrap:pretty}" \
+    ".MSCXVerdictDim{font-size:13px;color:#8b929a;text-wrap:balance}" \
+    ".MSCXVerdictNote{font-size:14px;color:#e8c46d;text-wrap:balance}" \
     ".MSCXVerdictBtns{display:flex;gap:8px;margin-top:4px}" \
     ".MSCXWarn{position:relative;display:flex;margin:12px 24px;padding:12px 44px 12px 14px;" \
     "border-left:3px solid #e8a800;border-radius:3px;background:rgba(59,63,72,.6);color:#dfe3e6;" \
     "font-size:14px;line-height:1.45}" \
     ".MSCXWarnBody{display:flex;flex-direction:column;gap:6px;min-width:0}" \
     ".MSCXWarnHead{font-weight:700;color:#fff;text-wrap:balance}" \
-    ".MSCXWarnBody>div{text-wrap:pretty}" \
+    ".MSCXWarnBody>div{text-wrap:balance}" \
     ".MSCXWarnBtn{background:#3d4450;color:#fff;border:none;border-radius:2px;padding:6px 14px;" \
     "font-size:14px;cursor:pointer}.MSCXWarnBtn:hover{background:#4c5361}" \
     ".MSCXWarnClose{position:absolute;top:6px;right:6px;width:28px;height:28px;padding:0;background:none;" \
@@ -451,36 +451,27 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "since=(L,s)=>/^s\\d+$/.test(s)?L('Steam build ','Steam 版本 ','Steam build ','сборки Steam ')+s.slice(1):'Bridgeplay '+s," \
     "main=(L,x)=>fill(x.v==='p'?L('Ran well on {p} of {n} Macs','在 {n} 台 Mac 中有 {p} 台运行良好','Funziona bene su {p} Mac su {n}','Хорошо работает на {p} из {n} Mac')" \
     ":x.v==='d'?L('Did not run on {b} of {n} Macs','在 {n} 台 Mac 中有 {b} 台无法运行','Non si avvia su {b} Mac su {n}','Не запустилась на {b} из {n} Mac')" \
-    ":x.v==='s'?L('Ran well before {s}, but not on newer builds','在 {s} 之前运行良好，但在更新的版本上无法运行'," \
-    "'Funzionava bene prima di {s}, ma non con le versioni più recenti','Хорошо работала до {s}, но не в более новых версиях')" \
-    ":x.v==='m'?L('Mixed: {p} ran well, {i} had issues, {b} did not run','结果不一：{p} 台运行良好，{i} 台有问题，{b} 台无法运行'," \
-    "'Risultati misti: {p} bene, {i} con problemi, {b} non si avvia','По-разному: хорошо — {p}, с проблемами — {i}, не запустилась — {b}')" \
-    ":x.p?L('One report so far: it ran well','目前只有 1 份报告：运行良好','Per ora una sola segnalazione: funziona bene','Пока один отчёт: работает хорошо')" \
-    ":x.i?L('One report so far: it ran with issues','目前只有 1 份报告：运行有问题','Per ora una sola segnalazione: funziona con problemi','Пока один отчёт: работает с проблемами')" \
-    ":L('One report so far: it did not run','目前只有 1 份报告：无法运行','Per ora una sola segnalazione: non si avvia','Пока один отчёт: не запускается')," \
+    ":x.v==='s'?L('Broken since {s}','仅在 {s} 之前运行良好'," \
+    "'Funzionava solo prima di {s}','Хорошо работала только до {s}')" \
+    ":x.v==='m'?L('Mixed: {p} good, {i} with issues, {b} failed','不一：{p} 良好，{i} 有问题，{b} 失败'," \
+    "'Misti: {p} bene, {i} problemi, {b} falliti','Смешанно: хорошо {p}, проблемы {i}, сбой {b}')" \
+    ":x.p?L('One report: ran well','仅 1 份报告：运行良好','Una segnalazione: funziona bene','Один отчёт: работает хорошо')" \
+    ":x.i?L('One report: had issues','仅 1 份报告：有问题','Una segnalazione: con problemi','Один отчёт: с проблемами')" \
+    ":L('One report: did not run','仅 1 份报告：无法运行','Una segnalazione: non si avvia','Один отчёт: не запускается')," \
     "Object.assign({s:since(L,x.since)},x))," \
-    "dim=(L,x)=>(x.v==='p'||x.v==='d'||x.v==='s'?fill(L('{p} ran well · {i} had issues · {b} did not run'," \
-    "'{p} 台运行良好 · {i} 台有问题 · {b} 台无法运行','{p} bene · {i} con problemi · {b} non si avvia','хорошо: {p} · с проблемами: {i} · не запустилась: {b}'),x)+' · ':'')" \
+    "dim=(L,x)=>(x.v==='p'||x.v==='d'||x.v==='s'?fill(L('{p} good · {i} with issues · {b} failed','{p} 良好 · {i} 有问题 · {b} 失败','{p} bene · {i} problemi · {b} falliti','хорошо: {p} · проблемы: {i} · сбой: {b}'),x)+' · ':'')" \
     "+(x.days<1?L('updated today','今天更新','aggiornato oggi','обновлено сегодня'):x.days<2?L('updated 1 day ago','1 天前更新','aggiornato 1 giorno fa','обновлено 1 день назад')" \
     ":fill(L('updated {d} days ago','{d} 天前更新','aggiornato {d} giorni fa','обновлено {d} дн. назад'),{d:x.days}))," \
     "acl=(L,x)=>{if(x.hard){const n=N[x.hard];" \
-    "return(n?fill(L('Uses {a}, anti-cheat that Wine on macOS can’t run, so the game will most likely not start.'," \
-    "'使用 {a}，macOS 上的 Wine 无法运行这种反作弊，游戏很可能无法启动。'," \
-    "'Usa {a}, un anti-cheat che Wine su macOS non può eseguire, quindi molto probabilmente il gioco non si avvierà.','Использует {a} — античит, который Wine на macOS не может запустить, поэтому игра, скорее всего, не запустится.'),{a:n})" \
-    ":L('Uses anti-cheat that Wine on macOS can’t run, so the game will most likely not start.'," \
-    "'使用了 macOS 上的 Wine 无法运行的反作弊，游戏很可能无法启动。'," \
-    "'Usa un anti-cheat che Wine su macOS non può eseguire, quindi molto probabilmente il gioco non si avvierà.','Использует античит, который Wine на macOS не может запустить, поэтому игра, скорее всего, не запустится.'))" \
-    "+(x.conf?' '+L('Bridgeplay asks before launching it.','Bridgeplay 会在启动前询问。','Bridgeplay chiede conferma prima di avviarlo.','Bridgeplay спросит перед запуском.'):'')}" \
+    "return(n?fill(L('Likely won’t start: Wine can’t run {a}.','Wine 无法运行 {a}，很可能无法启动。','Probabilmente non si avvia: Wine non supporta {a}.','Вряд ли запустится: Wine не поддерживает {a}.'),{a:n})" \
+    ":L('Likely won’t start: Wine can’t run its anti-cheat.','Wine 不支持其反作弊，很可能无法启动。','Probabilmente non si avvia: Wine non supporta il suo anti-cheat.','Вряд ли запустится: Wine не поддерживает античит.'))" \
+    "+(x.conf?' '+L('Bridgeplay asks first.','Bridgeplay 会先询问。','Bridgeplay chiede prima.','Bridgeplay спросит заранее.'):'')}" \
     "const a=x.ac.find(a=>a!=='vac')||x.ac[0];if(!a)return'';" \
-    "if(a==='vac')return L('Uses VAC: online matchmaking may not work.','使用 VAC：在线匹配可能无法使用。'," \
-    "'Usa VAC: il matchmaking online potrebbe non funzionare.','Использует VAC: онлайн-подбор игроков может не работать.');" \
-    "return N[a]?fill(L('Uses {a}: online play may fail.','使用 {a}：在线游戏可能无法进行。'," \
-    "'Usa {a}: il gioco online potrebbe non funzionare.','Использует {a}: игра по сети может не работать.'),{a:N[a]})" \
-    ":L('Uses anti-cheat: online play may fail.','使用了反作弊：在线游戏可能无法进行。','Usa un anti-cheat: il gioco online potrebbe non funzionare.','Использует античит: игра по сети может не работать.')}," \
+    "if(a==='vac')return L('VAC: matchmaking may fail.','VAC：在线匹配可能失败。','VAC: il matchmaking potrebbe non funzionare.','VAC: онлайн-подбор может не работать.');" \
+    "return N[a]?fill(L('{a}: online play may fail.','{a}：在线游戏可能失败。','{a}: il gioco online potrebbe non funzionare.','{a}: игра по сети может не работать.'),{a:N[a]})" \
+    ":L('Anti-cheat: online play may fail.','反作弊：在线游戏可能失败。','Anti-cheat: il gioco online potrebbe non funzionare.','Античит: игра по сети может не работать.')}," \
     /* A plain link to Bridgeplay's own guide: no service is named or linked from here. */ \
-    "away=(L,el,cls)=>{const k=[el('div','MSCXVerdictDim',L('You may still play it through cloud gaming, if a service carries it, " \
-    "or Steam Remote Play from a Windows PC.','如果有云游戏服务提供此游戏，仍可通过云游戏游玩，或从 Windows 电脑使用 Steam 远程畅玩。'," \
-    "'Puoi ancora giocarci con il cloud gaming, se un servizio lo offre, o con Steam Remote Play da un PC Windows.','В неё всё ещё можно поиграть через облачный гейминг, если сервис её предлагает, или через Steam Remote Play с ПК на Windows.'))]," \
+    "away=(L,el,cls)=>{const k=[el('div','MSCXVerdictDim',L('Try cloud gaming or Remote Play.','可试试云游戏或远程畅玩。','Prova il cloud gaming o Remote Play.','Попробуйте облачный гейминг или Remote Play.'))]," \
     "s=G.SteamClient&&G.SteamClient.System;" \
     "if(s&&typeof s.OpenInSystemBrowser==='function'){const b=el('button',cls,L('Other Ways to Play','其他游玩方式','Altri modi per giocare','Другие способы играть'));" \
     "b.onclick=()=>{try{G.SteamClient.System.OpenInSystemBrowser(U)}catch(e){}};const r=el('div','MSCXVerdictBtns');r.append(b);k.push(r)}" \
@@ -505,10 +496,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "if(!r||!d){e.style.display='none';return}css(d);const L=tr(lang()),el=mk(d),b=el('div','MSCXWarnBody');" \
     "e.className='MSCXWarn';e.setAttribute&&e.setAttribute('role','note');" \
     "b.append(el('div','MSCXWarnHead',L('Before you download','下载前请注意','Prima di scaricare','Перед загрузкой'))," \
-    "el('div','',r==='a'?acl(L,x):r==='d'?fill(L('Players report it did not run on {b} of {n} Macs.'," \
-    "'玩家反馈：在 {n} 台 Mac 中有 {b} 台无法运行。','Secondo i giocatori non si avvia su {b} Mac su {n}.','По отчётам игроков, игра не запустилась на {b} из {n} Mac.'),x)" \
-    ":fill(L('Players report it ran well before {s}, but not on newer builds.','玩家反馈：在 {s} 之前运行良好，但在更新的版本上无法运行。'," \
-    "'Secondo i giocatori funzionava bene prima di {s}, ma non con le versioni più recenti.','По отчётам игроков, игра хорошо работала до {s}, но не в более новых версиях.'),{s:since(L,x.since)})));" \
+    "el('div','',r==='a'?acl(L,x):r==='d'?fill(L('Failed on {b} of {n} players’ Macs.','{n} 位玩家中有 {b} 位无法运行。','Non si avvia per {b} giocatori su {n}.','Не запустилась у {b} из {n} игроков.'),x)" \
+    ":fill(L('Broken since {s}, players report.','玩家反馈：仅在 {s} 之前运行良好。','Secondo i giocatori funzionava solo prima di {s}.','По отчётам игроков, хорошо работала только до {s}.'),{s:since(L,x.since)})));" \
     "r!=='s'&&b.append(...away(L,el,'MSCXWarnBtn'));" \
     "const c=el('button','MSCXWarnClose','×'),t=L('Dismiss','关闭','Chiudi','Закрыть');c.title=t;c.setAttribute&&c.setAttribute('aria-label',t);" \
     "c.onclick=()=>{const s=gone();s[x.id]=r;try{G.localStorage.setItem(W,JSON.stringify(s))}catch(e){}e.style.display='none'};" \
@@ -525,6 +514,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "\".MSCXPanel{margin-top:10px}" \
     ".MSCXPanel .MSCXRow{display:flex;flex-direction:row;padding:9px;margin:0;" \
     "color:#dfe3e6;background:rgba(59,63,72,.5);border-radius:3px}" \
+    ".MSCXPanel{text-wrap:balance}.MSCXHelp{display:block;font-size:13px;line-height:1.4;color:#acb2b8;letter-spacing:normal;text-transform:none;margin:2px 0 6px}" \
     ".MSCXPanel .MSCXRow:hover{box-shadow:0 6px 8px 0 rgba(0,0,0,.16)}" \
     ".MSCXPanel .MSCXDrop{display:flex;flex-direction:column;align-items:stretch;gap:6px;" \
     "padding:0;margin:10px 0;background:none}" \
@@ -555,24 +545,20 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 // Labels both panels (native and Wine) show, as npL(en, zh, it, ru) calls.
 #define NP_L_OFF "npL(\"Off\",\"关闭\",\"Disattivato\",\"Выкл.\")"
 #define NP_L_AUTO "npL(\"Automatic\",\"自动\",\"Automatico\",\"Автоматически\")"
-#define NP_L_PO_TITLE "npL(\"Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)\"," \
-    "\"性能叠加层（游戏中按 ⌥⌘P 打开这些设置的快捷面板）\"," \
-    "\"Overlay delle prestazioni (in gioco, ⌥⌘P apre le impostazioni rapide di questi controlli)\",\"Оверлей производительности (в игре ⌥⌘P открывает быстрые настройки для этих параметров)\")"
+#define NP_L_PO_TITLE "npL(\"Performance Overlay\"," \
+    "\"性能叠加层\"," \
+    "\"Overlay prestazioni\",\"Оверлей производительности\")"
 #define NP_L_PO_OPTIONS "[{data:\"0\",label:" NP_L_OFF "},{data:\"fps\",label:\"FPS\"}," \
-    "{data:\"summary\",label:npL(\"Summary (FPS, frame time, CPU, GPU, memory, battery)\"," \
-    "\"摘要（FPS、帧时间、CPU、GPU、内存、电池）\",\"Riepilogo (FPS, tempo per fotogramma, CPU, GPU, memoria, batteria)\",\"Сводка (FPS, время кадра, CPU, GPU, память, аккумулятор)\")}," \
-    "{data:\"detailed\",label:npL(\"Detailed (adds a frame-time graph)\",\"详细（增加帧时间图表）\"," \
-    "\"Dettagliato (aggiunge il grafico dei tempi per fotogramma)\",\"Подробно (добавляет график времени кадра)\")}," \
-    "{data:\"hud\",label:npL(\"Apple Metal HUD\",\"Apple Metal 性能监视器\",\"Metal HUD di Apple\",\"Apple Metal HUD\")}]"
-#define NP_L_FL_TITLE "npL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\"," \
-    "\"帧率限制（与显示器同步，不会更改其刷新率）\",\"Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)\",\"Ограничение частоты кадров (синхронизировано с дисплеем, его частота обновления не меняется)\")"
-#define NP_L_FL_SWITCH "npL(\"Enable frame limit\",\"启用帧率限制\",\"Attiva limite di fotogrammi\",\"Включить ограничение частоты кадров\")"
-#define NP_L_FL_COOL "npL(\"Cool and steady (Lowers the frame limit while the Mac runs hot)\"," \
-    "\"凉爽稳定（Mac 发热时降低帧率上限）\",\"Fresco e stabile (abbassa il limite di fotogrammi quando il Mac \\u00e8 caldo)\"," \
-    "\"Прохладно и стабильно (снижает ограничение частоты кадров, пока Mac сильно нагрет)\")"
-#define NP_L_SQ_TITLE "npL(\"Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)\"," \
-    "\"缩放过滤（当游戏绘制的像素少于屏幕时生效，例如关闭高分辨率时）\"," \
-    "\"Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)\",\"Фильтр масштабирования (когда игра рисует меньше пикселей, чем у экрана, например при выключенном высоком разрешении)\")"
+    "{data:\"summary\",label:npL(\"Summary\",\"摘要\",\"Riepilogo\",\"Сводка\")}," \
+    "{data:\"detailed\",label:npL(\"Detailed\",\"详细\",\"Dettagliato\",\"Подробно\")}," \
+    "{data:\"hud\",label:npL(\"Metal HUD\",\"Metal 性能监视器\",\"Metal HUD\",\"Metal HUD\")}]"
+#define NP_L_FL_TITLE "npL(\"FPS Limit\"," \
+    "\"帧率限制\",\"Limite FPS\",\"Ограничение FPS\")"
+#define NP_L_FL_SWITCH "npL(\"Enable\",\"启用\",\"Attiva\",\"Включить\")"
+#define NP_L_FL_COOL "npL(\"Lower when hot\",\"过热时降低\",\"Riduci se si scalda\",\"Снижать при перегреве\")"
+#define NP_L_SQ_TITLE "npL(\"Scaling Filter\"," \
+    "\"缩放滤镜\"," \
+    "\"Filtro di scala\",\"Фильтр масштабирования\")"
 #define NP_L_SQ_REST \
     "{data:\"linear\",label:npL(\"Linear (smooth)\",\"线性（平滑）\",\"Lineare (morbido)\",\"Линейный (плавный)\")}," \
     "{data:\"nearest\",label:npL(\"Nearest (sharp pixels at any scale)\",\"最近邻（任何比例都保持锐利像素）\"," \
@@ -630,6 +616,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "const a=(Fx.a||{})[t.unAppID]||{},en=Fx.e||{},x=en[t.strCompatToolName]||en[\"\"]||{};" \
     "return k in a?a[k]:k in(Fx.g||{})?Fx.g[k]:k in x?x[k]:(Fx.d||{})[k]||\"\"}," \
     "ev=k=>A(k)?g(k):dv(k)," \
+    "H=text=>(0," RT ".jsx)(\"div\",{className:\"MSCXHelp\",children:text})," \
     "T=(ks,l,on,off)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
     "checked:ev(ks[0])===on," \
     "onChange:v=>s(ks.map(k=>[k,v?(dv(k)===on?\"\":on):(dv(k)===on?(off||\"0\"):\"\")]))},ks[0])," \
@@ -641,30 +628,30 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "lc=z=>x=>(x||z).toLowerCase()," \
     "fz=x=>{x=(x||\"\").toLowerCase();return x===\"1\"?\"2\":/^(0|off|false|no)?$/.test(x)?\"0\":x}," \
     "fo=fz(ev(\"BRIDGEPLAY_FRAMEGEN\"))!==\"0\"," \
-    "FG=()=>(0," RT ".jsxs)(" BARREL ".XY,{label:npL(\"Frame Generation (Experimental. Adds input lag)\"," \
-    "\"帧生成（实验性。会增加输入延迟）\",\"Generazione fotogrammi (sperimentale. Aggiunge input lag)\",\"Генерация кадров (экспериментально, увеличивает задержку ввода)\"),children:[" \
-    "D(\"BRIDGEPLAY_FRAMEGEN\",npL(\"Mode\",\"模式\",\"Modalit\\u00e0\",\"Режим\"),[{data:\"0\",label:" NP_L_OFF "},{data:\"2\",label:\"2x\"}," \
+    "FG=()=>(0," RT ".jsxs)(" BARREL ".XY,{label:npL(\"Frame Generation\"," \
+    "\"帧生成\",\"Generazione fotogrammi\",\"Генерация кадров\"),children:[" \
+    "H(npL(\"Experimental. Adds input lag.\",\"实验功能，会增加输入延迟。\",\"Sperimentale. Aumenta la latenza dei comandi.\",\"Экспериментальная функция. Повышает задержку ввода.\")),D(\"BRIDGEPLAY_FRAMEGEN\",npL(\"Mode\",\"模式\",\"Modalit\\u00e0\",\"Режим\"),[{data:\"0\",label:" NP_L_OFF "},{data:\"2\",label:\"2x\"}," \
     "{data:\"3\",label:\"3x\"},{data:\"adaptive\",label:npL(\"Adaptive (fills to display refresh)\"," \
     "\"自适应（补足到显示器刷新率）\",\"Adattiva (arriva alla frequenza dello schermo)\",\"Адаптивный (добирает до частоты обновления дисплея)\")}],fz)," \
     "fo&&D(\"BRIDGEPLAY_FRAMEGEN_QUALITY\",npL(\"Quality\",\"画质\",\"Qualit\\u00e0\",\"Качество\")," \
     "[{data:\"performance\",label:npL(\"Performance\",\"性能\",\"Prestazioni\",\"Производительность\")}," \
     "{data:\"balanced\",label:npL(\"Balanced\",\"均衡\",\"Bilanciato\",\"Сбалансированно\")}," \
     "{data:\"quality\",label:npL(\"Quality\",\"画质\",\"Qualit\\u00e0\",\"Качество\")}],lc(\"balanced\"))," \
-    "fo&&T([\"BRIDGEPLAY_FRAMEGEN_UI\"],npL(\"Protect UI (keeps static HUD and menus sharp)\"," \
-    "\"保护界面（保持静态 HUD 和菜单清晰）\",\"Proteggi interfaccia (mantiene nitidi HUD e menu statici)\",\"Защита интерфейса (сохраняет чёткость неподвижного HUD и меню)\"),\"1\",\"0\")," \
-    "fo&&T([\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"],npL(\"Fast-motion fallback (skips frames that would smear)\"," \
-    "\"快速运动回退（跳过会产生拖影的帧）\",\"Ripiego per movimento veloce (salta i fotogrammi che sfocherebbero)\",\"Запасной режим для быстрого движения (пропускает кадры, которые дали бы смазывание)\"),\"1\",\"0\")," \
+    "fo&&T([\"BRIDGEPLAY_FRAMEGEN_UI\"],npL(\"Keep HUD and menus sharp\"," \
+    "\"保持 HUD 和菜单清晰\",\"Mantieni nitidi HUD e menu\",\"Сохранять чёткость HUD и меню\"),\"1\",\"0\")," \
+    "fo&&T([\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"],npL(\"Skip blurry frames in fast motion\"," \
+    "\"快速运动时跳过模糊帧\",\"Salta i fotogrammi sfocati nei movimenti rapidi\",\"Пропускать смазанные кадры при быстром движении\"),\"1\",\"0\")," \
     "fo&&D(\"BRIDGEPLAY_FRAMEGEN_ENGINE\",npL(\"Engine\",\"引擎\",\"Motore\",\"Движок\")," \
     "[{data:\"own\",label:npL(\"Built-in optical flow\",\"内置光流\",\"Flusso ottico integrato\",\"Встроенный оптический поток\")}," \
     "{data:\"metalfx\",label:\"MetalFX\"}],lc(\"own\"))]},\"fgn\")," \
     /* The performance overlay and Apple's Metal HUD are one choice, so only one of them \
        is ever on screen. The Metal HUD wins in overlay-shim when both come from the confs. */ \
     "pf=x=>{x=(x||\"\").toLowerCase();return x===\"1\"?\"fps\":/^(fps|summary|detailed)$/.test(x)?x:\"0\"}," \
-    "PO=(l,O)=>(0," RT ".jsx)(" BARREL ".XY,{label:l,children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:O," \
+    "PO=(l,O)=>(0," RT ".jsxs)(" BARREL ".XY,{label:l,children:[(0," RT ".jsx)(" BARREL ".m,{rgOptions:O," \
     "selectedOption:\"1\"===ev(\"MTL_HUD_ENABLED\")?\"hud\":pf(ev(\"BRIDGEPLAY_PERF_OVERLAY\"))," \
     "onChange:v=>{const h=\"hud\"===v.data,p=h?\"0\":v.data;" \
     "s([[\"BRIDGEPLAY_PERF_OVERLAY\",pf(dv(\"BRIDGEPLAY_PERF_OVERLAY\"))===p?\"\":p]," \
-    "[\"MTL_HUD_ENABLED\",(\"1\"===dv(\"MTL_HUD_ENABLED\"))===h?\"\":h?\"1\":\"0\"]])}})},\"pov\")," \
+    "[\"MTL_HUD_ENABLED\",(\"1\"===dv(\"MTL_HUD_ENABLED\"))===h?\"\":h?\"1\":\"0\"]])}})]},\"pov\")," \
     /* The frame rate limit: a slider in whole frames per second from 15 to the fastest \
        display's refresh rate (Fx.fm), and Enable frame limit, which applies it; unchecked, the \
        slider dims and keeps its value (BRIDGEPLAY_FPS_LIMIT_OFF=1). overlay-shim clamps to the display the game \
@@ -693,9 +680,9 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     /* The filter Core Animation scales the game's frames to the screen with. 0 leaves it as \
        Wine (nearest with High Resolution off) or a native game (linear) sets it. */ \
     "sq=x=>{x=(x||\"\").toLowerCase();return/^(linear|nearest|integer)$/.test(x)?x:\"0\"}," \
-    "SQ=(l,O)=>(0," RT ".jsx)(" BARREL ".XY,{label:l,children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:O," \
+    "SQ=(l,O)=>(0," RT ".jsxs)(" BARREL ".XY,{label:l,children:[H(npL(\"Applies below display resolution.\",\"游戏分辨率低于屏幕分辨率时生效。\",\"Si applica sotto la risoluzione dello schermo.\",\"Для игр с разрешением ниже экранного.\")),(0," RT ".jsx)(" BARREL ".m,{rgOptions:O," \
     "selectedOption:sq(ev(\"BRIDGEPLAY_SCALING_FILTER\"))," \
-    "onChange:v=>s([[\"BRIDGEPLAY_SCALING_FILTER\",sq(dv(\"BRIDGEPLAY_SCALING_FILTER\"))===v.data?\"\":v.data]])})},\"scf\")," \
+    "onChange:v=>s([[\"BRIDGEPLAY_SCALING_FILTER\",sq(dv(\"BRIDGEPLAY_SCALING_FILTER\"))===v.data?\"\":v.data]])})]},\"scf\")," \
     /* A toggle that is on unless set to "0" (upstream 1.2.0: AVX2, FEX x87 precision). */ \
     "X=(k,l)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
     "checked:\"0\"!==ev(k),onChange:v=>s([[k,v?\"\":\"0\"]])},k)," \
@@ -757,42 +744,39 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     ".concat(\"dxmt\"===v.data?[]:[[\"DXMT_ENABLE_NVEXT\",\"\"]]))})," \
     "dm&&T([\"D3DM_ENABLE_METALFX\"],\"DLSS\",\"1\")," \
     /* NVAPI=1 is a shipped default; off writes BRIDGEPLAY_NVAPI=0, which wins over every conf. */ \
-    "dm&&T([\"BRIDGEPLAY_NVAPI\"],npL(\"Report an NVIDIA GPU (Needed for DLSS. Turn off if the game crashes or looks wrong)\"," \
-    "\"报告为 NVIDIA GPU（DLSS 需要。游戏崩溃或画面异常时关闭）\"," \
-    "\"Segnala una GPU NVIDIA (serve per DLSS. Disattiva se il gioco si blocca o si vede male)\",\"Сообщать о видеокарте NVIDIA (нужно для DLSS; отключите, если игра вылетает или выглядит неправильно)\"),\"1\",\"0\")," \
+    "dm&&T([\"BRIDGEPLAY_NVAPI\"],npL(\"NVIDIA GPU for DLSS\",\"为 DLSS 报告 NVIDIA GPU\",\"GPU NVIDIA per DLSS\",\"GPU NVIDIA для DLSS\"),\"1\",\"0\")," \
+    "dm&&H(npL(\"Turn off if the game crashes.\",\"游戏崩溃时请关闭。\",\"Disattiva se il gioco va in crash.\",\"Отключите при вылетах.\"))," \
     "\"dxmt\"===b&&T([\"DXMT_ENABLE_NVEXT\"],\"DLSS\",\"1\")," \
     "T([\"BRIDGEPLAY_RETINA\"],npL(\"High Resolution\",\"高分辨率\",\"Alta risoluzione\",\"Высокое разрешение\"),\"1\",\"0\")" \
     "]},\"gfx\")," \
     "PO(" NP_L_PO_TITLE "," NP_L_PO_OPTIONS ")," \
     "FL(" NP_L_FL_TITLE "," NP_L_FL_SWITCH ",T([\"BRIDGEPLAY_SUSTAINED\"]," NP_L_FL_COOL ",\"1\",\"0\"))," \
     "SQ(" NP_L_SQ_TITLE ",[" \
-    "{data:\"0\",label:npL(\"Automatic (Wine keeps pixels sharp with High Resolution off)\"," \
-    "\"自动（关闭高分辨率时 Wine 保持像素锐利）\",\"Automatico (con Alta risoluzione disattivata Wine mantiene i pixel nitidi)\",\"Автоматически (при выключенном высоком разрешении Wine сохраняет пиксели чёткими)\")}," \
+    "{data:\"0\",label:npL(\"Automatic (sharp with High Resolution off)\"," \
+    "\"自动（关闭高分辨率时保持锐利）\",\"Automatico (nitido con Alta risoluzione disattivata)\",\"Авто (чётко при выключенном высоком разрешении)\")}," \
     NP_L_SQ_REST "])," \
     "FG()," \
     /* Expert settings, in a group that starts closed unless one of its settings is set, for \
        this game in its launch options or its own conf, or the player opened it this session. */ \
     "(0," RT ".jsxs)(\"details\",{className:\"MSCXAdv\",open:ao,onToggle:e=>{AO[t.unAppID]=!!e.target.open},children:[" \
     "(0," RT ".jsx)(\"summary\",{children:npL(\"Advanced\",\"高级\",\"Avanzate\",\"Дополнительно\")})," \
-    "!fex&&X(\"ROSETTA_ADVERTISE_AVX\",npL(\"Advertise AVX2 to Rosetta\",\"向 Rosetta 声明 AVX2 支持\",\"Segnala AVX2 a Rosetta\",\"Сообщать Rosetta о поддержке AVX2\"))," \
+    "!fex&&X(\"ROSETTA_ADVERTISE_AVX\",\"AVX2\")," \
     "T([\"WINEMSYNC\"],\"MSync\",\"1\",\"0\")," \
     "dx&&(0," RT ".jsx)(" BARREL ".XY," \
-    "{label:npL(\"MetalFX Upscaling (Samples from the resolution the game is set to)\"," \
-    "\"MetalFX 超分辨率（以游戏设置的分辨率为采样来源）\",\"Upscaling MetalFX (ingrandisce l'immagine dalla risoluzione impostata nel gioco)\",\"Масштабирование MetalFX (берёт за основу разрешение, заданное в игре)\")," \
+    "{label:\"MetalFX\"," \
     "children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:U," \
     "selectedOption:sw?(U.find(u=>u.data&&+u.data===fn)||{data:String(fn)}).data:\"\"," \
     "onChange:v=>s([[\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",v.data?\"1\":\"\"],[\"DXMT_CONFIG\",fx(v.data)]])})},\"usf\")," \
     "(0," RT ".jsxs)(" BARREL ".XY,{label:" NP_L_CONTROLLERS ",children:[" \
-    "T([\"BRIDGEPLAY_RAW_CONTROLLERS\"],npL(\"Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)\"," \
-    "\"允许游戏直接读取控制器（Mac 上推荐，仅在需要 Steam Input 按键映射时关闭）\"," \
-    "\"Lascia che i giochi leggano direttamente i controller (consigliato su Mac, disattiva solo per la rimappatura di Steam Input)\",\"Разрешить играм напрямую читать данные геймпадов (рекомендуется на Mac; отключайте только для переназначения кнопок через Steam Input)\"),\"1\",\"\")," \
+    "T([\"BRIDGEPLAY_RAW_CONTROLLERS\"],npL(\"Direct input\",\"直接输入\",\"Input diretto\",\"Прямой ввод\"),\"1\",\"\")," \
+    "H(npL(\"Turn off for Steam Input remaps.\",\"用 Steam 输入改键时关闭。\",\"Disattiva per rimappare con Steam Input.\",\"Отключите для переназначения в Steam Input.\"))," \
     "T([\"BRIDGEPLAY_DISABLE_HIDRAW\"],npL(\"Disable hidraw\",\"停用 hidraw\",\"Disattiva hidraw\",\"Отключить hidraw\"),\"1\",\"\")" \
     "]},\"ctl\")," \
     "fex&&(0," RT ".jsx)(" BARREL ".XY,{label:\"FEX\"," \
     "children:X(\"FEX_X87REDUCEDPRECISION\"," \
-    "npL(\"Reduced x87 Precision (Reducing precision improves game performance, is enabled by default in CrossOver Preview)\"," \
-    "\"降低 x87 精度（降低精度可提升游戏性能，CrossOver Preview 中默认开启）\"," \
-    "\"Precisione x87 ridotta (ridurre la precisione migliora le prestazioni dei giochi, attiva di default in CrossOver Preview)\",\"Пониженная точность x87 (ускоряет игры, в CrossOver Preview включена по умолчанию)\"))},\"fex\")" \
+    "npL(\"Reduced x87 precision\"," \
+    "\"降低 x87 精度\"," \
+    "\"Precisione x87 ridotta\",\"Пониженная точность x87\"))},\"fex\")" \
     "]},\"adv\")," \
     "OV.length>0&&(0," RT ".jsx)(\"div\",{className:\"MSCXBtns\",children:(0," RT ".jsx)(\"button\",{className:\"MSCXBtn\"," \
     "onClick:()=>s(OV.map(k=>[k,\"DXMT_CONFIG\"===k?fx(\"\"):\"\"]))," \

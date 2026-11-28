@@ -104,8 +104,8 @@ function hud(nodes) {
   } };
 }
 
-// The Frame Rate Limit: Steam's slider (or the menu standing in for it) and the Enable frame
-// limit switch, with what they show: the value, whether the limit is off, and whether the
+// The FPS Limit: Steam's slider (or the menu standing in for it) and its Enable
+// switch, with what they show: the value, whether the limit is off, and whether the
 // slider is dimmed.
 function limit(nodes) {
   const value = nodes.find(n => n.props && n.props.npKey === 'BRIDGEPLAY_FPS_LIMIT');

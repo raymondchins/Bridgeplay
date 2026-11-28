@@ -1046,12 +1046,12 @@ fex_graphics_notice() {
   if imports_d3d12 "$1"; then
     graphics_log "the game imports d3d12.dll, and Wine through FEX has no Direct3D 12 yet, so it may quit or stay black"
     fex_title="This game needs Direct3D 12"
-    fex_body="Wine through FEX can't run Direct3D 12 yet, so the game may quit or stay black. For Direct3D 12, pick this CrossOver's Rosetta tool in the game's Compatibility settings in Steam."
+    fex_body="FEX cannot run Direct3D 12. The game may quit or show a black screen. In Steam Compatibility, select the Rosetta tool for this CrossOver version."
   else
     case " $np_dropped " in *" CX_GRAPHICS_BACKEND=d3dmetal "*) ;; *) return 0 ;; esac
     graphics_log "D3DMetal was asked for, and Wine through FEX has none, so the engine picks the graphics"
     fex_title="D3DMetal is off on FEX"
-    fex_body="Wine through FEX has no D3DMetal, so the game runs without it. For D3DMetal, pick this CrossOver's Rosetta tool in the game's Compatibility settings in Steam."
+    fex_body="To use D3DMetal, select the Rosetta tool for this CrossOver version in Steam Compatibility."
   fi
   fex_mark="$STEAM_COMPAT_DATA_PATH/bridgeplay-fex-noticed"
   [ -n "$STEAM_COMPAT_DATA_PATH" ] && [ "$(sed -n 1p "$fex_mark" 2>/dev/null)" != "$np_build" ] || return 0
@@ -1070,7 +1070,7 @@ toolkit_graphics_notice() {
   toolkit_mark="$STEAM_COMPAT_DATA_PATH/bridgeplay-toolkit-noticed"
   [ -n "$STEAM_COMPAT_DATA_PATH" ] && [ "$(sed -n 1p "$toolkit_mark" 2>/dev/null)" != "$np_build" ] || return 0
   printf '%s\n' "$np_build" > "$toolkit_mark" 2>/dev/null || true
-  notify_user "This game uses DirectX 12" "It runs best with Apple's Game Porting Toolkit. Get it from Apple, then press Rescan in Bridgeplay's Status. Your games and saves stay as they are."
+  notify_user "This game uses DirectX 12" "For best performance, get Game Porting Toolkit from Apple. In Bridgeplay, open Status and click Rescan. Your saves and games stay in place."
 }
 
 # Returns 0 when the destination already matches or was replaced.
@@ -1875,7 +1875,7 @@ launch_progress() {
     np_panel_pid=$!
     echo "launch: progress panel started (new prefix: $prefix_was_new)" >> "$log" 2>&1 || true
   elif [ "$prefix_was_new" = 1 ]; then
-    notify_user "Getting this game ready" "The first launch sets the game up and prepares its graphics. It can take a few minutes, and the screen may stay black until it is ready."
+    notify_user "Getting this game ready" "First-time setup can take a few minutes. The screen may stay black while graphics load."
   fi
 }
 
@@ -2033,12 +2033,12 @@ kernel_anticheat_notice() {
   if [ -n "${gamefix_anticheat:-}" ]; then
     ka_label=$(anticheat_label "$gamefix_anticheat")
     ka_found="$ka_label (gamefix)"
-    ka_text=$(alert_text "It uses {1}, which the Bridgeplay maintainers found this game cannot run with on macOS, so it will most likely quit at start or refuse to play online. Playing online with it is at your own risk." "$(alert_text "$ka_label")")
+    ka_text=$(alert_text "Bridgeplay confirmed {1} blocks this game on Mac. It may quit at launch or block online play. Playing online risks an account ban." "$(alert_text "$ka_label")")
     echo "anticheat: ANTICHEAT=$gamefix_anticheat in this game's gamefix, confirmed by a maintainer" >> "$log" 2>&1 || true
   else
     ka_found=$(find_kernel_anticheat "$STEAM_COMPAT_INSTALL_PATH")
     [ -n "$ka_found" ] || return 0
-    ka_text=$(alert_text "It uses {1}, kernel anti-cheat that needs a Windows driver. Wine cannot load it, so the game will most likely quit at start. Playing online with it is at your own risk." "$ka_found")
+    ka_text=$(alert_text "Wine cannot load the Windows driver for {1}. The game will likely quit at launch. Playing online risks an account ban." "$ka_found")
     echo "anticheat: found kernel anti-cheat $ka_found, whose driver Wine cannot load" >> "$log" 2>&1 || true
   fi
   ka_status=0
@@ -2315,7 +2315,7 @@ APPLESCRIPT
   esac
   executable=$(cat "$np_support/app-executable" 2>/dev/null) || executable=""
   if [ ! -x "$executable" ]; then
-    show_alert "Couldn't find the Bridgeplay app" "The prefix wasn't rebuilt and the game wasn't launched, because the Bridgeplay app was moved or deleted since it was installed, or was installed from a disk image or Downloads. Move Bridgeplay to Applications, open it and click Install again, then launch the game."
+    show_alert "Couldn't find the Bridgeplay app" "The game did not launch or rebuild its prefix. Move Bridgeplay to Applications, open it, click Install, then launch the game again."
     exit 1
   fi
   if ! run_rebuild "$executable" "$backup"; then
@@ -2358,7 +2358,7 @@ refuse_foreign_prefix() {
   esac
   rebuild_prefix "This game needs its prefix rebuilt" "$explanation
 
-$(alert_text "Do you want to rebuild the prefix for {1}? Your save games will be preserved and not lost." "$(running_name "$np_display" "$want_tool")")"
+$(alert_text "Rebuild the prefix for {1}? Your saves will be kept." "$(running_name "$np_display" "$want_tool")")"
 }
 
 last_wine_build() {
@@ -2666,9 +2666,9 @@ offer_switch_rebuild() {
   echo "=== last session crashed after switching from $old_display, offering a rebuild ===" >> "$log" 2>&1 || true
   alert_language
   rebuild_prefix "This game may need its prefix rebuilt" \
-    "$(alert_text "Something appears to have gone wrong the last time you ran this game! Rebuilding the prefix may fix it.")
+    "$(alert_text "The last launch failed. Rebuilding the prefix may help.")
 
-$(alert_text "Rebuild your prefix for {1}? Your save games will be preserved and not lost." "$(running_name "$np_display" "$(tool_name "$now_arch")")")" \
+$(alert_text "Rebuild the prefix for {1}? Your saves will be kept." "$(running_name "$np_display" "$(tool_name "$now_arch")")")" \
     "Launch Without Rebuilding"
 }
 
@@ -2693,7 +2693,7 @@ note_prefix_volume() {
   echo "=== compatdata is on $fs, not APFS: Wine prefixes are only tested on APFS, games may hang or fail to start ===" \
     >> "$log" 2>&1 || true
   [ "$prefix_was_new" = 1 ] || return 0
-  notify_user "This Steam library is not on APFS" "It is formatted {1}. Games run from it may hang or fail to start. Move the game to a library on an APFS drive for the best results." "$fs"
+  notify_user "This Steam library is not on APFS" "Games on {1} may freeze or fail to start. Move this game to a Steam library on an APFS drive." "$fs"
 }
 
 # Without C:\windows\system32 Wine stops at "could not load kernel32.dll" and the game quits
@@ -2720,7 +2720,7 @@ refuse_broken_prefix() {
   # Wine reports a full disk only as error=112 on each file it could not copy.
   free_kb=$(df -Pk "$STEAM_COMPAT_DATA_PATH" 2>/dev/null | awk 'NR == 2 { print $4 }')
   if [ -n "$free_kb" ] && [ "$free_kb" -lt 2097152 ]; then
-    show_alert "The disk is too full for the game's prefix" "Wine needs about 2 GB free to set up the game. Free some space on the drive that holds this Steam library, then rebuild the prefix in Bridgeplay."
+    show_alert "The disk is too full for the game's prefix" "Free about 2 GB on the Steam library drive, then rebuild the prefix in Bridgeplay."
     exit 1
   fi
   # set_up_prefix_contents runs reg import, which can leave wineserver holding the prefix
@@ -3366,7 +3366,7 @@ import_prefix_settings() {
 mark "runner check"
 if [ -z "$np_build" ] || [ ! -d "$CX_ROOT/lib/wine" ]; then
   echo "=== build ${np_build:-(none recorded)} behind this compatibility tool is not set up, set it up in Bridgeplay ===" >> "$log" 2>&1 || true
-  show_alert "CrossOver is not set up" "The CrossOver build behind {1} is not set up. Set it up in Bridgeplay, or pick another compatibility tool for this game." "$(alert_safe "$np_display")"
+  show_alert "CrossOver is not set up" "Set up CrossOver for {1} in Bridgeplay, or choose another compatibility tool in Steam." "$(alert_safe "$np_display")"
   np_outcome=engine_missing
   exit 1
 fi
@@ -3405,7 +3405,7 @@ case "$(/usr/bin/file -b "$WINESERVER" 2>/dev/null)" in
         echo "=== arch -x86_64 failed, but the engine's loader runs, so Rosetta is there for it ===" >> "$log" 2>&1 || true
       else
         echo "=== Rosetta 2 is not installed, Wine cannot run: softwareupdate --install-rosetta --agree-to-license ===" >> "$log" 2>&1 || true
-        show_alert "Rosetta 2 is not installed" "Windows games need Rosetta 2, and this Mac does not have it (a macOS update can remove it). Install it in Terminal with: softwareupdate --install-rosetta --agree-to-license, then launch the game again."
+        show_alert "Rosetta 2 is not installed" "To run the game, enter this command in Terminal, then launch again: softwareupdate --install-rosetta --agree-to-license"
         np_outcome=rosetta_missing
         exit 1
       fi

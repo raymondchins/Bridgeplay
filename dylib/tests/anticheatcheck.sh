@@ -97,7 +97,7 @@ is "Don't Launch: exits cleanly" 0 "$rc"
 is "Don't Launch: the game does not start" no "$launched"
 is "the dialog names the anti-cheat and the wait" "$wait_seconds
 This game's anti-cheat can't run
-It uses Ricochet (Randgrid.sys), kernel anti-cheat that needs a Windows driver. Wine cannot load it, so the game will most likely quit at start. Playing online with it is at your own risk.
+Wine cannot load the Windows driver for Ricochet (Randgrid.sys). The game will likely quit at launch. Playing online risks an account ban.
 Other Ways to Play
 Launch Anyway
 Don't Launch" "$(cat "$work/case dont/args")"
@@ -164,7 +164,7 @@ answer "Don't Launch"
 prompt_case confirmed waitforexitandrun "$plain" stub
 is "a confirmed game is asked with no anti-cheat file" yes "$asked"
 is "a confirmed game does not start on Don't Launch" no "$launched"
-has "the dialog names the confirmed anti-cheat" "It uses Easy Anti-Cheat, which the Bridgeplay maintainers found this game cannot run with on macOS" "$(cat "$work/case confirmed/args")"
+has "the dialog names the confirmed anti-cheat" "Bridgeplay confirmed Easy Anti-Cheat blocks this game on Mac." "$(cat "$work/case confirmed/args")"
 has "a confirmed game: logged" "anticheat: ANTICHEAT=eac in this game's gamefix, confirmed by a maintainer" "$log"
 has "a confirmed game: exit cause" "=== exit cause: blocked before launch: kernel anti-cheat Easy Anti-Cheat (gamefix), the player chose Don't Launch ===" "$log"
 lacks "a confirmed game: the exit cause does not contradict the maintainer line" "not confirmed" "$log"
@@ -179,7 +179,7 @@ is "Steam's helpers of a confirmed game are not asked" no "$asked"
 # shellcheck disable=SC2034 # kernel_anticheat_notice, eval'd above, reads it
 gamefix_anticheat=other
 prompt_case confirmed-other waitforexitandrun "$plain" stub
-has "an unnamed anti-cheat reads as one" "It uses an anti-cheat, which" "$(cat "$work/case confirmed-other/args")"
+has "an unnamed anti-cheat reads as one" "Bridgeplay confirmed an anti-cheat blocks this game on Mac." "$(cat "$work/case confirmed-other/args")"
 
 echo "== order =="
 # The prompt comes before anything that touches the prefix or starts Wine.

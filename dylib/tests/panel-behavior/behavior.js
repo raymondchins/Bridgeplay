@@ -62,8 +62,8 @@ for (const form of Object.keys(FORMS)) {
   // the game is the wording this replaced.
   const upscaler = nodes('CX_GRAPHICS_BACKEND=dxmt').find(x => x.type === 'Section' &&
     x.props.label.indexOf('MetalFX') === 0);
-  t.ok(/Samples from the resolution the game is set to/.test(upscaler.props.label),
-       'the upscaler section says where it samples from');
+  t.ok(upscaler.props.label === 'MetalFX',
+       'the upscaler section names the control');
   const factors = nodes('CX_GRAPHICS_BACKEND=dxmt').find(x => x.type === 'Dropdown' && x.props.rgOptions.some(o => o.data === '1.5'))
     .props.rgOptions.map(o => o.label);
   t.ok(factors.join(',') === 'Off,1.5x,1.72x,2x,3x', `the factors name themselves (${factors.join(',')})`);
@@ -83,10 +83,9 @@ for (const form of Object.keys(FORMS)) {
 
   // Performance Overlay: Bridgeplay's own levels and the Metal HUD in one menu, off by default.
   const po = o => overlay(nodes(o));
-  const POL = 'Off:0,FPS:fps,Summary (FPS, frame time, CPU, GPU, memory, battery):summary,' +
-              'Detailed (adds a frame-time graph):detailed,Apple Metal HUD:hud';
+  const POL = 'Off:0,FPS:fps,Summary:summary,Detailed:detailed,Metal HUD:hud';
   t.ok(po('').props.rgOptions.map(x => x.label + ':' + x.data).join(',') === POL, 'the overlay levels name themselves');
-  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === 'Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)'),
+  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === 'Performance Overlay'),
        'the overlay has a section of its own');
   t.ok(po('').props.selectedOption === '0', 'the overlay is off by default');
   t.ok(po('BRIDGEPLAY_PERF_OVERLAY=summary').props.selectedOption === 'summary', 'a level reads from its argument');
@@ -129,16 +128,15 @@ for (const form of Object.keys(FORMS)) {
   globalThis.MSCXFx = { g: {}, a: { 287700: { BRIDGEPLAY_PERF_OVERLAY: 'summary' } }, e: {}, d: {} };
   t.ok(po('').props.selectedOption === 'summary', "the game's own conf level shows");
   delete globalThis.MSCXFx;
-  // Frame Rate Limit: a slider from 15 to the fastest display's rate and a switch that turns it
+  // FPS Limit: a slider from 15 to the fastest display's rate and a switch that turns it
   // off and keeps its value, as on Steam Deck. Off, with the slider at the top, by default.
   const fl = o => limit(nodes(o));
-  t.ok(nodes('').some(x => x.type === 'Section' && typeof x.props.label === 'string' &&
-       x.props.label.startsWith('Frame Rate Limit (') && x.props.label.includes('refresh rate stays')),
-       'the limit says it does not change the refresh rate');
+  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === 'FPS Limit'),
+       'the limit has its own section');
   let L = fl('');
   t.ok(L.value.type === 'Slider' && L.value.props.min === 15 && L.value.props.max === 60 &&
        L.value.props.showValue === true && L.value.props.valueSuffix === ' FPS', "Steam's own slider, 15 to 60 FPS");
-  t.ok(L.sw.type === 'Toggle' && L.sw.props.label === 'Enable frame limit' && L.sw.props.className === 'MSCXRow',
+  t.ok(L.sw.type === 'Toggle' && L.sw.props.label === 'Enable' && L.sw.props.className === 'MSCXRow',
        'the switch is a row of its own');
   t.ok(L.off && L.dimmed && L.v === 60, 'no limit by default: switched off, the slider dimmed at the display rate');
   L = fl('BRIDGEPLAY_FPS_LIMIT=30');
@@ -209,11 +207,11 @@ for (const form of Object.keys(FORMS)) {
   // Scaling Filter: linear unless set, nearest or integer written only when they differ.
   const sf = o => filter(nodes(o));
   t.ok(sf('').props.rgOptions.map(x => x.label + ':' + x.data).join(',') ===
-       'Automatic (Wine keeps pixels sharp with High Resolution off):0,Linear (smooth):linear,' +
+       'Automatic (sharp with High Resolution off):0,Linear (smooth):linear,' +
        'Nearest (sharp pixels at any scale):nearest,' +
        'Integer (sharp at exact 2x or 3x, smooth otherwise):integer', 'the filters name themselves');
   t.ok(nodes('').some(x => x.type === 'Section' && typeof x.props.label === 'string' &&
-       x.props.label.startsWith('Scaling Filter (When the game draws fewer pixels than the screen')),
+       x.props.label === 'Scaling Filter' && walk(x).some(n => n.props.children === 'Applies below display resolution.')),
        'the filter says when it applies');
   t.ok(sf('').props.selectedOption === '0', 'automatic by default');
   t.ok(sf('BRIDGEPLAY_SCALING_FILTER=Nearest').props.selectedOption === 'nearest', 'nearest reads in any case');
@@ -248,7 +246,7 @@ for (const form of Object.keys(FORMS)) {
   written.length = 0;
   def('WINEDEBUG=-all BRIDGEPLAY_PERF_OVERLAY=summary').props.onClick();
   t.ok(last().trim() === 'WINEDEBUG=-all %command%', `Use Bridgeplay defaults drops the overlay (${last()})`);
-  const raw = o => nodes(o).find(x => x.props.label === 'Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)');
+  const raw = o => nodes(o).find(x => x.props.label === 'Direct input');
   t.ok(sections(nodes('')).includes('Controllers') && raw('').props.checked === false,
        'controller hiding is on unless the game says otherwise');
   written.length = 0;
@@ -273,7 +271,7 @@ for (const form of Object.keys(FORMS)) {
   t.ok(row('', 'Metal HUD').props.checked === true, 'a global conf value reads as on');
   t.ok(row('', 'High Resolution').props.checked === false, 'the per-app conf beats the global conf');
   t.ok(row('', 'MSync').props.checked === true, 'the engine default reads as on');
-  t.ok(row('', 'Let games read controllers directly').props.checked === true, 'the run script default reads as on');
+  t.ok(row('', 'Direct input').props.checked === true, 'the run script default reads as on');
   t.ok(row('MTL_HUD_ENABLED=0', 'Metal HUD').props.checked === false, 'the launch options beat the confs');
   written.length = 0;
   row('', 'Metal HUD').props.onChange(false);
@@ -285,24 +283,24 @@ for (const form of Object.keys(FORMS)) {
   row('', 'High Resolution').props.onChange(true);
   t.ok(last().trim() === 'BRIDGEPLAY_RETINA=1 %command%', `turning on what a conf turns off writes 1 (${last()})`);
   written.length = 0;
-  row('', 'Let games read controllers directly').props.onChange(false);
+  row('', 'Direct input').props.onChange(false);
   t.ok(last().trim() === 'BRIDGEPLAY_RAW_CONTROLLERS=0 %command%', `opting out of raw controllers writes 0 (${last()})`);
   delete globalThis.MSCXFx;
 
   // Frame generation: a mode for every backend, and the rest of its rows only once it is on.
-  const FGL = 'Frame Generation (Experimental. Adds input lag)';
+  const FGL = 'Frame Generation';
   const fgRows = o => {
     const sec = nodes(o).find(x => x.type === 'Section' && x.props.label === FGL);
-    return sec ? walk(sec.props.children) : [];
+    return sec ? walk(sec.props.children).filter(n => n.type === 'Toggle' || n.type === 'Dropdown') : [];
   };
-  const FGT = { ui: 'Protect UI (keeps static HUD and menus sharp)',
-                fb: 'Fast-motion fallback (skips frames that would smear)' };
+  const FGT = { ui: 'Keep HUD and menus sharp',
+                fb: 'Skip blurry frames in fast motion' };
   const fgrow = (o, l) => fgRows(o).find(x => x.props.label === l || (typeof x.props.label === 'string' && x.props.label.startsWith(l + ' (')));
   for (const b of ['', 'd3dmetal', 'dxmt', 'dxvk', 'wined3d']) {
     t.ok(fgrow(b ? 'CX_GRAPHICS_BACKEND=' + b : '', 'Mode') !== undefined,
          `${b || 'automatic'} shows the frame generation mode`);
   }
-  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === FGL),
+  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === FGL && walk(x).some(n => n.props.children === 'Experimental. Adds input lag.')),
        'the frame generation section warns about latency');
   const mode = fgrow('', 'Mode');
   t.ok(mode.type === 'Dropdown' && mode.props.className === undefined && mode.props.strClassName === 'MSCXDrop',
@@ -415,7 +413,7 @@ for (const form of Object.keys(FORMS)) {
   let n = nnodes('');
   t.ok(P({ details: mac('') }) !== null && P({ details: mac('') }).props.className === 'MSCXPanel',
        'a mac build with nothing pinned renders the native panel');
-  t.ok(toggles(n).join(',') === 'Enable frame limit' && sections(n).join(',') === 'Performance,Frame,Scaling,Frame,Controllers',
+  t.ok(toggles(n).join(',') === 'Enable' && sections(n).join(',') === 'Performance,FPS,Scaling,Frame,Controllers',
        `the native panel has the overlay, the limit, the filter, frame generation and controllers only (${toggles(n)} / ${sections(n)})`);
   t.ok(n.filter(x => x.type === 'Dropdown').map(x => x === overlay(n) ? 'overlay' :
         x === filter(n) ? 'filter' : x.props.label).join(',') === 'overlay,filter,Mode,Controller layer' &&

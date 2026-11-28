@@ -104,30 +104,30 @@ try {
   let e = row(1001);
   t.ok(e.style.display === '' && e.style.flexDirection === 'column', 'the row shows, stacked');
   t.ok(JSON.stringify(texts(e)) === JSON.stringify(['Players report', 'Ran well on 9 of 11 Macs',
-       '9 ran well · 1 had issues · 1 did not run · updated 3 days ago']), `playable reads as counts per Mac (${texts(e)})`);
+       '9 good · 1 with issues · 1 failed · updated 3 days ago']), `playable reads as counts per Mac (${texts(e)})`);
   t.ok(buttons(e).length === 0, 'a game that runs offers no other ways to play');
   t.ok(e.ownerDocument.getElementById('MSCXVerdictCSS') !== null, 'its style goes in once per document');
   ctx.MSCXVerdictRow(e, 1001);
   t.ok(e.ownerDocument.head.children.length === 1, 'rendering again for the same game changes nothing');
   t.ok(texts(row(1002))[1] === 'Did not run on 5 of 6 Macs', 'doesn’t run names the Macs it failed on');
-  t.ok(texts(row(1003))[1] === 'Mixed: 3 ran well, 2 had issues, 2 did not run' &&
+  t.ok(texts(row(1003))[1] === 'Mixed: 3 good, 2 with issues, 2 failed' &&
        texts(row(1003))[2] === 'updated 3 days ago', 'mixed spells out the three counts once');
-  t.ok(texts(row(1003))[3] === 'Uses Easy Anti-Cheat: online play may fail.', 'a user-mode anti-cheat is a note');
-  t.ok(texts(row(1004))[1] === 'One report so far: it ran well', 'one report says so');
-  t.ok(texts(row(1011))[1] === 'One report so far: it did not run' &&
-       texts(row(1011))[3] === 'Uses anti-cheat: online play may fail.', 'one failed report, with an unnamed anti-cheat');
-  t.ok(texts(row(1005))[1] === 'Ran well before Bridgeplay 0.7.66, but not on newer builds', 'broken since names the build');
-  t.ok(texts(row(1009))[1] === 'Ran well before Steam build 1764000000, but not on newer builds', 'or the Steam build');
+  t.ok(texts(row(1003))[3] === 'Easy Anti-Cheat: online play may fail.', 'a user-mode anti-cheat is a note');
+  t.ok(texts(row(1004))[1] === 'One report: ran well', 'one report says so');
+  t.ok(texts(row(1011))[1] === 'One report: did not run' &&
+       texts(row(1011))[3] === 'Anti-cheat: online play may fail.', 'one failed report, with an unnamed anti-cheat');
+  t.ok(texts(row(1005))[1] === 'Broken since Bridgeplay 0.7.66', 'broken since names the build');
+  t.ok(texts(row(1009))[1] === 'Broken since Steam build 1764000000', 'or the Steam build');
   e = row(1006);
   t.ok(JSON.stringify(texts(e)) === JSON.stringify([
-    'Uses Ricochet, anti-cheat that Wine on macOS can’t run, so the game will most likely not start.',
-    'You may still play it through cloud gaming, if a service carries it, or Steam Remote Play from a Windows PC.']),
+    'Likely won’t start: Wine can’t run Ricochet.',
+    'Try cloud gaming or Remote Play.']),
     `kernel anti-cheat with no verdict is a hard note with other ways to play (${texts(e)})`);
   t.ok(buttons(e).length === 0, 'without a way to open a browser there is no button');
-  t.ok(texts(row(1007)).includes('Uses Ricochet: online play may fail.'),
+  t.ok(texts(row(1007)).includes('Ricochet: online play may fail.'),
        'kernel anti-cheat in a game players ran well is only a note');
-  t.ok(texts(row(1008))[0] === 'Uses VAC: online matchmaking may not work.', 'VAC has its own note');
-  t.ok(texts(row(1010))[0].endsWith('so the game will most likely not start. Bridgeplay asks before launching it.'),
+  t.ok(texts(row(1008))[0] === 'VAC: matchmaking may fail.', 'VAC has its own note');
+  t.ok(texts(row(1010))[0].startsWith('Likely won’t start: ') && texts(row(1010))[0].endsWith('. Bridgeplay asks first.'),
        'a confirmed anti-cheat says the launch asks first');
   e = row(424242);
   t.ok(e.style.display === 'none' && e.children.length === 0, 'an unknown game hides the row');
@@ -161,7 +161,7 @@ try {
   const warn = (id, doc = documentFor('en')) => { const n = new Node(doc, 'div'); ctx.MSCXWarnRow(n, id); return n; };
   e = warn(1002);
   t.ok(e.className === 'MSCXWarn' && e.attrs.role === 'note', 'the warning is a note, not a dialog');
-  t.ok(texts(e)[0] === 'Before you download' && texts(e)[1] === 'Players report it did not run on 5 of 6 Macs.',
+  t.ok(texts(e)[0] === 'Before you download' && texts(e)[1] === 'Failed on 5 of 6 players’ Macs.',
        `it says why (${texts(e)})`);
   const close = buttons(e).find(b => b.className === 'MSCXWarnClose');
   t.ok(!!close && close.attrs['aria-label'] === 'Dismiss', 'it has a labelled dismiss button');
@@ -170,7 +170,7 @@ try {
   t.ok(e.style.display === 'none' && W(1002) === '' && JSON.parse(store.MSCXWarnDismissed)[1002] === 'd',
        'dismissed, it hides and stays hidden for that game');
   t.ok(W(1006) === 'a', 'other games still warn');
-  t.ok(texts(warn(1005))[1] === 'Players report it ran well before Bridgeplay 0.7.66, but not on newer builds.' &&
+  t.ok(texts(warn(1005))[1] === 'Broken since Bridgeplay 0.7.66, players report.' &&
        !buttons(warn(1005)).some(b => b.className === 'MSCXWarnBtn'), 'broken since warns without other ways to play');
   e = warn(1001);
   t.ok(e.style.display === 'none' && e.children.length === 0, 'a game that runs gets no warning');

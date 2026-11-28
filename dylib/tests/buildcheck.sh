@@ -179,13 +179,13 @@ arch_case() {
 }
 is "an architecture mismatch offers rebuilding" 'rebuild: This game needs its prefix rebuilt: Rosetta prefixes cannot be used with versions of CrossOver that run through FEX unless they are rebuilt.
 
-Do you want to rebuild the prefix for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Your save games will be preserved and not lost.' "$(arch_case aarch64-unix)"
+Rebuild the prefix for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Your saves will be kept.' "$(arch_case aarch64-unix)"
 is "the build that set up the prefix is named" 'rebuild: This game needs its prefix rebuilt: This game'"'"'s prefix was last used by CrossOver 26.3, running through Rosetta. Rosetta prefixes cannot be used with versions of CrossOver that run through FEX unless they are rebuilt.
 
-Do you want to rebuild the prefix for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Your save games will be preserved and not lost.' "$(arch_case aarch64-unix 'CrossOver 26.3')"
+Rebuild the prefix for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Your saves will be kept.' "$(arch_case aarch64-unix 'CrossOver 26.3')"
 is "a tool name's own arch suffix is not repeated" 'rebuild: This game needs its prefix rebuilt: This game'"'"'s prefix was last used by CrossOver Preview 2026 10 15‑ARM64, running through Rosetta. Rosetta prefixes cannot be used with versions of CrossOver that run through FEX unless they are rebuilt.
 
-Do you want to rebuild the prefix for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Your save games will be preserved and not lost.' "$(arch_case aarch64-unix 'CrossOver 2026 10 15-ARM64 - Rosetta')"
+Rebuild the prefix for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Your saves will be kept.' "$(arch_case aarch64-unix 'CrossOver 2026 10 15-ARM64 - Rosetta')"
 is "a matching architecture needs no rebuild" "" "$(arch_case x86_64-unix)"
 rebuild="$(extract launch_step)
 $(extract alert_language)
@@ -442,9 +442,9 @@ session new-build "$crash_log" 5
 is "a crash after the switch is recorded" failed "$(state)"
 is "nothing is offered in the session that crashed" no "$([ -f "$data/offers" ] && echo yes || echo no)"
 session new-build "$crash_log" 5
-is "the next launch offers a rebuild for the selected tool" "This game may need its prefix rebuilt|Something appears to have gone wrong the last time you ran this game! Rebuilding the prefix may fix it.
+is "the next launch offers a rebuild for the selected tool" "This game may need its prefix rebuilt|The last launch failed. Rebuilding the prefix may help.
 
-Rebuild your prefix for New Tool, running through Rosetta? Your save games will be preserved and not lost.|Launch Without Rebuilding" "$(cat "$data/offers")"
+Rebuild the prefix for New Tool, running through Rosetta? Your saves will be kept.|Launch Without Rebuilding" "$(cat "$data/offers")"
 is "the offer is made once per switch" none "$([ -f "$data/notproton-switch" ] && state || echo none)"
 session new-build "$crash_log" 5
 is "a crash after the offer is not offered again" 1 "$(grep -c "^This game may need" "$data/offers")"

@@ -7,7 +7,7 @@ const { panel, walk, details, runner, FORMS } = require('./harness');
 const emit = process.argv[2];
 if (!emit) { console.error('usage: sustained.js <emit>'); process.exit(2); }
 
-const LABEL = 'Cool and steady (Lowers the frame limit while the Mac runs hot)';
+const LABEL = 'Lower when hot';
 const NONE = { g: {}, a: {}, e: {}, d: {} };
 
 let failed = 0;
@@ -22,7 +22,7 @@ for (const form of Object.keys(FORMS)) {
   const r = nodes('');
   t.ok(!!row(r) && row(r).props.checked === false, 'a Wine game shows the switch, off by default');
   const limit = r.find(x => x.type === 'Section' && walk(x.props.children).includes(row(r)));
-  t.ok(!!limit && /^Frame Rate Limit/.test(limit.props.label), 'it sits in the frame rate limit section');
+  t.ok(!!limit && /^FPS Limit/.test(limit.props.label), 'it sits in the frame rate limit section');
   t.ok(!r.some(x => x.type === 'details' && walk(x.props.children).includes(row(r))), 'it is not in the Advanced group');
   t.ok(!row(nodes('', { vecPlatforms: ['osx'], strCompatToolName: '' })), 'a native Mac game has no such switch');
 

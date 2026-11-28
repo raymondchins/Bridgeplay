@@ -6,8 +6,8 @@ const { panel, walk, details, runner, FORMS, hud } = require('./harness');
 const emit = process.argv[2];
 if (!emit) { console.error('usage: fex.js <emit>'); process.exit(2); }
 
-const AVX = 'Advertise AVX2 to Rosetta';
-const X87 = 'Reduced x87 Precision (Reducing precision improves game performance, is enabled by default in CrossOver Preview)';
+const AVX = 'AVX2';
+const X87 = 'Reduced x87 precision';
 
 // The hook passes only FEX tools; bridgeplay-proton-rosetta stands for a Rosetta tool next to it.
 const FEX_TOOLS = ['bridgeplay-proton-fex'];

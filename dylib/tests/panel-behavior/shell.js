@@ -11,8 +11,8 @@ if (!emit) { console.error('usage: shell.js <emit>'); process.exit(2); }
 const TOGGLES = {
   'MSync': 'WINEMSYNC',
   'High Resolution': 'BRIDGEPLAY_RETINA',
-  'Advertise AVX2 to Rosetta': 'ROSETTA_ADVERTISE_AVX',
-  'Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)': 'BRIDGEPLAY_RAW_CONTROLLERS',
+  'AVX2': 'ROSETTA_ADVERTISE_AVX',
+  'Direct input': 'BRIDGEPLAY_RAW_CONTROLLERS',
   'Disable hidraw': 'BRIDGEPLAY_DISABLE_HIDRAW',
 };
 const ON_UNLESS_0 = { ROSETTA_ADVERTISE_AVX: true };
