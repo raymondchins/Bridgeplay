@@ -456,15 +456,16 @@ struct RoadmapSnapshots {
 
     // The launch panel's question after two minutes with no window, and what follows.
     @Test func launchPanels() async throws {
-        let message = LaunchProgress.message(game: "The Witcher 3: Wild Hunt")
-        try await panel("B1-launch-panel-waiting") { $0.show(message: message, phase: LaunchProgress.phase(.start)) }
+        // Built inside each panel's closure, after the snapshot language is installed.
+        func message() -> String { LaunchProgress.message(game: "The Witcher 3: Wild Hunt") }
+        try await panel("B1-launch-panel-waiting") { $0.show(message: message(), phase: LaunchProgress.phase(.start)) }
         try await panel("B1-launch-panel-keep-waiting-or-stop") {
-            $0.show(message: message, phase: LaunchProgress.phase(.start), note: LaunchProgress.hangNote, buttons: [
+            $0.show(message: message(), phase: LaunchProgress.phase(.start), note: LaunchProgress.hangNote, buttons: [
                 PanelButton(title: String(localized: "Stop Game")) {},
                 PanelButton(title: String(localized: "Keep Waiting")) {},
             ])
         }
-        try await panel("B1-launch-panel-stopping") { $0.show(message: message, phase: LaunchProgress.stopping) }
+        try await panel("B1-launch-panel-stopping") { $0.show(message: message(), phase: LaunchProgress.stopping) }
 
         // LaunchEndedPanel.present's layout: why it stopped, with a next step.
         func ended(_ name: String, _ code: String, seconds: Int, game: String) async throws {
