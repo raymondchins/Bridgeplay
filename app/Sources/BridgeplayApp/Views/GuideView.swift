@@ -140,7 +140,7 @@ struct GuideView: View {
 
             SteamBlock(title: String(localized: "Advanced")) {
                 Text("Closed until you open it, or until one of these is set for the game.")
-                    .font(BP.sans(12.5))
+                    .font(BP.sans(12))
                     .foregroundStyle(BP.fg2)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.bottom, 4)

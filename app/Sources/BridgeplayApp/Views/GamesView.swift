@@ -63,7 +63,16 @@ struct GamesView: View {
         .task { await refresh() }
         // A trash, rebuild or restore changes what is on disk: list again (no sizes walked).
         .onChange(of: prefixes.prefixes) { Task { await games.load() } }
+        // The Prefix menu acts on PrefixesModel's selection: keep it on this table's game, so
+        // nothing chosen on Prefixes earlier is what Run Program or Move to Trash reaches.
+        .onAppear { followSelection() }
+        .onChange(of: selection) { followSelection() }
+        .onChange(of: games.games) { followSelection() }
         .prefixDialogs()
+    }
+
+    private func followSelection() {
+        prefixes.selection = GamesLibrary.prefixSelection(selection, in: games.games)
     }
 
     private func refresh() async {

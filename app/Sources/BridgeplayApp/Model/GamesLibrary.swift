@@ -91,6 +91,13 @@ enum GamesLibrary {
         return line
     }
 
+    // What the Prefix menu and the prefix dialogs act on while Games is shown: the game its
+    // table selected, when that game has a prefix, else nothing.
+    static func prefixSelection(_ id: InstalledGame.ID?, in games: [InstalledGame]) -> Set<WinePrefix.ID> {
+        guard let id, let game = games.first(where: { $0.id == id }), game.hasPrefix else { return [] }
+        return [game.prefix.id]
+    }
+
     // Steam's own Play. A non-Steam shortcut's game id is its appid in the high 32 bits.
     static func playURL(_ game: InstalledGame) -> URL? {
         guard let appID = UInt64(game.appID) else { return nil }

@@ -109,6 +109,20 @@ struct GamesLibraryTests {
             == "steam://rungameid/\((shortcut << 32) | 0x0200_0000)")
     }
 
+    @Test("The Prefix menu on Games follows the game its table selected")
+    func prefixSelectionFollowsTheTable() {
+        let library = SteamLibrary(root: URL(filePath: "/nonexistent"))
+        func game(_ appID: String, prefix: Bool) -> InstalledGame {
+            InstalledGame(prefix: WinePrefix(appID: appID, name: "x", library: library, lastUsed: nil),
+                          hasPrefix: prefix, record: nil, backendFile: nil, installedIn: library)
+        }
+        let games = [game("10", prefix: true), game("20", prefix: false)]
+        #expect(GamesLibrary.prefixSelection(games[0].id, in: games) == [games[0].prefix.id])
+        #expect(GamesLibrary.prefixSelection(games[1].id, in: games).isEmpty)
+        #expect(GamesLibrary.prefixSelection(nil, in: games).isEmpty)
+        #expect(GamesLibrary.prefixSelection("gone", in: games).isEmpty)
+    }
+
     @Test("Backend ids read as their projects write them")
     func backendLabels() {
         #expect(GamesLibrary.backendLabel("d3dmetal") == "D3DMetal")
