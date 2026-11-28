@@ -117,6 +117,23 @@ static int child(const char *path, const char *mode)
 		settle(device, layer);
 		probe(&limit, &cap, &waits, &vsync);
 		CHECK(cap == -1 && vsync == 0 && !layer.displaySyncEnabled, "cool again, the game's VSync off did not return");
+		// A second window (a launcher) that draws first after each change leaves the game's own
+		// update to the game's layer.
+		CAMetalLayer *other = [CAMetalLayer layer];
+		other.device = device;
+		other.pixelFormat = MTLPixelFormatBGRA8Unorm;
+		other.drawableSize = CGSizeMake(64, 64);
+		other.displaySyncEnabled = NO;
+		CHECK(tick(2, 200) == 1, "thermal serious did not step again");
+		settle(device, other);
+		settle(device, layer);
+		CHECK(layer.displaySyncEnabled && other.displaySyncEnabled, "hot with two windows: game %d, other %d",
+		      layer.displaySyncEnabled, other.displaySyncEnabled);
+		CHECK(tick(0, 201) == 1 && tick(0, 231) == 0, "cool for 30 s did not step back again");
+		settle(device, other);
+		settle(device, layer);
+		CHECK(!layer.displaySyncEnabled && !other.displaySyncEnabled, "cool with two windows: game %d, other %d",
+		      layer.displaySyncEnabled, other.displaySyncEnabled);
 		printf("%-10s no limit: hot turns display sync on, cool gives the game its VSync off back\n", mode);
 		return 0;
 	}

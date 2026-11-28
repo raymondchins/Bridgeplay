@@ -43,7 +43,6 @@ static _Atomic uint64_t fl_waits;
 // Cool and steady: the switch, and the step now in force (0 none, 1 serious, 2 critical).
 static _Atomic int fl_sustained;
 static _Atomic int fl_step;
-static _Atomic int fl_step_synced;
 static _Atomic int fl_sustained_started;
 static _Atomic int fl_thermal_test;
 static os_unfair_lock fl_thermal_lock = OS_UNFAIR_LOCK_INIT;
@@ -186,9 +185,12 @@ static void fl_follow_step(id layer)
 		return;
 	if (!atomic_exchange(&fl_sustained_started, 1))
 		fl_sustained_start();
+	// Each layer remembers the step its display sync was last set for, so a second window
+	// drawing first after a change can't take the game's update (nothing stored is step 0).
 	int step = atomic_load(&fl_step);
-	if (atomic_exchange(&fl_step_synced, step) == step)
+	if ((int)(intptr_t)objc_getAssociatedObject(layer, &fl_follow_step) == step)
 		return;
+	objc_setAssociatedObject(layer, &fl_follow_step, (id)(intptr_t)step, OBJC_ASSOCIATION_ASSIGN);
 	[layer retain];
 	dispatch_async(dispatch_get_main_queue(), ^{
 		framelimit_sync_layer(layer);
