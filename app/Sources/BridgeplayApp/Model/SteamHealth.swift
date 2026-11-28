@@ -115,7 +115,8 @@ enum SteamHealthStore {
         folder: URL = supportFolder(),
         installedPatch: String?,
         installedSteam: String? = installedSteamBuild(),
-        isThisUsersSteam: (Int32) -> Bool = isThisUsersSteam
+        isThisUsersSteam: (Int32) -> Bool = isThisUsersSteam,
+        pids: () -> [Int32] = allPids
     ) -> HealthReading {
         var reading = HealthReading()
         reading.paused = FileManager.default.fileExists(atPath: folder.appending(path: pausedFile).path(percentEncoded: false))
@@ -130,7 +131,10 @@ enum SteamHealthStore {
         if let pid = health.pid, pid > 0, isThisUsersSteam(pid) {
             reading.freshness = .live
         } else if let patch = health.patchBuild, let steam = health.steamBuild,
-                  patch == installedPatch, steam == installedSteam {
+                  patch == installedPatch, steam == installedSteam,
+                  // Another Steam of this user still runs: the report is from a start that
+                  // left, not from the Steam that is open now.
+                  !pids().contains(where: isThisUsersSteam) {
             reading.freshness = .lastStart
         } else {
             reading.freshness = .stale
@@ -162,6 +166,15 @@ enum SteamHealthStore {
             }
         }
         return nil
+    }
+
+    static func allPids() -> [Int32] {
+        let count = proc_listallpids(nil, 0)
+        guard count > 0 else { return [] }
+        var pids = [Int32](repeating: 0, count: Int(count) + 64)
+        let found = pids.withUnsafeMutableBytes { proc_listallpids($0.baseAddress, Int32($0.count)) }
+        guard found > 0 else { return [] }
+        return pids.prefix(Int(found)).filter { $0 > 0 }
     }
 
     static func isThisUsersSteam(_ pid: Int32) -> Bool {

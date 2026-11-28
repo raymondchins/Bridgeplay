@@ -38,18 +38,23 @@ struct SteamHealthTests {
         #expect(SteamHealth.parse(Data("not json".utf8)) == nil)
     }
 
-    @Test("Live while its Steam runs, last start while the builds match, stale otherwise, missing without a file")
+    @Test("Live while its Steam runs, last start while the builds match and no Steam runs, stale otherwise, missing without a file")
     func freshness() throws {
         let dir = try Self.folder()
         defer { try? FileManager.default.removeItem(at: dir) }
         #expect(SteamHealthStore.read(folder: dir, installedPatch: "85", installedSteam: "1795567705", isThisUsersSteam: { _ in true }).freshness == .missing)
 
         try Data(Self.health().utf8).write(to: dir.appending(path: "health.json"))
-        func read(running: Bool, patch: String = "85", steam: String = "1795567705") -> HealthReading {
-            SteamHealthStore.read(folder: dir, installedPatch: patch, installedSteam: steam, isThisUsersSteam: { $0 == 4242 && running })
+        func read(running: Bool, patch: String = "85", steam: String = "1795567705", other: Bool = false) -> HealthReading {
+            SteamHealthStore.read(folder: dir, installedPatch: patch, installedSteam: steam,
+                                  isThisUsersSteam: { ($0 == 4242 && running) || ($0 == 5151 && other) },
+                                  pids: { [1, 4242, 5151] })
         }
         #expect(read(running: true).freshness == .live)
         #expect(read(running: false).freshness == .lastStart)
+        #expect(read(running: false, other: true).freshness == .stale)
+        #expect(read(running: false, other: true).mode == nil)
+        #expect(SteamHealthStore.allPids().contains(getpid()))
         #expect(read(running: false, steam: "1795999999").freshness == .stale)
         #expect(read(running: false, patch: "86").freshness == .stale)
         #expect(read(running: false, patch: "86").mode == nil)
