@@ -2037,9 +2037,10 @@ first_window_ms() {
   printf '%s' "$fw_ms"
 }
 
-# The same for the first Metal drawable, from the overlay shim's line in the Wine log $1.
+# The same for the first Metal drawable, from the overlay shim's line in the Wine log $1. A
+# call that got no drawable is not a frame.
 first_frame_ms() {
-  ff_ms=$(grep -a -m 1 -o 'overlay_shim hook_next_drawable: .* t=[0-9]*' "$1" 2>/dev/null | sed 's/.* t=//')
+  ff_ms=$(grep -a -m 1 -o 'overlay_shim hook_next_drawable: .* drawable=yes t=[0-9]*' "$1" 2>/dev/null | sed 's/.* t=//')
   case "$ff_ms" in ''|*[!0-9]*) return 1 ;; esac
   printf '%s' "$ff_ms"
 }

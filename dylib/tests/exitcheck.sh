@@ -191,6 +191,11 @@ is "the game's times, from its start" "time: game exited at 130.000s
 time: first window 12.000s after the game started
 time: first frame 13.375s after the game started" "$(cat "$work/times")"
 is "the first window in whole seconds" 12 "$np_window"
+printf 'overlay_shim hook_next_drawable: layer=CAMetalLayer drawable=no t=1795765880000\n%s\n' \
+	'overlay_shim hook_next_drawable: layer=CAMetalLayer drawable=yes t=1795765892000' > "$frames"
+launch_times 1795765878625 1795766000000 "$frames" > "$work/times"
+is "a first call that got no drawable is not the first frame" "time: first frame 13.375s after the game started" \
+	"$(grep 'first frame' "$work/times")"
 rm "$compat/bridgeplay-first-window"
 launch_times 1795765878625 1795766000000 "$clean" 1 > "$work/times"
 is "no window file while the panel watched, no window" "" "$np_window"
