@@ -201,7 +201,9 @@ int np_hooks_install_all(const struct mach_header_64 *mh, intptr_t slide,
                                 resolved, &total);
 
     np_hooks_compat_publish_originals();
-    np_hooks_compat_enabled_slot(mh, slide,
+    // Counted like the others, so health.json shows a switch getter that did not take.
+    total++;
+    landed += np_hooks_compat_enabled_slot(mh, slide,
         np_lookup_address(resolved, "CCompatManager::BIsCompatibilityToolEnabled"));
 
     if (total_out)
