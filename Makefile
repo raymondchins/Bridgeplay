@@ -659,7 +659,7 @@ OVERLAY_SHIM_TEST_FLAGS := -mmacosx-version-min=$(MIN_VER) -O2 -Wall -Wextra \
 overlay-shim: $(OVERLAY_SHIM)
 
 $(OVERLAY_SHIM): $(OVERLAY_SHIM_SRC) overlay-shim/framegen.m overlay-shim/quitkey.m overlay-shim/perfhud.m overlay-shim/framelimit.m overlay-shim/scalefilter.m overlay-shim/cursor.m overlay-shim/sidebar.m \
-                overlay-shim/displaymode.m $(OVERLAY_SHIM_FONT)
+                overlay-shim/displaymode.m overlay-shim/bench.m $(OVERLAY_SHIM_FONT)
 	@mkdir -p $(OUT_DIR)
 	$(CC) -arch arm64 $(OVERLAY_SHIM_FLAGS) -o $(OVERLAY_SHIM_ARM) $<
 	$(CC) -arch x86_64 $(OVERLAY_SHIM_FLAGS) -o $(OVERLAY_SHIM_X86) $<
@@ -682,7 +682,7 @@ overlay-shim-tests: $(OVERLAY_SHIM)
 		$(call SKIP,overlay-shim-tests,$(OVERLAY_SHIM_TESTS)); exit 0; fi; \
 	mkdir -p $(OUT_DIR); \
 	fail=0; ran=0; skipped=0; \
-	for t in displaymode device bridge delivery framegen ownership perfhud framelimit scalefilter quicksettings handoff; do \
+	for t in displaymode device bridge delivery framegen ownership perfhud framelimit scalefilter quicksettings handoff bench; do \
 		for a in arm64 x86_64; do \
 			$(CC) -arch $$a $(OVERLAY_SHIM_TEST_FLAGS) -o $(OUT_DIR)/$$t.$$a \
 				$(OVERLAY_SHIM_TESTS)/$$t.m || exit 1; \
@@ -1037,9 +1037,13 @@ native-shim-tests:
 	sh native-shim/tests/run.sh
 
 # Inventory fixtures exercise modern and legacy Steam libraries offline.
-.PHONY: np-inventory-check
+.PHONY: np-inventory-check benchcheck
 np-inventory-check:
 	@python3 scripts/tests/np-inventory.py
+
+# BRIDGEPLAY_BENCH capture reader against a fixed capture.
+benchcheck:
+	@python3 scripts/tests/bench-summary.py
 
 # Offline tests for the Steam build canary's manifest, state and download handling.
 steamcanarycheck:
@@ -1054,7 +1058,7 @@ CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck breakercheck clientgatecheck pauselistcheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck launchercheck \
-	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check steamcanarycheck np-native-tests native-shim-tests \
+	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check benchcheck steamcanarycheck np-native-tests native-shim-tests \
 	app-tests native-installercheck
 
 # app.yml runs the checks that need the built app in its build job and the rest in a

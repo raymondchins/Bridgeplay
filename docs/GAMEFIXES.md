@@ -206,6 +206,21 @@ have been another Steam account's, is dropped. The Metal HUD, when a game starts
 stays the only overlay and the overlay row is locked. Controllers cannot open or move through
 the quick settings. `BRIDGEPLAY_QUICK_SETTINGS=0` in the launch options turns them off.
 
+## Frame-time capture
+
+`BRIDGEPLAY_BENCH=1 %command%` in a game's launch options (native games too) makes overlay-shim
+write the time between the game's frames, one line per frame in milliseconds, to
+`~/Library/Application Support/bridgeplay/launchers/<appid>/bench/<UTC time>-<pid>.csv`, flushed
+once a second. Frame generation stays off while it is set, so each frame counted is one the game
+rendered. The frame rate limit still applies and is noted in the file's header, with the chip and
+the macOS version. The newest 20 captures per game are kept. It is a launch option only, not a conf
+key. A process that never draws writes no file.
+
+`scripts/bench-summary.py <file or bench folder>` prints the average frame rate, the 1% and 0.1%
+lows (the frame rate over the slowest 1% and 0.1% of frames), frame-time percentiles and stutters
+(frames over 50 ms). `--skip 10` leaves out the first 10 seconds, `--json` prints JSON. Gaps of a
+second or more (loading, the game in the background) are left out and counted as pauses.
+
 ## Native macOS games
 
 A Mac build with no compatibility tool pinned runs through `~/.bridgeplay/np-native`, not the

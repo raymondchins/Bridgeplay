@@ -2165,6 +2165,11 @@ static void framegen_init(void)
 	const char *value = getenv("NOTPROTON_FRAMEGEN");
 	if (value == NULL || value[0] == '\0' || value[0] == '0' || strcasecmp(value, "off") == 0)
 		return;
+	// Benchmarks count only the frames the game rendered
+	if (bench_wanted()) {
+		shim_log("overlay_shim framegen: BRIDGEPLAY_FRAMEGEN=%s ignored while BRIDGEPLAY_BENCH is on\n", value);
+		return;
+	}
 
 	if (strcasecmp(value, "adaptive") == 0)
 		framegen_multiplier = fg_mult_adaptive;

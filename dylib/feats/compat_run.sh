@@ -4449,9 +4449,10 @@ if [ -n "\$STEAM_DYLD_INSERT_LIBRARIES" ]; then
     export DYLD_INSERT_LIBRARIES="\$STEAM_DYLD_INSERT_LIBRARIES"
   fi
 elif [ -f "\$shim" ] && { wants "\$NOTPROTON_FRAMEGEN" || wants "\$NOTPROTON_PERF_OVERLAY" ||
-  { wants "\$NOTPROTON_FPS_LIMIT" && [ "\$NOTPROTON_FPS_LIMIT_OFF" != 1 ]; } || wants "\$NOTPROTON_SCALING_FILTER"; }; then
-  # Frame generation, the performance overlay, the frame rate limit and the scaling filter
-  # live in the shim, so it loads without the Steam overlay too.
+  { wants "\$NOTPROTON_FPS_LIMIT" && [ "\$NOTPROTON_FPS_LIMIT_OFF" != 1 ]; } || wants "\$NOTPROTON_SCALING_FILTER" ||
+  wants "\$NOTPROTON_BENCH"; }; then
+  # Frame generation, the performance overlay, the frame rate limit, the scaling filter and
+  # frame-time capture live in the shim, so it loads without the Steam overlay too.
   export DYLD_INSERT_LIBRARIES="\$shim"
   export NOTPROTON_OVERLAY_SHIM="\$shim"
 fi
@@ -4593,7 +4594,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | LC_ALL=C sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|FEX_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_PERF_OVERLAY|NOTPROTON_FPS_LIMIT(_OFF)?|NOTPROTON_SCALING_FILTER|NOTPROTON_QUICK_SETTINGS|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|NOTPROTON_HIDE_WINE_EXPORTS|NOTPROTON_ROCKSTAR_DXGI|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
+for name in $(env | LC_ALL=C sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|FEX_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_PERF_OVERLAY|NOTPROTON_BENCH|NOTPROTON_FPS_LIMIT(_OFF)?|NOTPROTON_SCALING_FILTER|NOTPROTON_QUICK_SETTINGS|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|NOTPROTON_HIDE_WINE_EXPORTS|NOTPROTON_ROCKSTAR_DXGI|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"
