@@ -10,6 +10,9 @@ struct SettingsView: View {
     @State private var background = BackgroundItem.State.off
     @State private var backgroundMode = BackgroundCheck.Mode.off
     @State private var backgroundError: String?
+    // A failed Choose… or Block Updates, shown on its row: Settings has no failure banner.
+    @State private var steamFailure: String?
+    @State private var blockFailure: String?
 
     var body: some View {
         Form {
@@ -52,7 +55,7 @@ struct SettingsView: View {
             titleVisibility: .visible
         ) {
             Button("Block Updates", role: .destructive) {
-                Task { await status.setUpdateBlock(true) }
+                setUpdateBlock(true)
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -66,10 +69,12 @@ struct SettingsView: View {
             StatusRow(
                 title: String(localized: "Location"),
                 value: SupportPaths.Steam.app.path(percentEncoded: false),
+                tone: steamFailure != nil ? .warning : nil,
+                detail: steamFailure,
                 action: StatusAction(
                     label: String(localized: "Choose\u{2026}"),
                     isEnabled: status.isIdle
-                ) { Task { await status.chooseSteam() } }
+                ) { Task { steamFailure = await failure { await status.chooseSteam() } } }
             )
             let blocked = status.snapshot?.updateBlocked ?? false
             StatusRow(
@@ -77,17 +82,29 @@ struct SettingsView: View {
                 value: blocked
                     ? String(localized: "Security fixes are blocked too.")
                     : String(localized: "Updates may break Bridgeplay."),
-                tone: blocked ? .warning : nil,
+                tone: blocked || blockFailure != nil ? .warning : nil,
+                detail: blockFailure,
                 toggle: Binding(
                     get: { status.snapshot?.updateBlocked ?? false },
                     set: { wanted in
-                        if wanted { askingBlock = true } else { Task { await status.setUpdateBlock(false) } }
+                        if wanted { askingBlock = true } else { setUpdateBlock(false) }
                     }
                 )
             )
             .disabled(!status.isIdle || status.snapshot == nil)
             backgroundRow
         }
+    }
+
+    private func setUpdateBlock(_ blocked: Bool) {
+        Task { blockFailure = await failure { await status.setUpdateBlock(blocked) } }
+    }
+
+    // The failure this action set, or nil when it worked, was cancelled or never ran.
+    private func failure(of action: () async -> Void) async -> String? {
+        let before = status.failureCount
+        await action()
+        return status.failureCount != before ? status.failure : nil
     }
 
     // Opt-in: a login agent that notices a Steam update while Bridgeplay is closed.

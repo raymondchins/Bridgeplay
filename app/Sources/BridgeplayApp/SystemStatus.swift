@@ -141,6 +141,8 @@ final class SystemStatus {
     @ObservationIgnored private var highlightReset: Task<Void, Never>?
     private(set) var failure: String?
     private(set) var failureRemedy: Remedy?
+    // Bumped by every failure set, so a view can tell whether its own action failed.
+    @ObservationIgnored private(set) var failureCount = 0
     // Leftover Wine processes behind the failure, which Status offers to stop before it tries
     // the run again (#4777).
     private(set) var leftoverRunner: RunnerActivity?
@@ -216,6 +218,7 @@ final class SystemStatus {
 
     func setFailure(_ message: String) {
         failure = message
+        failureCount &+= 1
         failureRemedy = nil
         clearLeftovers()
     }
@@ -224,6 +227,7 @@ final class SystemStatus {
         let report = FailureReport([error])
         failure = report?.message
         failureRemedy = report?.remedy
+        failureCount &+= 1
         clearLeftovers()
     }
 
