@@ -129,6 +129,13 @@ class Export(unittest.TestCase):
         self.assertEqual(self.games[101]["counts"], {"playable": 3, "issues": 1, "broken": 1})
         self.assertNotIn("M5", {r["chip"] for r in self.records.values() if r["appid"] == 101})
 
+    def test_scrub_compressed_ipv6(self):
+        for address in ["2001:db8::1", "::1", "fe80::1%en0", "2001:db8:0:0:1::", "::ffff:192.0.2.1"]:
+            self.assertEqual(ce.scrub(f"server {address} lags", 200, note=True), "server <ip> lags", address)
+        # Not addresses: times, C++ names and ratios stay.
+        for text in ["at 10:30 it froze", "std::vector crash", "ratio 16:9"]:
+            self.assertEqual(ce.scrub(text, 200, note=True), text)
+
     def test_privacy(self):
         text = self.published()
         for needle in ["john", "example.com", "76561198000000001", "12345]", "192.168", "415 555", "x.com",

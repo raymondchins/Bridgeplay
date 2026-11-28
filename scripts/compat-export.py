@@ -21,6 +21,7 @@ JSON. The verdict rule and the file formats are in scripts/compat-export.md.
 """
 import argparse
 import datetime
+import ipaddress
 import json
 import os
 import re
@@ -123,10 +124,21 @@ SCRUB = [
     (re.compile(r"\b7656119\d{10}\b"), "<steamid>"),
     (re.compile(r"\[U:1:\d+\]"), "[U:1:<redacted>]"),
     (re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.I), "<id>"),
+    # Compressed IPv6 ("2001:db8::1", "::1", "fe80::1%en0"): first, so the rules below don't split it; any run with "::" that parses as one.
+    (re.compile(r"(?<![\w:])[0-9a-f:]*::[0-9a-f:.]*(?:%\w+)?(?![\w:])", re.I),
+     lambda m: "<ip>" if _is_ipv6(m.group(0)) else m.group(0)),
     (re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"), "<ip>"),
     (re.compile(r"\b(?:[0-9a-f]{1,4}:){4,7}[0-9a-f]{1,4}\b", re.I), "<ip>"),
     (re.compile(r"@[\w-]+"), "<name>"),
 ]
+def _is_ipv6(token):
+    try:
+        ipaddress.IPv6Address(token.split("%", 1)[0])
+        return True
+    except ValueError:
+        return False
+
+
 # Nothing in a published file may match these; build stops instead of writing it.
 PRIVATE = re.compile(
     r"[\w.+-]+@[\w-]+\.[\w.-]*[A-Za-z]|\b7656119\d{10}\b|\[U:1:\d+\]|/Users/(?!Shared\b)\w"
