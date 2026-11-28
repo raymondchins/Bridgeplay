@@ -11,6 +11,46 @@
 
 #include "../feats/breaker.c"
 
+// The compat chunk hook, with its webpatch inputs faked and its health report recorded.
+static void web_report(const char *shape, size_t applied, size_t total, int drifted);
+#define np_health_web web_report
+#include "../hooks/hook_webpatch.c"
+#undef np_health_web
+
+static int    fake_patch = 1;
+static size_t fake_live = 5, fake_total = 6;
+static char   got_shape[64];
+static size_t got_applied = (size_t)-1, got_total;
+static int    got_reports;
+
+static void web_report(const char *shape, size_t applied, size_t total, int drifted) {
+    (void)drifted;
+    set_str(got_shape, sizeof got_shape, shape);
+    got_applied = applied;
+    got_total = total;
+    got_reports++;
+}
+void np_webpatch_set_fallback_tool(const char *name) { (void)name; }
+void np_webpatch_set_fex_tools(const char *const *names, size_t count) { (void)names; (void)count; }
+const char *np_compat_fallback_tool_name(void) { return "fake"; }
+size_t np_compat_fex_tools(const char **names, size_t max) { (void)names; (void)max; return 0; }
+int np_compatsvc_routes(void) { return NP_COMPATSVC_ABSENT + 1; }
+int np_webpatch_should_patch(const char *path) { (void)path; return 0; }
+void np_webpatch_last_gates(size_t *live, size_t *total, int *drifted) {
+    *live = fake_live;
+    *total = fake_total;
+    *drifted = !fake_patch;
+}
+char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
+                            const char **out_shape) {
+    if (out_shape) *out_shape = "selecttool";
+    if (!fake_patch) return NULL;
+    char *out = malloc(src_len);
+    if (out) memcpy(out, src, src_len);
+    *out_len = src_len;
+    return out;
+}
+
 static int fails;
 static char root[PATH_MAX];
 static char pkg[PATH_MAX];
@@ -329,6 +369,33 @@ static void runtime_cases(void) {
     CHECK("health.json is a plain file", lstat(path, &st) == 0 && S_ISREG(st.st_mode));
 }
 
+static void chunk_cases(void) {
+    printf("web report\n");
+    char chunk[PATH_MAX];
+    snprintf(chunk, sizeof chunk, "%s/chunk.js", root);
+    put(root, "chunk.js", "console.log(1)\n");
+
+    got_reports = 0;
+    int fd = open_patched(chunk);
+    CHECK("a served chunk reports its gates", fd >= 0 && got_reports == 1 &&
+          strcmp(got_shape, "selecttool") == 0 && got_applied == 5 && got_total == 6);
+    if (fd >= 0) close(fd);
+
+    chmod(support, 0500);
+    got_reports = 0;
+    fd = open_patched(chunk);
+    chmod(support, 0755);
+    CHECK("a chunk that could not be staged reports no gate applied",
+          fd < 0 && got_reports == 1 && got_applied == 0 && got_total == 6);
+    if (fd >= 0) close(fd);
+
+    fake_patch = 0;
+    got_reports = 0;
+    CHECK("a drifted chunk still reports what matched",
+          open_patched(chunk) < 0 && got_reports == 1 && got_applied == 5 && got_total == 6);
+    fake_patch = 1;
+}
+
 static int scrub(const char *path, const struct stat *st, int flag, struct FTW *ftw) {
     (void)st; (void)flag; (void)ftw;
     if (strncmp(path, root, strlen(root)) != 0) return -1;
@@ -351,6 +418,7 @@ int main(void) {
     decide_cases();
     file_cases();
     runtime_cases();
+    chunk_cases();
 
     // Only temp files could be left, and none may be.
     int strays = 0;

@@ -129,14 +129,15 @@ static int open_patched(const char *path) {
     char *patched = np_webpatch_transform((const uint8_t *)raw, raw_len, &patched_len,
                                           &shape);
     free(raw);
-    if (shape) {
-        size_t live = 0, total = 0;
-        int drifted = 0;
+    size_t live = 0, total = 0;
+    int drifted = 0;
+    if (shape)
         np_webpatch_last_gates(&live, &total, &drifted);
-        np_health_web(shape, live, total, drifted);
-    }
-    if (!patched)
+    if (!patched) {
+        if (shape)
+            np_health_web(shape, live, total, drifted);
         return -1;
+    }
 
     // Only this page pays for an unregistered service, and only here is it known that the
     // page arrived. UNTRIED is not a miss: the chunk can precede the first route lookup.
@@ -148,6 +149,9 @@ static int open_patched(const char *path) {
 
     int fd = spill_to_temp(patched, patched_len);
     free(patched);
+    // The gates count as applied only once the patched bytes are what the client reads.
+    if (shape)
+        np_health_web(shape, fd < 0 ? 0 : live, total, drifted);
     if (fd < 0) {
         NP_ERR("webpatch: patched %s but staging the bytes failed, so the client reads "
                "the chunk Valve shipped", path);
