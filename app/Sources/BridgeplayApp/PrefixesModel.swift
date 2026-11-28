@@ -234,7 +234,7 @@ final class PrefixesModel {
     }
 
     func shaderCacheBytes(_ targets: [WinePrefix]) -> Int64 {
-        targets.reduce(into: Int64(0)) { $0 += shaderCaches[$1.id]?.bytes ?? 0 }
+        ShaderCacheUsage.totalBytes(targets.compactMap { shaderCaches[$0.id] })
     }
 
     func clearShaderCaches(_ targets: [WinePrefix]) async {

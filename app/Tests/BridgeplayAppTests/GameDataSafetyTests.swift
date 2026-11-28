@@ -306,6 +306,24 @@ struct GameDataSafetyTests {
         #expect(ShaderCache.usage(of: f.prefix, caches: nil, installDirectory: install).isEmpty)
     }
 
+    @Test("Two games that share an exe name count its shader cache once")
+    func sharedShaderCacheCountsOnce() throws {
+        let f = try fixture("shared-shaders")
+        defer { try? FileManager.default.removeItem(at: f.dir) }
+        let install = f.dir.appending(path: "common/Game")
+        try FileManager.default.createDirectory(at: install, withIntermediateDirectories: true)
+        try Data().write(to: install.appending(path: "Game.exe"))
+        let caches = try caches(in: f.dir, names: ["d3dm/Game.exe/shaders.cache", "com.notproton.launcher.1574480"])
+        let other = WinePrefix(appID: "253750", name: "Other", library: f.library, lastUsed: nil)
+
+        let mine = ShaderCache.usage(of: f.prefix, caches: caches, installDirectory: install)
+        let theirs = ShaderCache.usage(of: other, caches: caches, installDirectory: install)
+
+        #expect(theirs.folders.map(\.lastPathComponent) == ["Game.exe"])
+        #expect(mine.bytes > theirs.bytes && theirs.bytes > 0)
+        #expect(ShaderCacheUsage.totalBytes([mine, theirs]) == mine.bytes)
+    }
+
     @Test("Clearing removes only the measured caches, never while the game runs")
     func shaderCacheClear() throws {
         let f = try fixture("shaders-clear")

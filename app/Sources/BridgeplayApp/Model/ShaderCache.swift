@@ -8,8 +8,21 @@ import Foundation
 struct ShaderCacheUsage: Sendable, Equatable {
     let folders: [URL]
     let bytes: Int64
+    // Each folder's size by path: games that share an exe name share its d3dm folder.
+    var sizes: [String: Int64] = [:]
 
     var isEmpty: Bool { folders.isEmpty }
+
+    // What clearing all of them frees: a folder two games share counts once.
+    static func totalBytes(_ usages: [ShaderCacheUsage]) -> Int64 {
+        var seen: [String: Int64] = [:]
+        var unsized: Int64 = 0
+        for usage in usages {
+            if usage.sizes.isEmpty { unsized += usage.bytes; continue }
+            seen.merge(usage.sizes) { first, _ in first }
+        }
+        return seen.values.reduce(unsized, +)
+    }
 }
 
 enum ShaderCache {
@@ -57,8 +70,9 @@ enum ShaderCache {
         of prefix: WinePrefix, caches: URL? = userCaches, installDirectory: URL? = nil
     ) -> ShaderCacheUsage {
         let folders = folders(for: prefix, caches: caches, installDirectory: installDirectory)
-        let bytes = folders.reduce(into: Int64(0)) { $0 += PrefixStore.directoryBytes($1) }
-        return ShaderCacheUsage(folders: folders, bytes: bytes)
+        var sizes: [String: Int64] = [:]
+        for folder in folders { sizes[folder.standardizedFileURL.path(percentEncoded: false)] = PrefixStore.directoryBytes(folder) }
+        return ShaderCacheUsage(folders: folders, bytes: sizes.values.reduce(0, +), sizes: sizes)
     }
 
     // The exe file names in a game's folder, lowercased. Unreal games keep the one that draws
