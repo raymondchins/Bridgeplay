@@ -1177,9 +1177,14 @@ final class SystemStatus {
         leftoversToTrash = []
         trashingLeftovers = true
         defer { trashingLeftovers = false }
-        let errors = await Task.detached(priority: .userInitiated) {
+        let errors = await Task.detached(priority: .userInitiated) { () -> [Error] in
             // A game reinstalled since the scan keeps its prefix
-            let still = LeftoverPrefixes.currentIDs()
+            guard let still = LeftoverPrefixes.currentIDs() else {
+                AppLog.note("leftover prefix: libraryfolders.vdf unreadable, nothing moved")
+                return [StepFailure(
+                    step: String(localized: "Move to Trash"),
+                    detail: String(localized: "Steam's library list couldn't be read, so nothing was moved."))]
+            }
             return items.compactMap { item -> Error? in
                 guard still.contains(item.id) else {
                     AppLog.note("leftover prefix: \(item.prefix.appID) is installed again, kept")

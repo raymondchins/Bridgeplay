@@ -19739,6 +19739,28 @@
         }
       }
     },
+    "Steam's library list couldn't be read, so nothing was moved." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile leggere l'elenco delle librerie di Steam, quindi non è stato spostato nulla."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось прочитать список библиотек Steam, поэтому ничего не перемещено."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取 Steam 的库列表，因此没有移动任何内容。"
+          }
+        }
+      }
+    },
     "Steam's own switch. It also lists tools made for Linux, which do not run on a Mac. Leave it off." : {
       "localizations" : {
         "it" : {

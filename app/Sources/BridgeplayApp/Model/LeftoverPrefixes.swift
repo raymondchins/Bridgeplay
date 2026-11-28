@@ -107,10 +107,11 @@ enum LeftoverPrefixes {
         Set(defaults.stringArray(forKey: keptKey) ?? [])
     }
 
-    // Leftovers right now, kept ones included: checked again just before the Trash
-    static func currentIDs() -> Set<String> {
+    // Leftovers right now, kept ones included: checked again just before the Trash.
+    // nil: Steam's library list can't be read, so no game can be told uninstalled.
+    static func currentIDs() -> Set<String>? {
         let vdf = SupportPaths.Steam.libraryFoldersVDF
-        guard let text = try? String(contentsOf: vdf, encoding: .utf8) else { return [] }
+        guard let text = try? String(contentsOf: vdf, encoding: .utf8) else { return nil }
         let found = scan(libraries: PrefixStore.libraries(vdf: vdf), listedApps: listedApps(in: text), kept: [], names: [:])
         return Set(found.leftovers.map(\.id))
     }
