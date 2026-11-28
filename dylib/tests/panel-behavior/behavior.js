@@ -19,7 +19,7 @@ for (const form of Object.keys(FORMS)) {
        'a shortcut renders the panel before a tool name reaches the page');
 
   let r = nodes('');
-  t.ok(toggles(r).length === 7 && sections(r).length === 7, 'automatic shows seven toggles in seven sections');
+  t.ok(toggles(r).length === 8 && sections(r).length === 7, 'automatic shows eight toggles in seven sections');
   t.ok(r.filter(x => x.type === 'Dropdown').length === 5 && r.filter(x => x.type === 'Slider').length === 1,
        'five dropdowns and the limit slider');
   t.ok(!('label' in r.find(x => x.type === 'Dropdown').props), 'the backend dropdown carries no label column');
@@ -79,7 +79,7 @@ for (const form of Object.keys(FORMS)) {
   const root = P({ details: details('') });
   t.ok(root.props.className === 'MSCXPanel', 'the panel root carries its own class');
   const classes = nodes('').filter(x => x.type === 'Toggle').map(x => x.props.className);
-  t.ok(classes.length === 7 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
+  t.ok(classes.length === 8 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
 
   // Performance Overlay: Bridgeplay's own levels and the Metal HUD in one menu, off by default.
   const po = o => overlay(nodes(o));

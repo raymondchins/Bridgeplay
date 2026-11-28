@@ -471,6 +471,30 @@ is "beside Apple's nvapi as the nvapi.dll placeholder it loads" "apple nvapi64" 
 user_conf 'NVAPI=0'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "NVAPI=0 disables it again" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
+# Report an NVIDIA GPU in Steam Properties: BRIDGEPLAY_NVAPI in the launch options wins per game.
+nv_off="d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=d;$trio"
+nv_on="d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64=n,b;nvngx=b;$trio"
+user_conf 'NVAPI=1'
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_NVAPI=0
+is "the launch option BRIDGEPLAY_NVAPI=0 wins over a conf NVAPI=1" "$nv_off" "$(got WINEDLLOVERRIDES)"
+is "and D3DMetal keeps Apple's adapter" "<unset> <unset>" "$(got D3DM_VENDOR_ID) $(got NOTPROTON_NGX_SIGNER)"
+has "and the log names the launch options" "NVAPI=0 from the launch options" "$case_dir/log"
+user_conf 'NVAPI=0'
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_NVAPI=1
+is "BRIDGEPLAY_NVAPI=1 wins over a conf NVAPI=0" "$nv_on" "$(got WINEDLLOVERRIDES)"
+is "and reports the NVIDIA adapter" "0x10de 0x2684" "$(got D3DM_VENDOR_ID) $(got D3DM_DEVICE_ID)"
+user_conf 'NVAPI=1'
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_NVAPI=0 BRIDGEPLAY_NVAPI=1
+is "NOTPROTON_NVAPI wins when both spellings are set" "$nv_off" "$(got WINEDLLOVERRIDES)"
+: > "$case_dir/log"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_NVAPI=yes
+is "a launch option that is not 0 or 1 leaves the conf's NVAPI" "$nv_on" "$(got WINEDLLOVERRIDES)"
+has "and says so" "BRIDGEPLAY_NVAPI in the launch options ignored: not 0 or 1" "$case_dir/log"
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_NVAPI=
+is "an empty launch option leaves the conf's NVAPI" "$nv_on" "$(got WINEDLLOVERRIDES)"
+user_conf 'BRIDGEPLAY_NVAPI=0'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a conf takes the BRIDGEPLAY_NVAPI name" "$nv_off" "$(got WINEDLLOVERRIDES)"
 # The shipped Diablo IV conf over the shipped NVAPI=1 for every game.
 d4_conf="$(dirname "$SRC")/../../gamefixes/2344520.conf"
 if [ -f "$d4_conf" ]; then

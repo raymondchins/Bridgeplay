@@ -54,7 +54,7 @@ enum GameDefaults {
             case .highResolution: ["RETINA", "BRIDGEPLAY_RETINA"]
             case .metalHUD: ["MTL_HUD_ENABLED"]
             case .perfOverlay: ["PERF_OVERLAY", "BRIDGEPLAY_PERF_OVERLAY"]
-            case .nvapi: ["NVAPI"]
+            case .nvapi: ["NVAPI", "BRIDGEPLAY_NVAPI"]
             case .metalFX: ["D3DM_ENABLE_METALFX"]
             case .dlssFrameGen: ["DLSS_FG"]
             case .advertiseAVX: ["ROSETTA_ADVERTISE_AVX"]
@@ -73,15 +73,15 @@ enum GameDefaults {
         }
 
         // The same setting in a game's launch options, where it wins over every conf.
-        // NVAPI and DLSS_FG have no launch-option spelling, and WINEDLLOVERRIDES adds to DLLOVERRIDES
+        // DLSS_FG has no launch-option spelling, and WINEDLLOVERRIDES adds to DLLOVERRIDES
         // per DLL instead of replacing it.
         var launchKeys: [String] {
             switch self {
             case .backend: ["BRIDGEPLAY_BACKEND", "NOTPROTON_BACKEND", "CX_GRAPHICS_BACKEND"]
             case .metalHUD, .metalFX, .advertiseAVX: keys
             case .msync: ["WINEMSYNC"]
-            case .nvapi, .dlssFrameGen, .dllOverrides: []
-            case .highResolution, .vsync, .frameGen, .frameGenQuality, .frameGenUI, .frameGenFallback, .frameGenEngine,
+            case .dlssFrameGen, .dllOverrides: []
+            case .nvapi, .highResolution, .vsync, .frameGen, .frameGenQuality, .frameGenUI, .frameGenFallback, .frameGenEngine,
                  .perfOverlay, .frameLimit, .frameLimitOff, .scalingFilter:
                 ["BRIDGEPLAY_\(keys[0])", "NOTPROTON_\(keys[0])"]
             }

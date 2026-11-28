@@ -591,6 +591,7 @@ panel-behavior:
 	node $(PANEL_TESTS)/effective.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/localization.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/fex.js $(OUT_DIR)/panel-emit && \
+	node $(PANEL_TESTS)/nvidia.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/quick-settings.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/prefix-row.js $(OUT_DIR)/panel-emit && \
 	echo "==> panel behavior: renders as expected, no stale arguments"

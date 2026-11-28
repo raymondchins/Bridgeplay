@@ -553,7 +553,7 @@ gamefix_read() {
     fi
     # The keys that set a BRIDGEPLAY_ variable also take its full name: BRIDGEPLAY_RETINA=1 is RETINA=1.
     case "$key" in
-      BRIDGEPLAY_STDOUT_NULL|BRIDGEPLAY_VSYNC|BRIDGEPLAY_GAME_MODE|BRIDGEPLAY_HIDE_WINE_EXPORTS|BRIDGEPLAY_RETINA|BRIDGEPLAY_FRAMEGEN|BRIDGEPLAY_FRAMEGEN_?*|BRIDGEPLAY_PERF_OVERLAY|BRIDGEPLAY_FPS_LIMIT|BRIDGEPLAY_FPS_LIMIT_OFF|BRIDGEPLAY_SCALING_FILTER)
+      BRIDGEPLAY_STDOUT_NULL|BRIDGEPLAY_VSYNC|BRIDGEPLAY_GAME_MODE|BRIDGEPLAY_HIDE_WINE_EXPORTS|BRIDGEPLAY_NVAPI|BRIDGEPLAY_RETINA|BRIDGEPLAY_FRAMEGEN|BRIDGEPLAY_FRAMEGEN_?*|BRIDGEPLAY_PERF_OVERLAY|BRIDGEPLAY_FPS_LIMIT|BRIDGEPLAY_FPS_LIMIT_OFF|BRIDGEPLAY_SCALING_FILTER)
         key=${key#BRIDGEPLAY_} ;;
     esac
     value=${line#*=}
@@ -617,6 +617,12 @@ load_gamefixes() {
       *) gamefix_apply_env "$key" "$value" "$from" ;;
     esac
   done
+  # Report an NVIDIA GPU in Steam Properties writes BRIDGEPLAY_NVAPI, which wins over every conf.
+  case "${NOTPROTON_NVAPI-}" in
+    '') ;;
+    0|1) gamefix_nvapi=$NOTPROTON_NVAPI; gamefix_log "NVAPI=$NOTPROTON_NVAPI from the launch options" ;;
+    *) gamefix_log "BRIDGEPLAY_NVAPI in the launch options ignored: not 0 or 1" ;;
+  esac
 }
 
 # Launch options > gamefix MSYNC > an engine with msync > the prefix's last choice > off.
