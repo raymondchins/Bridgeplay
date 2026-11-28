@@ -354,6 +354,8 @@ $(extract preview_name)
 $(extract running_name)
 $(extract tool_name)
 $(extract last_wine_build)
+$(extract wine_crash_pattern)
+$(extract crash_status)
 $(extract session_health)
 $(extract set_switch_state)
 $(extract record_session)
@@ -369,13 +371,32 @@ health() {
 		session_health "$@"
 	)
 }
-is "a crash in the first minute is a failure" failed "$(health "$crash_log" 5 0)"
-is "a crash after a minute says nothing" unknown "$(health "$crash_log" 300 0)"
-is "a crash Steam stopped says nothing" unknown "$(health "$crash_log" 5 1)"
-is "a session without a crash is healthy" healthy "$(health "$clean_log" 3 0)"
-is "a long session Steam stopped is healthy" healthy "$(health "$clean_log" 600 1)"
-is "a short session Steam stopped says nothing" unknown "$(health "$clean_log" 5 1)"
-is "a missing log is healthy" healthy "$(health "$work/none.log" 5 0)"
+is "a crash in the first minute is a failure" "failed, a crash within the first minute" "$(health "$crash_log" 5 0 5)"
+is "a crash after a minute says nothing" "unknown, a crash after the first minute" "$(health "$crash_log" 300 0 0)"
+is "a crash Steam stopped says nothing" "unknown, stopped from Steam after a crash" "$(health "$crash_log" 5 1 143)"
+is "a minute without a crash is healthy" healthy "$(health "$clean_log" 75 0 0)"
+is "so is a long one with the game's own exit code" healthy "$(health "$clean_log" 900 0 1)"
+is "a quick clean quit says nothing (exit 0 within a minute)" "unknown, quit within a minute" "$(health "$clean_log" 24 0 0)"
+is "nor does a quick generic failure" "unknown, quit within a minute" "$(health "$clean_log" 4 0 1)"
+is "a crash code is a crash without a crash line" "failed, a crash within the first minute" "$(health "$clean_log" 12 0 5)"
+is "so is a Mac-side crash" "failed, a crash within the first minute" "$(health "$clean_log" 12 0 139)"
+is "and a crash code after a minute says nothing" "unknown, a crash after the first minute" "$(health "$clean_log" 300 0 5)"
+is "through Launch Services the status is open's" "unknown, quit within a minute" "$(NOTPROTON_LAUNCH_SERVICES=1; export NOTPROTON_LAUNCH_SERVICES; health "$clean_log" 12 0 5)"
+illegal_log="$work/illegal.log"
+printf 'wine: Unhandled illegal instruction at address 00006FFFFFC3A2B1 (thread 0024), starting debugger...\n' > "$illegal_log"
+is "an illegal instruction is a crash" "failed, a crash within the first minute" "$(health "$illegal_log" 8 0 0)"
+is "a long session Steam stopped is healthy" healthy "$(health "$clean_log" 600 1 143)"
+is "a short session Steam stopped says nothing" "unknown, stopped from Steam within a minute" "$(health "$clean_log" 5 1 143)"
+is "a missing log is healthy after a minute" healthy "$(health "$work/none.log" 90 0 0)"
+is "and says nothing before" "unknown, quit within a minute" "$(health "$work/none.log" 5 0 0)"
+quick=$(mktemp -d "$work/quick.XXXXXX")
+(
+	STEAM_COMPAT_DATA_PATH=$quick np_build=new-build log="$quick/run.log"
+	eval "$health_functions"
+	record_session "$clean_log" 24 0 0
+)
+is "a quick clean quit is logged with its reason" "=== session health: unknown after 24s, quit within a minute ===" "$(cat "$quick/run.log")"
+is "and does not mark the build healthy" no "$([ -f "$quick/notproton-healthy" ] && echo yes || echo no)"
 
 # Each step is one launch: switch to a build, then a session that ends healthy or failed.
 switch_world() {
@@ -392,15 +413,15 @@ session() {
 		note_other_build
 		printf '%s\nNew Tool\n' "$1" > "$data/notproton-build"
 		offer_switch_rebuild
-		record_session "$2" "$3" 0
+		record_session "$2" "$3" 0 0
 	)
 }
 state() { sed -n 3p "$data/notproton-switch" 2>/dev/null || echo none; }
 
 switch_world old-build
-session new-build "$clean_log" 5
+session new-build "$clean_log" 90
 is "a switch from a build that worked is tracked" 1 "$(state)"
-session new-build "$clean_log" 5
+session new-build "$clean_log" 90
 is "two healthy sessions clear the record" none "$([ -f "$data/notproton-switch" ] && state || echo none)"
 is "the healthy build is remembered" new-build "$(cat "$data/notproton-healthy")"
 

@@ -380,8 +380,20 @@ launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=wined3d
 is "an explicit wined3d runs d3dmetal" "d3dmetal" "$(got backend)"
 has "and says why" "wined3d is not available (D3DMetal replaces Wine's Direct3D in this engine), falling back to d3dmetal" "$case_dir/log"
 user_conf 'BACKEND=wined3d'
+: > "$case_dir/log"
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "so does a conf BACKEND=wined3d" "d3dmetal" "$(got backend)"
+has "a player's own conf choice is a fallback" "wined3d is not available (D3DMetal replaces Wine's Direct3D in this engine), falling back to d3dmetal" "$case_dir/log"
+user_conf ''
+default_conf 'BACKEND=wined3d'
+: > "$case_dir/log"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a shipped conf's BACKEND=wined3d runs d3dmetal here too" "d3dmetal" "$(got backend)"
+lacks "but is not called a fallback" "falling back" "$case_dir/log"
+lacks "in the backend line either" "fell back" "$case_dir/log"
+has "the log says the conf is for other engines" "the default conf's BACKEND=wined3d is for engines that have it, this one does not (D3DMetal replaces Wine's Direct3D in this engine), so the game runs on d3dmetal" "$case_dir/log"
+has "and so does the backend line" "backend=d3dmetal (the default conf's BACKEND=wined3d is for other engines)" "$case_dir/log"
+default_conf ''
 user_conf 'BACKEND=dxmt'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a game importing d3d12.dll with a conf BACKEND=dxmt runs d3dmetal" "d3dmetal" "$(got backend)"

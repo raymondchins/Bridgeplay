@@ -10,6 +10,15 @@ enum LaunchProgressCommand {
     static let flag = "--launch-progress"
     // Shared with compat_run.sh.
     static let stepName = "bridgeplay-launch-step"
+    // Milliseconds since 1970 at which the game's first window showed, for the script's
+    // outcome record. Also shared with compat_run.sh, which removes it before each launch.
+    static let firstWindowName = "bridgeplay-first-window"
+
+    static func noteFirstWindow(compatdata: String, at date: Date = Date()) {
+        let milliseconds = UInt64(max(0, date.timeIntervalSince1970 * 1000))
+        // Written aside and renamed, so the script never reads half a line.
+        try? "\(milliseconds)\n".write(toFile: compatdata + "/" + firstWindowName, atomically: true, encoding: .utf8)
+    }
 
     // <compatdata> <1 when the prefix is new> <the launcher's Wine log> <the run script's pid>.
     // Never returns.
@@ -115,11 +124,14 @@ final class LaunchProgressWatcher {
     func tick() {
         let text = try? String(contentsOfFile: compatdata + "/" + LaunchProgressCommand.stepName, encoding: .utf8)
         let step = text.flatMap { LaunchStep(rawValue: $0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        let launchEnded = getppid() != launcher
+        let gameWindow = gameWindowShown()
         let action = progress.action(
             step: step, elapsed: ProcessInfo.processInfo.systemUptime - started,
-            launchEnded: getppid() != launcher, gameWindow: gameWindowShown())
+            launchEnded: launchEnded, gameWindow: gameWindow)
         switch action {
         case .quit:
+            if gameWindow && !launchEnded { LaunchProgressCommand.noteFirstWindow(compatdata: compatdata) }
             exit(0)
         case .hidden:
             guard showing != nil else { return }

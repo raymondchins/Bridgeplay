@@ -83,12 +83,22 @@ is "no notice when the panel shows" "" "$(cat "$work/notes" 2>/dev/null)"
 run waitforexitandrun 0 "$app"
 wait_started
 is "a known prefix is passed as not new" 0 "$(sed -n 3p "$started" 2>/dev/null)"
+printf '1795765878625\n' > "$compat/bridgeplay-first-window"
+run waitforexitandrun 0 "$app"
+wait_started
+is "the last launch's first-window time is removed before the panel starts" no \
+	"$([ -f "$compat/bridgeplay-first-window" ] && echo yes || echo no)"
 
 echo "== without it =="
 run run 1 "$app"
 sleep 0.5
 is "Steam's helpers (verb run) get no panel" no "$([ -f "$started" ] && echo yes || echo no)"
 is "nor a step file" no "$([ -f "$compat/bridgeplay-launch-step" ] && echo yes || echo no)"
+printf '1795765878625\n' > "$compat/bridgeplay-first-window"
+run run 1 "$app"
+is "and they leave a running game's first-window time alone" yes \
+	"$([ -f "$compat/bridgeplay-first-window" ] && echo yes || echo no)"
+rm -f "$compat/bridgeplay-first-window"
 run waitforexitandrun 1 ""
 is "no app: a new prefix gets the first-launch notice" "Getting this game ready" "$(cat "$work/notes" 2>/dev/null)"
 run waitforexitandrun 0 "$work/missing"

@@ -15,6 +15,7 @@ legacy=$(sed -n '/^install_legacycompat() {/,/^}/p' "$SRC")
 [ -n "$legacy" ] || { echo "FAIL: install_legacycompat not found in $SRC"; exit 1; }
 body='same_volume() { [ -z "$cross" ]; }
 volume_clones() { :; }
+mark() { :; }
 show_alert() { printf "alert: %s\n" "$1" >> "$log"; }
 '"$block
 fi"

@@ -23,6 +23,7 @@
 #import <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #import <unistd.h>
 
 __attribute__((format(printf, 1, 2)))
@@ -1051,6 +1052,7 @@ static void kick_renderer_metal_hooks(void)
 }
 
 static int next_drawable_logged;
+static int next_drawable_got;
 static id (*next_layer_drawable)(id, SEL);
 
 static id hook_next_drawable(id layer, SEL selector)
@@ -1058,10 +1060,16 @@ static id hook_next_drawable(id layer, SEL selector)
 	framelimit_wait(layer);
 	id drawable = next_layer_drawable(layer, selector);
 
-	if (!next_drawable_logged) {
+	// The first call, and the first that returned a drawable when that one got none.
+	if (!next_drawable_logged || (drawable != nil && !next_drawable_got)) {
 		next_drawable_logged = 1;
-		shim_log("overlay_shim hook_next_drawable: layer=%s drawable=%s\n",
-		        class_getName(object_getClass(layer)), drawable != nil ? "yes" : "no");
+		next_drawable_got = drawable != nil;
+		// t is milliseconds since 1970: the run script logs the first frame from it.
+		struct timespec now = {0};
+		clock_gettime(CLOCK_REALTIME, &now);
+		shim_log("overlay_shim hook_next_drawable: layer=%s drawable=%s t=%lld\n",
+		        class_getName(object_getClass(layer)), drawable != nil ? "yes" : "no",
+		        (long long)now.tv_sec * 1000 + now.tv_nsec / 1000000);
 	}
 
 	if (framegen_enabled) {

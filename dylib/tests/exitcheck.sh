@@ -1,13 +1,16 @@
 #!/bin/sh
 # exitcheck: the run script's account of how a game ended (exit_summary in compat_run.sh),
 # which play reports quote.
+# shellcheck disable=SC2016,SC2034,SC2154 # the functions under test are eval'd, out of shellcheck's sight
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 [ -f "$SRC" ] || { echo "==> exitcheck: $SRC not present, skipped"; exit 0; }
 
 extract() { sed -n "/^$1() {\$/,/^}\$/p" "$SRC"; }
 functions=""
-for name in kernel_anticheat_name exit_anticheat exit_meaning exit_signal exit_crash_lines exit_summary; do
+for name in kernel_anticheat_name exit_anticheat exit_meaning exit_signal wine_crash_pattern exit_crash_lines \
+	exit_summary exit_outcome np_now_ms np_seconds mark first_window_ms first_frame_ms launch_times \
+	write_last_launch report_early_exit abandon_seed; do
 	body=$(extract "$name")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -15,7 +18,7 @@ $body"
 done
 eval "$functions"
 
-work=$(mktemp -d)
+work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT
 
 fails=0
@@ -110,6 +113,192 @@ is "a home folder keeps its accents for redaction; invalid bytes and carriage re
 is "a long line is cut" 300 "$(printf '%s\n' "$lines" | sed -n 2p | tr -d '\n' | wc -c | tr -d ' ')"
 is "only crash lines are kept" 3 "$(printf '%s\n' "$lines" | wc -l | tr -d ' ')"
 is "what is kept is valid UTF-8" yes "$(printf '%s\n' "$lines" | iconv -f UTF-8 -t UTF-8 >/dev/null 2>&1 && echo yes || echo no)"
+
+echo "== the outcome record's code =="
+outcome() { exit_outcome "$1" "$2" "$3" "${4:-$clean}"; }
+is "a long clean session is ok" "ok game" "$(outcome 0 1642 0)"
+is "a quick clean quit is not ok" "quit_early game" "$(outcome 0 24 0)"
+is "a quick quit with a crash line crashed" "crashed game" "$(outcome 0 12 0 "$crash")"
+is "a long clean exit stays ok with a crash line of some helper" "ok game" "$(outcome 0 600 0 "$crash")"
+is "Steam's Stop wins over the status" "stopped_from_steam steam" "$(outcome 143 6 1)"
+is "Launch Services hides the status" "launch_services unknown" "$(NOTPROTON_LAUNCH_SERVICES=1 exit_outcome 5 10 0 "$clean")"
+is "a kernel anti-cheat driver names the cause" "anticheat_driver game" "$(outcome 0 13 0 "$cod")"
+is "an access violation" "access_violation game" "$(outcome 5 3 0)"
+is "a Mac-side crash" "sigsegv game" "$(outcome 139 5 0)"
+is "killed from outside, by someone" "sigkill unknown" "$(outcome 137 900 0)"
+is "a generic failure" "generic_failure game" "$(outcome 1 4 0)"
+is "a generic failure with a crash line crashed" "crashed game" "$(outcome 1 4 0 "$crash")"
+is "exit -1" "game_error game" "$(outcome 255 19 0)"
+is "an unknown code" "exit_code game" "$(outcome 42 10 0)"
+words=""
+code=0
+while [ "$code" -le 255 ]; do
+	if [ -n "$(exit_meaning "$code")$(exit_signal "$code")" ]; then
+		word=$(outcome "$code" 30 0)
+		word=${word% *}
+		case "$word" in
+			exit_code|crashed|quit_early|ok) bad "exit $code has its own word" "a word of its own" "$word" ;;
+			*[!a-z0-9_]*|'') bad "exit $code is one lower-case word" "a snake_case word" "$word" ;;
+		esac
+		words="$words
+$word"
+	fi
+	code=$((code + 1))
+done
+is "every code the summary explains has its own word" \
+	"$(printf '%s\n' "$words" | sed '/^$/d' | sort -u | wc -l | tr -d ' ')" "$(printf '%s\n' "$words" | sed '/^$/d' | wc -l | tr -d ' ')"
+for word in $words ok quit_early crashed generic_failure game_error exit_code stopped_from_steam launch_services \
+	anticheat_driver anticheat_blocked aborted rosetta_missing engine_missing engine_unsupported; do
+	grep -q -F -- "\`$word\`" "$(dirname "$SRC")/../../docs/DEVELOPING.md" 2>/dev/null \
+		|| bad "docs/DEVELOPING.md lists $word" "a row for $word" "none"
+done
+ok "docs/DEVELOPING.md lists every code"
+
+echo "== step times =="
+np_t0=1000000
+np_seconds 1234
+is "milliseconds read as seconds" 1.234 "$np_sec"
+np_seconds 5
+is "with the leading zeros" 0.005 "$np_sec"
+np_seconds -3
+is "and a clock that went back reads as zero" 0.000 "$np_sec"
+# Each clock this Mac has: /bin/date has %N only on newer macOS, perl's Time::HiRes may be
+# missing. The run script picks among the same, so an absent one is never used there.
+ns=$(/bin/date +%s%N 2>/dev/null) || ns=""
+case "$ns" in *[!0-9]*|'') ns="" ;; esac
+[ "${#ns}" -ge 19 ] || ns=""
+best=seconds
+for np_clock in date-ns perl-hires seconds; do
+	case "$np_clock" in
+		date-ns) if [ -z "$ns" ]; then echo "  skip  date-ns: /bin/date has no %N here"; continue; fi ;;
+		perl-hires) if ! /usr/bin/perl -MTime::HiRes -e 1 2>/dev/null; then
+				echo "  skip  perl-hires: no Time::HiRes here"; continue; fi ;;
+	esac
+	[ "$best" != seconds ] || best=$np_clock
+	np_now_ms
+	case "$np_ms" in
+		[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ok "the $np_clock clock gives milliseconds" ;;
+		*) bad "the $np_clock clock gives milliseconds" "13 digits" "$np_ms" ;;
+	esac
+done
+np_clock=$best
+np_now_ms
+np_t0=$np_ms
+log="$work/steps.log"
+: > "$log"
+mark "prefix seed"
+is "a step is logged with its time" yes \
+	"$(grep -qE '^time: prefix seed at [0-9]+\.[0-9]{3}s$' "$log" && echo yes || echo no)"
+is "and is the step an abort names" "prefix seed" "$stage_step"
+
+compat="$work/compat"
+mkdir -p "$compat"
+STEAM_COMPAT_DATA_PATH=$compat
+printf '1795765890625\n' > "$compat/bridgeplay-first-window"
+frames="$work/frames.log"
+printf 'overlay_shim hook_next_drawable: layer=CAMetalLayer drawable=yes t=1795765892000\n' > "$frames"
+np_t0=1795765870000
+launch_times 1795765878625 1795766000000 "$frames" > "$work/times"
+is "the game's times, from its start" "time: game exited at 130.000s
+time: first window 12.000s after the game started
+time: first frame 13.375s after the game started" "$(cat "$work/times")"
+is "the first window in whole seconds" 12 "$np_window"
+printf 'overlay_shim hook_next_drawable: layer=CAMetalLayer drawable=no t=1795765880000\n%s\n' \
+	'overlay_shim hook_next_drawable: layer=CAMetalLayer drawable=yes t=1795765892000' > "$frames"
+launch_times 1795765878625 1795766000000 "$frames" > "$work/times"
+is "a first call that got no drawable is not the first frame" "time: first frame 13.375s after the game started" \
+	"$(grep 'first frame' "$work/times")"
+rm "$compat/bridgeplay-first-window"
+launch_times 1795765878625 1795766000000 "$clean" 1 > "$work/times"
+is "no window file while the panel watched, no window" "" "$np_window"
+is "and the log says none was noted" "time: game exited at 130.000s
+time: no first window noted" "$(cat "$work/times")"
+launch_times 1795765878625 1795766000000 "$clean" > "$work/times"
+is "no window file and no panel watching, not measured" "-" "$np_window"
+is "and the log says so" "time: game exited at 130.000s
+time: first window not measured, the launch panel was not watching" "$(cat "$work/times")"
+printf 'garbage\n' > "$compat/bridgeplay-first-window"
+launch_times 1795765878625 1795766000000 "$clean" 1 > /dev/null
+is "a file that is not a number is no window" "" "$np_window"
+
+echo "== the outcome record =="
+backend=d3dmetal np_build=winecx-11.17 verb=waitforexitandrun
+write_last_launch access_violation 5 12 game 3
+ended=$(sed -n 's/^ended=//p' "$compat/bridgeplay-last-launch")
+is "KEY=VALUE lines in a fixed order" "version=1
+code=access_violation
+exit=5
+seconds=12
+stopped=game
+backend=d3dmetal
+engine=winecx-11.17
+window=3
+ended=$ended" "$(cat "$compat/bridgeplay-last-launch")"
+write_last_launch ok 0 900 steam -
+is "not measured leaves the window key out" "no" \
+	"$(grep -q '^window' "$compat/bridgeplay-last-launch" && echo yes || echo no)"
+write_last_launch ok 0 900 steam ""
+is "no window is an empty key" "window=" "$(grep '^window' "$compat/bridgeplay-last-launch")"
+write_last_launch access_violation 5 12 game 3
+is "ended is the time in seconds" yes "$(printf '%s' "$ended" | grep -qE '^[1-9][0-9]{9}$' && echo yes || echo no)"
+is "nothing is left beside it" no "$([ -e "$compat/bridgeplay-last-launch.new" ] && echo yes || echo no)"
+printf 'theirs\n' > "$work/outside"
+rm "$compat/bridgeplay-last-launch"
+ln -s "$work/outside" "$compat/bridgeplay-last-launch"
+write_last_launch ok 0 900 game 20
+is "a link at its name is replaced, never written through" "theirs" "$(cat "$work/outside")"
+is "by a file" yes "$([ -f "$compat/bridgeplay-last-launch" ] && [ ! -L "$compat/bridgeplay-last-launch" ] && echo yes || echo no)"
+rm "$compat/bridgeplay-last-launch"
+(verb=run; write_last_launch ok 0 900 game 20)
+is "a helper writes none" no "$([ -e "$compat/bridgeplay-last-launch" ] && echo yes || echo no)"
+
+# One launch that ends before the game starts: the trap writes the record.
+early() {
+	rm -f "$compat/bridgeplay-last-launch"
+	: > "$log"
+	# A subshell, so the shell's note that a child was killed by a signal stays out of the output.
+	(env functions="$functions" log="$log" verb=waitforexitandrun STEAM_COMPAT_DATA_PATH="$compat" \
+		np_build=winecx-11.17 sh -c 'eval "$functions"; np_outcome=""; stage_step="prefix lock"
+trap report_early_exit EXIT
+'"$1") 2>/dev/null || true
+}
+record_line() { grep -E '^(code|exit|seconds|stopped)=' "$compat/bridgeplay-last-launch" 2>/dev/null | paste -sd ' ' -; }
+early 'exit 1'
+is "a failed step is aborted, with no game status" "code=aborted exit= seconds=0 stopped=unknown" "$(record_line)"
+is "and the log names the step" "=== aborted during prefix lock (exit 1) before launch ===" "$(cat "$log")"
+early 'np_outcome=rosetta_missing; exit 1'
+is "a missing Rosetta has its code" "code=rosetta_missing exit= seconds=0 stopped=unknown" "$(record_line)"
+early 'np_outcome=engine_missing; exit 1'
+is "so does a missing engine" "code=engine_missing exit= seconds=0 stopped=unknown" "$(record_line)"
+early 'np_outcome=anticheat_blocked; exit 0'
+is "the anti-cheat prompt's Don't Launch" "code=anticheat_blocked exit= seconds=0 stopped=unknown" "$(record_line)"
+is "with no abort line" "" "$(cat "$log")"
+early 'kill -TERM $$; sleep 1'
+is "Steam's Stop before the game started" "code=aborted exit= seconds=0 stopped=steam" "$(record_line)"
+is "and the log says it stopped there" "=== stopped during prefix lock before launch ===" "$(cat "$log")"
+early 'stage_step="prefix seed"; trap "abandon_seed 143" TERM; kill -TERM $$; sleep 1'
+is "Steam's Stop while the prefix is seeded, whose trap exits 143" "code=aborted exit= seconds=0 stopped=steam" "$(record_line)"
+is "and the log says it stopped there" "=== stopped during prefix seed before launch ===" "$(cat "$log")"
+
+echo "== order =="
+at() { grep -n -- "$1" "$SRC" | head -1 | cut -d: -f1; }
+summary_at=$(at '^exit_summary "$status"')
+record_at=$(at '^write_last_launch "${outcome')
+clear_at=$(at '^trap - EXIT$')
+start_at=$(at '^launch_step start$')
+if [ -n "$summary_at" ] && [ -n "$record_at" ] && [ "$summary_at" -lt "$record_at" ]; then
+	ok "the record is written after the exit summary"
+else
+	bad "the record is written after the exit summary" "exit_summary before write_last_launch" "$summary_at, $record_at"
+fi
+if [ -n "$clear_at" ] && [ -n "$start_at" ] && [ "$clear_at" -lt "$start_at" ] && [ $((start_at - clear_at)) -lt 6 ]; then
+	ok "a game launch keeps the abort report until the game starts"
+else
+	bad "a game launch keeps the abort report until the game starts" "trap - EXIT just before launch_step start" "$clear_at, $start_at"
+fi
+for code in anticheat_blocked rosetta_missing engine_missing engine_unsupported; do
+	if grep -q "np_outcome=$code" "$SRC"; then ok "$code is set before its exit"; else bad "$code is set before its exit" "np_outcome=$code" "none"; fi
+done
 
 if [ "$fails" -ne 0 ]; then
 	echo "exitcheck: $fails failure(s)"

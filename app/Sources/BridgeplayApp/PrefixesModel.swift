@@ -263,6 +263,19 @@ final class PrefixesModel {
         }
     }
 
+    // Rebuild Prefix… on the Status page's last-launch card: the Prefixes page then asks as
+    // it does for its own Rebuild, with the game selected.
+    func askRebuild(_ prefix: WinePrefix) async {
+        let listTools = installedTools
+        let tool = await Task.detached { () -> InstalledTool? in
+            let tools = listTools()
+            return PrefixTools.tool(for: prefix, among: tools) ?? tools.first
+        }.value
+        guard let tool, !isBusy else { return }
+        selection = [prefix.id]
+        pendingConfirmation = .rebuild([prefix], tool)
+    }
+
     @discardableResult
     func confirmRebuild(keepBackup: Bool = true) -> Task<Void, Never>? {
         guard case .rebuild(let targets, let tool) = pendingConfirmation else { return nil }
