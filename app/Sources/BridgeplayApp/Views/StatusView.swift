@@ -171,6 +171,7 @@ struct StatusRow: View {
 
 struct StatusView: View {
     @Environment(SystemStatus.self) private var status
+    var openPane: ((Pane) -> Void)?
     // Two of the Game Defaults (GameDefaults), read when the page opens; the switches write them straight away.
 
     private static let updateBlockPrompt =
@@ -346,6 +347,8 @@ struct StatusView: View {
                 }
                 DownloadStrip()
             }
+
+            LastLaunchSection(launches: snapshot.recentLaunches, openPane: openPane)
 
             Section("Steam") {
                 StatusRow(

@@ -44,6 +44,34 @@ struct WinecxUpgradeTests {
         guard releases.count > 1 else { return }
         let offer = try #require(WinecxUpgrade.offer(installs: [Self.engine(releases[1].build)]))
         #expect(offer.to == FreeEngineWinecx.current.build)
+        #expect(StatusHero.engineName(offer.to) == FreeEngineWinecx.current.runner.releaseVersion)
+    }
+
+    private static func snapshot(installs: [CrossOverInstall], running: Bool = false) -> StatusSnapshot {
+        let payload = PayloadState(expected: 0, present: 0, missing: [], overlayShimPresent: true,
+                                   iconmakerPresent: true, appinfoPresent: true, signatureDatabase: "fixture",
+                                   legacyCompatPresent: 0, legacyCompatExpected: 0, manifestProblem: nil)
+        var health = SteamHealth()
+        health.mode = .active
+        health.hooksInstalled = 12
+        health.hooksTotal = 12
+        return StatusSnapshot(steam: .installed(version: "4.0.85"), steamRunning: running, updateBlocked: false,
+                              crossOver: installs, runner: .ready(builds: ["crossover-26.0"]), payload: payload,
+                              steamRunningHere: running,
+                              health: running ? HealthReading(health: health, paused: false, freshness: .live) : .none)
+    }
+
+    @Test("The hero stays ready on the older release and says the current one is waiting")
+    func heroSaysWhatIsWaiting() throws {
+        let older = try #require(FreeEngineWinecx.releases.dropFirst().first)
+        let name = StatusHero.engineName(FreeEngineWinecx.current.build)
+        for running in [false, true] {
+            let hero = HeroState.make(Self.snapshot(installs: [Self.engine(older.build)], running: running))
+            #expect(hero.ready)
+            #expect(hero.detail == "\(name) is available below.")
+        }
+        let current = HeroState.make(Self.snapshot(installs: [Self.engine(FreeEngineWinecx.current.build)]))
+        #expect(current.detail == "Open Steam and press Play.")
     }
 
     // MARK: Nothing downloads by itself

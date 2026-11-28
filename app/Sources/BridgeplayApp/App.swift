@@ -36,6 +36,8 @@ struct BridgeplayApp: App {
                 // look again whenever the user comes back and every few minutes.
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                     checkSteamPatch("foreground")
+                    // Steam may have started or quit, or a game ended, while the app was behind
+                    Task { await status.refreshHealth() }
                     PlayReports.shared.scan()
                     Task { await StarPrompt.shared.check() }
                 }

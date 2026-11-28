@@ -46,6 +46,10 @@ struct StatusSnapshot: Sendable {
     var currentFreeEngines: Set<String> = []
     // The Game Porting Toolkit folder linked into the WineCX engine, when one is.
     var gptkSource: String?
+    // This macOS user's Steam, the one the health files and Pause belong to.
+    var steamRunningHere = false
+    var health: HealthReading = .none
+    var recentLaunches: [LastLaunch] = []
 
     static func capture(bundledVersion: String) -> StatusSnapshot {
         let installs = CrossOverSource.discover()
@@ -57,9 +61,12 @@ struct StatusSnapshot: Sendable {
         let runner = RunnerStore.state()
         let installed = RunnerStore.installedBuilds()
         let engines = FreeEngineStatus.capture(installs)
+        let steam = SteamBundle.deployment(bundledVersion: bundledVersion)
+        var deployed: String?
+        if case .installed(let version) = steam { deployed = version }
 
         return StatusSnapshot(
-            steam: SteamBundle.deployment(bundledVersion: bundledVersion),
+            steam: steam,
             steamRunning: SteamBundle.isRunning,
             updateBlocked: UpdateBlock.isPresent(),
             crossOver: installs,
@@ -71,7 +78,10 @@ struct StatusSnapshot: Sendable {
             damagedRunners: RunnerStore.damagedClones(),
             installContent: DeploymentContent.current(version: bundledVersion),
             currentFreeEngines: engines.current,
-            gptkSource: engines.gptkSource
+            gptkSource: engines.gptkSource,
+            steamRunningHere: SteamBundle.isRunningForThisUser,
+            health: SteamHealthStore.read(installedPatch: SteamHealthStore.patchBuild(deployed: deployed)),
+            recentLaunches: LastLaunch.scan()
         )
     }
 }
@@ -1134,6 +1144,53 @@ final class SystemStatus {
         if !captured.installContent.blocksInstallation { CJKFonts.fetchIfNeeded() }
         await refreshSigningIdentity()
         await refreshRunnerStorage(cleanTemplates: !captured.installContent.blocksInstallation)
+    }
+
+    // The hero's Steam state and the last-launch card only: no engine or Steam bundle checks.
+    func refreshHealth() async {
+        guard let current = snapshot else { return }
+        var deployed: String?
+        if case .installed(let version) = current.steam { deployed = version }
+        let patch = SteamHealthStore.patchBuild(deployed: deployed)
+        let (health, runningHere, launches) = await Task.detached(priority: .userInitiated) {
+            (SteamHealthStore.read(installedPatch: patch), SteamBundle.isRunningForThisUser, LastLaunch.scan())
+        }.value
+        snapshot?.health = health
+        snapshot?.steamRunningHere = runningHere
+        snapshot?.recentLaunches = launches
+    }
+
+    func openSteam() {
+        NSWorkspace.shared.open(SupportPaths.Steam.app)
+    }
+
+    // Writes only the paused file in the support folder; Steam reads it at its next start.
+    func setSteamPaused(_ paused: Bool) async {
+        do {
+            try SteamHealthStore.setPaused(paused)
+            AppLog.note(paused ? "steam: paused at the next start" : "steam: resumed at the next start")
+        } catch {
+            setFailure(error)
+        }
+        await refreshHealth()
+    }
+
+    // After the breaker tripped. Only with this user's Steam closed: a running Steam still
+    // holds its boot record.
+    func tryAgainInSteam() async {
+        let running = await Task.detached(priority: .userInitiated) { SteamBundle.isRunningForThisUser }.value
+        if running {
+            setFailure(String(localized: "Quit Steam first, then choose Try Again."))
+            await refreshHealth()
+            return
+        }
+        do {
+            try SteamHealthStore.clearStrikes()
+            AppLog.note("steam: breaker strikes cleared by Try Again")
+        } catch {
+            setFailure(error)
+        }
+        await refreshHealth()
     }
 
     private(set) var runnerSizes: [String: Int64] = [:]

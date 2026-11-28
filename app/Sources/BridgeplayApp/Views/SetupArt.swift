@@ -544,7 +544,8 @@ private struct DoneArt: View {
         ZStack {
             Circle()
                 .fill(RadialGradient(colors: [BP.violet.opacity(0.45), BP.blue.opacity(0.15), .clear], center: .center, startRadius: 0, endRadius: 120))
-                .frame(width: 260, height: 260)
+                // As wide as the gradient reaches; any wider pushes the art past its 240 pt column.
+                .frame(width: 240, height: 240)
                 .scaleEffect(1 + sin(t * 1.2) * 0.04)
             GlassMark(size: 124)
                 .offset(y: sin(t * 1.1) * 4)

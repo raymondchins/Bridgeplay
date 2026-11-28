@@ -115,7 +115,7 @@ struct RootView: View {
             } detail: {
                 Group {
                     switch pane {
-                    case .status: StatusView()
+                    case .status: StatusView(openPane: { pane = $0 })
                     case .games: GamesView()
                     case .gameDefaults: GameDefaultsView()
                     case .prefixes: PrefixesView()
@@ -173,6 +173,8 @@ struct RootView: View {
                 Text("Game Porting Toolkit by Apple")
             }
             Text("[Buy CrossOver](https://www.codeweavers.com/crossover) to support Wine.")
+                // Wraps in a longer language rather than ending in "…" in a short window
+                .fixedSize(horizontal: false, vertical: true)
         }
         .font(BP.sans(11))
         .lineSpacing(2)
