@@ -1061,6 +1061,28 @@
         }
       }
     },
+    "%@ was uninstalled. Its prefix still uses %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ è stato disinstallato. Il suo prefisso occupa ancora %2$@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ удалена. Её префикс всё ещё занимает %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 已卸载，但它的前缀仍占用 %2$@。"
+          }
+        }
+      }
+    },
     "%@ will stop working in Steam, and Steam may quit for a moment." : {
       "localizations" : {
         "it" : {
@@ -10665,6 +10687,28 @@
         }
       }
     },
+    "Keep" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantieni"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оставить"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留"
+          }
+        }
+      }
+    },
     "Keep Waiting" : {
       "localizations" : {
         "it" : {
@@ -11905,6 +11949,28 @@
         }
       }
     },
+    "Move these prefixes to the Trash?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spostare questi prefissi nel Cestino?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить эти префиксы в Корзину?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将这些前缀移到废纸篓？"
+          }
+        }
+      }
+    },
     "Move to Trash" : {
       "localizations" : {
         "it" : {
@@ -11945,6 +12011,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移到废纸篓。"
+          }
+        }
+      }
+    },
+    "Move to Trash…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sposta nel Cestino…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить в Корзину…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到废纸篓…"
           }
         }
       }
@@ -14363,6 +14451,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "游戏容器"
+          }
+        }
+      }
+    },
+    "Prefixes of uninstalled games still use %@: %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I prefissi dei giochi disinstallati occupano ancora %1$@: %2$@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Префиксы удалённых игр всё ещё занимают %1$@: %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已卸载游戏的前缀仍占用 %1$@：%2$@。"
           }
         }
       }
@@ -17126,6 +17236,28 @@
         }
       }
     },
+    "Saves a game keeps in its prefix go with it. You can put them back from the Trash until you empty it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I salvataggi che un gioco tiene nel suo prefisso vanno con esso. Puoi ripristinarli dal Cestino finché non lo svuoti."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранения, которые игра хранит в своём префиксе, уйдут вместе с ним. Их можно вернуть из Корзины, пока она не очищена."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏存放在前缀中的存档会一并移走。在清倒废纸篓之前，你可以把它们放回原处。"
+          }
+        }
+      }
+    },
     "Saves and %lld backups go too." : {
       "localizations" : {
         "it" : {
@@ -19603,6 +19735,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Steam 中已安装的动态库与当前账户的版本记录不一致。请使用上次执行安装的 Bridgeplay 应用完成或修复安装。"
+          }
+        }
+      }
+    },
+    "Steam's library list couldn't be read, so nothing was moved." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile leggere l'elenco delle librerie di Steam, quindi non è stato spostato nulla."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось прочитать список библиотек Steam, поэтому ничего не перемещено."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取 Steam 的库列表，因此没有移动任何内容。"
           }
         }
       }
@@ -22219,6 +22373,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已卸载"
+          }
+        }
+      }
+    },
+    "Uninstalled games" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giochi disinstallati"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалённые игры"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已卸载的游戏"
           }
         }
       }

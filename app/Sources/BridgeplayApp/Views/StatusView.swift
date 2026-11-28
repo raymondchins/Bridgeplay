@@ -249,6 +249,18 @@ struct StatusView: View {
             }
         }
         .confirmationDialog(
+            String(localized: "Move these prefixes to the Trash?"),
+            isPresented: asking(.trashLeftoverPrefixes),
+            titleVisibility: .visible
+        ) {
+            Button("Move to Trash", role: .destructive) {
+                Task { await status.trashLeftoverPrefixes() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Saves a game keeps in its prefix go with it. You can put them back from the Trash until you empty it.")
+        }
+        .confirmationDialog(
             String(localized: "Stop the leftover Wine processes?"),
             isPresented: asking(.stopLeftovers),
             titleVisibility: .visible
@@ -370,6 +382,9 @@ struct StatusView: View {
                 }
                 updateBlockRow(snapshot.updateBlocked)
                 controllerRow
+                if !status.leftoverPrefixes.isEmpty {
+                    leftoverPrefixesRow
+                }
                 if status.signingIdentityReady == false {
                     StatusRow(
                         title: String(localized: "Trust Bridgeplay on this Mac"),
@@ -433,6 +448,26 @@ struct StatusView: View {
                 detail: migration.keptNotes.joined(separator: "\n")
             )
         }
+    }
+
+    // Games Steam uninstalled whose prefixes are still on disk
+    private var leftoverPrefixesRow: some View {
+        let items = status.leftoverPrefixes
+        let size = SetupChecks.size(items.reduce(0) { $0 + $1.bytes })
+        let value = items.count == 1
+            ? String(localized: "\(items[0].prefix.title) was uninstalled. Its prefix still uses \(size).")
+            : String(localized: "Prefixes of uninstalled games still use \(size): \(ListFormatter.localizedString(byJoining: items.map(\.prefix.title))).")
+        return StatusRow(
+            title: String(localized: "Uninstalled games"),
+            value: value,
+            tone: .info,
+            secondaryAction: StatusAction(label: String(localized: "Keep"), isEnabled: status.isIdle) {
+                status.keepLeftoverPrefixes()
+            },
+            action: StatusAction(label: String(localized: "Move to Trash…"), isEnabled: status.isIdle) {
+                status.askToTrashLeftoverPrefixes()
+            }
+        )
     }
 
     // A reset macOS refused leaves Steam's old approval in place, and macOS then blocks the

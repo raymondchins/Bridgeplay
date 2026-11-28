@@ -147,6 +147,8 @@ final class SystemStatus {
     // the run again (#4777).
     private(set) var leftoverRunner: RunnerActivity?
     @ObservationIgnored private var leftoverRetry: (@MainActor () async -> Void)?
+    // Prefixes of games Steam uninstalled, which Status offers to move to the Trash
+    private(set) var leftoverPrefixes: [LeftoverPrefix] = []
 
     private var runInFlight = false
     // Tests replace the refresh so a run does not modify the real Steam/support folders
@@ -160,7 +162,7 @@ final class SystemStatus {
     // happened from one refused because another was in flight.
     @ObservationIgnored private(set) var runsStarted = 0
 
-    var isBusy: Bool { activity != nil || runInFlight || checkingLicense || setupDownloading }
+    var isBusy: Bool { activity != nil || runInFlight || checkingLicense || setupDownloading || trashingLeftovers }
     var isIdle: Bool { !isBusy && !isRefreshing }
     // A pending 3.0 folder move blocks every install: anything written now would land in
     // the new folders before the old ones are moved in.
@@ -175,6 +177,7 @@ final class SystemStatus {
         case toolUnlicensed
         case removeBuild
         case stopLeftovers
+        case trashLeftoverPrefixes
 
         var id: Self { self }
     }
@@ -1148,6 +1151,63 @@ final class SystemStatus {
         if !captured.installContent.blocksInstallation { CJKFonts.fetchIfNeeded() }
         await refreshSigningIdentity()
         await refreshRunnerStorage(cleanTemplates: !captured.installContent.blocksInstallation)
+        await refreshLeftoverPrefixes()
+    }
+
+    func refreshLeftoverPrefixes() async {
+        let found = await Task.detached(priority: .utility) { LeftoverPrefixes.load() }.value
+        // A Keep made while this scan ran still holds
+        let kept = LeftoverPrefixes.kept()
+        leftoverPrefixes = found.filter { !kept.contains($0.id) }
+    }
+
+    // What the dialog names, so a scan that ends while it's open can't add to it
+    @ObservationIgnored private var leftoversToTrash: [LeftoverPrefix] = []
+    private(set) var trashingLeftovers = false
+
+    func askToTrashLeftoverPrefixes() {
+        leftoversToTrash = leftoverPrefixes
+        pendingConfirmation = .trashLeftoverPrefixes
+    }
+
+    // Only to the Trash: a prefix can hold a game's only saves.
+    func trashLeftoverPrefixes() async {
+        guard !trashingLeftovers else { return }
+        let items = leftoversToTrash
+        leftoversToTrash = []
+        trashingLeftovers = true
+        defer { trashingLeftovers = false }
+        let errors = await Task.detached(priority: .userInitiated) { () -> [Error] in
+            // A game reinstalled since the scan keeps its prefix
+            guard let still = LeftoverPrefixes.currentIDs() else {
+                AppLog.note("leftover prefix: libraryfolders.vdf unreadable, nothing moved")
+                return [StepFailure(
+                    step: String(localized: "Move to Trash"),
+                    detail: String(localized: "Steam's library list couldn't be read, so nothing was moved."))]
+            }
+            return items.compactMap { item -> Error? in
+                guard still.contains(item.id) else {
+                    AppLog.note("leftover prefix: \(item.prefix.appID) is installed again, kept")
+                    return nil
+                }
+                do {
+                    try PrefixTools.delete(item.prefix)
+                    AppLog.note("leftover prefix: moved \(item.prefix.root.path(percentEncoded: false)) to the Trash")
+                    return nil
+                } catch {
+                    return error
+                }
+            }
+        }.value
+        if let error = errors.first { setFailure(error) }
+        await refreshLeftoverPrefixes()
+    }
+
+    func keepLeftoverPrefixes() {
+        LeftoverPrefixes.keep(leftoverPrefixes.map(\.id))
+        let ids = leftoverPrefixes.map(\.prefix.appID).joined(separator: " ")
+        AppLog.note("leftover prefix: kept \(ids)")
+        leftoverPrefixes = []
     }
 
     // The hero's Steam state and the last-launch card only: no engine or Steam bundle checks.
@@ -1162,6 +1222,8 @@ final class SystemStatus {
         snapshot?.health = health
         snapshot?.steamRunningHere = runningHere
         snapshot?.recentLaunches = launches
+        // A game uninstalled in Steam while Bridgeplay was in the background
+        await refreshLeftoverPrefixes()
     }
 
     func openSteam() {
