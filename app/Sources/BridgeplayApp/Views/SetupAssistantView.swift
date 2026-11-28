@@ -54,6 +54,12 @@ struct SetupAssistantView: View {
         .environment(\.colorScheme, .dark)
         .tint(BP.accent)
         .task(id: model.step) { await wave() }
+        .task { await model.locateSteam(status) }
+        // Space freed or Steam moved while Setup was in the background.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            _ = model.refreshSpace()
+            model.refreshSteam()
+        }
     }
 
     private var finishedFraction: Double {
@@ -77,7 +83,7 @@ struct SetupAssistantView: View {
                         if let message = model.message {
                             SetupCard {
                                 WizardRow(row: StatusRow(title: String(localized: "Something went wrong"), value: message, tone: .bad,
-                                          action: StatusAction(label: ErrorReport.reportLabel) { ErrorReport.open(message, in: "Setup") }))
+                                          action: failureAction(message, in: "Setup")))
                             }
                         }
                     }
@@ -173,9 +179,7 @@ struct SetupAssistantView: View {
                       value: model.macOSSupported ? SetupChecks.macOSDisplay : String(localized: "\(SetupChecks.macOSDisplay). Update macOS first."),
                       tone: model.macOSSupported ? .ok : .bad))
             SetupHairline()
-            checked(2, StatusRow(title: String(localized: "Free space"),
-                      value: model.freeBytes.map { String(localized: "\(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file)) available, 3 GB needed") },
-                      tone: model.hasSpace ? .ok : .bad))
+            checked(2, spaceRow)
             SetupHairline()
             checked(3, StatusRow(title: String(localized: "Rosetta 2"),
                       value: model.rosettaInstalled ? String(localized: "Installed.") : model.rosettaNote ?? String(localized: "Apple's translator for Windows games. Asks for your Mac password."),
@@ -183,6 +187,32 @@ struct SetupAssistantView: View {
                       action: model.rosettaInstalled ? nil : StatusAction(
                         label: String(localized: "Install"), isProminent: true, isEnabled: !model.isWorking
                       ) { Task { await model.installRosetta() } }))
+            if let note = SetupChecks.accessNote(model.steamAccess) {
+                SetupHairline()
+                checked(4, StatusRow(title: String(localized: "Steam"), value: note,
+                                     tone: model.steamAccess.needsOtherAccount ? .warning : .info))
+            }
+        }
+    }
+
+    private var spaceRow: StatusRow {
+        let needed = SetupChecks.size(SetupChecks.requiredBytes)
+        let value = model.freeBytes.map { String(localized: "\(SetupChecks.size($0)) available, \(needed) needed") }
+        guard !model.hasSpace else { return StatusRow(title: String(localized: "Free space"), value: value, tone: .ok) }
+        let short = SetupChecks.size(SetupChecks.requiredBytes - (model.freeBytes ?? 0))
+        return StatusRow(title: String(localized: "Free space"), value: value, tone: .bad,
+                         detail: String(localized: "Free up another \(short)."),
+                         secondaryAction: StatusAction(label: String(localized: "Open Storage")) { model.openStorageSettings() },
+                         action: StatusAction(label: String(localized: "Check Again"), isProminent: true) { _ = model.refreshSpace() })
+    }
+
+    // The size comes from the signature file published beside the zip; offline it is left out.
+    private var componentsNote: String {
+        switch (model.componentsBytes.map(SetupChecks.size), model.addsSteamWithComponents) {
+        case (let size?, true): String(localized: "\(size). Adds Steam too.")
+        case (let size?, false): String(localized: "\(size) download.")
+        case (nil, true): String(localized: "Adds Steam too.")
+        case (nil, false): String(localized: "Apple's files, unmodified.")
         }
     }
 
@@ -198,8 +228,7 @@ struct SetupAssistantView: View {
             } else {
                 // Apple's files unmodified, from Bridgeplay's installer release; Steam comes along when it's missing.
                 WizardRow(row: StatusRow(title: String(localized: "Download with Bridgeplay"),
-                          value: DownloadMeter.shared.title ?? model.gptkProgress
-                            ?? String(localized: "About 500 MB. Also installs Steam if this Mac doesn't have it yet."),
+                          value: DownloadMeter.shared.title ?? model.gptkProgress ?? componentsNote,
                           action: StatusAction(label: String(localized: "Download"), isProminent: true, isEnabled: !model.isWorking) {
                               Task { await model.downloadGPTK() }
                           }), symbol: "arrow.down.circle")
@@ -229,6 +258,7 @@ struct SetupAssistantView: View {
             Task { await model.importGPTK(url) }
             return true
         }
+        .task { await model.loadComponentsSize() }
         if model.gptk == nil {
             Text("Optional. If you skip it, games use DXMT, which runs DirectX 10 and 11 games only. You can add the toolkit later from Status.")
                 .font(BP.sans(12))
@@ -252,13 +282,18 @@ struct SetupAssistantView: View {
         .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 2)
         SetupCard {
+            // Choose… for a Steam somewhere Setup didn't look, such as an external drive.
             checked(0, StatusRow(title: String(localized: "Steam"),
                       value: model.steamInstalled ? SupportPaths.Steam.app.path(percentEncoded: false)
                         : DownloadMeter.shared.title ?? model.steamProgress ?? String(localized: "Not installed."),
                       tone: model.steamInstalled ? .ok : .warning,
+                      detail: model.steamInstalled ? nil : SetupChecks.accessNote(model.steamAccess),
+                      secondaryAction: model.steamInstalled ? nil : StatusAction(
+                        label: String(localized: "Choose…"), isEnabled: !model.isWorking
+                      ) { Task { await model.chooseSteam(status) } },
                       action: model.steamInstalled ? nil : StatusAction(
                         label: String(localized: "Install Steam"), isProminent: true, isEnabled: !model.isWorking
-                      ) { Task { await model.installSteam() } }))
+                      ) { Task { await model.installSteam(with: status) } }))
             SetupHairline()
             checked(1, StatusRow(title: String(localized: "Steam account"),
                       value: model.signedIn ? String(localized: "Signed in.") : String(localized: "Waiting for you to sign in to Steam. Bridgeplay doesn't read or store your password."),
@@ -295,7 +330,7 @@ struct SetupAssistantView: View {
     @ViewBuilder
     private var finishStep: some View {
         StepHeader(step: model.step, title: "Set up Bridgeplay",
-                   detail: "Bridgeplay adds itself to Steam, sets up the WineCX engine and makes it Steam's default. Steam closes for a moment.")
+                   detail: "Downloads first. Then Steam closes for a moment.")
         // Above the tasks, so the button is in view without scrolling.
         if model.needsAppManagement {
             SetupCard {
@@ -433,7 +468,14 @@ struct SetupAssistantView: View {
     private func report(_ task: SetupAssistant.SetupTask) -> StatusAction? {
         guard case .failed(let reason) = task.state, !model.needsAppManagement, model.needsSteamRepair == nil
         else { return nil }
-        return StatusAction(label: ErrorReport.reportLabel) { ErrorReport.open(reason, in: "Setup: \(task.title)") }
+        return failureAction(reason, in: "Setup: \(task.title)")
+    }
+
+    private func failureAction(_ failure: String, in place: String) -> StatusAction {
+        if model.isOutOfSpace(failure) {
+            return StatusAction(label: String(localized: "Open Storage")) { model.openStorageSettings() }
+        }
+        return StatusAction(label: ErrorReport.reportLabel) { ErrorReport.open(failure, in: place) }
     }
 
     private func tone(of task: SetupAssistant.SetupTask) -> StatusTone {

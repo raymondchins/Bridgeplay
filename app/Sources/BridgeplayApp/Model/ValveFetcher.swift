@@ -29,7 +29,7 @@ enum ValveFetcher {
         var wroteNothing: Bool { installed.isEmpty }
     }
 
-    private static let step = String(localized: "Fetch the Valve binaries")
+    static let step = String(localized: "Fetch the Valve binaries")
 
     static func run(
         manifest suppliedManifest: ValvePackageManifest? = nil,

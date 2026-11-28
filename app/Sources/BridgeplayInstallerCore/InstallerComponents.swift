@@ -123,7 +123,9 @@ public struct InstallerComponents: Sendable, Equatable {
     /// Unpack the verified archive and put Steam, GPTK, the engine archives and the configs in
     /// place (ComponentsPlacement). `status` gets each step as it starts; `log` gets the
     /// underlying reason when a step fails.
-    public static func install(archive: URL, work: URL, status: @escaping @Sendable (String) -> Void = { _ in },
+    /// `addsSteam` false leaves Steam to the caller: the app's Setup, which finds a Steam outside
+    /// /Applications and installs it in ~/Applications for an account that can't write /Applications.
+    public static func install(archive: URL, work: URL, addsSteam: Bool = true, status: @escaping @Sendable (String) -> Void = { _ in },
                                download: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in },
                                log: @escaping @Sendable (String) -> Void = { InstallerLog.write($0) }) throws {
         let unpacked = work.appending(path: "components")
@@ -134,6 +136,7 @@ public struct InstallerComponents: Sendable, Equatable {
         try verifyAppleSigned(gptk: source.appending(path: "gptk"))
         var placement = ComponentsPlacement(source: source)
         placement.log = log
+        placement.addsSteam = addsSteam
         try placement.place(status: status, download: download)
     }
 

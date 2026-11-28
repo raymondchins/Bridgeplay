@@ -405,8 +405,12 @@ final class SystemStatus {
         panel.directoryURL = current.deletingLastPathComponent()
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let picked = URL(filePath: url.path)
+        await useSteam(URL(filePath: url.path))
+    }
 
+    // Also what Setup calls for a Steam it found, or installed, outside /Applications.
+    func useSteam(_ picked: URL) async {
+        let current = SupportPaths.Steam.app
         clearFailure()
         outcome = nil
 

@@ -46,18 +46,22 @@ final class SetupAssistant {
     var rosettaNote: String?
     let appleSilicon = SetupChecks.isAppleSilicon
     let macOSSupported = SetupChecks.macOSVersion.majorVersion >= SetupChecks.minimumMacOS
-    let freeBytes = SetupChecks.freeBytes()
+    // Read again when the app comes back to the front and before each download.
+    var freeBytes = SetupChecks.freeBytes()
 
     // Graphics
     var gptk: WinecxD3DMetal.Payload?
     var gptkImages: [URL]
     // "Installing the Game Porting Toolkit" once the components download is done.
     var gptkProgress: String?
+    // The components zip's length, from the signature file published beside it.
+    var componentsBytes: Int64?
     @ObservationIgnored private var componentsRate = DownloadRate()
 
     // Steam
     var steamInstalled = SteamBundle.isPresent
     var signedIn = SetupChecks.steamSignedIn()
+    var steamAccess = SetupChecks.SteamAccess.ok
     @ObservationIgnored private var signInWatch: Task<Void, Never>?
 
     // The keychain identity that keeps Steam's controller permission across updates.
@@ -82,6 +86,8 @@ final class SetupAssistant {
     nonisolated static let defaultStep = String(localized: "Make WineCX Steam's default")
 
     static let plannedTasks = [
+        // Everything Set Up downloads comes first, while Steam is still open.
+        SetupTask(id: "download", title: String(localized: "Download the files")),
         SetupTask(id: "steam", title: String(localized: "Add Bridgeplay to Steam")),
         SetupTask(id: "engine", title: String(localized: "Set up the WineCX engine")),
         SetupTask(id: "default", title: defaultStep),
@@ -96,6 +102,7 @@ final class SetupAssistant {
         let located = preview == .fresh ? nil : WinecxD3DMetal.locate()
         gptk = located
         gptkImages = preview == .fresh ? [] : GPTKImport.candidatesIfMissing(installed: located != nil)
+        if preview != nil { componentsBytes = Self.previewComponentsBytes } else { steamAccess = SetupChecks.steamAccess() }
         if preview == .fresh {
             rosettaInstalled = false
             signedIn = false
@@ -116,6 +123,8 @@ final class SetupAssistant {
     }
 
     enum Preview { case thisMac, fresh }
+
+    static let previewComponentsBytes: Int64 = 46_513_630
 
     // The preview only flips the switch; it never writes the real default.conf.
     func setGameDefault(_ setting: GameDefaults.Setting, _ on: Bool) {
@@ -155,13 +164,38 @@ final class SetupAssistant {
     var macReady: Bool { appleSilicon && macOSSupported && rosettaInstalled && hasSpace }
     var hasSpace: Bool { (freeBytes ?? .max) >= SetupChecks.requiredBytes }
 
+    // True when there is room; otherwise the reason is shown and nothing is downloaded.
+    func refreshSpace() -> Bool {
+        if !isPreview { freeBytes = SetupChecks.freeBytes() }
+        return hasSpace
+    }
+
+    var spaceMessage: String {
+        let free = freeBytes.map(SetupChecks.size) ?? "0"
+        return String(localized: "\(free) free, \(SetupChecks.size(SetupChecks.requiredBytes)) needed.")
+    }
+
+    // A full disk is not a bug to report: its failure offers Storage settings instead. Both
+    // the check before a download and a download that ran out of room mid-way count.
+    func isOutOfSpace(_ failure: String) -> Bool {
+        failure == spaceMessage || failure.hasSuffix(PinnedDownload.outOfSpaceDetail)
+    }
+
+    func openStorageSettings() {
+        guard !isPreview else { return }
+        NSWorkspace.shared.open(SetupChecks.storageSettings)
+    }
+
+    // Not Now doesn't set finishedKey, so Setup comes back next launch until this Mac can play:
+    // Bridgeplay in Steam with the WineCX engine, or with another compatibility tool such as CrossOver's.
     static func shouldShow(_ snapshot: StatusSnapshot?, defaults: UserDefaults = .standard) -> Bool {
         guard !defaults.bool(forKey: finishedKey), let snapshot else { return false }
         let deployed: Bool = switch snapshot.steam {
         case .installed, .outdated: true
         default: false
         }
-        return !(deployed && snapshot.currentFreeEngines.contains(FreeEngineWinecx.current.build))
+        return !(deployed && (snapshot.currentFreeEngines.contains(FreeEngineWinecx.current.build)
+            || !snapshot.installedRunners.isEmpty))
     }
 
     func advance() {
@@ -169,6 +203,7 @@ final class SetupAssistant {
         message = nil
         step = next
         if step == .steam {
+            refreshSteam()
             watchSignIn()
             Task { await checkTrust() }
         }
@@ -232,8 +267,12 @@ final class SetupAssistant {
         isWorking = true
         defer { isWorking = false; gptkProgress = nil }
         message = nil
+        guard refreshSpace() else {
+            message = spaceMessage
+            return
+        }
         if isPreview {
-            await pretendDownload(host: "github.com", total: 504_399_923) { gptkProgress = $0 }
+            await pretendDownload(host: "github.com", total: Self.previewComponentsBytes) { gptkProgress = $0 }
             gptk = WinecxD3DMetal.Payload(libRoot: WinecxD3DMetal.userFolder, version: nil)
             steamInstalled = true
             return
@@ -246,8 +285,14 @@ final class SetupAssistant {
             try? FileManager.default.removeItem(at: work)
             meter.clear()
         }
+        // Steam found elsewhere is not installed again, and one this account can't add to
+        // /Applications is left to the Steam step, so the toolkit is still added.
+        let addsSteam = !SteamBundle.isPresent && SetupChecks.canAddApplications()
+        var expected: Int64?
         do {
             let components = try await InstallerComponents.latest()
+            componentsBytes = components.length
+            expected = components.length
             componentsRate = DownloadRate()
             meter.pauseControl = { $0 ? control.pause() : control.resume() }
             let archive = try await components.downloadAcrossRelease(to: work, control: control) { value in
@@ -264,7 +309,8 @@ final class SetupAssistant {
             gptkProgress = String(localized: "Installing the Game Porting Toolkit")
             try await Task.detached(priority: .userInitiated) {
                 // The failure's reason also goes to app.log, which the error report includes.
-                try InstallerComponents.install(archive: archive, work: work, status: { AppLog.note("setup: components: \($0)") },
+                try InstallerComponents.install(archive: archive, work: work, addsSteam: addsSteam,
+                                                status: { AppLog.note("setup: components: \($0)") },
                                                 log: { InstallerLog.write($0); AppLog.note("setup: components: \($0)") })
             }.value
         } catch {
@@ -272,30 +318,81 @@ final class SetupAssistant {
             // The step's own reason, without the core's generic sentence in front of it.
             let detail = if case InstallerError.componentsFailure(let reason)? = error as? InstallerError { reason }
                 else { error.localizedDescription }
-            message = String(localized: "The Game Porting Toolkit wasn't added. \(detail)")
+            freeBytes = SetupChecks.freeBytes()
+            // The download's own error says nothing about space; a disk that can't hold the zip does.
+            if let free = freeBytes, let expected, free < expected * 2 {
+                message = String(localized: "The Game Porting Toolkit wasn't added. \(PinnedDownload.outOfSpaceDetail)")
+            } else {
+                message = String(localized: "The Game Porting Toolkit wasn't added. \(detail)")
+            }
         }
         gptk = WinecxD3DMetal.locate()
-        steamInstalled = SteamBundle.isPresent
+        refreshSteam()
         if gptk != nil { gptkImages = [] }
     }
 
+    // For the Graphics row; without it the row just leaves the size out.
+    func loadComponentsSize() async {
+        guard componentsBytes == nil, !isPreview else { return }
+        componentsBytes = try? await InstallerComponents.latest().length
+    }
+
+    var addsSteamWithComponents: Bool { !steamInstalled && steamAccess != .homeApplications }
+
     // MARK: Steam
 
-    func installSteam() async {
+    func refreshSteam() {
+        steamInstalled = SteamBundle.isPresent
+        if !isPreview { steamAccess = SetupChecks.steamAccess() }
+    }
+
+    // A Steam outside /Applications is used without asking, the same way Choose… in Status saves it.
+    // A saved Steam on a drive that isn't connected is waited for, not replaced.
+    func locateSteam(_ status: SystemStatus) async {
+        guard !isPreview, !SteamBundle.isPresent, !SupportPaths.Steam.isUnreachable(),
+              let found = SetupChecks.steamCandidates().first else { return }
+        AppLog.note("setup: found Steam at \(found.path(percentEncoded: false))")
+        await status.useSteam(found)
+        afterSteamChoice(status)
+    }
+
+    func chooseSteam(_ status: SystemStatus) async {
+        guard !isPreview else { return }
+        await status.chooseSteam()
+        afterSteamChoice(status)
+    }
+
+    private func afterSteamChoice(_ status: SystemStatus) {
+        if let failure = status.failure { message = failure }
+        refreshSteam()
+        signedIn = SetupChecks.steamSignedIn()
+    }
+
+    func installSteam(with status: SystemStatus) async {
+        guard refreshSpace() else {
+            message = spaceMessage
+            return
+        }
         isWorking = true
         defer { isWorking = false; steamProgress = nil }
         if isPreview {
-            await pretendDownload(host: "cdn.cloudflare.steamstatic.com", total: 4_404_019) { steamProgress = $0 }
+            await pretendDownload(host: "cdn.cloudflare.steamstatic.com", total: 3_471_749) { steamProgress = $0 }
             steamInstalled = true
             return
         }
         message = nil
+        // A standard account can't add apps to /Applications, but can to its own.
+        let target = SetupChecks.canAddApplications() ? SupportPaths.Steam.defaultApp : SetupChecks.homeSteam
         do {
-            try await SetupChecks.installSteam { label in Task { @MainActor in self.steamProgress = label } }
+            try await SetupChecks.installSteam(to: target) { label in Task { @MainActor in self.steamProgress = label } }
+            if target != SupportPaths.Steam.defaultApp {
+                await status.useSteam(target)
+                if let failure = status.failure { message = failure }
+            }
         } catch {
             message = String(localized: "Steam wasn't installed. \(error.localizedDescription)")
         }
-        steamInstalled = SteamBundle.isPresent
+        refreshSteam()
     }
 
     func openSteam() {
@@ -360,8 +457,8 @@ final class SetupAssistant {
         if isPreview {
             for task in Self.plannedTasks {
                 set(task.id, .running)
-                if task.id == "engine" {
-                    await pretendDownload(host: "github.com", total: 461_373_440) { status.activity = $0 }
+                if task.id == "download" {
+                    await pretendDownload(host: "github.com", total: 461_131_598) { status.activity = $0 }
                 } else {
                     await pretend(1.2)
                 }
@@ -374,6 +471,25 @@ final class SetupAssistant {
             message = refusal
             return
         }
+
+        // Steam stays open while these download; only the steps after quit it.
+        set("download", .running)
+        guard refreshSpace() else {
+            set("download", .failed(spaceMessage))
+            return
+        }
+        guard !status.isBusy else {
+            set("download", .failed(String(localized: "Another task is running. Retry when it ends.")))
+            return
+        }
+        do {
+            try await SetupPrefetch.run()
+        } catch {
+            AppLog.note("setup: prefetch failed: \(error.localizedDescription)")
+            set("download", .failed((error as? StepFailure)?.detail ?? error.localizedDescription))
+            return
+        }
+        set("download", .done)
 
         set("steam", .running)
         await status.installIntoSteam()
@@ -541,10 +657,13 @@ final class SetupAssistant {
         NSWorkspace.shared.open(SupportPaths.Steam.app)
     }
 
+    // Only a finished setup stays away; Not Now brings it back next launch.
     func dismiss() {
         signInWatch?.cancel()
         permissionWatch?.cancel()
-        guard !isPreview else { return }
+        guard !isPreview, Self.closingFinishes(step) else { return }
         UserDefaults.standard.set(true, forKey: Self.finishedKey)
     }
+
+    nonisolated static func closingFinishes(_ step: Step) -> Bool { step == .done }
 }

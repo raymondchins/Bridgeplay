@@ -112,6 +112,11 @@ enum PinnedDownload {
                     }
                 } catch {
                     refusals.append("\(host): \(error.localizedDescription)")
+                    // Another host has no more room on this disk than the first.
+                    if Self.outOfSpace(error) {
+                        AppLog.note("\(file) from \(host): out of space")
+                        throw StepFailure(step: step, detail: outOfSpaceDetail)
+                    }
                     kinds.insert(Self.connectionFailed(error) ? .unreachable : .failed)
                     continue hosts
                 }
@@ -157,6 +162,7 @@ enum PinnedDownload {
                     try? FileManager.default.removeItem(at: archive)
                     try FileManager.default.moveItem(at: body, to: archive)
                 } catch {
+                    if Self.outOfSpace(error) { throw StepFailure(step: step, detail: outOfSpaceDetail) }
                     throw StepFailure(
                         step: step,
                         detail: String(localized: "\(downloads.path(percentEncoded: false)) could not be written. ")
@@ -228,6 +234,27 @@ enum PinnedDownload {
         if monitor.currentPath.status != .satisfied {
             AppLog.note("network still down after \(limit), trying anyway")
         }
+    }
+
+    static var outOfSpaceDetail: String {
+        let free = SetupChecks.freeBytes().map(SetupChecks.size) ?? "0"
+        return String(localized: "Out of space (\(free) free). Free some up and retry.")
+    }
+
+    // ENOSPC or Foundation's out-of-space error anywhere in the chain, or the download task's
+    // "cannot write to file", which is how a full disk shows up mid-download.
+    static func outOfSpace(_ error: Error) -> Bool {
+        var current: NSError? = error as NSError
+        while let error = current {
+            switch (error.domain, error.code) {
+            case (NSPOSIXErrorDomain, Int(ENOSPC)), (NSCocoaErrorDomain, NSFileWriteOutOfSpaceError),
+                 (NSURLErrorDomain, NSURLErrorCannotWriteToFile):
+                return true
+            default:
+                current = error.userInfo[NSUnderlyingErrorKey] as? NSError
+            }
+        }
+        return false
     }
 
     private enum Refusal {

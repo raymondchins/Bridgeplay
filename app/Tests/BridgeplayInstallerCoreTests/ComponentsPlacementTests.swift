@@ -91,6 +91,19 @@ struct ComponentsPlacementTests {
         #expect(calls.statuses == [ComponentsPlacement.steamStatus, ComponentsPlacement.copyStatus])
     }
 
+    @Test("With addsSteam off, a Mac without Steam still gets the toolkit and Steam is left alone")
+    func steamLeftToCaller() throws {
+        let f = try fixture(steam: false)
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        let calls = Calls()
+        var placement = placement(f, calls)
+        placement.addsSteam = false
+        try placement.place(status: { calls.statuses.append($0) })
+        #expect(calls.steam.isEmpty)
+        #expect(calls.statuses == [ComponentsPlacement.copyStatus])
+        #expect(text(f.support.appending(path: "gptk/external/libd3dshared.dylib")) == "new gptk")
+    }
+
     @Test("A failed Steam install stops before anything is copied")
     func steamFailure() throws {
         let f = try fixture(steam: false)

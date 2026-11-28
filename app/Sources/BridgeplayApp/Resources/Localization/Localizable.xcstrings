@@ -111,24 +111,24 @@
         }
       }
     },
-    "%@ available, 3 GB needed" : {
+    "%@ available, %@ needed" : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ disponibili, ne servono 3 GB"
+            "value" : "%1$@ disponibili, ne servono %2$@"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Доступно %@, нужно 3 ГБ"
+            "value" : "Доступно %1$@, нужно %2$@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "可用空间 %@，需要 3 GB"
+            "value" : "可用空间 %1$@，需要 %2$@"
           }
         }
       }
@@ -375,6 +375,28 @@
         }
       }
     },
+    "%@ download." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download di %@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузка %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载 %@。"
+          }
+        }
+      }
+    },
     "%@ failed with status %d." : {
       "localizations" : {
         "it" : {
@@ -415,6 +437,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 执行失败，状态码为 %d：%@"
+          }
+        }
+      }
+    },
+    "%@ free, %@ needed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ liberi, ne servono %2$@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свободно %1$@, нужно %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余 %1$@，需要 %2$@。"
           }
         }
       }
@@ -1064,6 +1108,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@，保存在 %2$@。"
+          }
+        }
+      }
+    },
+    "%@. Adds Steam too." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@. Aggiunge anche Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@. Также добавит Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@。也会添加 Steam。"
           }
         }
       }
@@ -2014,28 +2080,6 @@
         }
       }
     },
-    "About 500 MB. Also installs Steam if this Mac doesn't have it yet." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circa 500 MB. Installa anche Steam se questo Mac non lo ha ancora."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Около 500 МБ. Также установит Steam, если его ещё нет на этом Mac."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "约 500 MB。如果这台 Mac 还没有 Steam，也会一并安装。"
-          }
-        }
-      }
-    },
     "About Bridgeplay" : {
       "localizations" : {
         "it" : {
@@ -2296,6 +2340,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在添加证书…"
+          }
+        }
+      }
+    },
+    "Adds Steam too." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiunge anche Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Также добавит Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "也会添加 Steam。"
           }
         }
       }
@@ -2586,6 +2652,28 @@
         }
       }
     },
+    "Another account owns it. Setup adds Bridgeplay for you only." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appartiene a un altro account. La configurazione aggiunge Bridgeplay solo per te."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Принадлежит другой учётной записи. Настройка добавит Bridgeplay только для вас."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它属于另一个账户。设置只会为你添加 Bridgeplay。"
+          }
+        }
+      }
+    },
     "Another installation operation is changing files here. Wait for it to finish." : {
       "localizations" : {
         "it" : {
@@ -2604,6 +2692,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "另一项安装操作正在修改此处的文件。请等待该操作完成。"
+          }
+        }
+      }
+    },
+    "Another task is running. Retry when it ends." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "È in corso un’altra operazione. Riprova quando finisce."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выполняется другая задача. Повторите, когда она завершится."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另一项任务正在运行，请在完成后重试。"
           }
         }
       }
@@ -2758,6 +2868,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple 的 Game Porting Toolkit（D3DMetal）可通过 Metal 运行 DirectX 11 和 12 游戏。Bridgeplay 可以按 Apple 的非商业许可为你下载它，你也可以添加自己从 Apple 下载的副本。"
+          }
+        }
+      }
+    },
+    "Apple's files, unmodified." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I file di Apple, senza modifiche."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файлы Apple без изменений."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 的原始文件，未做修改。"
           }
         }
       }
@@ -3531,28 +3663,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 会向 Steam.app 添加一个库，并在这台 Mac 上为 Steam 重新签名。Valve 不支持这样做，也可能违反 Steam 的条款。在“状态”中修复 Steam 即可撤销。"
-          }
-        }
-      }
-    },
-    "Bridgeplay adds itself to Steam, sets up the WineCX engine and makes it Steam's default. Steam closes for a moment." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bridgeplay si aggiunge a Steam, configura il motore WineCX e lo imposta come predefinito di Steam. Steam si chiude per un momento."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bridgeplay добавляется в Steam, настраивает движок WineCX и делает его движком Steam по умолчанию. Steam ненадолго закроется."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bridgeplay 会将自己添加到 Steam，配置 WineCX 引擎并将其设为 Steam 的默认引擎。Steam 会短暂关闭。"
           }
         }
       }
@@ -6838,6 +6948,28 @@
         }
       }
     },
+    "Download the files" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scarica i file"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скачать файлы"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载文件"
+          }
+        }
+      }
+    },
     "Download with Bridgeplay" : {
       "localizations" : {
         "it" : {
@@ -7010,6 +7142,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在下载缺失的组件"
+          }
+        }
+      }
+    },
+    "Downloads first. Then Steam closes for a moment." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prima scarica tutto. Poi Steam si chiude per un momento."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сначала загрузка. Затем Steam ненадолго закроется."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先下载，然后 Steam 会短暂关闭。"
           }
         }
       }
@@ -7956,6 +8110,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "可用空间"
+          }
+        }
+      }
+    },
+    "Free up another %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Libera altri %@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Освободите ещё %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请再腾出 %@ 空间。"
           }
         }
       }
@@ -9342,6 +9518,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在安装 Game Porting Toolkit"
+          }
+        }
+      }
+    },
+    "Installs in ~/Applications." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si installa in ~/Applications."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установится в ~/Applications."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将安装到 ~/Applications。"
           }
         }
       }
@@ -11876,6 +12074,28 @@
         }
       }
     },
+    "Open Storage" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri Spazio"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть хранилище"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开储存空间"
+          }
+        }
+      }
+    },
     "Open System Settings" : {
       "localizations" : {
         "it" : {
@@ -12028,6 +12248,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此 Mac 上的其他账户会保留各自的 Bridgeplay 文件，直到他们自行移除：%@"
+          }
+        }
+      }
+    },
+    "Out of space (%@ free). Free some up and retry." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spazio esaurito (%@ liberi). Liberane un po’ e riprova."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет места (свободно %@). Освободите место и повторите."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间不足（剩余 %@）。请腾出空间后重试。"
           }
         }
       }
@@ -14602,6 +14844,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "运行程序…"
+          }
+        }
+      }
+    },
+    "Run Setup in the owner’s account first." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esegui prima la configurazione nell’account proprietario."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сначала выполните настройку в учётной записи владельца."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先在所有者账户中完成设置。"
           }
         }
       }

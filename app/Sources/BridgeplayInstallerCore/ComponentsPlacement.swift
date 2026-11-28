@@ -17,6 +17,7 @@ struct ComponentsPlacement {
         _ = try? InstallerComponents.run("/usr/bin/defaults", ["delete", "com.bridgeplay.Bridgeplay", "setupAssistantFinished"])
     }
     var oldConfs = ComponentsPlacement.oldInstallerConfs
+    var addsSteam = true
     var log: (String) -> Void = { InstallerLog.write($0) }
 
     static let steamStatus = "Installing Steam from Valve"
@@ -34,7 +35,7 @@ struct ComponentsPlacement {
     func place(status: @escaping @Sendable (String) -> Void = { _ in },
                download: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in }) throws {
         let fm = FileManager.default
-        if !fm.fileExists(atPath: applications.appending(path: "Steam.app").path) {
+        if addsSteam, !fm.fileExists(atPath: applications.appending(path: "Steam.app").path) {
             status(Self.steamStatus)
             try installSteam(applications, download, log)
         }
