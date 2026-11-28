@@ -41,7 +41,7 @@ struct UninstallPlanSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 520)
+        .frame(width: 460)
     }
 
     private var steamLine: String {
@@ -121,7 +121,7 @@ struct UninstallChecklistSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 520)
+        .frame(width: 460)
     }
 
     private var signatureLine: String {
