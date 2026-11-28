@@ -1973,6 +1973,22 @@ find_in_game() {
   printf '%s' "$fg_path"
 }
 
+# Follows a file's own symlinks, at most 20, and prints the path they end at.
+follow_file_links() {
+  fl_path=$1
+  fl_hops=0
+  while [ -L "$fl_path" ]; do
+    fl_hops=$((fl_hops + 1))
+    [ "$fl_hops" -le 20 ] || return 1
+    fl_link=$(readlink "$fl_path") || return 1
+    case "$fl_link" in
+      /*) fl_path=$fl_link ;;
+      *) fl_path=${fl_path%/*}/$fl_link ;;
+    esac
+  done
+  printf '%s\n' "$fl_path"
+}
+
 # EXE: start the game's own exe instead of a publisher launcher that fails under Wine. Sets
 # skip_exe and skip_cwd when the launch should change; every other case starts what Steam starts.
 launcher_skip() {
@@ -2022,9 +2038,12 @@ launcher_skip() {
     gamefix_log "EXE=$sk_exe not applied: no such file in $sk_root, starting $sk_launched"
     return 0
   fi
-  # A symlink must not lead the launch out of the game folder.
+  # A symlink, to the folder or to the file itself, must not lead the launch out of the game folder.
   sk_real_root=$(cd -P "$sk_root" 2>/dev/null && pwd -P) || sk_real_root=""
-  sk_real_dir=$(cd -P "${sk_target%/*}" 2>/dev/null && pwd -P) || sk_real_dir=""
+  sk_real_dir=""
+  if sk_end=$(follow_file_links "$sk_target"); then
+    sk_real_dir=$(cd -P "${sk_end%/*}" 2>/dev/null && pwd -P) || sk_real_dir=""
+  fi
   case "$sk_real_dir/" in
     "$sk_real_root"/*) ;;
     *)

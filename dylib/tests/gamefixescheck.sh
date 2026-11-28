@@ -665,7 +665,7 @@ is "no ARGS leaves the command line alone" "[/g/game.exe][-novid]" "$out"
 echo "== EXE: skip a launcher that fails"
 skip_functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env load_gamefixes \
-	kernel_anticheat_name find_kernel_anticheat launcher_needed find_in_game launcher_skip; do
+	kernel_anticheat_name find_kernel_anticheat launcher_needed find_in_game follow_file_links launcher_skip; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	skip_functions="$skip_functions
@@ -793,6 +793,29 @@ default_conf 'EXE=link/evil.exe'
 skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
 is "a symlink out of the game folder is not followed" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
 has "and logged" "EXE=link/evil.exe not applied: it leads outside $case_dir/game" "$case_dir/log"
+
+skip_case
+outside=$(mktemp -d "$work/outside.XXXXXX")
+printf 'MZ elsewhere\n' > "$outside/evil.exe"
+ln -s "$outside/evil.exe" "$case_dir/game/far.exe"
+ln -s far.exe "$case_dir/game/near.exe"
+default_conf 'EXE=near.exe'
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+is "an exe that links out of the game folder is not followed" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
+has "and logged" "EXE=near.exe not applied: it leads outside $case_dir/game" "$case_dir/log"
+
+skip_case
+ln -s Cities2.exe "$case_dir/game/alias.exe"
+default_conf 'EXE=alias.exe'
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+is "an exe that links inside the game folder is started" "[$case_dir/game/alias.exe][-steamarg]" "$(cmdline)"
+
+skip_case
+ln -s loop2.exe "$case_dir/game/loop1.exe"
+ln -s loop1.exe "$case_dir/game/loop2.exe"
+default_conf 'EXE=loop1.exe'
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+is "a symlink loop is not followed" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
 
 for bad_exe in '/abs/game.exe' '../game.exe' 'a/../game.exe' './game.exe' 'a//game.exe' 'a\b.exe' \
 	'game.bat' 'game.exe/' 'g*.exe' 'g;x.exe' 'g$x.exe'; do
