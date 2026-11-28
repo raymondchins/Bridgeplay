@@ -749,6 +749,28 @@
         }
       }
     },
+    "%@ is not signed by Valve: %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ non è firmato da Valve: %2$@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ не подписан Valve: %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 未由 Valve 签名：%2$@"
+          }
+        }
+      }
+    },
     "%@ is not the Steam bundle. Expected Identifier=%@." : {
       "localizations" : {
         "it" : {
@@ -767,6 +789,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 不是 Steam 应用包。预期 Identifier=%@。"
+          }
+        }
+      }
+    },
+    "%@ is not there" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non c'è"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ отсутствует"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 不存在"
           }
         }
       }
@@ -811,6 +855,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 正在运行。请先退出游戏。"
+          }
+        }
+      }
+    },
+    "%@ is signed by Valve (%@)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ è firmato da Valve (%2$@)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ подписан Valve (%2$@)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 由 Valve 签名（%2$@）"
           }
         }
       }
@@ -3685,6 +3751,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 无法在 Intel 版 Mac 上运行。"
+          }
+        }
+      }
+    },
+    "Bridgeplay files still in Steam:" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File di Bridgeplay ancora in Steam:"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файлы Bridgeplay, оставшиеся в Steam:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍在 Steam 中的 Bridgeplay 文件："
           }
         }
       }
@@ -10424,6 +10512,28 @@
         }
       }
     },
+    "Moved to the Trash:" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spostati nel Cestino:"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перемещено в Корзину:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已移到废纸篓："
+          }
+        }
+      }
+    },
     "Moving to the Bridgeplay folders failed" : {
       "localizations" : {
         "it" : {
@@ -10574,6 +10684,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂无备份"
+          }
+        }
+      }
+    },
+    "No Bridgeplay files in Steam" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun file di Bridgeplay in Steam"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В Steam нет файлов Bridgeplay"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 中没有 Bridgeplay 文件"
           }
         }
       }
@@ -11542,6 +11674,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "或从 Apple 下载"
+          }
+        }
+      }
+    },
+    "Other accounts on this Mac keep their own Bridgeplay files until they remove them: %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gli altri account su questo Mac conservano i propri file di Bridgeplay finché non li rimuovono: %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Другие учётные записи на этом Mac сохраняют свои файлы Bridgeplay, пока не удалят их: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 Mac 上的其他账户会保留各自的 Bridgeplay 文件，直到他们自行移除：%@"
           }
         }
       }
@@ -12756,6 +12910,28 @@
         }
       }
     },
+    "Remains:" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimane:"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Осталось:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留："
+          }
+        }
+      }
+    },
     "Remove" : {
       "localizations" : {
         "it" : {
@@ -13038,6 +13214,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已移除构建版本 %@。"
+          }
+        }
+      }
+    },
+    "Removed:" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimossi:"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалено:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已移除："
           }
         }
       }
@@ -18827,6 +19025,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "验证 CrossOver 许可证"
+          }
+        }
+      }
+    },
+    "Verify:" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verifica:"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证："
           }
         }
       }

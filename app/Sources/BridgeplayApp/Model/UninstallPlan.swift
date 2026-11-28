@@ -306,12 +306,12 @@ struct UninstallChecklist: Sendable {
                 lines.append("  \(item.path)" + (extra.isEmpty ? "" : "  (\(extra))"))
             }
         }
-        section("Removed:", removed)
-        section("Moved to the Trash:", trashed)
-        section("Remains:", remains)
+        section(String(localized: "Removed:"), removed)
+        section(String(localized: "Moved to the Trash:"), trashed)
+        section(String(localized: "Remains:"), remains)
         if !otherUsers.isEmpty {
-            lines.append("Other accounts on this Mac keep their own Bridgeplay files until they remove them: "
-                + otherUsers.joined(separator: ", "))
+            let names = otherUsers.joined(separator: ", ")
+            lines.append(String(localized: "Other accounts on this Mac keep their own Bridgeplay files until they remove them: \(names)"))
         }
         lines.append(verification.text)
         return lines.joined(separator: "\n")
@@ -320,16 +320,16 @@ struct UninstallChecklist: Sendable {
 
 extension UninstallVerification {
     var text: String {
-        var lines = ["Verify:"]
+        var lines = [String(localized: "Verify:")]
         switch signature {
-        case .valve: lines.append("  [ok] \(app.plainPath) is signed by Valve (\(SteamRepair.valveTeam))")
-        case .missing: lines.append("  [--] \(app.plainPath) is not there")
-        case .notValve(let why): lines.append("  [!!] \(app.plainPath) is not signed by Valve: \(why)")
+        case .valve: lines.append("  [ok] " + String(localized: "\(app.plainPath) is signed by Valve (\(SteamRepair.valveTeam))"))
+        case .missing: lines.append("  [--] " + String(localized: "\(app.plainPath) is not there"))
+        case .notValve(let why): lines.append("  [!!] " + String(localized: "\(app.plainPath) is not signed by Valve: \(why)"))
         }
         if leftInSteam.isEmpty {
-            lines.append("  [ok] No Bridgeplay files in Steam")
+            lines.append("  [ok] " + String(localized: "No Bridgeplay files in Steam"))
         } else {
-            lines.append("  [!!] Bridgeplay files still in Steam:")
+            lines.append("  [!!] " + String(localized: "Bridgeplay files still in Steam:"))
             lines += leftInSteam.map { "       \($0.path)" + ($0.note.map { " (\($0))" } ?? "") }
         }
         return lines.joined(separator: "\n")
