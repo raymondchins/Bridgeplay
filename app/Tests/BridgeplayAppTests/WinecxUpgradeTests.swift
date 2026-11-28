@@ -237,4 +237,49 @@ struct WinecxUpgradeTests {
         #expect(try String(contentsOf: file, encoding: .utf8) == text)
         #expect(SteamDefaultTool.readBackup(backup)?.applied == Self.old)
     }
+
+    @Test("Steam starting while the move is recorded leaves its config alone and the record as it was")
+    func followSteamStartsDuringRecord() throws {
+        let dir = try scratchDirectory("winecx-default-steam-starts")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appending(path: "config.vdf")
+        let backup = dir.appending(path: "backups/steam-default-tool.json")
+        let text = Self.vdf([("0", Self.old)])
+        try text.write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: backup.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let before = try JSONEncoder().encode(SteamDefaultTool.Backup(previous: nil, applied: Self.old))
+        try before.write(to: backup)
+        try FileManager.default.createDirectory(
+            at: dir.appending(path: "compatibilitytools.d/\(Self.new)"), withIntermediateDirectories: true)
+
+        var checks = 0
+        #expect(try follow(dir, steamRunning: { checks += 1; return checks > 2 }) == .steamRunning)
+        #expect(try String(contentsOf: file, encoding: .utf8) == text)
+        #expect(try Data(contentsOf: backup) == before)
+        #expect(try follow(dir) == .updated)
+        #expect(SteamDefaultTool.readBackup(backup)?.applied == Self.new)
+    }
+
+    @Test("A config write that fails puts the record back")
+    func followConfigWriteFails() throws {
+        let dir = try scratchDirectory("winecx-default-config-refused")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dir.path(percentEncoded: false))
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let file = dir.appending(path: "config.vdf")
+        let backup = dir.appending(path: "backups/steam-default-tool.json")
+        let text = Self.vdf([("0", Self.old)])
+        try text.write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: backup.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let before = try JSONEncoder().encode(SteamDefaultTool.Backup(previous: nil, applied: Self.old))
+        try before.write(to: backup)
+        try FileManager.default.createDirectory(
+            at: dir.appending(path: "compatibilitytools.d/\(Self.new)"), withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: dir.path(percentEncoded: false))
+
+        #expect(throws: (any Error).self) { try follow(dir) }
+        #expect(try String(contentsOf: file, encoding: .utf8) == text)
+        #expect(try Data(contentsOf: backup) == before)
+    }
 }

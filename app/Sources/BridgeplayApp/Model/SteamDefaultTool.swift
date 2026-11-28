@@ -311,16 +311,40 @@ enum SteamDefaultTool {
             text, from: older, previous: previous, to: current, backup: readBackup(backup))
         else { return .unchanged }
         guard !steamRunning() else { return .steamRunning }
-        try WriteRefused.catching(file) { try result.write(to: file, atomically: true, encoding: .utf8) }
-        // A backup that still names the older tool would move a user who picks it back later.
+        // A backup that still names the older tool would move a user who picks it back later, so
+        // the record is written first. Undoing a failed move then only touches the record, never
+        // Steam's config a second time.
+        let record = try? Data(contentsOf: backup)
         do {
             try writeApplied(current, backup: backup)
         } catch {
-            AppLog.note("default tool: could not record \(current), putting the default back: \(error.localizedDescription)")
-            try WriteRefused.catching(file) { try text.write(to: file, atomically: true, encoding: .utf8) }
+            AppLog.note("default tool: could not record \(current), the default stays: \(error.localizedDescription)")
             return .failed
         }
+        guard !steamRunning() else {
+            putBack(record, at: backup)
+            return .steamRunning
+        }
+        do {
+            try WriteRefused.catching(file) { try result.write(to: file, atomically: true, encoding: .utf8) }
+        } catch {
+            putBack(record, at: backup)
+            throw error
+        }
         return .updated
+    }
+
+    // Restores the backup file as it was before a move that did not happen.
+    private static func putBack(_ record: Data?, at backup: URL) {
+        do {
+            if let record {
+                try record.write(to: backup, options: .atomic)
+            } else if FileManager.default.fileExists(atPath: backup.path(percentEncoded: false)) {
+                try FileManager.default.removeItem(at: backup)
+            }
+        } catch {
+            AppLog.note("default tool: could not put the record back: \(error.localizedDescription)")
+        }
     }
 
     // Replaces the "0" entry under CompatToolMapping, or adds it (and CompatToolMapping) when
