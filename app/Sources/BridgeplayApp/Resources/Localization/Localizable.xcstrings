@@ -1552,6 +1552,28 @@
         }
       }
     },
+    "A Windows file didn't load." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un file di Windows non si è caricato."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не загрузился файл Windows."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个 Windows 文件未能载入。"
+          }
+        }
+      }
+    },
     "A backup of %@ needs %@, and its drive has %@ free. Nothing was copied." : {
       "localizations" : {
         "it" : {
@@ -2604,6 +2626,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "其他工具修改了 Steam。请修复 Steam 后再使用 Bridgeplay。"
+          }
+        }
+      }
+    },
+    "Anti-cheat needs Windows." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'anti-cheat richiede Windows."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Античиту нужна Windows."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "反作弊需要 Windows。"
           }
         }
       }
@@ -5295,6 +5339,28 @@
         }
       }
     },
+    "Closed early." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiuso in anticipo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрылась раньше времени."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提前关闭。"
+          }
+        }
+      }
+    },
     "Compatibility Tool" : {
       "localizations" : {
         "it" : {
@@ -6017,6 +6083,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法写入文件。"
+          }
+        }
+      }
+    },
+    "Crashed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arresto anomalo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сбой."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已崩溃。"
           }
         }
       }
@@ -7120,6 +7208,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "引擎"
+          }
+        }
+      }
+    },
+    "Engine missing. Set it up again below." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motore mancante. Configuralo di nuovo qui sotto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Движок отсутствует. Настройте его заново ниже."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引擎缺失。请在下方重新设置。"
           }
         }
       }
@@ -8422,6 +8532,28 @@
         }
       }
     },
+    "Hide" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скрыть"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏"
+          }
+        }
+      }
+    },
     "Hides raw HID devices from the game, so pads only show up through SDL. Try it if a game sees one controller twice or ignores yours." : {
       "localizations" : {
         "it" : {
@@ -9386,6 +9518,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保留"
+          }
+        }
+      }
+    },
+    "Last Launch" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ultimo avvio"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последний запуск"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次启动"
           }
         }
       }
@@ -10622,6 +10776,50 @@
         }
       }
     },
+    "Needs Rosetta, which isn't installed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serve Rosetta, che non è installato."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нужна Rosetta, но она не установлена."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要 Rosetta，但尚未安装。"
+          }
+        }
+      }
+    },
+    "Needs macOS 26.5, or its Rosetta tool in Steam." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serve macOS 26.5 o il suo strumento Rosetta in Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нужна macOS 26.5 или его инструмент Rosetta в Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要 macOS 26.5，或在 Steam 中选用其 Rosetta 工具。"
+          }
+        }
+      }
+    },
     "Needs rebuilding" : {
       "localizations" : {
         "it" : {
@@ -10926,6 +11124,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未找到受支持的 Wine 引擎。请先下载免费的 WineHQ 或 WineCX 引擎。"
+          }
+        }
+      }
+    },
+    "No window opened." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna finestra aperta."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Окно не открылось."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未打开窗口。"
           }
         }
       }
@@ -12316,6 +12536,28 @@
         }
       }
     },
+    "Quit normally." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiuso normalmente."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершилась нормально."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正常退出。"
+          }
+        }
+      }
+    },
     "Quit your game first." : {
       "localizations" : {
         "it" : {
@@ -12620,6 +12862,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重建游戏容器"
+          }
+        }
+      }
+    },
+    "Rebuild Prefix…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricrea prefisso…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пересоздать префикс…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重建前缀…"
           }
         }
       }
@@ -13456,6 +13720,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "替换 %@ 失败。%@"
+          }
+        }
+      }
+    },
+    "Report" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сообщить"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告"
           }
         }
       }
@@ -15528,6 +15814,28 @@
         }
       }
     },
+    "Started outside Steam, so the result is unknown." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avviato fuori da Steam, esito sconosciuto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запущена вне Steam, итог неизвестен."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Steam 之外启动，结果未知。"
+          }
+        }
+      }
+    },
     "Status" : {
       "localizations" : {
         "it" : {
@@ -16759,6 +17067,182 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要停止遗留的 Wine 进程吗？"
+          }
+        }
+      }
+    },
+    "Stopped" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановлено"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已停止"
+          }
+        }
+      }
+    },
+    "Stopped after %lld min" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto dopo %lld min"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановлено через %lld мин"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分钟后停止"
+          }
+        }
+      }
+    },
+    "Stopped after %lld s" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto dopo %lld s"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановлено через %lld с"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 秒后停止"
+          }
+        }
+      }
+    },
+    "Stopped before starting. See the log." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto prima dell'avvio. Vedi il log."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановлена до запуска. См. журнал."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在启动前停止。请查看日志。"
+          }
+        }
+      }
+    },
+    "Stopped by macOS or Wine." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto da macOS o Wine."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановлена macOS или Wine."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "被 macOS 或 Wine 停止。"
+          }
+        }
+      }
+    },
+    "Stopped from Steam." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto da Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановлено из Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已从 Steam 停止。"
+          }
+        }
+      }
+    },
+    "Stopped outside Steam." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto fuori da Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановлена вне Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Steam 之外被停止。"
+          }
+        }
+      }
+    },
+    "Stopped unexpectedly." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto inaspettatamente."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Неожиданно остановлена."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "意外停止。"
           }
         }
       }
@@ -18963,6 +19447,28 @@
         }
       }
     },
+    "Used a CPU instruction this Mac lacks." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ha usato un'istruzione CPU che questo Mac non ha."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Использована инструкция процессора, которой нет у этого Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用了此 Mac 不支持的 CPU 指令。"
+          }
+        }
+      }
+    },
     "Uses MetalFX when a game turns DLSS on." : {
       "localizations" : {
         "it" : {
@@ -20307,6 +20813,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS 需要先获得你的许可。"
+          }
+        }
+      }
+    },
+    "macOS stopped it, likely low memory." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS l'ha interrotto, forse per poca memoria."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS остановила игру, вероятно, из‑за нехватки памяти."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 停止了它，可能是内存不足。"
           }
         }
       }
