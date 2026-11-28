@@ -137,6 +137,25 @@ over:
 | `aborted` | any other stop before the game started | `steam` when Steam's Stop did it, else `unknown` |
 
 The codes before the game started (the last five) leave `exit` empty and `seconds` at `0`.
+
+### Why it stopped, and a way out of a hang
+
+Right after the record, `launch_ended` starts `BridgeplayApp --launch-ended-panel <compatdata>`
+(`LaunchEnded.swift`) reparented to launchd, and the app calls `setsid`, so Steam shows Play
+again at once. The app reads the record and shows the Status card's sentence (`LaunchVerdict`)
+with one button: See Reports opens `bridgeplay.dev/compatibility/<slug>-<appid>`, which the site
+redirects to the game's page (`HelpLinks.gamePage`); a kernel anti-cheat gets Other Ways to
+Play. It shows nothing after `ok`, a Steam Stop after a window, a kill from outside Steam,
+`launch_services`, `generic_failure`, `game_error` or `exit_code` after a minute (some games
+quit with 1), or a stop before the game started (those have their own alerts), nor for a record
+older than two minutes. It goes when the game is launched again, or after 30 minutes.
+Without the app, or with one from before the flag, nothing is shown.
+
+The launch panel (`LaunchProgress.swift`) asks Keep Waiting or Stop Game after 120 seconds in
+step `start` with no game window. Stop Game sends TERM to the run script, as Steam's Stop does,
+and the panel stays until the script ends, so the record says `stopped_from_steam` with an empty
+`window` and the panel above says the game never opened a window. A question nobody answered
+stays up past the panel's 15-minute limit.
 `=== session health:` in the run log is separate: `healthy` only after a minute or more
 without a crash, `failed` for a crash within the first minute that Steam did not stop, and
 `unknown` with its reason otherwise.

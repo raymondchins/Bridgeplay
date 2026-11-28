@@ -9,7 +9,7 @@ SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 
 extract() { sed -n "/^$1() {\$/,/^}\$/p" "$SRC"; }
 functions=""
-for name in launch_progress launch_step; do
+for name in launch_progress launch_step launch_ended; do
 	body=$(extract "$name")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -128,6 +128,74 @@ for name in show_alert show_rebuild_failure rebuild_prefix; do
 		*) bad "$name hides the panel" "launch_step dialog" "missing" ;;
 	esac
 done
+
+echo "== after the game ended =="
+# launch_ended starts the why-it-stopped panel. The stand-in records its arguments, the
+# descriptors it got and, once the script's subshell is gone, its parent.
+ended_app="$work/Ended.app/Contents/MacOS/BridgeplayApp"
+mkdir -p "$(dirname "$ended_app")"
+cat > "$ended_app" <<'APP'
+#!/bin/sh
+# knows --launch-ended-panel
+out="$(dirname "$0")/ended"
+printf '%s\n' "$@" > "$out.args"
+for fd in 5 6 7 8 9; do { true >&"$fd"; } 2>/dev/null && echo "$fd" >> "$out.fds"; done
+sleep 0.5
+echo "$PPID" > "$out.parent"
+mv "$out.args" "$out"
+sleep 3
+APP
+chmod +x "$ended_app"
+ended="$(dirname "$ended_app")/ended"
+old_ended="$work/OldEnded.app/Contents/MacOS/BridgeplayApp"
+mkdir -p "$(dirname "$old_ended")"
+sed 's/^# knows --launch-ended-panel$/# an older app/' "$ended_app" > "$old_ended"
+chmod +x "$old_ended"
+
+# ended VERB CODE WINDOW [APP]: the end of one launch, with lock-like descriptors open
+ended() {
+	rm -f "$ended" "$ended.fds" "$ended.parent" "$(dirname "$old_ended")/ended"
+	if [ -n "${4:-}" ]; then printf '%s' "$4" > "$support/app-executable"; else rm -f "$support/app-executable"; fi
+	env verb="$1" code="$2" window="$3" app_id=3372060 np_support="$support" log="$work/log" \
+		STEAM_COMPAT_DATA_PATH="$compat" functions="$functions" work="$work" \
+		sh -ec 'eval "$functions"
+exec 5>> "$work/log.lock" 6>> "$work/log.lock" 7>> "$work/log.lock" 8>> "$work/log.lock" 9>> "$work/log.lock"
+before=$(date +%s)
+launch_ended "$code" "$window"
+echo $(($(date +%s) - before)) > "$work/took"'
+	took=$(cat "$work/took")
+}
+wait_ended() { i=0; while [ ! -f "$ended" ] && [ "$i" -lt 30 ]; do sleep 0.1; i=$((i + 1)); done; }
+
+ended waitforexitandrun access_violation 3 "$ended_app"
+is "the script does not wait for the panel" yes "$([ "$took" -le 1 ] && echo yes || echo no)"
+wait_ended
+is "a crash starts the panel with the prefix" "--launch-ended-panel|$compat" "$(paste -sd '|' - < "$ended" 2>/dev/null)"
+is "out of the script's process tree, so Steam shows Play" 1 "$(cat "$ended.parent" 2>/dev/null)"
+is "no descriptor of the launch is handed to it" "" "$(cat "$ended.fds" 2>/dev/null)"
+ended waitforexitandrun stopped_from_steam "" "$ended_app"
+wait_ended
+is "a stop with no window ever starts it" yes "$([ -f "$ended" ] && echo yes || echo no)"
+for case in "ok|" "ok|8" "launch_services|" "stopped_from_steam|8" "stopped_from_steam|-"; do
+	ended waitforexitandrun "${case%|*}" "${case#*|}" "$ended_app"
+	sleep 0.8
+	is "no panel after ${case%|*} with window [${case#*|}]" no "$([ -f "$ended" ] && echo yes || echo no)"
+done
+ended run access_violation 3 "$ended_app"
+sleep 0.8
+is "Steam's helpers get none" no "$([ -f "$ended" ] && echo yes || echo no)"
+ended waitforexitandrun access_violation 3 "$old_ended"
+sleep 0.8
+is "an app without the flag is not started" no "$([ -f "$(dirname "$old_ended")/ended" ] && echo yes || echo no)"
+ended waitforexitandrun access_violation 3 ""
+is "no app: nothing, and no error" 0 "$took"
+end_record_at=$(at '^write_last_launch "${outcome')
+end_panel_at=$(at '^launch_ended "${outcome')
+if [ -n "$end_record_at" ] && [ -n "$end_panel_at" ] && [ $((end_panel_at - end_record_at)) -eq 1 ]; then
+	ok "the panel starts right after the record it reads is written"
+else
+	bad "the panel starts right after the record it reads is written" "write_last_launch, then launch_ended" "$end_record_at, $end_panel_at"
+fi
 
 [ "$fails" -eq 0 ] || { echo "launchprogresscheck: $fails failed"; exit 1; }
 echo "==> launchprogresscheck: the launch panel starts beside the launch"

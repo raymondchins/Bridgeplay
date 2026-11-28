@@ -149,7 +149,9 @@ struct LastLaunch: Equatable, Sendable, Identifiable {
 
     var id: String { "\(prefix.id)@\(Int(ended.timeIntervalSince1970))" }
 
-    var duration: String {
+    var duration: String { Self.duration(seconds: seconds) }
+
+    static func duration(seconds: Int?) -> String {
         guard let seconds else { return String(localized: "Stopped") }
         if seconds < 120 { return String(localized: "Stopped after \(seconds) s") }
         return String(localized: "Stopped after \(seconds / 60) min")
