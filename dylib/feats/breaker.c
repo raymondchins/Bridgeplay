@@ -663,11 +663,6 @@ void np_health_web(const char *shape, size_t applied, size_t total, int drifted)
         pthread_mutex_unlock(&g_lock);
         return;
     }
-    set_str(last_shape, sizeof last_shape, shape);
-    last_applied = applied;
-    last_total = total;
-    last_drifted = drifted;
-
     char pkg[PATH_MAX], build[24], channel[64];
     package_dir(pkg, sizeof pkg);
     np_steam_build(pkg, build, sizeof build);
@@ -686,7 +681,14 @@ void np_health_web(const char *shape, size_t applied, size_t total, int drifted)
         cJSON_AddNumberToObject(root, "gates_total", (double)total);
         cJSON_AddBoolToObject(root, "drifted", drifted != 0);
     }
-    if (write_json(path, root) != 0)
+    // Remembered only once written, so the same report is tried again after a failed write.
+    if (write_json(path, root) != 0) {
         NP_WARN("breaker: could not write %s", path);
+    } else {
+        set_str(last_shape, sizeof last_shape, shape);
+        last_applied = applied;
+        last_total = total;
+        last_drifted = drifted;
+    }
     pthread_mutex_unlock(&g_lock);
 }

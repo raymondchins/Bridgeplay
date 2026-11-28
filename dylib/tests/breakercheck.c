@@ -396,6 +396,18 @@ static void chunk_cases(void) {
     fake_patch = 1;
 }
 
+static void web_retry_case(void) {
+    chmod(support, 0500);
+    np_health_web("vite", 3, 4, 0);
+    chmod(support, 0755);
+    np_health_web("vite", 3, 4, 0);
+    cJSON *j = load_json(support, NP_HEALTH_WEB_FILE);
+    CHECK("a report that failed to write is written by the next identical one",
+          j && strcmp(jstr(j, "shape"), "vite") == 0 && jnum(j, "gates_applied") == 3 &&
+          jnum(j, "gates_total") == 4);
+    cJSON_Delete(j);
+}
+
 static int scrub(const char *path, const struct stat *st, int flag, struct FTW *ftw) {
     (void)st; (void)flag; (void)ftw;
     if (strncmp(path, root, strlen(root)) != 0) return -1;
@@ -419,6 +431,7 @@ int main(void) {
     file_cases();
     runtime_cases();
     chunk_cases();
+    web_retry_case();
 
     // Only temp files could be left, and none may be.
     int strays = 0;
