@@ -174,6 +174,9 @@ for (const form of Object.keys(FORMS)) {
   written.length = 0;
   fl('').enable(true);
   t.ok(last().trim() === 'BRIDGEPLAY_FPS_LIMIT=60 %command%', `switching on with no value takes the slider's (${last()})`);
+  written.length = 0;
+  fl('WINEDEBUG=-all BRIDGEPLAY_FPS_LIMIT=60').enable(false);
+  t.ok(last().trim() === 'WINEDEBUG=-all %command%', `switching off a limit at the top drops it and the switch (${last()})`);
   globalThis.MSCXFx = { g: { BRIDGEPLAY_FPS_LIMIT: '40' }, a: {}, e: {}, d: {} };
   L = fl('');
   t.ok(!L.off && L.v === 40, 'the Game Defaults limit shows');
@@ -428,6 +431,17 @@ for (const form of Object.keys(FORMS)) {
   written.length = 0;
   limit(nnodes('-novid')).enable(true);
   t.ok(last() === NAT + ' BRIDGEPLAY_FPS_LIMIT=60 %command% -novid', `a native game gets the limit under np-native (${last()})`);
+  written.length = 0;
+  limit(nnodes(NAT + ' BRIDGEPLAY_FPS_LIMIT=60 %command% -novid')).enable(false);
+  t.ok(last() === NAT + ' %command% -novid',
+       `switching off the limit switching on gave leaves nothing behind (${last()})`);
+  written.length = 0;
+  limit(nnodes(NAT + ' %command% -novid')).enable(true);
+  t.ok(last() === NAT + ' BRIDGEPLAY_FPS_LIMIT=60 %command% -novid', `and on again restores it (${last()})`);
+  written.length = 0;
+  limit(nnodes(NAT + ' BRIDGEPLAY_FPS_LIMIT=45 %command% -novid')).enable(false);
+  t.ok(last() === NAT + ' BRIDGEPLAY_FPS_LIMIT=45 BRIDGEPLAY_FPS_LIMIT_OFF=1 %command% -novid',
+       `a value under the top is kept while off (${last()})`);
   written.length = 0;
   limit(nnodes(NAT + ' BRIDGEPLAY_FPS_LIMIT=60 %command% -novid')).slide(30);
   t.ok(last() === NAT + ' BRIDGEPLAY_FPS_LIMIT=30 %command% -novid', `and its slider writes there too (${last()})`);

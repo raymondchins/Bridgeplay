@@ -730,7 +730,9 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
        is on, so a value from the game, which knows that display, is kept up to 360 even when \
        Fx.fm, read when Steam loaded this page, is lower. display and half from earlier releases show as the rate they give, 0 or no value \
        as no limit. Without Steam's slider, a menu in steps of 5 stands in. npKey and npSet are for \
-       MSCXApply, which sets the value even while the switch dims the slider. ex is one more row \
+       MSCXApply, which sets the value even while the switch dims the slider. Switching off a \
+       limit at the slider's top, with no default limit under it, drops both keys: switching \
+       on again gives the same value. ex is one more row \
        under the switch (Cool and steady, BRIDGEPLAY_SUSTAINED, for Wine games). */ \
     "fm=+Fx.fm>=15&&+Fx.fm<=360?+Fx.fm:60," \
     "lf=x=>{x=(x||\"\").toLowerCase();return x===\"display\"?fm:x===\"half\"?Math.max(15,Math.round(fm/2)):" \
@@ -739,8 +741,10 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "FL=(l,dl,ex)=>{const n=lf(ev(\"BRIDGEPLAY_FPS_LIMIT\")),off=!n||ev(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",v=n||fm," \
     "set=(x,top)=>{x=Math.min(top||fm,Math.max(15,Math.round(+x)));if(!(x>=15))return;const b=dv(\"BRIDGEPLAY_FPS_LIMIT\");" \
     "s([[\"BRIDGEPLAY_FPS_LIMIT\",/^\\d+$/.test(b)&&+b===x?\"\":String(x)]])}," \
-    "tog=on=>{const d=!on,b=dv(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\",ps=[[\"BRIDGEPLAY_FPS_LIMIT_OFF\",d?(b?\"\":\"1\"):(b?\"0\":\"\")]];" \
-    "d||n||ps.push([\"BRIDGEPLAY_FPS_LIMIT\",String(v)]);s(ps)}," \
+    "tog=on=>{const d=!on,b=dv(\"BRIDGEPLAY_FPS_LIMIT_OFF\")===\"1\"," \
+    "cl=d&&+g(\"BRIDGEPLAY_FPS_LIMIT\")===fm&&!lf(dv(\"BRIDGEPLAY_FPS_LIMIT\"))," \
+    "ps=[[\"BRIDGEPLAY_FPS_LIMIT_OFF\",d?(b||cl?\"\":\"1\"):(b?\"0\":\"\")]];" \
+    "cl&&ps.push([\"BRIDGEPLAY_FPS_LIMIT\",\"\"]);d||n||ps.push([\"BRIDGEPLAY_FPS_LIMIT\",String(v)]);s(ps)}," \
     "R=[];for(let x=15;x<fm;x+=5)R.push(x);R.push(fm);R.indexOf(v)<0&&R.push(v);" \
     "return(0," RT ".jsxs)(" BARREL ".XY,{label:l,children:[(0," RT ".jsx)(\"div\",{className:off?\"MSCXDim\":\"\",children:" \
     "SL?(0," RT ".jsx)(SL,{min:15,max:fm,value:v,showValue:!0,valueSuffix:\" FPS\",disabled:off," \
