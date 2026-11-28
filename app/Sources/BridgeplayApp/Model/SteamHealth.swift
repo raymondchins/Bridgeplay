@@ -120,6 +120,12 @@ enum SteamHealthStore {
     static let bootFile = "boot.json"
     static let pausedFile = "paused"
 
+    // Pause, the crash-loop breaker and the pause list all start Steam without the hooks, and
+    // that Steam configures Windows games for macOS and removes their content. Off until an off
+    // mode keeps the compat layer on; matches NP_BREAKER_OFF_MODES in dylib/feats/breaker.h.
+    // CEILING: off modes disabled outright — re-enable once pause keeps the compat hooks in.
+    static let offModesEnabled = false
+
     // The dylib's np_support_path: .../bridgeplay, or the old .../notproton while only it exists.
     static func supportFolder(home: URL = SupportPaths.home) -> URL {
         let support = home.appending(path: "Library/Application Support")
