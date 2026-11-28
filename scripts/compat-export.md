@@ -16,6 +16,9 @@ scripts/compat-export.py build out                      # compat.json, compat-in
 make compat-export-check                                # the fixture tests
 ```
 
+The workflow adds new reports hourly, prunes once a day and runs `--full` on Sundays (UTC),
+so a report edited after it was read is picked up within a week.
+
 A `--full` read that finds under 90% of the stored reports, or a prune listing under half, stops
 without changing the store (`--force` accepts it). `build` writes nothing when a file would match
 an email, Steam ID, IP address, install ID or home-folder pattern.

@@ -60,6 +60,8 @@ jobs:
           daily=0
           mode=""
           [ "$SCHEDULE" != "53 3 * * *" ] || { daily=1; mode=--prune; }
+          # On Sundays the daily run re-reads every report, so edited reports catch up too.
+          [ "$mode" != --prune ] || [ "$(date -u +%u)" != 7 ] || mode=--full
           [ "$FULL" != "true" ] || { daily=1; mode=--full; }
           [ -n "$old" ] || { daily=1; mode=--full; }
           python3 scripts/compat-export.py fetch out $mode
