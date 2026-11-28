@@ -540,14 +540,17 @@ def votes(reports, now):
 def broken_since(counted, key):
     """'Broken since': it ran well on at least half the Macs up to the newest build it ran well
     on, then at least BROKEN_MIN Macs did not run it on newer builds, and they are most of the
-    reports on those builds. Returns the oldest failing report and how many failed, or None."""
-    played = [r[key] for r in counted if BUCKET[r["status"]] == "playable" and r.get(key)]
+    reports on those builds. Returns the oldest failing report and how many failed, or None.
+    Reports that don't name the build are on neither side: an older report without a Steam
+    build is no report from build zero."""
+    counted = [r for r in counted if r.get(key)]
+    played = [r[key] for r in counted if BUCKET[r["status"]] == "playable"]
     if not played:
         return None
-    older = [r for r in counted if (r.get(key) or 0) <= max(played)]
+    older = [r for r in counted if r[key] <= max(played)]
     if sum(1 for r in older if BUCKET[r["status"]] == "playable") * 2 < len(older):
         return None
-    newer = [r for r in counted if (r.get(key) or 0) > max(played)]
+    newer = [r for r in counted if r[key] > max(played)]
     failed = [r for r in newer if BUCKET[r["status"]] == "broken"]
     if len(failed) < BROKEN_MIN or len(failed) * 2 <= len(newer):
         return None

@@ -337,6 +337,22 @@ class Pieces(unittest.TestCase):
         before = [dict(rows[0], n=20 + k, chip=f"M{k} Max", status="borked") for k in range(1, 5)]
         self.assertEqual(ce.verdict(rows[:5] + before, now)["label"], "doesnt_run")
 
+    def test_unknown_steam_builds_hide_no_regression(self):
+        # Schema 1 reports carry no Steam build. They are no reports from build zero, so failures
+        # without one don't outweigh the successes on the older Steam build.
+        now = datetime.datetime(2026, 11, 27, tzinfo=datetime.timezone.utc)
+        rows = []
+        for k, (status, steam) in enumerate([("platinum", 1795500000), ("gold", 1795500000), ("borked", 1795567705),
+                                             ("borked", 1795567705), ("borked", None), ("borked", None), ("borked", None)]):
+            rows.append({"n": k, "date": "2026-11-20T00:00:00Z", "status": status, "build": 83, "steam": steam,
+                         "version": "0.7.66 (83)", "chip": f"M{k + 1}", "memory": "16 GB", "macos": "macOS 26.1"})
+        v = ce.verdict(rows, now)
+        self.assertEqual((v["label"], v["since"]), ("broken_since", "Steam build 1795567705"))
+        first, failed = ce.broken_since(ce.votes(rows, now), "steam")
+        self.assertEqual((first["steam"], failed), (1795567705, 2))
+        # Without a build on either side there is nothing to compare.
+        self.assertIsNone(ce.broken_since([dict(r, steam=None) for r in rows], "steam"))
+
 
 if __name__ == "__main__":
     unittest.main()
