@@ -8,7 +8,7 @@ SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 
 functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
-	load_gamefixes mod_loader_dir detect_mod_loaders compose_dll_overrides; do
+	load_gamefixes ml_list ml_is mod_loader_dir detect_mod_loaders compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -24,7 +24,8 @@ order=$(grep -n -e '^stage_rockstar_shim || true$' -e '^detect_mod_loaders "\$1"
 
 work=$(mktemp -d) || exit 1
 [ -d "$work" ] || exit 1
-trap 'rm -rf "$work"' EXIT
+volume=""
+trap '[ -z "$volume" ] || hdiutil detach -quiet "$volume" 2>/dev/null || true; rm -rf "$work"' EXIT
 
 fails=0
 ok() { printf '  ok    %s\n' "$1"; }
@@ -206,6 +207,54 @@ put winhttp.dll doorstop_config.ini
 user_conf 'DLLOVERRIDES=xinput1_3=n,b'
 run_game WINEDLLOVERRIDES='winhttp=b'
 is "the launch options come last and win" "dxgi=b;winhttp=n,b;xinput1_3=n,b;winhttp=b" "$(got WINEDLLOVERRIDES)"
+
+echo "== names in any case"
+mixed_cases() {
+	new_case
+	put WinHttp.dll bepinex/core/BepInEx.dll
+	run_game
+	is "$1: WinHttp.dll beside bepinex/" "dxgi=b;winhttp=n,b" "$(got WINEDLLOVERRIDES)"
+
+	new_case
+	put VERSION.DLL Doorstop_Config.INI
+	run_game
+	is "$1: VERSION.DLL beside Doorstop_Config.INI" "dxgi=b;version=n,b" "$(got WINEDLLOVERRIDES)"
+
+	new_case
+	put Version.dll MELONLOADER/net6/MelonLoader.dll
+	run_game
+	is "$1: Version.dll beside MELONLOADER/" "dxgi=b;version=n,b" "$(got WINEDLLOVERRIDES)"
+
+	new_case
+	put DInput8.dll scripthookv.dll
+	run_game
+	is "$1: DInput8.dll beside scripthookv.dll" "dxgi=b;dinput8=n,b" "$(got WINEDLLOVERRIDES)"
+
+	new_case
+	put dinput8.dll Scripts/mod.asi
+	run_game
+	is "$1: Scripts/*.asi" "dxgi=b;dinput8=n,b" "$(got WINEDLLOVERRIDES)"
+
+	new_case
+	put WinHttp.dll BepInEx/core/x.dll DXGI.dll
+	run_game
+	has "$1: DXGI.dll is left to the backend" "mod loader: dxgi.dll in $game left to the d3dmetal backend" "$case_dir/log"
+}
+mixed_cases "here"
+
+if ! command -v hdiutil >/dev/null 2>&1; then
+	echo "==> modloadercheck: hdiutil not found, the case-sensitive volume cases skipped"
+elif ! hdiutil create -quiet -size 8m -fs "Case-sensitive APFS" -volname modloader "$work/cs.dmg" 2> "$work/hdiutil.err" \
+	|| ! volume=$(hdiutil attach -nobrowse "$work/cs.dmg" 2>> "$work/hdiutil.err" | sed -n 's|.*\(/Volumes/.*\)$|\1|p' | tail -1) \
+	|| [ -z "$volume" ]; then
+	bad "a case-sensitive disk image mounts" "a mounted volume" "$(tr '\n' ' ' < "$work/hdiutil.err")"
+else
+	echo "== on a case-sensitive volume"
+	work_here=$work
+	work="$volume"
+	mixed_cases "case-sensitive"
+	work=$work_here
+fi
 
 if [ "$fails" -gt 0 ]; then
 	echo "==> modloadercheck: $fails failed"

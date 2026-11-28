@@ -1535,20 +1535,41 @@ record_backend() {
   fi
 }
 
+# The files (f) and folders (d) in folder $1, lowercased, one "f name" or "d name" per line.
+ml_list() {
+  for ml_entry in "$1"/*; do
+    if [ -f "$ml_entry" ]; then printf 'f %s\n' "${ml_entry##*/}"
+    elif [ -d "$ml_entry" ]; then printf 'd %s\n' "${ml_entry##*/}"
+    fi
+  done | tr '[:upper:]' '[:lower:]'
+}
+
+# Whether ml_list's listing in ml_names has a file (f) or folder (d) named $2, in any case.
+ml_is() {
+  case "$ml_names" in *"
+$1 $2
+"*) return 0 ;; esac
+  return 1
+}
+
 # A mod loader is a proxy DLL beside the game that Wine passes over for its own builtin. A
 # proxy gets n,b only beside its loader's own files, so a DLL the game ships stays as it is.
-# dxgi and d3d11 belong to the backend and are never touched. Only stat calls and, when a
-# proxy is there, one glob for .asi files per folder.
+# dxgi and d3d11 belong to the backend and are never touched. Names match in any case, as
+# Windows does, so WinHttp.dll and bepinex/ count on a case-sensitive volume too. One listing
+# of the folder and, when a proxy is there, one glob for .asi files per folder.
 mod_loader_dir() {
   ml_found=""
+  ml_names="
+$(ml_list "$1")
+"
   for ml_name in winhttp version dinput8; do
     case " $ml_seen " in *" $ml_name "*) continue ;; esac
-    if [ -f "$1/$ml_name.dll" ] || [ -f "$1/$ml_name.DLL" ]; then ml_found="$ml_found $ml_name"; fi
+    if ml_is f "$ml_name.dll"; then ml_found="$ml_found $ml_name"; fi
   done
   [ -n "$ml_found" ] || return 0
   ml_asi=0
-  for ml_sub in "" /scripts /plugins; do
-    for ml_file in "$1$ml_sub"/*.[aA][sS][iI]; do
+  for ml_dir in "$1" "$1"/[sS][cC][rR][iI][pP][tT][sS] "$1"/[pP][lL][uU][gG][iI][nN][sS]; do
+    for ml_file in "$ml_dir"/*.[aA][sS][iI]; do
       if [ -f "$ml_file" ]; then ml_asi=1; break 2; fi
     done
   done
@@ -1557,12 +1578,12 @@ mod_loader_dir() {
     ml_loader=""
     case $ml_name in
       winhttp|version)
-        if [ -d "$1/BepInEx" ]; then ml_loader=BepInEx
-        elif [ -f "$1/doorstop_config.ini" ]; then ml_loader="Unity Doorstop"
-        elif [ -d "$1/MelonLoader" ]; then ml_loader=MelonLoader
+        if ml_is d bepinex; then ml_loader=BepInEx
+        elif ml_is f doorstop_config.ini; then ml_loader="Unity Doorstop"
+        elif ml_is d melonloader; then ml_loader=MelonLoader
         fi ;;
       dinput8)
-        if [ -f "$1/ScriptHookV.dll" ] || [ -f "$1/ScriptHookRDR2.dll" ]; then ml_loader="Script Hook"; fi ;;
+        if ml_is f scripthookv.dll || ml_is f scripthookrdr2.dll; then ml_loader="Script Hook"; fi ;;
     esac
     [ -n "$ml_loader" ] || [ "$ml_asi" = 0 ] || ml_loader="an ASI loader"
     if [ -z "$ml_loader" ]; then
@@ -1580,7 +1601,7 @@ mod_loader_dir() {
   done
   [ "$ml_any" = 1 ] || return 0
   for ml_name in dxgi d3d11; do
-    [ ! -f "$1/$ml_name.dll" ] || gamefix_log "mod loader: $ml_name.dll in $1 left to the ${backend:-engine} backend"
+    ! ml_is f "$ml_name.dll" || gamefix_log "mod loader: $ml_name.dll in $1 left to the ${backend:-engine} backend"
   done
 }
 
