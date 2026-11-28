@@ -79,6 +79,7 @@ struct RoadmapSnapshots {
                         then: ((Fixture?) -> Void)? = nil) async throws -> Bool {
         _ = NSApplication.shared
         SnapshotLanguage.install()
+        defer { SnapshotLanguage.uninstall() }
         let prefixes = fixture?.prefixes ?? Fixture.emptyPrefixes()
         let games = fixture?.games ?? GamesModel(libraries: { [] })
         let host = NSHostingView(rootView: view.environment(status).environment(prefixes).environment(games)
@@ -142,6 +143,7 @@ struct RoadmapSnapshots {
     private func panel(_ name: String, dark: Bool = true, _ configure: (ProgressPanel) -> Void) async throws {
         _ = NSApplication.shared
         SnapshotLanguage.install()
+        defer { SnapshotLanguage.uninstall() }
         Self.useMarkAsIcon()
         let panel = ProgressPanel(title: "Bridgeplay", activates: false)
         panel.panel.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)

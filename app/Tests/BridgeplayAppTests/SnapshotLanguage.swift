@@ -16,14 +16,37 @@ enum SnapshotLanguage {
 
     static var locale: Locale { Locale(identifier: code ?? "en") }
 
-    @MainActor private static var installed = false
+    // What install replaced, for uninstall: Bundle.main's class and this process's own
+    // AppleLanguages (nil when it had none).
+    @MainActor private static var saved: (bundleClass: AnyClass, languages: Any?)?
+    private static let defaultsDomain = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
 
+    // Swaps Bundle.main's class for the language's and sets AppleLanguages, until uninstall.
+    // Other suites share the process, so call uninstall as soon as the snapshot is taken.
     @MainActor static func install() {
-        guard !installed, let code,
+        guard saved == nil, let code, let subclass = languageClass else { return }
+        let defaults = UserDefaults.standard
+        saved = (object_getClass(Bundle.main)!, defaults.persistentDomain(forName: defaultsDomain)?["AppleLanguages"])
+        defaults.set([code], forKey: "AppleLanguages")
+        object_setClass(Bundle.main, subclass)
+    }
+
+    @MainActor static func uninstall() {
+        guard let saved else { return }
+        self.saved = nil
+        object_setClass(Bundle.main, saved.bundleClass)
+        if let languages = saved.languages {
+            UserDefaults.standard.set(languages, forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        }
+    }
+
+    // Made once: objc_allocateClassPair returns nil for a class name already taken.
+    @MainActor private static let languageClass: AnyClass? = {
+        guard let code,
               let path = Bundle.module.path(forResource: code, ofType: "lproj"),
-              let strings = Bundle(path: path) else { return }
-        installed = true
-        UserDefaults.standard.set([code], forKey: "AppleLanguages")
+              let strings = Bundle(path: path) else { return nil }
         let main: AnyClass = object_getClass(Bundle.main)!
         let subclass: AnyClass = objc_allocateClassPair(main, "BPSnapshotMainBundle", 0)!
 
@@ -71,6 +94,6 @@ enum SnapshotLanguage {
             return block as AnyObject
         }
         objc_registerClassPair(subclass)
-        object_setClass(Bundle.main, subclass)
-    }
+        return subclass
+    }()
 }
