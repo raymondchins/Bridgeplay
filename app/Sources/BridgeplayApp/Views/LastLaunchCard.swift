@@ -30,6 +30,7 @@ struct LastLaunchSection: View {
                 }
             }, at: 0)
         }
+        let hasLog = PrefixTools.hasLog(.launch, for: launch.prefix)
         return StatusRow(
             title: launch.prefix.title,
             value: launch.verdict.sentence,
@@ -37,7 +38,8 @@ struct LastLaunchSection: View {
             detail: [launch.duration, launch.ended.formatted(.relative(presentation: .named))]
                 .joined(separator: " · "),
             secondaryAction: StatusAction(label: String(localized: "Open Log"),
-                                          isEnabled: PrefixTools.hasLog(.launch, for: launch.prefix)) {
+                                          help: hasLog ? nil : String(localized: "This launch left no log."),
+                                          isEnabled: hasLog) {
                 PrefixTools.openLastRun(for: launch.prefix)
             },
             action: StatusAction(label: String(localized: "Report")) {

@@ -18743,6 +18743,28 @@
         }
       }
     },
+    "This launch left no log." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo avvio non ha lasciato un log."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "После этого запуска не осталось журнала."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这次启动没有留下日志。"
+          }
+        }
+      }
+    },
     "This tool is intended to repair a prefix after switching between Rosetta/FEX CrossOver." : {
       "localizations" : {
         "it" : {
