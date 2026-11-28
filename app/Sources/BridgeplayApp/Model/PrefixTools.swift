@@ -575,6 +575,9 @@ enum PrefixTools {
             throw WriteRefused(path: path, errno: WriteRefused.posixCode(of: error))
         } catch {
             AppLog.note("trash: \(path) not moved: \(error)")
+            // Gone since it was listed (a drive unplugged, a folder removed): that failure, not
+            // a drive without a Trash, so no permanent delete is offered for it.
+            if (try? FileManager.default.attributesOfItem(atPath: path)) == nil { throw error }
             throw TrashUnavailable(url: url)
         }
     }

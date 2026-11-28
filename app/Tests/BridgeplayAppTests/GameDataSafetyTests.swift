@@ -86,6 +86,17 @@ struct GameDataSafetyTests {
         #expect(save(in: backup.url) == "old")
     }
 
+    @Test("A folder that went away is reported as gone, not as a drive without a Trash")
+    func goneIsNotNoTrash() throws {
+        let f = try fixture("gone")
+        defer { try? FileManager.default.removeItem(at: f.dir) }
+        let unplugged: PrefixTools.Trash = { url in
+            try FileManager.default.removeItem(at: url)
+            throw NoTrashHere()
+        }
+        #expect(throws: NoTrashHere.self) { try PrefixTools.delete(f.prefix, trash: unplugged) }
+    }
+
     @Test("A refused permission is reported as one, not offered as a permanent delete")
     func noPermissionIsNotNoTrash() throws {
         let f = try fixture("perm")
