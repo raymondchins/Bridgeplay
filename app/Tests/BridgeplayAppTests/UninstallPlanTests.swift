@@ -227,6 +227,18 @@ struct UninstallPlanTests {
                                           inspect: { _ in .clean }).passed)
     }
 
+    @Test("Verify fails when the list of changed Steam copies can't be read")
+    func verifyNeedsTheTrackedList() throws {
+        let fixture = try fixture(modified: false)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        try Data("not json".utf8).write(to: fixture.paths.modifications.file)
+
+        let result = UninstallVerification.run(paths: fixture.paths, signature: { _ in .valve }, inspect: { _ in .clean })
+        #expect(!result.passed)
+        #expect(result.leftInSteam.map(\.url) == [fixture.paths.modifications.file])
+        #expect(result.leftInSteam.first?.note?.hasPrefix("Not checked") == true)
+    }
+
     @Test("Verify fails when Steam is not Valve's, even with nothing of Bridgeplay's in it")
     func verifyNeedsValvesSignature() throws {
         let fixture = try fixture(modified: false)

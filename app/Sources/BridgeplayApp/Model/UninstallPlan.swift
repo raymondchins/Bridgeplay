@@ -218,8 +218,16 @@ struct UninstallVerification: Sendable {
         }
         inSteam += paths.filesInSteamData().map { UninstallItem(url: $0) }
         // Other copies of Steam Bridgeplay changed: one on a drive that is not connected was not checked.
+        // A list that can't be read leaves the other copies unchecked, so the check fails.
         let checked = paths.app.standardizedFileURL.path
-        for copy in (try? paths.modifications.paths()) ?? [] where copy.standardizedFileURL.path != checked {
+        var copies: [URL] = []
+        do {
+            copies = try paths.modifications.paths()
+        } catch {
+            inSteam.append(UninstallItem(url: paths.modifications.file,
+                                         note: String(localized: "Not checked: \(error.localizedDescription)")))
+        }
+        for copy in copies where copy.standardizedFileURL.path != checked {
             do {
                 switch try inspect(copy) {
                 case .absent, .clean: break
