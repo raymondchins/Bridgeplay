@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Settings › Check Steam in the Background. Registered with SMAppService.agent only when the
+     user turns it on; runs as the user. See app/Sources/BridgeplayApp/Support/BackgroundAgent.swift. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.bridgeplay.Bridgeplay.background</string>
+	<key>BundleProgram</key>
+	<string>Contents/MacOS/BridgeplayApp</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>BridgeplayApp</string>
+		<string>--background-check</string>
+	</array>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>com.bridgeplay.Bridgeplay</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>ThrottleInterval</key>
+	<integer>300</integer>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>LowPriorityIO</key>
+	<true/>
+	<key>LimitLoadToSessionType</key>
+	<string>Aqua</string>
+</dict>
+</plist>

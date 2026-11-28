@@ -3887,6 +3887,28 @@
         }
       }
     },
+    "Bridgeplay is back in Steam" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay è di nuovo in Steam"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay снова в Steam"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 已回到 Steam"
+          }
+        }
+      }
+    },
     "Bridgeplay is busy, so it won't restart yet. The update installs when you quit." : {
       "localizations" : {
         "it" : {
@@ -4147,6 +4169,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 需要“App 管理”权限。请在“系统设置 › 隐私与安全性 › App 管理”中开启 Bridgeplay。Bridgeplay 更新后，开关可能显示为开启，但实际已失效：请将其关闭再重新开启。"
+          }
+        }
+      }
+    },
+    "Bridgeplay puts itself back once Steam is closed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay si rimette da solo quando Steam è chiuso."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay вернётся сам, когда Steam будет закрыт."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 关闭后，Bridgeplay 会自行装回。"
           }
         }
       }
@@ -10688,6 +10732,28 @@
         }
       }
     },
+    "Open Bridgeplay to put it back." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri Bridgeplay per rimetterlo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте Bridgeplay, чтобы вернуть его."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Bridgeplay 将其装回。"
+          }
+        }
+      }
+    },
     "Open CrossOver to activate it." : {
       "localizations" : {
         "it" : {
@@ -14849,6 +14915,28 @@
         }
       }
     },
+    "Steam now has this version's files." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ora Steam ha i file di questa versione."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Теперь в Steam файлы этой версии."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 现已包含此版本的文件。"
+          }
+        }
+      }
+    },
     "Steam opened while Bridgeplay was getting ready to update it, so Steam was left alone." : {
       "localizations" : {
         "it" : {
@@ -15131,6 +15219,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Steam 的签名已与其文件不符，Steam 可能无法启动，且当前账户无法重新签名。"
+          }
+        }
+      }
+    },
+    "Steam's update had removed it. Windows games start again." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'aggiornamento di Steam lo aveva rimosso. I giochi Windows si avviano di nuovo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновление Steam удалило его. Игры для Windows снова запускаются."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 更新曾将其移除。Windows 游戏又能启动了。"
           }
         }
       }
