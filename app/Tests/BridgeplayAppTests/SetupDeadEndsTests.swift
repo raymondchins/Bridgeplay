@@ -146,10 +146,16 @@ struct SetupDeadEndsTests {
         try bytes.write(to: file)
         #expect(list() == [release.archive, release.renderer.archive])
 
-        final class Seen: @unchecked Sendable { var files: [String] = [] }
+        final class Seen: @unchecked Sendable {
+            private let lock = NSLock()
+            private var seen: [String] = []
+            func add(_ file: String) { lock.withLock { seen.append(file) } }
+            var files: Set<String> { lock.withLock { Set(seen) } }
+        }
         let seen = Seen()
         try await SetupPrefetch.run(SetupPrefetch.files(valve: valve, bridge: bridge, engineCache: caches,
-                                                        rendererCache: caches, valveCache: caches)) { seen.files.append($0.file) }
+                                                        rendererCache: caches, valveCache: caches)) { seen.add($0.file) }
+        // They run side by side, so in no set order.
         #expect(seen.files == [release.archive, release.renderer.archive])
         #expect(!FileManager.default.fileExists(atPath: caches.path(percentEncoded: false)))
     }

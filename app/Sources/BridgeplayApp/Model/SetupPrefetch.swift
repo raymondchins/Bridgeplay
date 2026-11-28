@@ -37,16 +37,43 @@ enum SetupPrefetch {
         return files
     }
 
+    // Set Up has at most four files on two hosts (GitHub, Valve's CDN), so all of them start
+    // at once and the bar has its total within a second.
+    static let parallel = 4
+
+    // Fetches every file, `limit` at a time. The first failure cancels the rest; their .part
+    // files stay for the next try, and nothing is moved into place that missed its pin.
     static func run(
         _ files: [Pinned] = files(),
-        obtain: (Pinned) async throws -> Void = { pinned in
+        limit: Int = parallel,
+        obtain: @escaping @Sendable (Pinned) async throws -> Void = { pinned in
             _ = try await PinnedDownload.obtain(file: pinned.file, sha256: pinned.sha256, bases: pinned.bases,
                                                 into: pinned.into, step: pinned.step, from: pinned.source)
         }
     ) async throws {
-        for file in files {
-            try Task.checkCancellation()
-            try await obtain(file)
+        try Task.checkCancellation()
+        let keys = files.map(\.archivePath)
+        await MainActor.run { DownloadMeter.shared.begin(batch: keys) }
+        do {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                var waiting = files.makeIterator()
+                for _ in 0..<max(limit, 1) {
+                    guard let file = waiting.next() else { break }
+                    group.addTask { try await obtain(file) }
+                }
+                while try await group.next() != nil {
+                    if let file = waiting.next() { group.addTask { try await obtain(file) } }
+                }
+            }
+        } catch {
+            await MainActor.run { DownloadMeter.shared.endBatch() }
+            throw error
         }
+        await MainActor.run { DownloadMeter.shared.endBatch() }
     }
+}
+
+extension SetupPrefetch.Pinned {
+    /// The meter's key for this file: the path PinnedDownload.obtain keeps it at.
+    var archivePath: String { into.appending(path: file).path(percentEncoded: false) }
 }
