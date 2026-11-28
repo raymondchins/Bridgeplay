@@ -515,6 +515,57 @@ struct InstallerServiceTests {
         #expect(!InstallerService.blocksInstall("/Applications/Bridgeplay.app/Contents/MacOS/Helper"))
     }
 
+    @Test func idleBackgroundCheckDoesNotBlockInstall() {
+        let app = "/Applications/Bridgeplay.app/Contents/MacOS/BridgeplayApp"
+        #expect(!InstallerService.blocksInstall(app, arguments: { ["BridgeplayApp", "--background-check"] }))
+        #expect(InstallerService.blocksInstall(app, arguments: { ["BridgeplayApp"] }))
+        #expect(InstallerService.blocksInstall(app, arguments: { [app, "--install-into-steam", "--unattended"] }))
+        #expect(InstallerService.blocksInstall(app, arguments: { ["BridgeplayApp", "--background-check", "x"] }))
+        #expect(InstallerService.blocksInstall(app, arguments: { nil }))
+    }
+
+    @Test func readsProcessArguments() {
+        var buffer = withUnsafeBytes(of: Int32(2)) { Array($0) }
+        buffer += Array("/x/BridgeplayApp".utf8) + [0, 0, 0, 0]
+        buffer += Array("BridgeplayApp".utf8) + [0] + Array("--background-check".utf8) + [0]
+        buffer += Array("HOME=/Users/a".utf8) + [0]
+        #expect(InstallerService.parseProcessArguments(buffer) == ["BridgeplayApp", "--background-check"])
+        #expect(InstallerService.parseProcessArguments(Array(buffer.prefix(30))) == nil)
+        #expect(InstallerService.arguments(of: getpid())?.first == CommandLine.arguments.first)
+    }
+
+    @Test func installWaitsForTheBackgroundChecksInstall() throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let app = root.appending(path: "Bridgeplay.app", directoryHint: .isDirectory)
+        guard case .held(let shared) = AppInUseLock.take(appBundle: app) else {
+            Issue.record("The background check's lock was not taken.")
+            return
+        }
+        do {
+            _ = try InstallLock(parent: root)
+            Issue.record("The installer took its lock while the background check was installing.")
+        } catch InstallerError.installLocked {
+        } catch { Issue.record("Expected installLocked, received \(error).") }
+        guard case .held(let second) = AppInUseLock.take(appBundle: app) else {
+            Issue.record("A second shared holder was refused.")
+            return
+        }
+        second.release()
+        shared.release()
+        let exclusive = try InstallLock(parent: root)
+        guard case .updating = AppInUseLock.take(appBundle: app) else {
+            Issue.record("The background check did not see the update in progress.")
+            return
+        }
+        exclusive.release()
+        guard case .held(let after) = AppInUseLock.take(appBundle: app) else {
+            Issue.record("The lock was not free after the update.")
+            return
+        }
+        after.release()
+    }
+
     @Test func logRedactsHomeDirectory() {
         #expect(InstallerLog.redact(NSHomeDirectory() + "/Downloads/x") == "~/Downloads/x")
     }

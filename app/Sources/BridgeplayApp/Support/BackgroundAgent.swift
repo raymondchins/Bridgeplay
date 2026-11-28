@@ -1,4 +1,5 @@
 import AppKit
+import BridgeplayInstallerCore
 import CoreServices
 import Foundation
 
@@ -8,7 +9,7 @@ import Foundation
 // updated. Then it decides with BackgroundCheck and either posts a notification or runs
 // `--install-into-steam`, which takes the install lock and refuses a running Steam itself.
 enum BackgroundAgent {
-    static let flag = "--background-check"
+    static let flag = InstallerService.backgroundCheckFlag
     // launchd's KeepAlive starts it again after this, with the updated executable.
     static let restartStatus: Int32 = 75
     // Unattended: a Steam the user opens meanwhile is left running.
@@ -37,6 +38,8 @@ enum BackgroundAgent {
         private var late: DispatchWorkItem?
         private var exits: [pid_t: any DispatchSourceProcess] = [:]
         private var trying = false
+        // Held while the install runs, so the installer doesn't replace Bridgeplay under it.
+        private var inUse: AppInUseLock?
         private var lastSkip: BackgroundCheck.Skip?
         private let ownBuild = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
         private let defaults = UserDefaults.standard
@@ -133,6 +136,15 @@ enum BackgroundAgent {
 
         private func reapply(_ kind: SteamPatchKeeper.Kind) {
             guard let executable = Bundle.main.executableURL else { return }
+            switch AppInUseLock.take(appBundle: Bundle.main.bundleURL) {
+            case .held(let lock): inUse = lock
+            case .updating:
+                // The new build's check restarts this one when the update lands.
+                AppLog.note("background check: Bridgeplay is being updated, not re-applying now")
+                return look(after: afterEvent)
+            case .unavailable:
+                AppLog.note("background check: could not open the update lock beside Bridgeplay, re-applying anyway")
+            }
             trying = true
             lastSkip = nil
             defaults.set(Date(), forKey: BackgroundCheck.lastTryKey)
@@ -156,6 +168,8 @@ enum BackgroundAgent {
 
         private func finished(_ kind: SteamPatchKeeper.Kind, status: Int32) {
             trying = false
+            inUse?.release()
+            inUse = nil
             let steamRunning = SteamBundle.isRunning
             let failed = BackgroundCheck.tryFailed(exitStatus: status, steamRunningAfter: steamRunning)
             defaults.set(failed, forKey: BackgroundCheck.lastTryFailedKey)

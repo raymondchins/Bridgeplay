@@ -316,20 +316,53 @@ public struct InstallerService: Sendable {
         for pid in pids.prefix(Int(filled)) where pid > 0 {
             guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { continue }
             let executable = String(cString: path)
-            if blocksInstall(executable) {
+            if blocksInstall(executable, arguments: { arguments(of: pid) }) {
                 InstallerLog.write("Blocked by running process \(pid): \(executable)")
                 throw InstallerError.appIsRunning
             }
         }
     }
 
+    /// The argument Bridgeplay's background check runs with (Settings › Check Steam in the Background).
+    public static let backgroundCheckFlag = "--background-check"
+
     // Sparkle names every app's updater Autoupdate, so only Bridgeplay's own copy counts.
-    static func blocksInstall(_ executable: String) -> Bool {
+    // The background check is left running: it holds AppInUseLock while it installs into Steam,
+    // which the install lock then waits on, and it restarts itself when the app's build changes.
+    // Arguments that can't be read (another account's process) still block.
+    static func blocksInstall(_ executable: String, arguments: () -> [String]? = { nil }) -> Bool {
         switch (executable as NSString).lastPathComponent {
-        case "BridgeplayApp": true
+        case "BridgeplayApp": arguments().map { Array($0.dropFirst()) != [backgroundCheckFlag] } ?? true
         case "Autoupdate": executable.contains("/\(applicationName)/") || executable.contains("/\(bundleIdentifier)/")
         default: false
         }
+    }
+
+    // argv of a process from KERN_PROCARGS2: argc, the executable path, padding, then argv.
+    static func arguments(of pid: pid_t) -> [String]? {
+        var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
+        var size = 0
+        guard sysctl(&mib, 3, nil, &size, nil, 0) == 0, size > MemoryLayout<Int32>.size else { return nil }
+        var buffer = [UInt8](repeating: 0, count: size)
+        guard sysctl(&mib, 3, &buffer, &size, nil, 0) == 0 else { return nil }
+        return parseProcessArguments(Array(buffer.prefix(size)))
+    }
+
+    static func parseProcessArguments(_ buffer: [UInt8]) -> [String]? {
+        let header = MemoryLayout<Int32>.size
+        guard buffer.count > header else { return nil }
+        let argc = buffer.withUnsafeBytes { Int($0.loadUnaligned(as: Int32.self)) }
+        guard argc > 0 else { return nil }
+        var index = header
+        while index < buffer.count, buffer[index] != 0 { index += 1 }
+        while index < buffer.count, buffer[index] == 0 { index += 1 }
+        var arguments: [String] = []
+        while arguments.count < argc, index < buffer.count {
+            let end = buffer[index...].firstIndex(of: 0) ?? buffer.count
+            arguments.append(String(decoding: buffer[index..<end], as: UTF8.self))
+            index = end + 1
+        }
+        return arguments.count == argc ? arguments : nil
     }
 
     private static func run(_ executable: String, _ arguments: [String], failure: InstallerError) throws {
@@ -351,11 +384,51 @@ public struct InstallerService: Sendable {
     }
 }
 
-private final class InstallLock {
+/// Taken shared by Bridgeplay's background check for as long as it installs into Steam, so the
+/// installer, which takes the same file exclusively, does not replace the app under that install.
+public final class AppInUseLock: @unchecked Sendable {
+    public enum Outcome: Sendable {
+        case held(AppInUseLock)
+        /// The installer is replacing the app right now.
+        case updating
+        /// No lock file could be opened, for instance a folder this account can't write.
+        case unavailable
+    }
+
+    private let descriptor: Int32
+
+    private init(descriptor: Int32) { self.descriptor = descriptor }
+
+    public static func take(appBundle: URL) -> Outcome {
+        let path = appBundle.deletingLastPathComponent().appending(path: InstallLock.name).path
+        var fd = open(path, O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+        if fd < 0, errno == EACCES || errno == EPERM { fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC) }
+        guard fd >= 0 else { return .unavailable }
+        var status = stat()
+        guard fstat(fd, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG, status.st_nlink == 1 else {
+            close(fd)
+            return .unavailable
+        }
+        guard flock(fd, LOCK_SH | LOCK_NB) == 0 else {
+            let busy = errno == EWOULDBLOCK
+            close(fd)
+            return busy ? .updating : .unavailable
+        }
+        return .held(AppInUseLock(descriptor: fd))
+    }
+
+    public func release() {
+        flock(descriptor, LOCK_UN)
+        close(descriptor)
+    }
+}
+
+final class InstallLock {
+    static let name = ".Bridgeplay.app.install.lock"
     private let descriptor: Int32
 
     init(parent: URL) throws {
-        let path = parent.appending(path: ".Bridgeplay.app.install.lock").path
+        let path = parent.appending(path: Self.name).path
         var fd = open(path, O_CREAT | O_EXCL | O_RDWR | O_NOFOLLOW | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
         let created = fd >= 0
         if created, fchmod(fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0 {
