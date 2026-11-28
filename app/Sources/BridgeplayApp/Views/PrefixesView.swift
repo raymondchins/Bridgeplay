@@ -106,8 +106,24 @@ struct PrefixesView: View {
             .keyboardShortcut(.defaultAction)
             Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
         } message: {
-            Text(PrefixPrompt.backUpMessage(backingUp))
+            Text(PrefixPrompt.backUpMessage(backingUp, bytes: backUpBytes))
         }
+        .confirmationDialog(
+            PrefixPrompt.clearShaderCacheTitle(clearingCache),
+            isPresented: asking(.clearShaderCache),
+            titleVisibility: .visible
+        ) {
+            Button(PrefixPrompt.clearShaderCacheButton(clearingCache), role: .destructive) {
+                let targets = clearingCache
+                model.pendingConfirmation = nil
+                Task { await model.clearShaderCaches(targets) }
+            }
+            Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
+                .keyboardShortcut(.defaultAction)
+        } message: {
+            Text(PrefixPrompt.clearShaderCacheMessage(bytes: model.shaderCacheBytes(clearingCache)))
+        }
+        .prefixDialogs()
         .alert(
             "Winetricks",
             isPresented: Binding(
@@ -130,7 +146,7 @@ struct PrefixesView: View {
     }
 
     private enum Question {
-        case delete, rebuild, backUp
+        case delete, rebuild, backUp, clearShaderCache
     }
 
     private var deleting: [WinePrefix] {
@@ -153,11 +169,26 @@ struct PrefixesView: View {
         return []
     }
 
+    private var backUpBytes: Int64? {
+        var total: Int64 = 0
+        for prefix in backingUp {
+            guard let bytes = model.usage[prefix.id]?.bytes else { return nil }
+            total += bytes
+        }
+        return total
+    }
+
+    private var clearingCache: [WinePrefix] {
+        if case .clearShaderCache(let targets) = model.pendingConfirmation { return targets }
+        return []
+    }
+
     private func isAsking(_ question: Question) -> Bool {
         switch (question, model.pendingConfirmation) {
         case (.delete, .delete): true
         case (.rebuild, .rebuild(_, _)): true
         case (.backUp, .backUp): true
+        case (.clearShaderCache, .clearShaderCache): true
         default: false
         }
     }
@@ -231,6 +262,7 @@ struct PrefixesView: View {
         let title: String
         let library: String
         let lastUsed: Date
+        let shaderCache: Int64
 
         var id: WinePrefix.ID { prefix.id }
     }
@@ -244,7 +276,8 @@ struct PrefixesView: View {
                 size: model.usage[prefix.id]?.bytes ?? -1,
                 title: prefix.title,
                 library: prefix.library.displayName,
-                lastUsed: prefix.lastUsed ?? .distantPast
+                lastUsed: prefix.lastUsed ?? .distantPast,
+                shaderCache: model.shaderCaches[prefix.id]?.bytes ?? -1
             )
         }
         .sorted(using: sortOrder)
@@ -320,6 +353,22 @@ struct PrefixesView: View {
             }
             .width(min: 56, ideal: 90)
 
+            TableColumn("Shaders", value: \.shaderCache) { row in
+                if let cache = model.shaderCaches[row.id] {
+                    if cache.isEmpty {
+                        Text("None").modifier(CellGrey(faint: true))
+                    } else {
+                        Text(cache.bytes.formatted(.byteCount(style: .file)))
+                            .monospacedDigit()
+                            .modifier(CellGrey())
+                    }
+                } else {
+                    Text("Calculating…")
+                        .modifier(CellGrey(faint: true))
+                }
+            }
+            .width(min: 56, ideal: 90)
+
             TableColumn("Last used", value: \.lastUsed) { row in
                 Text(lastUsed(row.prefix))
                     .modifier(CellGrey())
@@ -354,6 +403,14 @@ struct PrefixesView: View {
                     }
                 }
                 Button("Report This Game…") { PlayReports.shared.ask(about: prefix) }
+                let kept = model.backups(of: prefix)
+                if !kept.isEmpty {
+                    Menu("Restore Backup") {
+                        ForEach(kept) { backup in
+                            Button(taken(backup)) { model.pendingConfirmation = .restore(backup) }
+                        }
+                    }
+                }
             }
             Button("Report Your Games…") { PlayReports.shared.openBulk() }
             if !targets.isEmpty {
@@ -365,6 +422,12 @@ struct PrefixesView: View {
                     Menu(PrefixPrompt.rebuildButton(targets)) { rebuildChoices(targets) }
                 } else {
                     rebuildChoices(targets, label: PrefixPrompt.rebuildButton(targets))
+                }
+                let cached = targets.filter { !(model.shaderCaches[$0.id]?.isEmpty ?? true) }
+                if !cached.isEmpty {
+                    Button(PrefixPrompt.clearShaderCacheButton(cached) + "…") {
+                        model.pendingConfirmation = .clearShaderCache(cached)
+                    }
                 }
                 Button(PrefixPrompt.deleteButton(targets), role: .destructive) {
                     model.pendingConfirmation = .delete(targets)
@@ -397,6 +460,10 @@ struct PrefixesView: View {
                 if let prefix { model.open(tool, for: prefix) }
             }
         }
+    }
+
+    private func taken(_ backup: PrefixBackup) -> String {
+        backup.taken?.formatted(date: .abbreviated, time: .shortened) ?? backup.url.lastPathComponent
     }
 
     private func single(_ ids: Set<WinePrefix.ID>) -> WinePrefix? {

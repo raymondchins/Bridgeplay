@@ -184,6 +184,22 @@ extension PrefixTools {
             )
         }
 
+        // A volume that clones copies takes almost no space for one; any other needs the full size.
+        let values = try? prefix.root.resourceValues(forKeys: [
+            .volumeSupportsFileCloningKey, .volumeAvailableCapacityForImportantUsageKey,
+        ])
+        let needed = PrefixStore.directoryBytes(prefix.pfx, metric: .allocated)
+        guard backupFits(needed: needed, available: values?.volumeAvailableCapacityForImportantUsage,
+                         clones: values?.volumeSupportsFileCloning)
+        else {
+            let size = needed.formatted(.byteCount(style: .file))
+            let free = (values?.volumeAvailableCapacityForImportantUsage ?? 0).formatted(.byteCount(style: .file))
+            throw StepFailure(
+                step: String(localized: "Back up prefix"),
+                detail: String(localized: "A backup of \(prefix.title) needs \(size), and its drive has \(free) free. Nothing was copied.")
+            )
+        }
+
         let slot = backupSlot(in: prefix.root, at: now)
         do {
             try fm.copyItem(at: prefix.pfx, to: slot)
@@ -194,7 +210,13 @@ extension PrefixTools {
         return slot
     }
 
-    private static func backupSlot(in root: URL, at now: Date) -> URL {
+    static func backupFits(needed: Int64, available: Int64?, clones: Bool?) -> Bool {
+        if clones == true { return true }
+        guard let available else { return true }
+        return available >= needed
+    }
+
+    static func backupSlot(in root: URL, at now: Date) -> URL {
         let stamp = PrefixStore.backupClock().string(from: now)
 
         let fm = FileManager.default

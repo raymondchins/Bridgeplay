@@ -105,6 +105,30 @@ enum PrefixStore {
         libraries: [SteamLibrary] = PrefixStore.libraries(),
         userdata: URL = SupportPaths.Steam.userData.appending(path: "userdata")
     ) -> [WinePrefix] {
+        scan(libraries: libraries, userdata: userdata) { isFolder($0.pfx) }.sorted {
+            ($0.lastUsed ?? .distantPast, $0.appID) > ($1.lastUsed ?? .distantPast, $1.appID)
+        }
+    }
+
+    // Appids whose prefix is gone but whose rebuild backups are still there, so they can be restored.
+    static func backupOnly(
+        libraries: [SteamLibrary] = PrefixStore.libraries(),
+        userdata: URL = SupportPaths.Steam.userData.appending(path: "userdata")
+    ) -> [WinePrefix] {
+        scan(libraries: libraries, userdata: userdata) { !isFolder($0.pfx) && !backups(of: $0).isEmpty }
+    }
+
+    private static func isFolder(_ url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path(percentEncoded: false), isDirectory: &isDirectory)
+            && isDirectory.boolValue
+    }
+
+    private static func scan(
+        libraries: [SteamLibrary],
+        userdata: URL,
+        keep: (WinePrefix) -> Bool
+    ) -> [WinePrefix] {
         var shortcuts: [String: String]?
         var found: [WinePrefix] = []
         for library in libraries {
@@ -116,11 +140,7 @@ enum PrefixStore {
 
             for entry in entries {
                 let appID = entry.lastPathComponent
-                let pfx = entry.appending(path: "pfx")
-                var isDirectory: ObjCBool = false
-                guard FileManager.default.fileExists(atPath: pfx.path(percentEncoded: false), isDirectory: &isDirectory),
-                    isDirectory.boolValue
-                else { continue }
+                guard keep(WinePrefix(appID: appID, name: nil, library: library, lastUsed: nil)) else { continue }
 
                 var name = appName(appID: appID, in: library)
                 if name == nil, let id = UInt32(appID), id & 0x8000_0000 != 0 {
@@ -133,16 +153,13 @@ enum PrefixStore {
                         appID: appID,
                         name: name,
                         library: library,
-                        lastUsed: (try? pfx.resourceValues(forKeys: [.contentModificationDateKey]))?
+                        lastUsed: (try? entry.appending(path: "pfx").resourceValues(forKeys: [.contentModificationDateKey]))?
                             .contentModificationDate
                     )
                 )
             }
         }
-
-        return found.sorted {
-            ($0.lastUsed ?? .distantPast, $0.appID) > ($1.lastUsed ?? .distantPast, $1.appID)
-        }
+        return found
     }
 
     static func appName(appID: String, in library: SteamLibrary) -> String? {

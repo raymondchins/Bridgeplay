@@ -20,18 +20,18 @@ struct PrefixPromptTests {
 
     @Test("One prefix is asked about by name")
     func singleDeleteNamesTheGame() {
-        #expect(PrefixPrompt.deleteTitle([agent]) == "Delete the prefix for Agent 64: Spies Never Die?")
-        #expect(PrefixPrompt.deleteButton([agent]) == "Delete Prefix")
+        #expect(PrefixPrompt.deleteTitle([agent]) == "Move prefix for Agent 64: Spies Never Die to Trash?")
+        #expect(PrefixPrompt.deleteButton([agent]) == "Move to Trash")
         // A prefix whose game is gone still has to be askable about.
-        #expect(PrefixPrompt.deleteTitle([orphan]) == "Delete the prefix for App 1649240?")
+        #expect(PrefixPrompt.deleteTitle([orphan]) == "Move prefix for App 1649240 to Trash?")
     }
 
     // The Prefix menu shows the delete item greyed out with nothing selected, and it shows
     // it by name, so an empty selection has to read as an action rather than as a count.
     @Test("With nothing selected the delete item still reads as an action")
     func emptySelectionReadsAsTheAction() {
-        #expect(PrefixPrompt.deleteButton([]) == "Delete Prefix")
-        #expect(PrefixPrompt.deleteTitle([]) == "Delete prefix?")
+        #expect(PrefixPrompt.deleteButton([]) == "Move to Trash")
+        #expect(PrefixPrompt.deleteTitle([]) == "Move prefix to Trash?")
     }
 
     // Naming one of them and deleting all of them is how the wrong prefix gets thrown
@@ -39,27 +39,42 @@ struct PrefixPromptTests {
     @Test("Several prefixes are counted, not named")
     func multipleDeleteCountsThem() {
         let targets = [agent, ikaruga, orphan]
-        #expect(PrefixPrompt.deleteTitle(targets) == "Delete 3 prefixes?")
-        #expect(PrefixPrompt.deleteButton(targets) == "Delete 3 Prefixes")
+        #expect(PrefixPrompt.deleteTitle(targets) == "Move 3 prefixes to Trash?")
+        #expect(PrefixPrompt.deleteButton(targets) == "Move 3 to Trash")
     }
 
-    @Test("Delete says the save data goes and asks for confirmation")
-    func deleteSaysSavesAreLost() {
-        let one = PrefixPrompt.deleteMessage([agent])
-        #expect(one == "This will DELETE the game's prefix. The game SAVE DATA inside the"
-            + " prefix WILL BE LOST. Are you sure you want to do this?")
-
-        let both = PrefixPrompt.deleteMessage([agent, ikaruga])
-        #expect(both == "This will DELETE the prefixes for 2 games. The game SAVE DATA inside"
-            + " them WILL BE LOST. Are you sure you want to do this?")
-        #expect(!both.contains("Agent 64"))
+    @Test("Delete says the save data goes to the Trash and how to undo it")
+    func deleteSaysSavesGoToTheTrash() {
+        #expect(PrefixPrompt.deleteMessage([agent])
+            == "Saves go too. Put them back before the next launch.")
+        #expect(!PrefixPrompt.deleteMessage([agent, ikaruga]).contains("Agent 64"))
     }
 
-    @Test("Delete warns that the backups inside the prefix go too")
+    @Test("Delete says the backups inside the prefix go too")
     func deleteNamesTheBackups() {
         #expect(PrefixPrompt.deleteMessage([agent], backups: 0) == PrefixPrompt.deleteMessage([agent]))
-        #expect(PrefixPrompt.deleteMessage([agent], backups: 1).contains("Its 1 backup will also be permanently deleted."))
-        #expect(PrefixPrompt.deleteMessage([agent, ikaruga], backups: 3).contains("All 3 backups will also be permanently deleted."))
+        #expect(PrefixPrompt.deleteMessage([agent], backups: 1).hasPrefix("Saves and 1 backup go too."))
+        #expect(PrefixPrompt.deleteMessage([agent, ikaruga], backups: 3).hasPrefix("Saves and 3 backups go too."))
+    }
+
+    // Asked only when the Trash refused, so it must say nothing went yet and what is at stake.
+    @Test("The no-Trash prompt says nothing was deleted, the size, and that saves go")
+    func deletePermanentlyPrompt() {
+        #expect(PrefixPrompt.deletePermanentlyTitle(prefixes: [agent], backups: []) == "This drive has no Trash")
+        #expect(PrefixPrompt.deletePermanentlyTitle(prefixes: [agent, ikaruga], backups: []) == "These drives have no Trash")
+        let message = PrefixPrompt.deletePermanentlyMessage(bytes: 2_000_000_000, prefixes: 1)
+        #expect(message.hasPrefix("Nothing deleted yet."))
+        #expect(message.contains(Int64(2_000_000_000).formatted(.byteCount(style: .file))))
+        #expect(message.contains("Saves and backups will be lost."))
+        #expect(!PrefixPrompt.deletePermanentlyMessage(bytes: nil, prefixes: 0).contains("Saves"))
+    }
+
+    @Test("Back Up says the size and where the copy goes once measured")
+    func backUpNamesSizeAndPlace() {
+        #expect(PrefixPrompt.backUpMessage([agent]) == "The copy stays beside the prefix.")
+        let one = PrefixPrompt.backUpMessage([agent], bytes: 1_000_000)
+        #expect(one.contains(agent.library.displayName))
+        #expect(one.contains(Int64(1_000_000).formatted(.byteCount(style: .file))))
     }
 
     // Rebuild inits the prefix itself before the dialog closes, so deferring to Steam
@@ -91,11 +106,11 @@ struct PrefixPromptTests {
         let one = backup(of: ikaruga, stamp: "20260101-120000")
         let two = backup(of: ikaruga, stamp: "20260102-133000")
 
-        #expect(PrefixPrompt.deleteBackupsTitle([]) == "Delete backup?")
-        #expect(PrefixPrompt.deleteBackupsTitle([one]) == "Delete the backup for IKARUGA?")
-        #expect(PrefixPrompt.deleteBackupsTitle([one, two]) == "Delete 2 backups?")
-        #expect(PrefixPrompt.deleteBackupsButton([one]) == "Delete Backup")
-        #expect(PrefixPrompt.deleteBackupsButton([one, two]) == "Delete 2 Backups")
+        #expect(PrefixPrompt.deleteBackupsTitle([]) == "Move backup to Trash?")
+        #expect(PrefixPrompt.deleteBackupsTitle([one]) == "Move backup for IKARUGA to Trash?")
+        #expect(PrefixPrompt.deleteBackupsTitle([one, two]) == "Move 2 backups to Trash?")
+        #expect(PrefixPrompt.deleteBackupsButton([one]) == "Move to Trash")
+        #expect(PrefixPrompt.deleteBackupsButton([one, two]) == "Move 2 to Trash")
     }
 
     @Test("The rebuild prompt offers the backup choice and counts both ways")
@@ -124,12 +139,8 @@ struct PrefixPromptTests {
         #expect(PrefixPrompt.backUpButton([agent]) == "Back Up Prefix")
         #expect(PrefixPrompt.backUpButton(targets) == "Back Up 3 Prefixes")
 
-        #expect(
-            PrefixPrompt.backUpMessage([agent])
-                == "Are you sure you want to back up this prefix?")
-        #expect(
-            PrefixPrompt.backUpMessage(targets)
-                == "Are you sure you want to back up these prefixes?")
+        #expect(PrefixPrompt.backUpMessage([agent]) == "The copy stays beside the prefix.")
+        #expect(PrefixPrompt.backUpMessage(targets) == "Each copy stays beside its prefix.")
     }
 
     private func backup(of prefix: WinePrefix, stamp: String) -> PrefixBackup {
@@ -141,16 +152,12 @@ struct PrefixPromptTests {
         )
     }
 
-    @Test("The backup prompt asks once and names what is lost")
+    @Test("The backup prompt says how to undo it")
     func deleteBackupsPromptReassures() {
         let one = backup(of: ikaruga, stamp: "20260101-120000")
         let two = backup(of: ikaruga, stamp: "20260102-133000")
 
-        #expect(PrefixPrompt.deleteBackupsMessage([one])
-            == "Are you sure you want to delete this backup? Any data in it will be lost.")
-        #expect(PrefixPrompt.deleteBackupsMessage()
-            == "Are you sure you want to delete this backup? Any data in it will be lost.")
-        #expect(PrefixPrompt.deleteBackupsMessage([one, two])
-            == "Are you sure you want to delete these 2 backups? Any data in them will be lost.")
+        #expect(PrefixPrompt.deleteBackupsMessage([one]) == "Undo with Put Back in the Trash.")
+        #expect(PrefixPrompt.deleteBackupsMessage([one, two]) == PrefixPrompt.deleteBackupsMessage([one]))
     }
 }

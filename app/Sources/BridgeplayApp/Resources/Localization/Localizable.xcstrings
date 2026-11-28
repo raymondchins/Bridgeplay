@@ -199,6 +199,28 @@
         }
       }
     },
+    "%@ could not be moved to the Trash. Nothing was deleted." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile spostare %@ nel Cestino. Non è stato eliminato nulla."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось переместить %@ в Корзину. Ничего не удалено."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法将“%@”移到废纸篓。未删除任何内容。"
+          }
+        }
+      }
+    },
     "%@ could not be read as a property list." : {
       "localizations" : {
         "it" : {
@@ -639,6 +661,28 @@
         }
       }
     },
+    "%@ is not a shader cache." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non è una cache degli shader."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ не является кэшем шейдеров."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”不是着色器缓存。"
+          }
+        }
+      }
+    },
     "%@ is not a supported build. Supported: %@." : {
       "localizations" : {
         "it" : {
@@ -910,6 +954,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@，独占空间 %@"
+          }
+        }
+      }
+    },
+    "%@, each beside its prefix." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, ognuna accanto al suo prefisso."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, каждая рядом со своим префиксом."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，每份都在其游戏容器旁。"
+          }
+        }
+      }
+    },
+    "%@, kept on %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, su %2$@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, на диске %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，保存在 %2$@。"
           }
         }
       }
@@ -1394,6 +1482,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Steam 客户端更新可能导致 Bridgeplay 无法使用。"
+          }
+        }
+      }
+    },
+    "A backup of %@ needs %@, and its drive has %@ free. Nothing was copied." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un backup di %1$@ richiede %2$@ e il suo disco ha %3$@ liberi. Non è stato copiato nulla."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для резервной копии %1$@ нужно %2$@, а на диске свободно %3$@. Ничего не скопировано."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份“%1$@”需要 %2$@，而其磁盘仅剩 %3$@ 可用。未复制任何内容。"
           }
         }
       }
@@ -2234,28 +2344,6 @@
         }
       }
     },
-    "All %lld backups will also be permanently deleted." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verranno eliminati definitivamente anche tutti i %lld backup."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Все резервные копии (%lld) также будут удалены без возможности восстановления."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全部 %lld 个备份也将被永久删除。"
-          }
-        }
-      }
-    },
     "Allow Bridgeplay in App Management" : {
       "localizations" : {
         "it" : {
@@ -2410,50 +2498,6 @@
         }
       }
     },
-    "Any data in it will be lost." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tutti i dati che contiene andranno persi."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Все данные в нём будут потеряны."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "其中的所有数据都将丢失。"
-          }
-        }
-      }
-    },
-    "Any data in them will be lost." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tutti i dati che contengono andranno persi."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Все данные в них будут потеряны."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这些备份中的所有数据都将丢失。"
-          }
-        }
-      }
-    },
     "App %@" : {
       "localizations" : {
         "it" : {
@@ -2604,116 +2648,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "应用"
-          }
-        }
-      }
-    },
-    "Are you sure you want to back up these prefixes?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vuoi davvero fare il backup di questi prefissi?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Создать резервные копии этих префиксов?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "确定要备份这些游戏容器吗？"
-          }
-        }
-      }
-    },
-    "Are you sure you want to back up this prefix?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vuoi davvero fare il backup di questo prefisso?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Создать резервную копию этого префикса?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "确定要备份此游戏容器吗？"
-          }
-        }
-      }
-    },
-    "Are you sure you want to delete these %lld backups?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vuoi davvero eliminare questi %lld backup?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить эти резервные копии (%lld)?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "确定要删除这 %lld 个备份吗？"
-          }
-        }
-      }
-    },
-    "Are you sure you want to delete this backup?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vuoi davvero eliminare questo backup?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить эту резервную копию?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "确定要删除此备份吗？"
-          }
-        }
-      }
-    },
-    "Are you sure you want to do this?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vuoi davvero procedere?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вы уверены?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "确定要继续吗？"
           }
         }
       }
@@ -4569,6 +4503,28 @@
         }
       }
     },
+    "Can't be undone." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non si può annullare."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отменить нельзя."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此操作无法撤销。"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "it" : {
@@ -4921,6 +4877,72 @@
         }
       }
     },
+    "Clear %lld Shader Caches" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Svuota %lld cache degli shader"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очистить кэши шейдеров (%lld)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除 %lld 个着色器缓存"
+          }
+        }
+      }
+    },
+    "Clear %lld shader caches?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Svuotare %lld cache degli shader?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очистить кэши шейдеров (%lld)?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除 %lld 个着色器缓存？"
+          }
+        }
+      }
+    },
+    "Clear Shader Cache" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Svuota cache degli shader"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очистить кэш шейдеров"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除着色器缓存"
+          }
+        }
+      }
+    },
     "Clear Steam's controller permission so macOS asks for it again." : {
       "localizations" : {
         "it" : {
@@ -4939,6 +4961,94 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除 Steam 的控制器权限，让 macOS 重新询问授权。"
+          }
+        }
+      }
+    },
+    "Clear shader cache" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pulizia della cache degli shader"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очистить кэш шейдеров"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除着色器缓存"
+          }
+        }
+      }
+    },
+    "Clear shader cache for %@?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Svuotare la cache degli shader di %@?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очистить кэш шейдеров %@?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除“%@”的着色器缓存？"
+          }
+        }
+      }
+    },
+    "Cleared %lld shader caches." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld cache degli shader svuotate."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кэши шейдеров очищены: %lld."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已清除 %lld 个着色器缓存。"
+          }
+        }
+      }
+    },
+    "Cleared shader cache for %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache degli shader di %@ svuotata."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кэш шейдеров %@ очищен."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已清除“%@”的着色器缓存。"
           }
         }
       }
@@ -5804,6 +5914,28 @@
         }
       }
     },
+    "Current data becomes a new backup." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I dati attuali diventano un nuovo backup."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Текущие данные станут новой копией."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前数据会保存为新备份。"
+          }
+        }
+      }
+    },
     "Customization" : {
       "localizations" : {
         "it" : {
@@ -5914,94 +6046,6 @@
         }
       }
     },
-    "Delete %lld Backups" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elimina %lld backup"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить копии (%lld)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除 %lld 个备份"
-          }
-        }
-      }
-    },
-    "Delete %lld Prefixes" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elimina %lld prefissi"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить префиксы (%lld)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除 %lld 个游戏容器"
-          }
-        }
-      }
-    },
-    "Delete %lld backups?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eliminare %lld backup?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить копии (%lld)?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除 %lld 个备份？"
-          }
-        }
-      }
-    },
-    "Delete %lld prefixes?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eliminare %lld prefissi?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить префиксы (%lld)?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除 %lld 个游戏容器？"
-          }
-        }
-      }
-    },
     "Delete All" : {
       "localizations" : {
         "it" : {
@@ -6020,28 +6064,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全部删除"
-          }
-        }
-      }
-    },
-    "Delete Backup" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elimina backup"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить копию"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除备份"
           }
         }
       }
@@ -6068,68 +6090,24 @@
         }
       }
     },
-    "Delete Prefix" : {
+    "Delete Permanently" : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elimina prefisso"
+            "value" : "Elimina definitivamente"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Удалить префикс"
+            "value" : "Удалить окончательно"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "删除游戏容器"
-          }
-        }
-      }
-    },
-    "Delete backup?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eliminare il backup?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить копию?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除备份？"
-          }
-        }
-      }
-    },
-    "Delete every backup that rebuilds have kept." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elimina tutti i backup conservati dalle ricostruzioni."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить все резервные копии, оставленные пересборками."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除重建时保留的所有备份。"
+            "value" : "永久删除"
           }
         }
       }
@@ -6156,116 +6134,6 @@
         }
       }
     },
-    "Delete prefix?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eliminare il prefisso?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить префикс?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除游戏容器？"
-          }
-        }
-      }
-    },
-    "Delete the backup for %@?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eliminare il backup di %@?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить резервную копию для %@?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除“%@”的备份？"
-          }
-        }
-      }
-    },
-    "Delete the prefix for %@?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eliminare il prefisso di %@?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить префикс для %@?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除“%@”的游戏容器？"
-          }
-        }
-      }
-    },
-    "Delete the selected backups." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elimina i backup selezionati."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить выбранные копии."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除所选备份。"
-          }
-        }
-      }
-    },
-    "Deleted %lld backups across %lld prefixes." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eliminati %1$lld backup di %2$lld prefissi."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалено копий: %lld, затронуто префиксов: %lld."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已删除 %2$lld 个游戏容器的 %1$lld 个备份。"
-          }
-        }
-      }
-    },
     "Deleted %lld backups for %@." : {
       "localizations" : {
         "it" : {
@@ -6288,40 +6156,62 @@
         }
       }
     },
-    "Deleted %lld prefixes. Steam will make a new prefix if a game is launched again." : {
+    "Deleted %lld backups." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminati %lld prefissi. Steam creerà un nuovo prefisso se un gioco viene riavviato."
+            "value" : "%lld backup eliminati."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Удалено префиксов: %lld. Если игру запустить снова, Steam создаст новый префикс."
+            "value" : "Копии удалены: %lld."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已删除 %lld 个游戏容器。下次启动游戏时，Steam 将创建新容器。"
+            "value" : "已删除 %lld 个备份。"
           }
         }
       }
     },
-    "Deleted the backup for %@." : {
+    "Deleted %lld prefixes." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminato il backup di %@."
+            "value" : "%lld prefissi eliminati."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Резервная копия для %@ удалена."
+            "value" : "Префиксы удалены: %lld."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已删除 %lld 个游戏容器。"
+          }
+        }
+      }
+    },
+    "Deleted backup for %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup di %@ eliminato."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копия %@ удалена."
           }
         },
         "zh-Hans" : {
@@ -6332,24 +6222,24 @@
         }
       }
     },
-    "Deleted the prefix for %@. Steam will make a new prefix if the game is launched again." : {
+    "Deleted prefix for %@." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminato il prefisso di %@. Steam creerà un nuovo prefisso se il gioco viene riavviato."
+            "value" : "Prefisso di %@ eliminato."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Префикс для %@ удалён. Если игру запустить снова, Steam создаст новый префикс."
+            "value" : "Префикс %@ удалён."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已删除“%@”的游戏容器。下次启动该游戏时，Steam 将创建新容器。"
+            "value" : "已删除“%@”的游戏容器。"
           }
         }
       }
@@ -6900,6 +6790,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "DualSense、Xbox、GameSir 等手柄无需映射界面即可使用。游戏首次使用手柄时，请在“输入监控”中允许 Steam。"
+          }
+        }
+      }
+    },
+    "Each copy stays beside its prefix." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ogni copia resta accanto al suo prefisso."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Каждая копия хранится рядом со своим префиксом."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每份副本都保存在其游戏容器旁。"
           }
         }
       }
@@ -7718,6 +7630,50 @@
         }
       }
     },
+    "Frees %@. Can't be undone." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Libera %@. Non si può annullare."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Освободит %@. Отменить нельзя."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将释放 %@，且无法撤销。"
+          }
+        }
+      }
+    },
+    "Frees %@. Saves stay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Libera %@. I salvataggi restano."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Освободит %@. Сохранения останутся."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将释放 %@，存档不受影响。"
+          }
+        }
+      }
+    },
     "Game" : {
       "localizations" : {
         "it" : {
@@ -8400,6 +8356,28 @@
         }
       }
     },
+    "If Steam Cloud asks, pick your save." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se Steam Cloud chiede, scegli il tuo salvataggio."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Если Steam Cloud спросит, выберите своё сохранение."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果 Steam 云询问，请选择你的存档。"
+          }
+        }
+      }
+    },
     "If macOS shows the switch, turn it on. Setup carries on by itself." : {
       "localizations" : {
         "it" : {
@@ -9056,28 +9034,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它会将 CrossOver 使用的 DLL 替换为与当前兼容工具匹配的版本。"
-          }
-        }
-      }
-    },
-    "Its 1 backup will also be permanently deleted." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verrà eliminato definitivamente anche il suo backup."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Его единственная резервная копия тоже будет удалена без возможности восстановления."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "其 1 个备份也将被永久删除。"
           }
         }
       }
@@ -9984,6 +9940,336 @@
         }
       }
     },
+    "Move %lld backups to Trash?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spostare %lld backup nel Cestino?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить копии (%lld) в Корзину?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %lld 个备份移到废纸篓？"
+          }
+        }
+      }
+    },
+    "Move %lld prefixes to Trash?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spostare %lld prefissi nel Cestino?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить префиксы (%lld) в Корзину?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %lld 个游戏容器移到废纸篓？"
+          }
+        }
+      }
+    },
+    "Move %lld to Trash" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sposta %lld nel Cestino"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить (%lld) в Корзину"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %lld 项移到废纸篓"
+          }
+        }
+      }
+    },
+    "Move all to Trash." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sposta tutto nel Cestino."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить всё в Корзину."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部移到废纸篓。"
+          }
+        }
+      }
+    },
+    "Move backup for %@ to Trash?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spostare nel Cestino il backup di %@?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить копию %@ в Корзину?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将“%@”的备份移到废纸篓？"
+          }
+        }
+      }
+    },
+    "Move backup to Trash?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spostare il backup nel Cestino?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить копию в Корзину?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将备份移到废纸篓？"
+          }
+        }
+      }
+    },
+    "Move prefix for %@ to Trash?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spostare nel Cestino il prefisso di %@?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить префикс %@ в Корзину?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将“%@”的游戏容器移到废纸篓？"
+          }
+        }
+      }
+    },
+    "Move prefix to Trash?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spostare il prefisso nel Cestino?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить префикс в Корзину?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将游戏容器移到废纸篓？"
+          }
+        }
+      }
+    },
+    "Move to Trash" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sposta nel Cestino"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить в Корзину"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到废纸篓"
+          }
+        }
+      }
+    },
+    "Move to Trash." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sposta nel Cestino."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить в Корзину."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到废纸篓。"
+          }
+        }
+      }
+    },
+    "Moved %lld backups for %@ to Trash." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld backup di %2$@ spostati nel Cestino."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копии %2$@ (%1$lld) перемещены в Корзину."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将“%2$@”的 %1$lld 个备份移到废纸篓。"
+          }
+        }
+      }
+    },
+    "Moved %lld backups to Trash." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld backup spostati nel Cestino."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копии (%lld) перемещены в Корзину."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将 %lld 个备份移到废纸篓。"
+          }
+        }
+      }
+    },
+    "Moved %lld prefixes to Trash." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld prefissi spostati nel Cestino."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Префиксы (%lld) перемещены в Корзину."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将 %lld 个游戏容器移到废纸篓。"
+          }
+        }
+      }
+    },
+    "Moved backup for %@ to Trash." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup di %@ spostato nel Cestino."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копия %@ перемещена в Корзину."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将“%@”的备份移到废纸篓。"
+          }
+        }
+      }
+    },
+    "Moved prefix for %@ to Trash." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prefisso di %@ spostato nel Cestino."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Префикс %@ перемещён в Корзину."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将“%@”的游戏容器移到废纸篓。"
+          }
+        }
+      }
+    },
     "Moving to the Bridgeplay folders failed" : {
       "localizations" : {
         "it" : {
@@ -10508,6 +10794,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未部署。"
+          }
+        }
+      }
+    },
+    "Nothing deleted yet." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato ancora eliminato nulla."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока ничего не удалено."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未删除任何内容。"
           }
         }
       }
@@ -11476,6 +11784,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保护界面（保持静态 HUD 和菜单清晰）"
+          }
+        }
+      }
+    },
+    "Put them back before the next launch." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimettili a posto prima del prossimo avvio."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановите их до следующего запуска."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在下次启动前将其放回原处。"
           }
         }
       }
@@ -12932,6 +13262,72 @@
         }
       }
     },
+    "Restore" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановить"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复"
+          }
+        }
+      }
+    },
+    "Restore %@ from %@?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristinare %1$@ al %2$@?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановить %1$@ от %2$@?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将“%1$@”恢复到 %2$@ 的状态？"
+          }
+        }
+      }
+    },
+    "Restore Backup" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina backup"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановить копию"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复备份"
+          }
+        }
+      }
+    },
     "Restore Steam to its original state." : {
       "localizations" : {
         "it" : {
@@ -12954,6 +13350,72 @@
         }
       }
     },
+    "Restore backup" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristino del backup"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановить резервную копию"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复备份"
+          }
+        }
+      }
+    },
+    "Restore backup for %@?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristinare il backup di %@?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановить копию %@?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复“%@”的备份？"
+          }
+        }
+      }
+    },
+    "Restore backup?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristinare il backup?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановить резервную копию?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复备份？"
+          }
+        }
+      }
+    },
     "Restore the files included with this app." : {
       "localizations" : {
         "it" : {
@@ -12972,6 +13434,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用此应用附带的文件恢复安装。"
+          }
+        }
+      }
+    },
+    "Restore the selected backup." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina il backup selezionato."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановить выбранную копию."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复所选备份。"
+          }
+        }
+      }
+    },
+    "Restored %@. Old data is a new backup." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ripristinato. I dati precedenti sono un nuovo backup."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ восстановлен. Прежние данные сохранены в новой копии."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已恢复“%@”。旧数据已存为新备份。"
           }
         }
       }
@@ -13302,6 +13808,94 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "基于 CodeWeavers 的 Wine 和 Apple 的 Game Porting Toolkit 运行。"
+          }
+        }
+      }
+    },
+    "Saves and %lld backups go too." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anche i salvataggi e %lld backup."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранения и копии (%lld) тоже."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存档和 %lld 个备份也会一起移走。"
+          }
+        }
+      }
+    },
+    "Saves and 1 backup go too." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anche i salvataggi e 1 backup."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранения и 1 копия тоже."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存档和 1 个备份也会一起移走。"
+          }
+        }
+      }
+    },
+    "Saves and backups will be lost." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I salvataggi e i backup andranno persi."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранения и копии будут потеряны."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存档和备份将会丢失。"
+          }
+        }
+      }
+    },
+    "Saves go too." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anche i salvataggi."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранения тоже."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存档也会一起移走。"
           }
         }
       }
@@ -13654,6 +14248,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置助理…"
+          }
+        }
+      }
+    },
+    "Shaders" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shader"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шейдеры"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "着色器"
           }
         }
       }
@@ -16081,6 +16697,28 @@
         }
       }
     },
+    "The backup is no longer there." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il backup non c'è più."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Резервной копии больше нет."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该备份已不存在。"
+          }
+        }
+      }
+    },
     "The bundled Bridgeplay dylib is invalid." : {
       "localizations" : {
         "it" : {
@@ -16279,6 +16917,28 @@
         }
       }
     },
+    "The copy stays beside the prefix." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La copia resta accanto al prefisso."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копия хранится рядом с префиксом."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "副本保存在游戏容器旁。"
+          }
+        }
+      }
+    },
     "The detour is %lld bytes from the hook site, which a branch and link cannot reach." : {
       "localizations" : {
         "it" : {
@@ -16433,50 +17093,6 @@
         }
       }
     },
-    "The game SAVE DATA inside the prefix WILL BE LOST." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I SALVATAGGI del gioco contenuti nel prefisso ANDRANNO PERSI."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "СОХРАНЕНИЯ игры внутри префикса БУДУТ ПОТЕРЯНЫ."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "容器内的游戏存档将永久丢失！"
-          }
-        }
-      }
-    },
-    "The game SAVE DATA inside them WILL BE LOST." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I SALVATAGGI dei giochi contenuti nei prefissi ANDRANNO PERSI."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "СОХРАНЕНИЯ игр внутри них БУДУТ ПОТЕРЯНЫ."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这些容器内的游戏存档将永久丢失！"
-          }
-        }
-      }
-    },
     "The hook site" : {
       "localizations" : {
         "it" : {
@@ -16561,6 +17177,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新的 Bridgeplay 文件夹中已存在同名文件，因此没有覆盖任何内容。"
+          }
+        }
+      }
+    },
+    "The next launch may stutter." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il prossimo avvio può scattare."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Следующий запуск может подтормаживать."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下次启动时可能会卡顿。"
           }
         }
       }
@@ -16675,6 +17313,28 @@
         }
       }
     },
+    "These drives have no Trash" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questi dischi non hanno un Cestino"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На этих дисках нет Корзины"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些磁盘没有废纸篓"
+          }
+        }
+      }
+    },
     "These files did not update: %@." : {
       "localizations" : {
         "it" : {
@@ -16759,6 +17419,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此应用包含适用于 Steam 的更新文件。"
+          }
+        }
+      }
+    },
+    "This backup is not in the folder of %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo backup non è nella cartella di %@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Эта резервная копия не в папке %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此备份不在“%@”的文件夹中。"
           }
         }
       }
@@ -16851,6 +17533,28 @@
         }
       }
     },
+    "This drive has no Trash" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo disco non ha un Cestino"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На этом диске нет Корзины"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此磁盘没有废纸篓"
+          }
+        }
+      }
+    },
     "This folder belongs to the system (root), and your account cannot write to it. Try again from an administrator account, or ask an administrator for help." : {
       "localizations" : {
         "it" : {
@@ -16913,50 +17617,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此版本的 Bridgeplay 包含适用于 Steam 的较新文件。"
-          }
-        }
-      }
-    },
-    "This will DELETE the game's prefix." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il prefisso del gioco verrà ELIMINATO."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Префикс игры будет УДАЛЁН."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此操作将删除该游戏的容器。"
-          }
-        }
-      }
-    },
-    "This will DELETE the prefixes for %lld games." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I prefissi di %lld giochi verranno ELIMINATI."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Префиксы для игр (%lld) будут УДАЛЕНЫ."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此操作将删除 %lld 个游戏的容器。"
           }
         }
       }
@@ -17111,6 +17771,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请在“隐私与安全性 › App 管理”中开启 Bridgeplay。开启后，设置会自动继续。"
+          }
+        }
+      }
+    },
+    "Undo with Put Back in the Trash." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per annullare, usa «Rimetti a posto» nel Cestino."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отменить можно через «Восстановить» в Корзине."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可在废纸篓中选择“放回原处”撤销。"
           }
         }
       }

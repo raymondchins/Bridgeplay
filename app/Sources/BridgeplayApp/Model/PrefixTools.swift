@@ -562,22 +562,136 @@ enum PrefixTools {
         )
     }
 
-    static func deleteBackup(_ backup: URL) throws {
+    typealias Trash = @Sendable (URL) throws -> Void
+
+    // The Trash is per volume, so this is a rename on the drive the game data is on.
+    static let systemTrash: Trash = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
+
+    static func moveToTrash(_ url: URL, trash: Trash) throws {
+        let path = url.path(percentEncoded: false)
+        do {
+            try trash(url)
+        } catch let error as NSError where error.code == NSFileWriteNoPermissionError {
+            throw WriteRefused(path: path, errno: WriteRefused.posixCode(of: error))
+        } catch {
+            AppLog.note("trash: \(path) not moved: \(error)")
+            // Gone since it was listed (a drive unplugged, a folder removed): that failure, not
+            // a drive without a Trash, so no permanent delete is offered for it.
+            if (try? FileManager.default.attributesOfItem(atPath: path)) == nil { throw error }
+            // Only a drive without a Trash is offered a permanent delete; any other failure
+            // is reported as itself.
+            guard trashIsMissing(error, for: url) else { throw error }
+            throw TrashUnavailable(url: url)
+        }
+    }
+
+    // trashItem says "not supported" on a volume without a Trash, and such a volume has no
+    // Trash folder to name.
+    static func trashIsMissing(_ error: Error, for url: URL) -> Bool {
+        let error = error as NSError
+        if error.domain == NSCocoaErrorDomain, error.code == NSFeatureUnsupportedError { return true }
+        return (try? FileManager.default.url(for: .trashDirectory, in: .userDomainMask,
+                                             appropriateFor: url, create: false)) == nil
+    }
+
+    static func deleteBackup(_ backup: URL, trash: Trash = systemTrash) throws {
+        try moveToTrash(backup, trash: trash)
+    }
+
+    // Only after the user chose Delete Permanently for a drive without a Trash.
+    static func deleteBackupPermanently(_ backup: URL) throws {
         try WriteRefused.catching(backup.path(percentEncoded: false)) {
             try FileManager.default.removeItem(at: backup)
         }
     }
 
-    static func delete(_ prefix: WinePrefix) throws {
+    static func delete(_ prefix: WinePrefix, trash: Trash = systemTrash) throws {
+        let claim = try claimForDelete(prefix)
+        defer { claim.release() }
+        try moveToTrash(prefix.root, trash: trash)
+    }
+
+    // Only after the user chose Delete Permanently for a drive without a Trash.
+    static func deletePermanently(_ prefix: WinePrefix) throws {
+        let claim = try claimForDelete(prefix)
+        defer { claim.release() }
+        try WriteRefused.catching(prefix.root.path(percentEncoded: false)) {
+            try FileManager.default.removeItem(at: prefix.root)
+        }
+    }
+
+    private static func claimForDelete(_ prefix: WinePrefix) throws -> PrefixClaim {
         guard let claim = PrefixStore.claim(prefix) else {
             throw StepFailure(
                 step: String(localized: "Delete prefix"),
                 detail: String(localized: "\(prefix.title) is running. Quit the game first.")
             )
         }
-        defer { claim.release() }
-        try WriteRefused.catching(prefix.root) {
-            try FileManager.default.removeItem(at: prefix.root)
+        return claim
+    }
+
+    // Swaps a backup in: the current pfx becomes a new backup, then the chosen one is renamed
+    // to pfx. Both are renames inside the game's folder, so nothing is copied or overwritten.
+    // Returns the backup now holding the data that was current, nil when there was none.
+    @discardableResult
+    static func restore(
+        _ backup: PrefixBackup, now: Date = .now,
+        move: (URL, URL) throws -> Void = { try FileManager.default.moveItem(at: $0, to: $1) }
+    ) throws -> URL? {
+        let prefix = backup.prefix
+        let step = String(localized: "Restore backup")
+        let fm = FileManager.default
+        // plainPath: a parent from deletingLastPathComponent ends in a slash, a library root doesn't.
+        let folder = backup.url.deletingLastPathComponent().standardizedFileURL.plainPath
+        guard folder == prefix.root.standardizedFileURL.plainPath,
+              backup.url.lastPathComponent.hasPrefix(PrefixStore.backupPrefix)
+        else {
+            throw StepFailure(step: step, detail: String(localized: "This backup is not in the folder of \(prefix.title)."))
         }
+        guard let claim = PrefixStore.claim(prefix) else {
+            throw StepFailure(step: step, detail: String(localized: "\(prefix.title) is running. Quit the game first."))
+        }
+        defer { claim.release() }
+
+        var isDirectory: ObjCBool = false
+        guard fm.fileExists(atPath: backup.url.path(percentEncoded: false), isDirectory: &isDirectory),
+              isDirectory.boolValue
+        else {
+            throw StepFailure(step: step, detail: String(localized: "The backup is no longer there."))
+        }
+
+        // attributesOfItem doesn't follow a final link, so a dangling pfx link still counts.
+        let current = (try? fm.attributesOfItem(atPath: prefix.pfx.path(percentEncoded: false))) != nil
+        let kept = current ? backupSlot(in: prefix.root, at: now) : nil
+        try WriteRefused.catching(prefix.root.path(percentEncoded: false)) {
+            if let kept { try move(prefix.pfx, kept) }
+            do {
+                try move(backup.url, prefix.pfx)
+            } catch {
+                if let kept {
+                    do {
+                        try move(kept, prefix.pfx)
+                    } catch let undo {
+                        AppLog.note("restore \(prefix.appID): current data left at \(kept.path(percentEncoded: false)): \(undo)")
+                    }
+                }
+                throw error
+            }
+        }
+        // The build record names whoever ran the data that is now a backup. Without it the
+        // next launch reads the restored prefix's own .update-timestamp, as for an old prefix.
+        try? fm.removeItem(at: prefix.root.appending(path: buildRecordName))
+        try? fm.removeItem(at: prefix.root.appending(path: "notproton-switch"))
+        return kept
+    }
+}
+
+// A move to the Trash failed and nothing was deleted, most often because the drive has no
+// Trash (some network and non-Apple volumes).
+struct TrashUnavailable: LocalizedError {
+    let url: URL
+
+    var errorDescription: String? {
+        String(localized: "\(url.lastPathComponent) could not be moved to the Trash. Nothing was deleted.")
     }
 }
