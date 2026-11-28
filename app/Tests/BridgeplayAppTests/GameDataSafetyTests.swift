@@ -36,6 +36,8 @@ struct GameDataSafetyTests {
     }
 
     private struct NoTrashHere: Error {}
+    // What trashItem throws on a drive without a Trash.
+    private let unsupported = CocoaError(.featureUnsupported)
 
     private func exists(_ url: URL) -> Bool {
         FileManager.default.fileExists(atPath: url.path(percentEncoded: false))
@@ -77,10 +79,10 @@ struct GameDataSafetyTests {
         let backup = try makeBackup(f.prefix, stamp: "20260101-120000", save: "old")
 
         #expect(throws: TrashUnavailable.self) {
-            try PrefixTools.delete(f.prefix, trash: { _ in throw NoTrashHere() })
+            try PrefixTools.delete(f.prefix, trash: { [unsupported] _ in throw unsupported })
         }
         #expect(throws: TrashUnavailable.self) {
-            try PrefixTools.deleteBackup(backup.url, trash: { _ in throw NoTrashHere() })
+            try PrefixTools.deleteBackup(backup.url, trash: { [unsupported] _ in throw unsupported })
         }
         #expect(save(in: f.prefix.pfx) == "save")
         #expect(save(in: backup.url) == "old")
@@ -95,6 +97,14 @@ struct GameDataSafetyTests {
             throw NoTrashHere()
         }
         #expect(throws: NoTrashHere.self) { try PrefixTools.delete(f.prefix, trash: unplugged) }
+    }
+
+    @Test("Another Trash failure on a drive with a Trash is reported as itself")
+    func otherFailureIsNotNoTrash() throws {
+        let f = try fixture("otherfail")
+        defer { try? FileManager.default.removeItem(at: f.dir) }
+        #expect(throws: NoTrashHere.self) { try PrefixTools.delete(f.prefix, trash: { _ in throw NoTrashHere() }) }
+        #expect(exists(f.prefix.pfx))
     }
 
     @Test("A refused permission is reported as one, not offered as a permanent delete")
@@ -239,7 +249,8 @@ struct GameDataSafetyTests {
         let f = try fixture("model")
         defer { try? FileManager.default.removeItem(at: f.dir) }
         let library = f.library
-        let model = PrefixesModel(libraries: { [library] }, trash: { _ in throw NoTrashHere() }, caches: nil)
+        let error = unsupported
+        let model = PrefixesModel(libraries: { [library] }, trash: { _ in throw error }, caches: nil)
         await model.load()
         let prefix = try #require(model.prefixes.first)
 

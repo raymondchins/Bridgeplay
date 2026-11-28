@@ -578,8 +578,20 @@ enum PrefixTools {
             // Gone since it was listed (a drive unplugged, a folder removed): that failure, not
             // a drive without a Trash, so no permanent delete is offered for it.
             if (try? FileManager.default.attributesOfItem(atPath: path)) == nil { throw error }
+            // Only a drive without a Trash is offered a permanent delete; any other failure
+            // is reported as itself.
+            guard trashIsMissing(error, for: url) else { throw error }
             throw TrashUnavailable(url: url)
         }
+    }
+
+    // trashItem says "not supported" on a volume without a Trash, and such a volume has no
+    // Trash folder to name.
+    static func trashIsMissing(_ error: Error, for url: URL) -> Bool {
+        let error = error as NSError
+        if error.domain == NSCocoaErrorDomain, error.code == NSFeatureUnsupportedError { return true }
+        return (try? FileManager.default.url(for: .trashDirectory, in: .userDomainMask,
+                                             appropriateFor: url, create: false)) == nil
     }
 
     static func deleteBackup(_ backup: URL, trash: Trash = systemTrash) throws {
