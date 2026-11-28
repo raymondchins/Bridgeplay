@@ -1,4 +1,5 @@
 import Foundation
+import ServiceManagement
 import Testing
 
 @testable import BridgeplayApp
@@ -227,5 +228,14 @@ struct BackgroundItemTests {
         service.state = .unavailable
         defaults.set("off", forKey: BackgroundCheck.modeKey)
         #expect(BackgroundItem.current(service: service, defaults: defaults) == .unavailable)
+    }
+
+    @Test("An agent launchd has never seen can be turned on; only a missing plist is unavailable")
+    func neverRegistered() {
+        #expect(BackgroundItem.state(for: .notFound, plistShipped: true) == .off)
+        #expect(BackgroundItem.state(for: .notFound, plistShipped: false) == .unavailable)
+        #expect(BackgroundItem.state(for: .notRegistered, plistShipped: true) == .off)
+        #expect(BackgroundItem.state(for: .enabled, plistShipped: true) == .on)
+        #expect(BackgroundItem.state(for: .requiresApproval, plistShipped: true) == .needsApproval)
     }
 }

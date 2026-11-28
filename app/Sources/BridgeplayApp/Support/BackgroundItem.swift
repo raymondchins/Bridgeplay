@@ -58,6 +58,23 @@ enum BackgroundItem {
     static func openLoginItems() {
         SMAppService.openSystemSettingsLoginItems()
     }
+
+    // launchd answers notFound for an agent it has never seen, which is every agent before its
+    // first register, so only a copy of the app without the plist is unavailable.
+    static func state(for status: SMAppService.Status, plistShipped: Bool) -> State {
+        switch status {
+        case .enabled: .on
+        case .requiresApproval: .needsApproval
+        case .notFound: plistShipped ? .off : .unavailable
+        case .notRegistered: .off
+        @unknown default: .off
+        }
+    }
+
+    static func plistShipped(in bundle: Bundle = .main) -> Bool {
+        FileManager.default.fileExists(atPath: bundle.bundleURL
+            .appending(path: "Contents/Library/LaunchAgents/\(plistName)").path(percentEncoded: false))
+    }
 }
 
 @MainActor
@@ -71,13 +88,7 @@ private struct AgentService: BackgroundItemService {
     private var agent: SMAppService { SMAppService.agent(plistName: BackgroundItem.plistName) }
 
     var state: BackgroundItem.State {
-        switch agent.status {
-        case .enabled: .on
-        case .requiresApproval: .needsApproval
-        case .notFound: .unavailable
-        case .notRegistered: .off
-        @unknown default: .off
-        }
+        BackgroundItem.state(for: agent.status, plistShipped: BackgroundItem.plistShipped())
     }
 
     func register() throws {
