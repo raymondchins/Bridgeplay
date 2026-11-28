@@ -174,4 +174,30 @@ struct SetupDeadEndsTests {
         #expect(seen.files == [release.archive, release.renderer.archive])
         #expect(!FileManager.default.fileExists(atPath: caches.path(percentEncoded: false)))
     }
+
+    @Test("Set Up also fetches Valve's restore bundle, unless it is already kept or cached")
+    func prefetchRestoreBundle() throws {
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bytes = Data("bundle".utf8)
+        let bundle = ValveBundle(file: "steam_osx.zip.test", sha256: Digest.sha256(of: bytes), innerArchive: "a.tar.gz", bundleName: "Steam.app")
+        let valve = ValvePackageManifest(bases: [URL(string: "https://example.invalid/client")!],
+                                         packages: [], files: [], bundle: bundle)
+        let caches = root.appending(path: "caches"), kept = root.appending(path: "kept")
+        func plan() -> [SetupPrefetch.Pinned] {
+            SetupPrefetch.files(valve: valve, bridge: root, engineCache: caches, rendererCache: caches,
+                                valveCache: caches, kept: kept).filter { $0.file == bundle.file }
+        }
+        // The bridge files already match (none are declared), yet the bundle is still fetched.
+        #expect(plan().map(\.into) == [kept])
+
+        try FileManager.default.createDirectory(at: caches, withIntermediateDirectories: true)
+        try bytes.write(to: caches.appending(path: bundle.file))
+        #expect(plan().isEmpty)
+        try FileManager.default.removeItem(at: caches.appending(path: bundle.file))
+
+        try FileManager.default.createDirectory(at: kept, withIntermediateDirectories: true)
+        try bytes.write(to: kept.appending(path: bundle.file))
+        #expect(plan().isEmpty)
+    }
 }

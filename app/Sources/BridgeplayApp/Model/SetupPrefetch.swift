@@ -13,7 +13,7 @@ enum SetupPrefetch {
         let source: String
     }
 
-    // The engine and its DXMT archive, and Valve's packages when a bridge file misses its pin,
+    // The engine and its DXMT archive, Valve's packages when a bridge file misses its pin,
     // the same test installIntoSteam makes before it fetches them.
     static func files(
         release: WinecxRelease = FreeEngineWinecx.current,
@@ -21,7 +21,8 @@ enum SetupPrefetch {
         bridge: URL = SupportPaths.bridge,
         engineCache: URL? = nil,
         rendererCache: URL = FreeEngine.downloads,
-        valveCache: URL = SupportPaths.packageDownloads
+        valveCache: URL = SupportPaths.packageDownloads,
+        kept: URL = SupportPaths.steamRestore
     ) -> [Pinned] {
         var files = [
             Pinned(file: release.archive, sha256: release.sha256, bases: release.bases,
@@ -34,10 +35,19 @@ enum SetupPrefetch {
                 Pinned(file: $0.file, sha256: $0.sha256, bases: valve.bases, into: valveCache, step: ValveFetcher.step, source: "Valve")
             }
         }
+        // Valve's restore bundle, which installIntoSteam keeps (SteamRepair.keepForOffline) after
+        // Steam quits. It lands in the kept folder, so that step finds it; a copy already kept or
+        // cached is a local move and needs no download.
+        if let valve, let bundle = valve.bundle,
+           SteamRepair.keptArchive(bundle, in: kept) == nil,
+           Digest.sha256IfPresent(valveCache.appending(path: bundle.file)) != bundle.sha256 {
+            files.append(Pinned(file: bundle.file, sha256: bundle.sha256, bases: valve.bases, into: kept,
+                                step: SteamRepair.step, source: "Valve"))
+        }
         return files
     }
 
-    // Set Up has at most four files on two hosts (GitHub, Valve's CDN), so all of them start
+    // Set Up has at most five files on two hosts (GitHub, Valve's CDN), so all of them start
     // at once and the bar has its total within a second.
     static let parallel = 4
 
