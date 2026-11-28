@@ -95,6 +95,36 @@ last run by build 26.3.0.39832 (CrossOver 26.3),
 CrossOver 26.3
 ")"
 
+# A WineCX bump moves games on Steam's default to the new build's tool: the older build's
+# prefix runs as is, and a crash right after can be laid on the switch.
+clone winecx-11.17 202610101200
+clone winecx-11.99 202612011200
+data=$(mktemp -d "$work/compatdata.XXXXXX")
+mkdir -p "$data/pfx"
+printf 'winecx-11.17\nWineCX 11.17\n' > "$data/notproton-build"
+printf 'winecx-11.17\n' > "$data/notproton-healthy"
+out=$(
+	STEAM_COMPAT_DATA_PATH=$data
+	np_build=winecx-11.99
+	np_display="WineCX 11.99"
+	wine_unix="$np_support/runners/crossover-winecx-11.99/CrossOver/lib/wine/x86_64-unix"
+	CX_ROOT="$np_support/runners/crossover-winecx-11.99/CrossOver"
+	log="$data/log"
+	# shellcheck disable=SC2329
+	show_alert() { printf 'alert: %s\n' "$2"; }
+	# shellcheck disable=SC2329
+	rebuild_prefix() { show_alert "rebuild" "$1"; exit 1; }
+	eval "$functions"
+	note_other_build
+	claim_prefix
+	echo "status=$?"
+) 2>&1
+is "a newer WineCX build runs an older WineCX build's prefix and claims it" "status=0
+winecx-11.99" "$out
+$(head -1 "$data/notproton-build")"
+is "the switch names the WineCX build the game ran on" "winecx-11.17
+WineCX 11.17" "$(sed -n 1,2p "$data/notproton-switch" 2>/dev/null)"
+
 echo "== alerts =="
 alert=$(extract show_alert)
 [ -n "$alert" ] || { echo "FAIL: show_alert not found in $SRC"; exit 1; }
