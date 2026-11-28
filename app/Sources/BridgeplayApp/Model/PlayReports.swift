@@ -114,6 +114,9 @@ struct ReportPayload: Codable, Equatable, Sendable {
         var summary = session.summary(log: log, wineLog: wineLog)
         if let newer = machine.newerRelease { summary += ". A newer Bridgeplay was out: \(newer)" }
         if source == .auto { summary += ". Status inferred from the log" }
+        // The Steam facts come from this session's own record: Steam can update between the
+        // launch and a report sent days later, and the regression watch compares builds.
+        let thisLaunch = Launch(record, session: session)
         return ReportPayload(
             appid: appID, status: status, install: install, source: source, name: name,
             chip: GameReport.chip(machine.chip), memory: GameReport.memory(machine.memoryBytes),
@@ -126,9 +129,10 @@ struct ReportPayload: Codable, Equatable, Sendable {
             log: log.map { String(GameReport.redacted($0).suffix(logLimit)) },
             wineLog: wineLog.map { GameReport.wineTail(GameReport.redacted($0), limit: wineLogLimit) },
             updateState: machine.updateState, buildChannel: machine.buildChannel,
-            consent: consent, steamBuild: machine.steamBuild, steamChannel: machine.steamChannel,
+            consent: consent, steamBuild: thisLaunch == nil ? nil : record?.steamBuild,
+            steamChannel: thisLaunch == nil ? nil : record?.steamChannel,
             engineID: launch.id ?? record?.engine.flatMap { $0.wholeMatch(of: /[A-Za-z0-9.-]{1,60}/) != nil ? $0 : nil },
-            launch: Launch(record, session: session), bulk: bulk ? true : nil)
+            launch: thisLaunch, bulk: bulk ? true : nil)
     }
 }
 

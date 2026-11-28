@@ -10,7 +10,7 @@ extract() { sed -n "/^$1() {\$/,/^}\$/p" "$SRC"; }
 functions=""
 for name in kernel_anticheat_name exit_anticheat exit_meaning exit_signal wine_crash_pattern exit_crash_lines \
 	exit_summary exit_outcome np_now_ms np_seconds mark first_window_ms first_frame_ms launch_times \
-	write_last_launch report_early_exit abandon_seed; do
+	write_last_launch report_early_exit abandon_seed steam_facts; do
 	body=$(extract "$name")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -242,6 +242,44 @@ is "no window is an empty key" "window=" "$(grep '^window' "$compat/bridgeplay-l
 write_last_launch access_violation 5 12 game 3
 is "ended is the time in seconds" yes "$(printf '%s' "$ended" | grep -qE '^[1-9][0-9]{9}$' && echo yes || echo no)"
 is "nothing is left beside it" no "$([ -e "$compat/bridgeplay-last-launch.new" ] && echo yes || echo no)"
+
+echo "== the Steam the launch ran under =="
+real_home=$HOME
+HOME="$work/home"
+pkg="$HOME/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/package"
+steam_facts
+is "no Steam package folder: no build or branch" "[][]" "[$steam_build][$steam_channel]"
+write_last_launch ok 0 900 game 20
+is "and the record names neither" no "$(grep -q '^steam_' "$compat/bridgeplay-last-launch" && echo yes || echo no)"
+mkdir -p "$pkg"
+printf '"bins_osx"\n{\n\t"version"\t\t"1795500000"\n}\n' > "$pkg/steam_client_osx.manifest"
+: > "$pkg/steam_client_osx.installed"
+touch -t 202601010000 "$pkg/steam_client_osx.installed"
+: > "$pkg/steam_client_publicbeta_osx.installed"
+steam_facts
+is "the newest package without a manifest gives way to an older one" "[1795500000][stable]" "[$steam_build][$steam_channel]"
+printf '"bins_osx"\n{\n\t"version"\t\t"1795567705"\n\t"files"\n\t{\n\t\t"version"\t"2"\n\t}\n}\n' \
+	> "$pkg/steam_client_publicbeta_osx.manifest"
+printf 'publicbeta\n' > "$pkg/beta"
+steam_facts
+is "the newest manifest's version and package/beta" "[1795567705][publicbeta]" "[$steam_build][$steam_channel]"
+write_last_launch ok 0 900 game 20
+is "the record carries both, before ended" "steam_build=1795567705
+steam_channel=publicbeta" "$(sed -n '/^steam_/p' "$compat/bridgeplay-last-launch")"
+is "and keeps ended last" ended "$(tail -n 1 "$compat/bridgeplay-last-launch" | cut -d= -f1)"
+printf 'a b; rm\n' > "$pkg/beta"
+steam_facts
+is "an odd branch name is unknown" unknown "$steam_channel"
+: > "$pkg/beta"
+steam_facts
+is "an empty beta file is stable" stable "$steam_channel"
+printf '"bins_osx"\n{\n\t"version"\t\t"1.0 beta"\n}\n' > "$pkg/steam_client_publicbeta_osx.manifest"
+printf '"bins_osx"\n{\n\t"version"\t\t"12"\n}\n' > "$pkg/steam_client_osx.manifest"
+steam_facts
+is "no plausible version: no build" "" "$steam_build"
+HOME=$real_home
+steam_build="" steam_channel=""
+
 printf 'theirs\n' > "$work/outside"
 rm "$compat/bridgeplay-last-launch"
 ln -s "$work/outside" "$compat/bridgeplay-last-launch"

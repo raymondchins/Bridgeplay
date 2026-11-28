@@ -24,9 +24,6 @@ enum GameReport {
         // The updater state (stable, beta, leaving) and the running build's channel.
         var updateState: String?
         var buildChannel: String?
-        // The Steam client's build ("1795567705") and branch ("stable", "publicbeta").
-        var steamBuild: String? = nil
-        var steamChannel: String? = nil
     }
 
     static var thisMac: Machine {
@@ -36,28 +33,12 @@ enum GameReport {
                        bridgeplay: ProductVersion.build.map { "\(ProductVersion.short) (\($0))" } ?? ProductVersion.short,
                        model: sysctl("hw.model"),
                        newerRelease: LatestRelease.newer(than: ProductVersion.build, state: state),
-                       updateState: state.rawValue, buildChannel: ProductVersion.channel.rawValue,
-                       steamBuild: SteamHealthStore.installedSteamBuild().flatMap(steamBuild),
-                       steamChannel: steamChannel())
+                       updateState: state.rawValue, buildChannel: ProductVersion.channel.rawValue)
     }
 
-    // The manifest's version, digits only.
+    // A Steam build as the launch record carries it: the manifest's version, digits only.
     static func steamBuild(_ version: String) -> String? {
         version.wholeMatch(of: /\d{6,12}/) != nil ? version : nil
-    }
-
-    // package/beta names the branch, as np_steam_channel in dylib/feats/breaker.c reads it: no
-    // file is the stable client, anything but a plain name is "unknown". nil without Steam.
-    static func steamChannel(
-        package: URL = SupportPaths.Steam.innerApp.appending(path: "Contents/MacOS/package")
-    ) -> String? {
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: package.path(percentEncoded: false), isDirectory: &isDirectory),
-              isDirectory.boolValue else { return nil }
-        guard let data = try? Data(contentsOf: package.appending(path: "beta")) else { return "stable" }
-        let text = String(decoding: data.prefix(256), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.isEmpty { return "stable" }
-        return text.wholeMatch(of: /[A-Za-z0-9_.-]{1,63}/) != nil ? text : "unknown"
     }
 
     private static func sysctl(_ name: String) -> String? {

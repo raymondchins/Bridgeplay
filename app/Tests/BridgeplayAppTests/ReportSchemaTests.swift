@@ -15,13 +15,8 @@ struct ReportSchemaTests {
         === aborted during prefix build check (exit 1) before launch ===
         """
 
-    private let machine: GameReport.Machine = {
-        var machine = GameReport.Machine(chip: "Apple M5 Max", memoryBytes: 64 * 1_073_741_824,
-                                         macOS: "macOS 27.0", bridgeplay: "0.7.68 (90)")
-        machine.steamBuild = "1795567705"
-        machine.steamChannel = "publicbeta"
-        return machine
-    }()
+    private let machine = GameReport.Machine(chip: "Apple M5 Max", memoryBytes: 64 * 1_073_741_824,
+                                             macOS: "macOS 27.0", bridgeplay: "0.7.68 (90)")
 
     private func record(_ text: String) -> LaunchRecord? { LaunchRecord.parse(text) }
 
@@ -32,20 +27,35 @@ struct ReportSchemaTests {
         #expect(GameReport.lastLaunch(in: "runner: build bad/id (X) at /b\n").id == nil)
     }
 
-    @Test("The Steam channel is read from package/beta as the dylib reads it")
-    func steamChannel() throws {
-        let dir = try scratchDirectory("steam-package")
-        defer { try? FileManager.default.removeItem(at: dir) }
-        #expect(GameReport.steamChannel(package: dir.appending(path: "missing")) == nil)
-        #expect(GameReport.steamChannel(package: dir) == "stable")
-        try Data("publicbeta\n".utf8).write(to: dir.appending(path: "beta"))
-        #expect(GameReport.steamChannel(package: dir) == "publicbeta")
-        try Data("\n".utf8).write(to: dir.appending(path: "beta"))
-        #expect(GameReport.steamChannel(package: dir) == "stable")
-        try Data("a b; rm".utf8).write(to: dir.appending(path: "beta"))
-        #expect(GameReport.steamChannel(package: dir) == "unknown")
+    @Test("The Steam build and branch are read from the launch record, odd values dropped")
+    func steamFacts() {
+        let facts = record("code=ok\nsteam_build=1795567705\nsteam_channel=publicbeta\n")
+        #expect(facts?.steamBuild == "1795567705" && facts?.steamChannel == "publicbeta")
+        let odd = record("code=ok\nsteam_build=1.0 beta\nsteam_channel=a b; rm\n")
+        #expect(odd?.steamBuild == nil && odd?.steamChannel == nil)
+        #expect(record("code=ok\n")?.steamBuild == nil)
         #expect(GameReport.steamBuild("1795567705") == "1795567705")
         #expect(GameReport.steamBuild("1.0 beta") == nil)
+    }
+
+    @Test("A report names the Steam its launch ran under, not the Steam at send time")
+    func steamOfTheLaunch() {
+        let ended = Date(timeIntervalSince1970: 1_790_000_000)
+        let session = GameSession(id: "x", started: nil, ended: ended, exitStatus: 0, stoppedBySteam: false)
+        func payload(_ file: String?) -> ReportPayload {
+            ReportPayload.make(name: "Game", appID: "1245620", status: .gold, source: .tap, session: session,
+                               log: nil, wineLog: nil, machine: machine, install: UUID().uuidString,
+                               record: file.flatMap(record))
+        }
+        let ours = "code=ok\nsteam_build=1795500000\nsteam_channel=stable\nended=\(Int(ended.timeIntervalSince1970))\n"
+        #expect(payload(ours).steamBuild == "1795500000" && payload(ours).steamChannel == "stable")
+        // A later launch's record ran under another Steam: its facts are not this session's.
+        let later = "code=ok\nsteam_build=1795567705\nsteam_channel=publicbeta\nended=\(Int(ended.timeIntervalSince1970) + 3600)\n"
+        #expect(payload(later).steamBuild == nil && payload(later).steamChannel == nil)
+        // A record from before the run script saved them, or no record: unknown, so left out.
+        let older = "code=ok\nended=\(Int(ended.timeIntervalSince1970))\n"
+        #expect(payload(older).steamBuild == nil && payload(older).steamChannel == nil)
+        #expect(payload(nil).steamBuild == nil)
     }
 
     @Test("The payload is schema 2 and carries this session's outcome record")
@@ -54,7 +64,7 @@ struct ReportSchemaTests {
         let session = GameSession(id: "x", started: ended.addingTimeInterval(-3600), ended: ended,
                                   exitStatus: 0, stoppedBySteam: false)
         let file = "version=1\ncode=ok\nexit=0\nseconds=3590\nstopped=game\nbackend=d3dmetal\nengine=winecx-11.17\n"
-            + "window=14\nended=\(Int(ended.timeIntervalSince1970) - 20)\n"
+            + "window=14\nsteam_build=1795567705\nsteam_channel=publicbeta\nended=\(Int(ended.timeIntervalSince1970) - 20)\n"
         let payload = ReportPayload.make(name: "Elden Ring", appID: "1245620", status: .gold, source: .tap, session: session,
                                          log: run, wineLog: nil, machine: machine, install: UUID().uuidString,
                                          note: "switched to DXVK", record: record(file), consent: 2, bulk: true)
