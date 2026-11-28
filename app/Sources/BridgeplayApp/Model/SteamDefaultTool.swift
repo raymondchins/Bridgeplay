@@ -24,9 +24,12 @@ enum SteamDefaultTool {
 
     // What the "0" entry was before Bridgeplay first set it (nil when there was none), and the
     // tool Bridgeplay last wrote there. Backups from before `applied` was kept have none.
+    // `moving` names the older tool while a move to `applied` is recorded but config.vdf not
+    // yet written, so a move cut short (a quit or crash) is finished on the next run.
     struct Backup: Codable, Equatable, Sendable {
         var previous: Mapping?
         var applied: String? = nil
+        var moving: String? = nil
     }
 
     static func readBackup(_ backup: URL = backup) -> Backup? {
@@ -45,9 +48,10 @@ enum SteamDefaultTool {
         }
     }
 
-    private static func writeApplied(_ tool: String, backup: URL) throws {
+    private static func writeApplied(_ tool: String, movingFrom: String? = nil, backup: URL) throws {
         var saved = readBackup(backup) ?? Backup(previous: nil)
         saved.applied = tool
+        saved.moving = movingFrom
         try write(saved, to: backup)
     }
 
@@ -278,6 +282,7 @@ enum SteamDefaultTool {
     ) -> String? {
         guard let mapping = self.current(in: text), older.contains(mapping.name), let backup,
               mapping.name == (backup.applied ?? previous)
+                || (backup.applied == current && backup.moving == mapping.name)
         else { return nil }
         var moved = mapping
         moved.name = current
@@ -316,7 +321,7 @@ enum SteamDefaultTool {
         // Steam's config a second time.
         let record = try? Data(contentsOf: backup)
         do {
-            try writeApplied(current, backup: backup)
+            try writeApplied(current, movingFrom: self.current(in: text)?.name, backup: backup)
         } catch {
             AppLog.note("default tool: could not record \(current), the default stays: \(error.localizedDescription)")
             return .failed
@@ -331,6 +336,7 @@ enum SteamDefaultTool {
             putBack(record, at: backup)
             throw error
         }
+        recordApplied(current, backup: backup)
         return .updated
     }
 
