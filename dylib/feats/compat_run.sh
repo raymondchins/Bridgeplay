@@ -2071,7 +2071,7 @@ APPLESCRIPT
   {
     echo "=== not launched: kernel anti-cheat, $ka_why ==="
     echo "=== exit summary: not launched, stopped before Wine started ==="
-    echo "=== exit cause: blocked: kernel anti-cheat $ka_found not confirmed, $ka_why ==="
+    echo "=== exit cause: blocked before launch: kernel anti-cheat $ka_found, $ka_why ==="
   } >> "$log" 2>&1 || true
   np_outcome=anticheat_blocked
   exit 0

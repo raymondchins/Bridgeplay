@@ -108,7 +108,7 @@ has "Don't Launch is the default" "default button (item 6 of argv)" "$(cat "$wor
 has "a translated button answers in English" 'if button returned of answer is (item 5 of argv) then return "Launch Anyway"' "$(cat "$work/case dont/script")"
 has "a translated Other Ways to Play answers in English" 'if button returned of answer is (item 4 of argv) then return "Other Ways to Play"' "$(cat "$work/case dont/script")"
 has "Don't Launch: logged" "=== not launched: kernel anti-cheat, the player chose Don't Launch ===" "$log"
-has "Don't Launch: exit cause" "=== exit cause: blocked: kernel anti-cheat Ricochet (Randgrid.sys) not confirmed, the player chose Don't Launch ===" "$log"
+has "Don't Launch: exit cause" "=== exit cause: blocked before launch: kernel anti-cheat Ricochet (Randgrid.sys), the player chose Don't Launch ===" "$log"
 
 answer "Other Ways to Play"
 prompt_case elsewhere waitforexitandrun "$ka_game" stub
@@ -116,7 +116,7 @@ is "Other Ways to Play: exits cleanly" 0 "$rc"
 is "Other Ways to Play: the game does not start" no "$launched"
 is "Other Ways to Play: opens Bridgeplay's guide" "$elsewhere" "$(cat "$work/case elsewhere/opened" 2>/dev/null)"
 is "the guide is Bridgeplay's own page" "https://bridgeplay.dev/guides/anti-cheat-on-mac#alternatives" "$elsewhere"
-has "Other Ways to Play: exit cause" "=== exit cause: blocked: kernel anti-cheat Ricochet (Randgrid.sys) not confirmed, the player chose Other Ways to Play ===" "$log"
+has "Other Ways to Play: exit cause" "=== exit cause: blocked before launch: kernel anti-cheat Ricochet (Randgrid.sys), the player chose Other Ways to Play ===" "$log"
 
 answer "Launch Anyway"
 prompt_case anyway waitforexitandrun "$ka_game" stub
@@ -130,7 +130,7 @@ is "no answer in time: exits cleanly" 0 "$rc"
 is "no answer in time: the game does not start" no "$launched"
 has "no answer in time: logged" "=== not launched: kernel anti-cheat, no answer within ${wait_seconds}s ===" "$log"
 has "no answer in time: exit summary" "=== exit summary: not launched, stopped before Wine started ===" "$log"
-has "no answer in time: exit cause" "=== exit cause: blocked: kernel anti-cheat Ricochet (Randgrid.sys) not confirmed, no answer within ${wait_seconds}s ===" "$log"
+has "no answer in time: exit cause" "=== exit cause: blocked before launch: kernel anti-cheat Ricochet (Randgrid.sys), no answer within ${wait_seconds}s ===" "$log"
 
 answer "" 1 "execution error: No user interaction allowed. (-1713)"
 prompt_case error waitforexitandrun "$ka_game" stub
@@ -138,7 +138,7 @@ is "dialog error: exits cleanly" 0 "$rc"
 is "dialog error: the game does not start" no "$launched"
 has "dialog error: why" "=== not launched: kernel anti-cheat, the dialog could not be shown (exit 1) ===" "$log"
 has "dialog error: the error is kept" "No user interaction allowed. (-1713)" "$log"
-has "dialog error: exit cause" "=== exit cause: blocked: kernel anti-cheat Ricochet (Randgrid.sys) not confirmed, the dialog could not be shown (exit 1) ===" "$log"
+has "dialog error: exit cause" "=== exit cause: blocked before launch: kernel anti-cheat Ricochet (Randgrid.sys), the dialog could not be shown (exit 1) ===" "$log"
 
 answer "" 0
 prompt_case empty waitforexitandrun "$ka_game" stub
@@ -166,7 +166,8 @@ is "a confirmed game is asked with no anti-cheat file" yes "$asked"
 is "a confirmed game does not start on Don't Launch" no "$launched"
 has "the dialog names the confirmed anti-cheat" "It uses Easy Anti-Cheat, which the Bridgeplay maintainers found this game cannot run with on macOS" "$(cat "$work/case confirmed/args")"
 has "a confirmed game: logged" "anticheat: ANTICHEAT=eac in this game's gamefix, confirmed by a maintainer" "$log"
-has "a confirmed game: exit cause" "=== exit cause: blocked: kernel anti-cheat Easy Anti-Cheat (gamefix) not confirmed, the player chose Don't Launch ===" "$log"
+has "a confirmed game: exit cause" "=== exit cause: blocked before launch: kernel anti-cheat Easy Anti-Cheat (gamefix), the player chose Don't Launch ===" "$log"
+lacks "a confirmed game: the exit cause does not contradict the maintainer line" "not confirmed" "$log"
 prompt_case confirmed-file waitforexitandrun "$ka_game" stub
 has "the gamefix comes before the file scan" "Easy Anti-Cheat" "$(cat "$work/case confirmed-file/args")"
 answer "Launch Anyway"
