@@ -579,6 +579,8 @@ gamefix_reason() {
     MTL_HUD_ENABLED|WINEDEBUG|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX) ;;
     ROSETTA_ADVERTISE_AVX)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
+    MOD_LOADERS)
+      case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     DXMT_?*|DXVK_?*|MVK_?*|VKD3D_?*|D3DM_?*|STAGING_?*) ;;
     *) echo "not on the allow-list" ;;
   esac
@@ -670,6 +672,7 @@ load_gamefixes() {
       RETINA) gamefix_apply_env NOTPROTON_RETINA "$value" "$from" ;;
       # Steam reads SteamDeck in mixed case, which a conf key cannot spell.
       STEAMDECK) gamefix_apply_env SteamDeck "$value" "$from" ;;
+      MOD_LOADERS) gamefix_apply_env NOTPROTON_MOD_LOADERS "$value" "$from" ;;
       FRAMEGEN|FRAMEGEN_QUALITY|FRAMEGEN_UI|FRAMEGEN_FALLBACK|FRAMEGEN_ENGINE|PERF_OVERLAY|FPS_LIMIT|FPS_LIMIT_OFF|SCALING_FILTER|SUSTAINED)
         gamefix_apply_env "NOTPROTON_$key" "$value" "$from" ;;
       *) gamefix_apply_env "$key" "$value" "$from" ;;
@@ -1474,6 +1477,74 @@ record_backend() {
     rm -f "$record.new" 2>/dev/null || true
     graphics_log "could not record the backend in $record"
   fi
+}
+
+# A mod loader is a proxy DLL beside the game that Wine passes over for its own builtin. A
+# proxy gets n,b only beside its loader's own files, so a DLL the game ships stays as it is.
+# dxgi and d3d11 belong to the backend and are never touched. Only stat calls and, when a
+# proxy is there, one glob for .asi files per folder.
+mod_loader_dir() {
+  ml_found=""
+  for ml_name in winhttp version dinput8; do
+    case " $ml_seen " in *" $ml_name "*) continue ;; esac
+    if [ -f "$1/$ml_name.dll" ] || [ -f "$1/$ml_name.DLL" ]; then ml_found="$ml_found $ml_name"; fi
+  done
+  [ -n "$ml_found" ] || return 0
+  ml_asi=0
+  for ml_sub in "" /scripts /plugins; do
+    for ml_file in "$1$ml_sub"/*.[aA][sS][iI]; do
+      if [ -f "$ml_file" ]; then ml_asi=1; break 2; fi
+    done
+  done
+  ml_any=0
+  for ml_name in $ml_found; do
+    ml_loader=""
+    case $ml_name in
+      winhttp|version)
+        if [ -d "$1/BepInEx" ]; then ml_loader=BepInEx
+        elif [ -f "$1/doorstop_config.ini" ]; then ml_loader="Unity Doorstop"
+        elif [ -d "$1/MelonLoader" ]; then ml_loader=MelonLoader
+        fi ;;
+      dinput8)
+        if [ -f "$1/ScriptHookV.dll" ] || [ -f "$1/ScriptHookRDR2.dll" ]; then ml_loader="Script Hook"; fi ;;
+    esac
+    [ -n "$ml_loader" ] || [ "$ml_asi" = 0 ] || ml_loader="an ASI loader"
+    if [ -z "$ml_loader" ]; then
+      gamefix_log "mod loader: $ml_name.dll in $1 matches no known loader, left to Wine's default"
+      continue
+    fi
+    ml_seen="$ml_seen $ml_name" ml_any=1
+    case ";$gamefix_dlloverrides;" in
+      *[\;,]"$ml_name"[=,]*)
+        gamefix_log "mod loader: $ml_loader in $1, $ml_name already set by DLLOVERRIDES or a shim"
+        continue ;;
+    esac
+    ml_overrides="${ml_overrides:+$ml_overrides;}$ml_name=n,b"
+    gamefix_log "mod loader: $ml_loader in $1, $ml_name=n,b"
+  done
+  [ "$ml_any" = 1 ] || return 0
+  for ml_name in dxgi d3d11; do
+    [ ! -f "$1/$ml_name.dll" ] || gamefix_log "mod loader: $ml_name.dll in $1 left to the ${backend:-engine} backend"
+  done
+}
+
+# Before the conf's DLLOVERRIDES, so a conf and the launch options still win per DLL.
+# BRIDGEPLAY_MOD_LOADERS=0 or MOD_LOADERS=0 in a conf turns it off.
+detect_mod_loaders() {
+  [ "$verb" = waitforexitandrun ] && [ -f "$1" ] || return 0
+  case "$1" in */*) ;; *) return 0 ;; esac
+  if [ "${NOTPROTON_MOD_LOADERS:-1}" = 0 ]; then
+    gamefix_log "mod loader: detection off (MOD_LOADERS=0)"
+    return 0
+  fi
+  ml_seen="" ml_overrides=""
+  mod_loader_dir "${1%/*}"
+  # A launcher in the install folder starting a game below it: the folder itself too.
+  if [ -n "${STEAM_COMPAT_INSTALL_PATH:-}" ] && [ "$STEAM_COMPAT_INSTALL_PATH" != "${1%/*}" ] \
+    && [ -d "$STEAM_COMPAT_INSTALL_PATH" ]; then
+    mod_loader_dir "$STEAM_COMPAT_INSTALL_PATH"
+  fi
+  [ -z "$ml_overrides" ] || gamefix_dlloverrides="$ml_overrides${gamefix_dlloverrides:+;$gamefix_dlloverrides}"
 }
 
 # Last entry wins: backend, then the gamefix conf, then the launch options.
@@ -4134,6 +4205,7 @@ select_backend "$1"
 activate_backend || true
 record_backend || true
 stage_rockstar_shim || true
+detect_mod_loaders "$1" || true
 fex_graphics_notice "$1" || true
 # An engine without lib/notproton-backends (CrossOver) picks its graphics itself, from
 # CX_GRAPHICS_BACKEND, so the log names that choice, not the dxmt-builtin placeholder.

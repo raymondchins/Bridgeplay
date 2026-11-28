@@ -31,7 +31,6 @@ main `Steam Helper` (no `--type=` argument) it only installs the spawn hook.
     a passing `make gamefixescheck`.
   - Checks that run it: `runcheck`, `envcheck`, `envpasscheck`, `settingscheck`, `routecheck`,
     `buildcheck`, `bridgecheck`, `seedcheck`, `gamedrivecheck`, `fontlinkcheck`, `prefixnotecheck`,
-    `anticheatcheck`, `padcheck`, `shortcutcheck`.
   - Controllers: the script starts the game's launcher bundle itself rather than through
     `open`, so macOS charges HID access to Steam and games need no Input Monitoring grant of
     their own (`BRIDGEPLAY_LAUNCH_SERVICES=1` goes back to `open`). It exports
