@@ -144,22 +144,22 @@ enum SteamHealthStore {
         return deployed.hasPrefix("4.0.") ? String(deployed.dropFirst(4)) : deployed
     }
 
-    // Steam's client build: "version" in the manifest beside the newest package/*.installed.
+    // Steam's client build: "version" in the manifest beside the newest package/*.installed. A
+    // newest one with no readable manifest gives way to the next, as np_steam_build does.
     static func installedSteamBuild(
         package: URL = SupportPaths.Steam.innerApp.appending(path: "Contents/MacOS/package")
     ) -> String? {
         let files = FileManager.default
         let entries = (try? files.contentsOfDirectory(at: package, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-        let newest = entries.filter { $0.pathExtension == "installed" }.max { a, b in
-            let da = (try? a.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-            let db = (try? b.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-            return (da, a.lastPathComponent) < (db, b.lastPathComponent)
-        }
-        guard let newest else { return nil }
-        let manifest = newest.deletingPathExtension().appendingPathExtension("manifest")
-        guard let text = try? String(contentsOf: manifest, encoding: .utf8) else { return nil }
-        for line in text.split(separator: "\n") {
-            if let (key, value, _) = BrandMigration.keyValue(String(line)), key == "version" { return value }
+        let installed = entries.filter { $0.pathExtension == "installed" }.map { entry in
+            ((try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast, entry)
+        }.sorted { ($0.0, $0.1.lastPathComponent) > ($1.0, $1.1.lastPathComponent) }
+        for (_, entry) in installed {
+            let manifest = entry.deletingPathExtension().appendingPathExtension("manifest")
+            guard let text = try? String(contentsOf: manifest, encoding: .utf8) else { continue }
+            for line in text.split(separator: "\n") {
+                if let (key, value, _) = BrandMigration.keyValue(String(line)), key == "version" { return value }
+            }
         }
         return nil
     }

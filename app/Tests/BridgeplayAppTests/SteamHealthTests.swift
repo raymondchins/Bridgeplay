@@ -89,7 +89,7 @@ struct SteamHealthTests {
         #expect(SteamHealthStore.supportFolder(home: home).lastPathComponent == "bridgeplay")
     }
 
-    @Test("Steam's build comes from the manifest beside the newest .installed")
+    @Test("Steam's build comes from the manifest beside the newest .installed that has one")
     func steamBuild() throws {
         let package = try Self.folder()
         defer { try? FileManager.default.removeItem(at: package) }
@@ -103,6 +103,8 @@ struct SteamHealthTests {
         try Data("\"steam_client_publicbeta\"\n{\n\t\"version\"\t\t\"1795567705\"\n}\n".utf8)
             .write(to: package.appending(path: "steam_client_publicbeta_signed-2_osx.manifest"))
         #expect(SteamHealthStore.installedSteamBuild(package: package) == "1795567705")
+        try FileManager.default.removeItem(at: package.appending(path: "steam_client_publicbeta_signed-2_osx.manifest"))
+        #expect(SteamHealthStore.installedSteamBuild(package: package) == "1782866176")
         #expect(SteamHealthStore.patchBuild(deployed: "4.0.85") == "85")
     }
 
