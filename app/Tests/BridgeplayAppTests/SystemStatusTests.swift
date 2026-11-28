@@ -539,6 +539,42 @@ struct PerformTests {
 
         #expect(busyDuringRefresh == true)
     }
+
+    @Test("A run refused because another is in flight is not counted, so Setup can tell")
+    func aRefusedRunIsNotCounted() async {
+        let status = quietStatus()
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        let first = Task { @MainActor in
+            await status.perform(from: "Other") { _ in
+                for await _ in gate { break }
+                return "Done."
+            }
+        }
+        while status.runsStarted == 0 { await Task.yield() }
+
+        var ranSecond = false
+        await status.perform(from: "Setup") { _ in
+            ranSecond = true
+            return nil
+        }
+        #expect(!ranSecond)
+        #expect(status.runsStarted == 1)
+
+        open.yield()
+        open.finish()
+        await first.value
+        await status.perform(from: "Setup") { _ in nil }
+        #expect(status.runsStarted == 2)
+    }
+
+    @Test("Setup's downloads count as busy, so no install starts before Setup's own")
+    func setupDownloadsAreBusy() {
+        let status = quietStatus()
+        status.setupDownloading = true
+        #expect(status.isBusy && !status.canInstall)
+        status.setupDownloading = false
+        #expect(!status.isBusy)
+    }
 }
 
 @MainActor

@@ -454,6 +454,8 @@ final class SetupAssistant {
 
     // MARK: Finish
 
+    static let anotherTask = String(localized: "Another task is running. Retry when it ends.")
+
     func finish(with status: SystemStatus) async {
         guard !isWorking else { return }
         isWorking = true
@@ -489,12 +491,15 @@ final class SetupAssistant {
             return
         }
         guard !status.isBusy else {
-            set("download", .failed(String(localized: "Another task is running. Retry when it ends.")))
+            set("download", .failed(Self.anotherTask))
             return
         }
+        status.setupDownloading = true
         do {
             try await SetupPrefetch.run()
+            status.setupDownloading = false
         } catch {
+            status.setupDownloading = false
             AppLog.note("setup: prefetch failed: \(error.localizedDescription)")
             set("download", .failed((error as? StepFailure)?.detail ?? error.localizedDescription))
             return
@@ -502,7 +507,13 @@ final class SetupAssistant {
         set("download", .done)
 
         set("steam", .running)
+        var runs = status.runsStarted
         await status.installIntoSteam()
+        // A run something else started first leaves this one undone, with no failure of its own.
+        if status.runsStarted == runs {
+            set("steam", .failed(Self.anotherTask))
+            return
+        }
         if let failure = status.failure, status.sealWarning == nil {
             if status.failureRemedy == .appManagement {
                 askForAppManagement(status)
@@ -517,7 +528,12 @@ final class SetupAssistant {
         set("steam", .done)
 
         set("engine", .running)
+        runs = status.runsStarted
         await status.installWinecxEngine()
+        if status.runsStarted == runs {
+            set("engine", .failed(Self.anotherTask))
+            return
+        }
         if let failure = status.failure {
             set("engine", .failed(failure))
             return

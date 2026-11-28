@@ -141,8 +141,14 @@ final class SystemStatus {
     // if run on an actual user's machine.
     @ObservationIgnored var refreshAfterRun: @MainActor (SystemStatus) async -> Void = { await $0.refresh() }
     private var checkingLicense = false
+    // Setup's downloads, which run outside perform: busy, so no other action starts before
+    // Setup's own steps do.
+    var setupDownloading = false
+    // Runs perform started. A caller compares it before and after its call to tell a run that
+    // happened from one refused because another was in flight.
+    @ObservationIgnored private(set) var runsStarted = 0
 
-    var isBusy: Bool { activity != nil || runInFlight || checkingLicense }
+    var isBusy: Bool { activity != nil || runInFlight || checkingLicense || setupDownloading }
     var isIdle: Bool { !isBusy && !isRefreshing }
     // A pending 3.0 folder move blocks every install: anything written now would land in
     // the new folders before the old ones are moved in.
@@ -556,6 +562,7 @@ final class SystemStatus {
             return
         }
         runInFlight = true
+        runsStarted += 1
         defer { runInFlight = false }
 
         clearFailure()
