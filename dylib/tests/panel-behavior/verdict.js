@@ -146,6 +146,16 @@ try {
   const W = ctx.MSCXWarnFor;
   t.ok(W(1006) === 'a' && W(1010) === 'a' && W(1002) === 'd' && W(1005) === 's', 'anti-cheat, doesn’t run and broken since warn');
   t.ok(!W(1001) && !W(1003) && !W(1004) && !W(1007) && !W(1008) && !W(424242), 'nothing else does');
+  // Steam's details: a game it runs as its Mac version gets no Wine warning.
+  const mac = { 1002: { vecPlatforms: ['windows', 'osx'], strCompatToolName: '' },
+                1006: { vecPlatforms: ['windows', 'osx'], strCompatToolName: 'bridgeplay-proton' },
+                1005: { vecPlatforms: ['windows'], strCompatToolName: '' } };
+  ctx.appDetailsStore = { GetAppDetails: id => mac[id] };
+  t.ok(W(1002) === '' && W(1006) === 'a' && W(1005) === 's' && W(1010) === 'a',
+       'a native Mac game does not warn; one forced to a compat tool or Windows-only still does');
+  ctx.appDetailsStore = { GetAppDetails: () => { throw new Error('gone'); } };
+  t.ok(W(1002) === 'd', 'a store that throws keeps the warning');
+  delete ctx.appDetailsStore;
   const store = {};
   ctx.localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
   const warn = (id, doc = documentFor('en')) => { const n = new Node(doc, 'div'); ctx.MSCXWarnRow(n, id); return n; };

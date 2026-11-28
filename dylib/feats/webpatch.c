@@ -497,7 +497,10 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "const a=acl(L,x);a&&k.push(el('div','MSCXVerdictNote',a));(x.hard||x.v==='d')&&k.push(...away(L,el,'MSCXBtn'));" \
     "e.style.flexDirection='column';e.style.gap='4px';e.replaceChildren(...k);e.style.display=k.length?'':'none'};" \
     /* a anti-cheat, d players report it does not run, s it broke on a newer build. */ \
-    "G.MSCXWarnFor=id=>{const x=info(id),r=x?x.hard?'a':x.v==='d'?'d':x.v==='s'?'s':'':'';return r&&gone()[x.id]!==r?r:''};" \
+    /* A game Steam runs as its Mac version gets no Wine warning. */ \
+    "G.MSCXWarnFor=id=>{let t;try{t=G.appDetailsStore?.GetAppDetails(id)}catch(e){}" \
+    "if(t&&id<2147483648&&(t.vecPlatforms||[]).indexOf('osx')>=0&&!t.strCompatToolName)return'';" \
+    "const x=info(id),r=x?x.hard?'a':x.v==='d'?'d':x.v==='s'?'s':'':'';return r&&gone()[x.id]!==r?r:''};" \
     "G.MSCXWarnRow=(e,id)=>{if(e.npWarn===id)return;e.npWarn=id;const r=G.MSCXWarnFor(id),x=info(id),d=e.ownerDocument;" \
     "if(!r||!d){e.style.display='none';return}css(d);const L=tr(lang()),el=mk(d),b=el('div','MSCXWarnBody');" \
     "e.className='MSCXWarn';e.setAttribute&&e.setAttribute('role','note');" \
