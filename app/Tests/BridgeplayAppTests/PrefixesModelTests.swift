@@ -537,6 +537,19 @@ struct PrefixesModelTests {
         #expect(model.backupBytes == model.backups.reduce(into: Int64(0)) { $0 += $1.bytes })
     }
 
+    @Test("A game whose prefix is gone still lists its backups, but not as a prefix")
+    func backupsOfAMissingPrefixAreListed() async throws {
+        let (dir, library) = try makeLibrary(appIDs: ["1574480"])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try park(["1574480": ["20260101-120000"], "1649240": ["20260103-090000"]], in: library)
+
+        let model = PrefixesModel.forTests(libraries: { [library] })
+        await model.load()
+
+        #expect(model.prefixes.map(\.appID) == ["1574480"])
+        #expect(model.backups.map(\.prefix.appID) == ["1649240", "1574480"])
+    }
+
     @Test("Deleting backups counts them rather than the prefixes")
     func deleteBackupsReportsTheCount() async throws {
         let (dir, library) = try makeLibrary(appIDs: ["1574480", "1649240"])

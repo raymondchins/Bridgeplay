@@ -104,7 +104,9 @@ final class PrefixesModel {
         defer { if run == loadGeneration { isLoading = false } }
 
         let roots = libraries()
-        let found = await Task.detached { PrefixStore.all(libraries: roots) }.value
+        let (found, parked) = await Task.detached {
+            (PrefixStore.all(libraries: roots), PrefixStore.backupOnly(libraries: roots))
+        }.value
         guard run == loadGeneration else { return }
         prefixes = found
         usage = usage.filter { id, _ in found.contains { $0.id == id } }
@@ -130,8 +132,9 @@ final class PrefixesModel {
         (tools, records, stale, currentTools) = resolved
         selection = selection.filter { id in found.contains { $0.id == id } }
 
+        // A prefix that is gone still lists its backups, so Restore can bring it back.
         var kept: [PrefixBackup] = []
-        for prefix in found {
+        for prefix in found + parked {
             let details = await Task.detached { PrefixStore.backupDetails(of: prefix) }.value
             guard run == loadGeneration else { return }
             kept.append(contentsOf: details)
