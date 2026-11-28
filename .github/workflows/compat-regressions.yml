@@ -4,7 +4,7 @@
 #
 # Off by default: a run only prints what it would do. Set the repository variable
 # BRIDGEPLAY_REGRESSION_ISSUES to `on` to let scheduled runs change issues, or dispatch the
-# workflow with `apply`.
+# workflow with `apply`. A manual run without `apply` stays a dry run either way.
 name: compat-regressions
 
 on:
@@ -34,7 +34,8 @@ jobs:
       - name: Compare verdicts across builds
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          APPLY: ${{ inputs.apply || vars.BRIDGEPLAY_REGRESSION_ISSUES == 'on' }}
+          # A manual run follows its own `apply` box; only scheduled runs read the variable.
+          APPLY: ${{ (github.event_name == 'workflow_dispatch' && inputs.apply) || (github.event_name == 'schedule' && vars.BRIDGEPLAY_REGRESSION_ISSUES == 'on') }}
         run: |
           set -euo pipefail
           remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"

@@ -13,7 +13,8 @@ make compat-regressions-check                            # the fixture tests
 ```
 
 The workflow is off by default: it prints the plan to the job summary. The repository variable
-`BRIDGEPLAY_REGRESSION_ISSUES=on`, or a dispatch with `apply`, lets it change issues. It needs
+`BRIDGEPLAY_REGRESSION_ISSUES=on` lets scheduled runs change issues; a manual dispatch changes
+them only with `apply` ticked, whatever the variable says. It needs
 only the workflow's `GITHUB_TOKEN` (`issues: write`).
 
 ## When a game counts
