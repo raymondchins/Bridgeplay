@@ -15,14 +15,18 @@ enum LaunchEndedCommand {
     // <compatdata>. Never returns.
     static func run(_ arguments: [String]) -> Never {
         guard arguments.count == 1, let prefix = prefix(compatdata: arguments[0]) else { exit(1) }
+        // The step before the record: a Play pressed meanwhile has written another step, and
+        // the record still on disk is the run before it.
+        let step = LaunchEndedPanel.read(prefix.root.appending(path: LaunchProgressCommand.stepName).path(percentEncoded: false))
         let recordURL = prefix.root.appending(path: LaunchRecord.fileName)
-        guard let text = try? String(contentsOf: recordURL, encoding: .utf8),
+        guard shows(step: step),
+              let text = try? String(contentsOf: recordURL, encoding: .utf8),
               let record = LaunchRecord.parse(text),
               let ending = LaunchEnding(record: record, now: Date())
         else { exit(0) }
         MainActor.assumeIsolated {
             NSApplication.shared.setActivationPolicy(.accessory)
-            let watcher = LaunchEndedPanel(prefix: prefix, ending: ending)
+            let watcher = LaunchEndedPanel(prefix: prefix, ending: ending, step: step)
             DispatchQueue.main.async { MainActor.assumeIsolated { watcher.present() } }
             let timer = Timer(timeInterval: 1, repeats: true) { _ in
                 MainActor.assumeIsolated { watcher.tick() }
@@ -31,6 +35,11 @@ enum LaunchEndedCommand {
             NSApp.run()
         }
         exit(0)
+    }
+
+    // The run script writes ended just before it starts this; any other step is a newer launch.
+    static func shows(step: String?) -> Bool {
+        step == LaunchStep.ended.rawValue
     }
 
     // steamapps/compatdata/<appid> on any library, with the game's name when Steam has one.
@@ -116,16 +125,16 @@ final class LaunchEndedPanel {
     private let prefix: WinePrefix
     private let ending: LaunchEnding
     private let stepFile: String
-    // What the step file said at the start: the script wrote ended. A new launch writes another.
+    // What the step file said at the start: ended. A new launch writes another.
     private let step: String?
     private let started = ProcessInfo.processInfo.systemUptime
     private let panel = ProgressPanel(title: "Bridgeplay", activates: false)
 
-    init(prefix: WinePrefix, ending: LaunchEnding) {
+    init(prefix: WinePrefix, ending: LaunchEnding, step: String?) {
         self.prefix = prefix
         self.ending = ending
         stepFile = prefix.root.appending(path: LaunchProgressCommand.stepName).path(percentEncoded: false)
-        step = Self.read(stepFile)
+        self.step = step
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification, object: panel.panel, queue: .main) { _ in exit(0) }
     }
@@ -150,7 +159,7 @@ final class LaunchEndedPanel {
         }
     }
 
-    private static func read(_ path: String) -> String? {
+    nonisolated static func read(_ path: String) -> String? {
         (try? String(contentsOfFile: path, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

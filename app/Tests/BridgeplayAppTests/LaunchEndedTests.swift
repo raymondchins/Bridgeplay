@@ -57,6 +57,15 @@ struct LaunchEndedTests {
         #expect(try ending("code=aborted\nexit=\nseconds=0\nstopped=unknown") == nil)
     }
 
+    @Test("A launch started before the panel came up shows nothing")
+    func newerLaunch() {
+        #expect(LaunchEndedCommand.shows(step: "ended"))
+        for step in ["setup", "prepare", "start", "dialog"] {
+            #expect(!LaunchEndedCommand.shows(step: step), "\(step)")
+        }
+        #expect(!LaunchEndedCommand.shows(step: nil))
+    }
+
     @Test("Another launch's record shows nothing")
     func staleRecord() throws {
         let later = Self.now.addingTimeInterval(LaunchEndedCommand.freshness + 1)
