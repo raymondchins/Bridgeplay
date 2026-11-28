@@ -466,10 +466,23 @@ else
   { kill_seed_after 1; } 2>/dev/null || true
   check test ! -e "$WINEPREFIX/system.reg"
   plugged=$(stat -f %d "$work/mnt.drive")
-  detach_image "$work/mnt.drive"
-  # Another disk takes the drive's old device node while it is away.
-  attach_image HFS+ other || true
-  if ! attach_image HFS+ drive; then
+  # Other disks take the drive's old device node while it is away. Other jobs on the host
+  # attach and detach images too, so a node can be taken or freed under the test: disks are
+  # added until one holds the old node, and the drive is plugged again until its number changed.
+  replugs=0 fillers=0 attached=1
+  while :; do
+    detach_image "$work/mnt.drive"
+    while [ "$fillers" -lt 8 ]; do
+      fillers=$((fillers + 1))
+      attach_image HFS+ "other$fillers" || continue
+      [ "$(stat -f %d "$work/mnt.other$fillers")" != "$plugged" ] || break
+    done
+    attach_image HFS+ drive || { attached=0; break; }
+    [ "$(stat -f %d "$work/mnt.drive")" = "$plugged" ] || break
+    replugs=$((replugs + 1))
+    [ "$replugs" -lt 3 ] || break
+  done
+  if [ "$attached" != 1 ]; then
     no_image HFS+ "the re-plugged drive seed"
   else
     check test "$(stat -f %d "$work/mnt.drive")" != "$plugged"
@@ -478,7 +491,9 @@ else
     check grep -q 'finished seeding this prefix' "$log"
     detach_image "$work/mnt.drive"
   fi
-  [ ! -d "$work/mnt.other" ] || /usr/bin/hdiutil detach -quiet -force "$work/mnt.other" 2>/dev/null || true
+  for filler in "$work"/mnt.other*; do
+    [ ! -d "$filler" ] || /usr/bin/hdiutil detach -quiet -force "$filler" 2>/dev/null || true
+  done
 fi
 
 # A volume without hard links (exFAT) is left as it was, so Wine builds the prefix as before.
