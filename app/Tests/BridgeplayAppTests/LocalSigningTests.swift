@@ -125,7 +125,15 @@ struct LocalSigningTests {
         let nothing = LocalSigning.Secrets(save: { _ in }, load: { nil }, delete: {})
         #expect(LocalSigning.unlocked(identity, secrets: nothing) { $0 } == nil)
         let login = LocalSigning.Identity(hash: identity.hash, keychain: nil)
-        #expect(LocalSigning.unlocked(login, secrets: nothing) { $0 } == login)
+        #expect(LocalSigning.unlocked(login, secrets: nothing, promptsAllowed: { true }) { $0 } == login)
+    }
+
+    @Test("With prompts off, a login keychain identity signs ad hoc rather than let codesign ask")
+    func unattendedSkipsLoginIdentity() {
+        let login = LocalSigning.Identity(hash: "E9B6B93497770DB40F9E30E511810EC68B9D4D93", keychain: nil)
+        let nothing = LocalSigning.Secrets(save: { _ in }, load: { nil }, delete: {})
+        #expect(LocalSigning.unlocked(login, secrets: nothing, promptsAllowed: { false }) { $0 } == nil)
+        #expect(LocalSigning.unlocked(nil, secrets: nothing, promptsAllowed: { true }) { $0 } == nil)
     }
 
     @Test("An older install's identity in the login keychain is kept")
