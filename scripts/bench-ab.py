@@ -293,16 +293,19 @@ def bench_dir_for(appid, support_dirs):
     return support_dirs[0] / "launchers" / appid / "bench"
 
 
-def read_from(path, offset):
+def read_from(path, offset, head=b""):
+    """The log from offset on, and the offset for the next read. The run script empties a log
+    over 256 KB: a log that got shorter, or no longer starts with head, is read from 0, and 0
+    is kept so the new run's start stays in what is read."""
     try:
         size = path.stat().st_size
     except OSError:
-        return ""
-    if size < offset:  # the run script empties a log over 256 KB
-        offset = 0
+        return "", offset
     with open(path, "rb") as f:
+        if size < offset or (offset and head and f.read(len(head)) != head):
+            offset = 0
         f.seek(offset)
-        return f.read().decode("utf-8", errors="replace")
+        return f.read().decode("utf-8", errors="replace"), offset
 
 
 def drive(appid, label, out, runs, cooldown, timeout, steam_root, support_dirs,
@@ -318,13 +321,17 @@ def drive(appid, label, out, runs, cooldown, timeout, steam_root, support_dirs,
     say("its launch options must already hold this side's settings and BRIDGEPLAY_BENCH=1")
     for n in range(1, runs + 1):
         offset = log.stat().st_size if log.exists() else 0
+        head = b""
+        if offset:
+            with open(log, "rb") as f:
+                head = f.read(min(offset, 512))
         before = set(bench_dir.glob("*.csv")) if bench_dir.is_dir() else set()
         say(f"run {n}/{runs}: opening steam://rungameid/{appid}; quit the game when the test is done")
         opener(f"steam://rungameid/{appid}")
         deadline = clock() + timeout
         text = ""
         while True:
-            text = read_from(log, offset)
+            text, offset = read_from(log, offset, head)
             if "\ntime: game exited at " in "\n" + text:
                 break
             if clock() > deadline:
@@ -332,7 +339,7 @@ def drive(appid, label, out, runs, cooldown, timeout, steam_root, support_dirs,
             sleep(2)
         sleep(2)  # the shim flushes once a second
         # The first window and frame times are written after "game exited": read them too.
-        text = read_from(log, offset)
+        text, offset = read_from(log, offset, head)
         new = sorted(set(bench_dir.glob("*.csv")) - before) if bench_dir.is_dir() else []
         if not new:
             raise ValueError(f"run {n}: no new capture in {bench_dir}; is BRIDGEPLAY_BENCH=1 in the launch options?")

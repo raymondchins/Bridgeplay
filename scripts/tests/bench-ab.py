@@ -231,6 +231,38 @@ class RunTests(unittest.TestCase):
             self.assertEqual(len(runs), 1)
             self.assertEqual(runs[0].get("first_frame_s"), 7.0)
 
+    def test_drive_keeps_a_run_whose_log_was_emptied(self):
+        header = ("=== bridgeplay run Thu Nov 27 10:00:05 UTC 2026 ===\n"
+                  "time: game start at 5.000s\n")
+        for grows_at_once in (False, True):
+            with self.subTest(grows_at_once=grows_at_once), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                steam = root / "Steam"
+                (steam / "steamapps/compatdata/4242").mkdir(parents=True)
+                (steam / "steamapps/appmanifest_4242.acf").write_text("")
+                bench_dir = root / "support/launchers/4242/bench"
+                bench_dir.mkdir(parents=True)
+                log = steam / "steamapps/compatdata/4242/bridgeplay-run.log"
+                log.write_text("an older run\n" * 100)
+                filler = "wine: a busy line\n" * 200
+
+                def opener(url):
+                    capture(bench_dir, 11, 10.0, 30.0)
+                    # Over 256 KB: the run script empties the log before this run writes to it.
+                    log.write_text(header + (filler if grows_at_once else ""))
+
+                def sleep(seconds):
+                    with open(log, "a") as f:
+                        f.write(filler + "time: game exited at 90.000s\n")
+
+                with contextlib.redirect_stdout(io.StringIO()):
+                    dest = ab.drive("4242", "A", root / "out", 1, 0, 60, steam, [root / "support"],
+                                    opener=opener, sleep=sleep, clock=lambda: 0.0)
+                saved = sorted(dest.glob("*.log"))[0].read_text()
+                self.assertTrue(saved.startswith(header))
+                self.assertNotIn("an older run", saved)
+                self.assertEqual(len(ab.log_runs(sorted(dest.glob("*.log")))), 1)
+
     def test_drive_times_out(self):
         with tempfile.TemporaryDirectory() as tmp:
             steam = Path(tmp) / "Steam"
