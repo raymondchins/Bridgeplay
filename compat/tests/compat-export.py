@@ -279,6 +279,19 @@ class Store(unittest.TestCase):
         with self.assertRaises(SystemExit):
             ce.main(["build", str(self.out), "--now", NOW])
 
+    def test_emptied_store_publishes_empty_results(self):
+        run("fetch", self.out, "--from", FIXTURE)
+        run("build", self.out, "--now", NOW)
+        # Every report gone from the Discussions: a forced prune empties the store on purpose.
+        run("fetch", self.out, "--prune", "--force", "--from", nodes_file(self.dir, lambda n: False))
+        self.assertEqual(self.count(), 0)
+        run("build", self.out, "--now", NOW)
+        self.assertEqual(json.loads((self.out / "compat.json").read_text())["games"], [])
+        self.assertFalse(json.loads((self.out / "compat-index.json").read_text())["games"])
+        # Reports coming back clear the marker.
+        run("fetch", self.out, "--from", FIXTURE)
+        self.assertFalse((self.out / ce.EMPTIED).exists())
+
     def test_fetch_needs_a_token(self):
         env = {k: v for k, v in os.environ.items() if k not in ("GH_TOKEN", "GITHUB_TOKEN")}
         with patch.dict(os.environ, env, clear=True), self.assertRaises(SystemExit):

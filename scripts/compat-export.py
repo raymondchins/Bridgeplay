@@ -397,7 +397,13 @@ def write_atomic(path, text):
     os.replace(tmp, path)
 
 
+EMPTIED = "reports/.emptied"  # fetch wrote an empty store on purpose; build may publish it
+
+
 def write_store(out, store):
+    marker = out / EMPTIED
+    if store:
+        marker.unlink(missing_ok=True)
     months = defaultdict(list)
     for r in store.values():
         months[r["date"][:7]].append(r)
@@ -410,6 +416,8 @@ def write_store(out, store):
         rows.sort(key=lambda r: r["n"])
         write_atomic(folder / f"{month}.ndjson",
                      "".join(json.dumps(r, ensure_ascii=False, separators=(",", ":")) + "\n" for r in rows))
+    if not store:
+        write_atomic(marker, "every report was removed\n")
 
 
 # ---- GitHub ----------------------------------------------------------------------------------------
@@ -736,7 +744,8 @@ def check_private(name, text):
 
 def build(out, now):
     store = load_store(out)
-    if not store:
+    if not store and not (out / EMPTIED).exists():
+        # No store at all is a failed or missing first fetch; an emptied one is a real result.
         raise SystemExit("compat-export: no reports in the store, nothing to publish")
     games, by_game = aggregate(store, now)
     updated = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
