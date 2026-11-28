@@ -177,9 +177,9 @@ struct RootView: View {
                 Text("Wine by [CodeWeavers](https://www.codeweavers.com)")
                 Text("Game Porting Toolkit by Apple")
             }
+            // Wraps in a longer language. No fixedSize: its height at the narrowest width
+            // became the sidebar's minimum, taller than a short window
             Text("[Buy CrossOver](https://www.codeweavers.com/crossover) to support Wine.")
-                // Wraps in a longer language rather than ending in "…" in a short window
-                .fixedSize(horizontal: false, vertical: true)
         }
         .font(BP.sans(11))
         .lineSpacing(2)
