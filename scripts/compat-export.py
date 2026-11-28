@@ -154,7 +154,7 @@ def scrub(text, limit, note=False):
 
 def chip_family(chip):
     chip = (chip or "").strip()
-    return chip if re.fullmatch(r"M\d{1,2}(?: (?:Pro|Max|Ultra))?", chip) else ("Other" if chip else None)
+    return chip if re.fullmatch(r"[AM][1-9]\d{0,2}(?: (?:Pro|Max|Ultra))?", chip) else ("Other" if chip else None)
 
 
 def memory_size(memory):

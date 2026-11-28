@@ -289,6 +289,9 @@ class Pieces(unittest.TestCase):
     def test_chip_and_macos(self):
         self.assertEqual(ce.chip_family("M4 Max"), "M4 Max")
         self.assertEqual(ce.chip_family("Apple M9 Turbo"), "Other")
+        # Same pattern as the app (GameReport.swift), A-series chips too.
+        self.assertEqual(ce.chip_family("A18 Pro"), "A18 Pro")
+        self.assertEqual(ce.chip_family("M0"), "Other")
         self.assertEqual(ce.macos_minor("macOS 26.1.2"), "macOS 26.1")
         self.assertEqual(ce.memory_size("Other"), "Other")
         self.assertEqual(ce.version_of("0.7.66 (83)"), ("0.7.66 (83)", 83))
