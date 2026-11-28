@@ -529,6 +529,28 @@
         }
       }
     },
+    "%@ is available. Games keep %@ until you update." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ è disponibile. I giochi restano su %2$@ finché non aggiorni."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступен %1$@. Игры остаются на %2$@, пока вы не обновите."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 已可用。更新前，游戏继续使用 %2$@。"
+          }
+        }
+      }
+    },
     "%@ is left from a rebuild that did not finish and may hold the only copy of the saves. Move it somewhere safe, then try again." : {
       "localizations" : {
         "it" : {
@@ -6526,6 +6548,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下载"
+          }
+        }
+      }
+    },
+    "Download %@ and set it up. %@ stays installed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scarica %1$@ e configuralo. %2$@ resta installato."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузить и настроить %1$@. %2$@ останется установленным."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载并设置 %1$@。%2$@ 会保留。"
           }
         }
       }
@@ -17067,6 +17111,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新已就绪"
+          }
+        }
+      }
+    },
+    "Update to %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiorna a %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновить до %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新到 %@"
           }
         }
       }

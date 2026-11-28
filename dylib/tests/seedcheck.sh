@@ -331,12 +331,37 @@ for signal in TERM:143 INT:130 HUP:129; do
   check seeded_whole
 done
 
+# A dead launch's staging folders named after the pid macOS has since given this launch: no
+# live launch can own them, so they are swept and this build and seed go ahead.
 fixture
 mkdir -p "$template_dir/pfx.building.$$"
 printf partial > "$template_dir/pfx.building.$$/system.reg"
 rm -rf "$template_dir/pfx"
 check test "$(build_prefix_template && echo accepted || echo refused)" = refused
 check test ! -e "$template_dir/pfx"
+check grep -q "=== building the prefix template" "$log"
+check test ! -e "$template_dir/pfx.building.$$/system.reg"
+fixture
+mkdir "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$$"
+printf partial > "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$$/system.reg"
+finish_dead_seeds
+check test ! -e "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$$"
+check grep -q "dropped pfx.seeding.$$, an earlier launch's unfinished seed: it stopped before it moved anything in" "$log"
+
+# Another live launch's staging folders stay.
+fixture
+sleep 120 &
+live=$!
+mkdir -p "$template_dir/pfx.building.$live" "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$live"
+printf partial > "$template_dir/pfx.building.$live/system.reg"
+printf partial > "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$live/system.reg"
+rm -rf "$template_dir/pfx"
+build_prefix_template || true
+finish_dead_seeds
+check test "$(cat "$template_dir/pfx.building.$live/system.reg")" = partial
+check test "$(cat "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$live/system.reg")" = partial
+kill "$live" 2>/dev/null || true
+wait "$live" 2>/dev/null || true
 
 fixture
 profile="$WINEPREFIX/drive_c/users/steamuser"
@@ -441,10 +466,23 @@ else
   { kill_seed_after 1; } 2>/dev/null || true
   check test ! -e "$WINEPREFIX/system.reg"
   plugged=$(stat -f %d "$work/mnt.drive")
-  detach_image "$work/mnt.drive"
-  # Another disk takes the drive's old device node while it is away.
-  attach_image HFS+ other || true
-  if ! attach_image HFS+ drive; then
+  # Other disks take the drive's old device node while it is away. Other jobs on the host
+  # attach and detach images too, so a node can be taken or freed under the test: disks are
+  # added until one holds the old node, and the drive is plugged again until its number changed.
+  replugs=0 fillers=0 attached=1
+  while :; do
+    detach_image "$work/mnt.drive"
+    while [ "$fillers" -lt 8 ]; do
+      fillers=$((fillers + 1))
+      attach_image HFS+ "other$fillers" || continue
+      [ "$(stat -f %d "$work/mnt.other$fillers")" != "$plugged" ] || break
+    done
+    attach_image HFS+ drive || { attached=0; break; }
+    [ "$(stat -f %d "$work/mnt.drive")" = "$plugged" ] || break
+    replugs=$((replugs + 1))
+    [ "$replugs" -lt 3 ] || break
+  done
+  if [ "$attached" != 1 ]; then
     no_image HFS+ "the re-plugged drive seed"
   else
     check test "$(stat -f %d "$work/mnt.drive")" != "$plugged"
@@ -453,7 +491,9 @@ else
     check grep -q 'finished seeding this prefix' "$log"
     detach_image "$work/mnt.drive"
   fi
-  [ ! -d "$work/mnt.other" ] || /usr/bin/hdiutil detach -quiet -force "$work/mnt.other" 2>/dev/null || true
+  for filler in "$work"/mnt.other*; do
+    [ ! -d "$filler" ] || /usr/bin/hdiutil detach -quiet -force "$filler" 2>/dev/null || true
+  done
 fi
 
 # A volume without hard links (exFAT) is left as it was, so Wine builds the prefix as before.

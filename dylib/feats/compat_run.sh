@@ -2636,12 +2636,18 @@ prefix_server_dir() {
   printf '%s' "$owned"
 }
 
+# A leftover named after a live pid is another launch's, unless the pid is ours: macOS gave
+# a dead launch's pid to this one, and this launch has not made its own folder yet.
+seed_owner_alive() {
+  [ "$1" != "$$" ] && kill -0 "$1" 2>/dev/null
+}
+
 sweep_dead_seeds() {
   for leftover in "$@"; do
     [ -d "$leftover" ] && [ ! -L "$leftover" ] || continue
     case "${leftover##*.}" in ''|0|*[!0-9]*) continue ;; esac
     [ "$(stat -f %u "$leftover" 2>/dev/null)" = "$(id -u)" ] || continue
-    kill -0 "${leftover##*.}" 2>/dev/null && continue
+    seed_owner_alive "${leftover##*.}" && continue
     stale_server=$(prefix_server_dir "$leftover") || continue
     if [ -d "$stale_server" ]; then
       stale_users=$(lsof -t +D "$stale_server" 2>&1 || true)
@@ -2871,7 +2877,7 @@ finish_dead_seeds() {
     [ -d "$leftover" ] && [ ! -L "$leftover" ] || continue
     case "${leftover##*.}" in ''|0|*[!0-9]*) continue ;; esac
     [ "$(stat -f %u "$leftover" 2>/dev/null)" = "$(id -u)" ] || continue
-    kill -0 "${leftover##*.}" 2>/dev/null && continue
+    seed_owner_alive "${leftover##*.}" && continue
     if [ ! -f "$leftover/.notproton-seed-target" ]; then
       why="it stopped before it moved anything in"
     elif [ "$(cat "$leftover/.notproton-seed-target" 2>/dev/null)" \

@@ -22,9 +22,37 @@ enum SteamDefaultTool {
         var priority: String = SteamDefaultTool.globalPriority
     }
 
-    // What the "0" entry was before Bridgeplay first set it; nil when there was none.
+    // What the "0" entry was before Bridgeplay first set it (nil when there was none), and the
+    // tool Bridgeplay last wrote there. Backups from before `applied` was kept have none.
+    // `moving` names the older tool while a move to `applied` is recorded but config.vdf not
+    // yet written, so a move cut short (a quit or crash) is finished on the next run.
     struct Backup: Codable, Equatable, Sendable {
         var previous: Mapping?
+        var applied: String? = nil
+        var moving: String? = nil
+    }
+
+    static func readBackup(_ backup: URL = backup) -> Backup? {
+        (try? Data(contentsOf: backup)).flatMap { try? JSONDecoder().decode(Backup.self, from: $0) }
+    }
+
+    private static func write(_ saved: Backup, to backup: URL) throws {
+        try FileManager.default.createDirectory(at: backup.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(saved).write(to: backup, options: .atomic)
+    }
+
+    // The file only says which tool Bridgeplay wrote, so a failure here is not the write's.
+    private static func recordApplied(_ tool: String, backup: URL) {
+        do { try writeApplied(tool, backup: backup) } catch {
+            AppLog.note("default tool: could not record \(tool): \(error.localizedDescription)")
+        }
+    }
+
+    private static func writeApplied(_ tool: String, movingFrom: String? = nil, backup: URL) throws {
+        var saved = readBackup(backup) ?? Backup(previous: nil)
+        saved.applied = tool
+        saved.moving = movingFrom
+        try write(saved, to: backup)
     }
 
     struct SteamRunning: LocalizedError {
@@ -44,10 +72,10 @@ enum SteamDefaultTool {
         // Bridgeplay first replaced theirs is kept.
         let previous = current(in: text)
         if previous.map({ !ToolName.isOurs($0.name) }) ?? true {
-            try FileManager.default.createDirectory(at: backup.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try JSONEncoder().encode(Backup(previous: previous)).write(to: backup, options: .atomic)
+            try write(Backup(previous: previous), to: backup)
         }
         try result.write(to: file, atomically: true, encoding: .utf8)
+        recordApplied(tool, backup: backup)
     }
 
     // Whether set() would write, so a caller can leave Steam open when it would not. A new
@@ -80,7 +108,7 @@ enum SteamDefaultTool {
               let mapping = current(in: text), ToolName.isOurs(mapping.name)
         else { return false }
         guard !steamRunning() else { throw SteamRunning() }
-        let saved = (try? Data(contentsOf: backup)).flatMap { try? JSONDecoder().decode(Backup.self, from: $0) }
+        let saved = readBackup(backup)
         guard let result = replacingDefault(text, with: saved?.previous), result != text else { return false }
         try WriteRefused.catching(file) { try result.write(to: file, atomically: true, encoding: .utf8) }
         return true
@@ -241,6 +269,103 @@ enum SteamDefaultTool {
         guard !steamRunning() else { return .steamRunning }
         try WriteRefused.catching(file) { try result.write(to: file, atomically: true, encoding: .utf8) }
         return .updated
+    }
+
+    // The default moved from an older WineCX release's tool to the current one's, when
+    // Bridgeplay put the older one there: the tool it last wrote or, in a backup from before
+    // that was kept, the tool of the release that was current before (`previous`), which is
+    // what Setup wrote then. A default the user picked since stays, and so does every per-game
+    // choice: a game set to the older release by hand keeps it, and games on the default move
+    // with it. nil when nothing changes.
+    static func movingWinecxDefault(
+        _ text: String, from older: Set<String>, previous: String?, to current: String, backup: Backup?
+    ) -> String? {
+        guard let mapping = self.current(in: text), older.contains(mapping.name), let backup,
+              mapping.name == (backup.applied ?? previous)
+                || (backup.applied == current && backup.moving == mapping.name)
+        else { return nil }
+        var moved = mapping
+        moved.name = current
+        guard let result = replacingDefault(text, with: moved), result != text else { return nil }
+        return result
+    }
+
+    // The same on config.vdf, once the current tool is installed and has its folder in
+    // compatibilitytools.d (RunnerSetup puts it there after the engine and runner verified).
+    // Never while Steam runs: a caller retries on .steamRunning, as for followSuccessors.
+    static func followCurrentWinecx(
+        current: String?, older: Set<String>, previous: String?, installed: [String],
+        in file: URL = config, backup: URL = backup,
+        compatTools: URL = SupportPaths.Steam.compatTools,
+        steamRunning: () -> Bool = { SteamBundle.isRunningForThisUser }
+    ) throws -> FollowResult {
+        guard let current, !older.contains(current), installed.contains(current) else { return .unchanged }
+        var isDirectory: ObjCBool = false
+        guard !current.contains("/"), FileManager.default.fileExists(
+            atPath: compatTools.appending(path: current).path(percentEncoded: false), isDirectory: &isDirectory
+        ), isDirectory.boolValue else { return .unchanged }
+        guard !steamRunning() else { return .steamRunning }
+        let text: String
+        do {
+            text = try String(contentsOf: file, encoding: .utf8)
+        } catch let error as NSError
+            where error.domain == NSCocoaErrorDomain && error.code == CocoaError.fileReadNoSuchFile.rawValue {
+            return .unchanged
+        }
+        var saved = readBackup(backup)
+        // A quit after config.vdf was written but before the record was finished leaves
+        // `moving` set. The default no longer names that tool, so the move is over: clear the
+        // marker, or a user who picks the older tool later would be moved again. Then go on:
+        // a default left on a release that is older now still moves to the current one.
+        if var finished = saved, let moving = finished.moving, self.current(in: text)?.name != moving {
+            finished.moving = nil
+            do {
+                try write(finished, to: backup)
+                AppLog.note("default tool: finished the record of the move from \(moving)")
+            } catch {
+                AppLog.note("default tool: could not finish the record of the move from \(moving): \(error.localizedDescription)")
+            }
+            saved = finished
+        }
+        guard let result = movingWinecxDefault(
+            text, from: older, previous: previous, to: current, backup: saved)
+        else { return .unchanged }
+        guard !steamRunning() else { return .steamRunning }
+        // A backup that still names the older tool would move a user who picks it back later, so
+        // the record is written first. Undoing a failed move then only touches the record, never
+        // Steam's config a second time.
+        let record = try? Data(contentsOf: backup)
+        do {
+            try writeApplied(current, movingFrom: self.current(in: text)?.name, backup: backup)
+        } catch {
+            AppLog.note("default tool: could not record \(current), the default stays: \(error.localizedDescription)")
+            return .failed
+        }
+        guard !steamRunning() else {
+            putBack(record, at: backup)
+            return .steamRunning
+        }
+        do {
+            try WriteRefused.catching(file) { try result.write(to: file, atomically: true, encoding: .utf8) }
+        } catch {
+            putBack(record, at: backup)
+            throw error
+        }
+        recordApplied(current, backup: backup)
+        return .updated
+    }
+
+    // Restores the backup file as it was before a move that did not happen.
+    private static func putBack(_ record: Data?, at backup: URL) {
+        do {
+            if let record {
+                try record.write(to: backup, options: .atomic)
+            } else if FileManager.default.fileExists(atPath: backup.path(percentEncoded: false)) {
+                try FileManager.default.removeItem(at: backup)
+            }
+        } catch {
+            AppLog.note("default tool: could not put the record back: \(error.localizedDescription)")
+        }
     }
 
     // Replaces the "0" entry under CompatToolMapping, or adds it (and CompatToolMapping) when
