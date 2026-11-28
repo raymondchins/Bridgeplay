@@ -1165,6 +1165,7 @@ __attribute__((constructor)) static void overlay_shim_load(void)
 	const char *vsync = getenv("NOTPROTON_VSYNC");
 	// A frame rate limit paces to the display, so it waits for the display as VSYNC does
 	int limited = framelimit_init();
+	limited |= framelimit_sustained_init();
 	int quick = sidebar_init();
 	force_vsync = vsync != NULL && strcmp(vsync, "1") == 0;
 	// The quick settings can set a limit while the game runs, so the hook is in place then too

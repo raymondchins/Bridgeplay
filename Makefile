@@ -592,6 +592,7 @@ panel-behavior:
 	node $(PANEL_TESTS)/localization.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/fex.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/nvidia.js $(OUT_DIR)/panel-emit && \
+	node $(PANEL_TESTS)/sustained.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/quick-settings.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/prefix-row.js $(OUT_DIR)/panel-emit && \
 	echo "==> panel behavior: renders as expected, no stale arguments"
@@ -682,7 +683,7 @@ overlay-shim-tests: $(OVERLAY_SHIM)
 		$(call SKIP,overlay-shim-tests,$(OVERLAY_SHIM_TESTS)); exit 0; fi; \
 	mkdir -p $(OUT_DIR); \
 	fail=0; ran=0; skipped=0; \
-	for t in displaymode device bridge delivery framegen ownership perfhud framelimit scalefilter quicksettings handoff bench; do \
+	for t in displaymode device bridge delivery framegen ownership perfhud framelimit sustained scalefilter quicksettings handoff bench; do \
 		for a in arm64 x86_64; do \
 			$(CC) -arch $$a $(OVERLAY_SHIM_TEST_FLAGS) -o $(OUT_DIR)/$$t.$$a \
 				$(OVERLAY_SHIM_TESTS)/$$t.m || exit 1; \
