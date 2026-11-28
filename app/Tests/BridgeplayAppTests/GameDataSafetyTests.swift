@@ -17,7 +17,9 @@ struct GameDataSafetyTests {
 
     private func fixture(_ name: String) throws -> Fixture {
         let fm = FileManager.default
-        let dir = fm.temporaryDirectory.appending(path: "bp-\(name)-\(UUID().uuidString)")
+        // From a plain path, as PrefixStore.libraries() reads libraryfolders.vdf. A URL built
+        // on temporaryDirectory keeps a trailing slash that a real library root doesn't have.
+        let dir = URL(filePath: fm.temporaryDirectory.appending(path: "bp-\(name)-\(UUID().uuidString)").path(percentEncoded: false))
         let library = SteamLibrary(root: dir.appending(path: "library"))
         let pfx = library.compatdata.appending(path: "1574480/pfx")
         try fm.createDirectory(at: pfx.appending(path: "drive_c/users/crossover/Saved Games"), withIntermediateDirectories: true)

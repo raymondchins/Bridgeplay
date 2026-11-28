@@ -626,8 +626,9 @@ enum PrefixTools {
         let prefix = backup.prefix
         let step = String(localized: "Restore backup")
         let fm = FileManager.default
-        let folder = backup.url.deletingLastPathComponent().standardizedFileURL.path(percentEncoded: false)
-        guard folder == prefix.root.standardizedFileURL.path(percentEncoded: false),
+        // plainPath: a parent from deletingLastPathComponent ends in a slash, a library root doesn't.
+        let folder = backup.url.deletingLastPathComponent().standardizedFileURL.plainPath
+        guard folder == prefix.root.standardizedFileURL.plainPath,
               backup.url.lastPathComponent.hasPrefix(PrefixStore.backupPrefix)
         else {
             throw StepFailure(step: step, detail: String(localized: "This backup is not in the folder of \(prefix.title)."))
