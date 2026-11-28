@@ -1053,6 +1053,20 @@ fex_graphics_notice() {
   notify_user "$fex_title" "$fex_body"
 }
 
+# WineCX without Apple's Game Porting Toolkit runs a Direct3D 12 game on Wine's own Direct3D 12,
+# which few games get far on. It is told once per prefix and build where to get the toolkit;
+# adding it later relinks the engine in place. CrossOver (no notproton-backends) has its own.
+toolkit_graphics_notice() {
+  [ "$verb" = waitforexitandrun ] && [ "${wine_unix##*/}" != aarch64-unix ] || return 0
+  [ "$backend" = wined3d ] && [ -d "$backend_root" ] && ! d3dmetal_engine || return 0
+  imports_d3d12 "$1" || return 0
+  graphics_log "the game imports d3d12.dll and this engine has no Game Porting Toolkit, so it runs on Wine's own Direct3D 12"
+  toolkit_mark="$STEAM_COMPAT_DATA_PATH/bridgeplay-toolkit-noticed"
+  [ -n "$STEAM_COMPAT_DATA_PATH" ] && [ "$(sed -n 1p "$toolkit_mark" 2>/dev/null)" != "$np_build" ] || return 0
+  printf '%s\n' "$np_build" > "$toolkit_mark" 2>/dev/null || true
+  notify_user "This game uses DirectX 12" "It runs best with Apple's Game Porting Toolkit. Get it from Apple, then press Rescan in Bridgeplay's Status. Your games and saves stay as they are."
+}
+
 # Returns 0 when the destination already matches or was replaced.
 stage_backend_file() {
   [ -f "$1" ] && [ ! -d "$2" ] || return 1
@@ -4303,6 +4317,7 @@ record_backend || true
 stage_rockstar_shim || true
 detect_mod_loaders "$1" || true
 fex_graphics_notice "$1" || true
+toolkit_graphics_notice "$1" || true
 # An engine without lib/notproton-backends (CrossOver) picks its graphics itself, from
 # CX_GRAPHICS_BACKEND, so the log names that choice, not the dxmt-builtin placeholder.
 if [ "$backend" = dxmt-builtin ]; then

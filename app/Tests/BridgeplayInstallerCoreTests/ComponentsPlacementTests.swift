@@ -91,6 +91,19 @@ struct ComponentsPlacementTests {
         #expect(calls.statuses == [ComponentsPlacement.steamStatus, ComponentsPlacement.copyStatus])
     }
 
+    @Test("With addsSteam off, a Mac without Steam still gets the toolkit and Steam is left alone")
+    func steamLeftToCaller() throws {
+        let f = try fixture(steam: false)
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        let calls = Calls()
+        var placement = placement(f, calls)
+        placement.addsSteam = false
+        try placement.place(status: { calls.statuses.append($0) })
+        #expect(calls.steam.isEmpty)
+        #expect(calls.statuses == [ComponentsPlacement.copyStatus])
+        #expect(text(f.support.appending(path: "gptk/external/libd3dshared.dylib")) == "new gptk")
+    }
+
     @Test("A failed Steam install stops before anything is copied")
     func steamFailure() throws {
         let f = try fixture(steam: false)
@@ -138,7 +151,7 @@ struct ComponentsPlacementTests {
     func failureReasonIsLogged() throws {
         let f = try fixture()
         defer { try? FileManager.default.removeItem(at: f.root) }
-        try FileManager.default.removeItem(at: f.source.appending(path: "gptk"))
+        try FileManager.default.removeItem(at: f.source.appending(path: "cache"))
         let lines = Lines()
         var placement = placement(f, Calls())
         placement.log = { lines.add($0) }
@@ -149,7 +162,7 @@ struct ComponentsPlacementTests {
             Issue.record("Unexpected error: \(failure)")
             return
         }
-        #expect(message == "The Game Porting Toolkit could not be copied.")
+        #expect(message == "The engine files could not be copied.")
         #expect(lines.all.count == 1)
         #expect(lines.all.first?.hasPrefix(message) == true)
         #expect(lines.all.first?.contains("ditto") == true)
@@ -225,5 +238,95 @@ struct ComponentsPlacementTests {
         #expect(ValveSteam.isDiskImage(good))
         #expect(!ValveSteam.isDiskImage(bad))
         #expect(!ValveSteam.isDiskImage(short))
+    }
+
+    // MARK: - Without Apple's toolkit
+
+    // A toolkit that passes every check but Apple's own signature, which the tests stub.
+    private func addToolkit(_ f: Fixture, license: Bool = true) throws {
+        let gptk = f.source.appending(path: "gptk")
+        let fm = FileManager.default
+        try fm.createDirectory(at: gptk.appending(path: "external/D3DMetal.framework"), withIntermediateDirectories: true)
+        try Data([0xCF, 0xFA, 0xED, 0xFE, 0, 0, 0, 0]).write(to: gptk.appending(path: "external/libd3dshared.dylib"))
+        if license { try Data("apple licence".utf8).write(to: gptk.appending(path: "License.rtf")) }
+    }
+
+    private func existingToolkit(_ f: Fixture) throws -> URL {
+        let mine = f.support.appending(path: "gptk/external/libd3dshared.dylib")
+        try FileManager.default.createDirectory(at: mine.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("the user's own toolkit".utf8).write(to: mine)
+        return mine
+    }
+
+    @Test("A zip without the toolkit still places the engine archives and confs, and keeps this Mac's toolkit")
+    func zipWithoutToolkit() throws {
+        let f = try fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        try FileManager.default.removeItem(at: f.source.appending(path: "gptk"))
+        let mine = try existingToolkit(f)
+        let calls = Calls()
+        let lines = Lines()
+        var placement = placement(f, calls)
+        placement.log = { lines.add($0) }
+
+        let toolkit = try InstallerComponents.place(placement, check: { _ in true }, status: { calls.statuses.append($0) })
+
+        #expect(toolkit == .notInDownload)
+        #expect(text(mine) == "the user's own toolkit")
+        #expect(text(f.caches.appending(path: "engines/dxmt.tar.gz")) == "dxmt")
+        #expect(text(f.support.appending(path: "gamefixes-default/448510.conf")) == "BACKEND=dxmt\n")
+        #expect(calls.statuses == [ComponentsPlacement.copyWithoutToolkitStatus])
+        #expect(calls.resets == 1)
+        #expect(lines.all.contains { $0.contains("left out") })
+    }
+
+    @Test("A toolkit that fails Apple's signature check is left out and the rest is placed")
+    func toolkitNotAppleSigned() throws {
+        let f = try fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        try FileManager.default.removeItem(at: f.source.appending(path: "gptk"))
+        try addToolkit(f)
+        let mine = try existingToolkit(f)
+
+        let toolkit = try InstallerComponents.place(placement(f, Calls()), check: { $0.lastPathComponent != "D3DMetal.framework" })
+
+        guard case .refused(let reason) = toolkit else {
+            Issue.record("Unexpected outcome: \(toolkit)")
+            return
+        }
+        #expect(reason.contains("not signed by Apple"))
+        #expect(text(mine) == "the user's own toolkit")
+        #expect(text(f.caches.appending(path: "engines/dxmt.tar.gz")) == "dxmt")
+    }
+
+    @Test("A toolkit without Apple's licence file is never placed")
+    func toolkitWithoutLicence() throws {
+        let f = try fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        try FileManager.default.removeItem(at: f.source.appending(path: "gptk"))
+        try addToolkit(f, license: false)
+
+        let toolkit = try InstallerComponents.place(placement(f, Calls()), check: { _ in true })
+
+        #expect(toolkit == .refused("Apple's licence file is missing."))
+        #expect(!FileManager.default.fileExists(atPath: f.support.appending(path: "gptk").path))
+        #expect(text(f.support.appending(path: "gamefixes-default/448510.conf")) == "BACKEND=dxmt\n")
+    }
+
+    @Test("A whole, Apple-signed toolkit with its licence replaces this Mac's copy")
+    func toolkitPlaced() throws {
+        let f = try fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        try FileManager.default.removeItem(at: f.source.appending(path: "gptk"))
+        try addToolkit(f)
+        let mine = try existingToolkit(f)
+        let calls = Calls()
+
+        let toolkit = try InstallerComponents.place(placement(f, calls), check: { _ in true }, status: { calls.statuses.append($0) })
+
+        #expect(toolkit == .placed)
+        #expect(FileManager.default.contents(atPath: mine.path)?.prefix(4) == Data([0xCF, 0xFA, 0xED, 0xFE]))
+        #expect(text(f.support.appending(path: "gptk/License.rtf")) == "apple licence")
+        #expect(calls.statuses == [ComponentsPlacement.copyStatus])
     }
 }

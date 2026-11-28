@@ -180,6 +180,10 @@ struct InstallerView: View {
                 row(tr("Version"), value: model.version, icon: "checkmark.circle.fill")
                 SetupHairline()
                 row(tr("Game data"), value: tr("Kept in place"), icon: "externaldrive")
+                if let note = model.toolkitNote {
+                    SetupHairline()
+                    row(tr("Game Porting Toolkit"), value: note, icon: "exclamationmark.triangle")
+                }
             }
             Toggle(tr("Open Bridgeplay"), isOn: $model.openBridgeplay).font(BP.sans(13))
             // Only when run from a DMG. From the ZIP the installer stays in Downloads: moving it

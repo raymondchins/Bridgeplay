@@ -29,6 +29,8 @@ final class InstallerModel {
     var components: InstallerComponents?
     var settingUp = false
     var componentStatus: String?
+    // Why Apple's Game Porting Toolkit was left out of the components, for the done screen.
+    var toolkitNote: String?
     // Bytes already downloaded in earlier steps, so progress counts toward one total.
     private var downloadedBefore: Int64 = 0
     let preview: String?
@@ -74,6 +76,7 @@ final class InstallerModel {
                 stage = .installing; settingUp = true; componentStatus = tr("Installing Steam from Valve")
                 scriptDownload = InstallerDownloadProgress(received: 2_202_009, total: 4_404_019, speed: 1_310_720)
             case "done": stage = .done
+            case "toolkit": stage = .done; toolkitNote = Self.toolkitNote(.notInDownload)
             case "error": stage = .failed; failure = tr("The download could not be verified. Your installed application has been kept.")
             default: stage = .review
             }
@@ -126,6 +129,7 @@ final class InstallerModel {
             stage = .downloading
             settingUp = false
             failure = nil
+            toolkitNote = nil
             InstallerLog.write("Install \(release.shortVersion) to \(destination.path)")
             received = 0
             downloadedBefore = 0
@@ -166,7 +170,7 @@ final class InstallerModel {
                     stage = .installing
                     progress = nil
                     componentStatus = nil
-                    try await Task.detached(priority: .userInitiated) {
+                    let toolkit = try await Task.detached(priority: .userInitiated) {
                         try InstallerComponents.install(archive: archive, work: work, status: { line in
                             InstallerLog.write("Components: \(line)")
                             Task { @MainActor [weak self] in self?.componentStatus = Self.status(line); self?.scriptDownload = nil }
@@ -174,6 +178,7 @@ final class InstallerModel {
                             Task { @MainActor [weak self] in self?.scriptDownload = meter }
                         })
                     }.value
+                    toolkitNote = Self.toolkitNote(toolkit)
                     self.components = nil
                 }
                 isCurrent = false
@@ -229,6 +234,18 @@ final class InstallerModel {
             if removeInstaller, let cleanupSource { try InstallerCleanup.schedule(cleanupSource) }
             NSApplication.shared.terminate(nil)
         } catch { failure = error.localizedDescription; finishing = false }
+    }
+
+    // The rest is in place without the toolkit, so the done screen says why it is missing and
+    // where to add it; the reason itself is in the log.
+    nonisolated static func toolkitNote(_ toolkit: ComponentsToolkit) -> String? {
+        switch toolkit {
+        case .placed: nil
+        case .notInDownload:
+            tr("Apple's Game Porting Toolkit was not in this download, so DirectX 12 games can't run yet. Add it from Bridgeplay's Status page.")
+        case .refused:
+            tr("Apple's Game Porting Toolkit failed Apple's checks and was left out, so DirectX 12 games can't run yet. Add it from Bridgeplay's Status page.")
+        }
     }
 
     // The components steps (ComponentsPlacement), in the installer's words.

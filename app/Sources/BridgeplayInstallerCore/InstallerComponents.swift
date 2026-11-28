@@ -123,18 +123,47 @@ public struct InstallerComponents: Sendable, Equatable {
     /// Unpack the verified archive and put Steam, GPTK, the engine archives and the configs in
     /// place (ComponentsPlacement). `status` gets each step as it starts; `log` gets the
     /// underlying reason when a step fails.
-    public static func install(archive: URL, work: URL, status: @escaping @Sendable (String) -> Void = { _ in },
+    /// `addsSteam` false leaves Steam to the caller: the app's Setup, which finds a Steam outside
+    /// /Applications and installs it in ~/Applications for an account that can't write /Applications.
+    /// A zip without the toolkit, or with one that fails Apple's checks, still places the rest;
+    /// the result says what happened to the toolkit.
+    @discardableResult
+    public static func install(archive: URL, work: URL, addsSteam: Bool = true, status: @escaping @Sendable (String) -> Void = { _ in },
                                download: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in },
-                               log: @escaping @Sendable (String) -> Void = { InstallerLog.write($0) }) throws {
+                               log: @escaping @Sendable (String) -> Void = { InstallerLog.write($0) }) throws -> ComponentsToolkit {
         let unpacked = work.appending(path: "components")
         try? FileManager.default.removeItem(at: unpacked)
         try FileManager.default.createDirectory(at: unpacked, withIntermediateDirectories: true)
         try run("/usr/bin/ditto", ["-x", "-k", archive.path, unpacked.path])
-        let source = unpacked.appending(path: "Bridgeplay")
-        try verifyAppleSigned(gptk: source.appending(path: "gptk"))
-        var placement = ComponentsPlacement(source: source)
+        var placement = ComponentsPlacement(source: unpacked.appending(path: "Bridgeplay"))
         placement.log = log
+        placement.addsSteam = addsSteam
+        return try place(placement, status: status, download: download)
+    }
+
+    /// Decides on the toolkit, then places everything else whatever that decision was.
+    static func place(_ placement: ComponentsPlacement, check: (URL) -> Bool = { appleSigned($0) },
+                      status: @escaping @Sendable (String) -> Void = { _ in },
+                      download: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in }) throws -> ComponentsToolkit {
+        var placement = placement
+        let toolkit = toolkit(in: placement.source.appending(path: "gptk"), check: check)
+        if toolkit != .placed { placement.log("Game Porting Toolkit left out: \(toolkit)") }
+        placement.placesToolkit = toolkit == .placed
         try placement.place(status: status, download: download)
+        return toolkit
+    }
+
+    /// Apple's files are placed only whole, unmodified and with Apple's licence beside them.
+    static func toolkit(in gptk: URL, check: (URL) -> Bool) -> ComponentsToolkit {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: gptk.path) else { return .notInDownload }
+        guard fm.fileExists(atPath: gptk.appending(path: "License.rtf").path) else {
+            return .refused("Apple's licence file is missing.")
+        }
+        do { try verifyAppleSigned(gptk: gptk, check: check) }
+        catch InstallerError.componentsFailure(let reason) { return .refused(reason) }
+        catch { return .refused(error.localizedDescription) }
+        return .placed
     }
 
     /// GPTK ships unmodified: D3DMetal.framework and every other Mach-O file must carry Apple's
@@ -200,6 +229,15 @@ public struct InstallerComponents: Sendable, Equatable {
         }
         return all
     }
+}
+
+/// What a components zip did about Apple's Game Porting Toolkit.
+public enum ComponentsToolkit: Sendable, Equatable {
+    case placed
+    /// The zip carries none (scripts/package-installer.sh --no-gptk).
+    case notInDownload
+    /// It failed Apple's signature or licence check, so it was left out.
+    case refused(String)
 }
 
 /// Pauses and resumes the installer's running download. A suspended task sends nothing and

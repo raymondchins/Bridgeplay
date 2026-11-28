@@ -721,9 +721,12 @@ struct StatusView: View {
         } else {
             StatusRow(
                 title: "Game Porting Toolkit",
-                value: "Not found. Copy the redist/lib folder of Apple's Game Porting Toolkit to "
-                    + "~/Library/Application Support/\(SupportPaths.supportDirName)/gptk, then press Rescan.",
+                value: String(localized: "Not added. Needed for DirectX 12, DLSS and ray tracing. Get the .dmg from Apple, then click Rescan."),
                 tone: .neutral,
+                secondaryAction: StatusAction(
+                    label: String(localized: "Get It from Apple"),
+                    help: String(localized: "Open Apple's downloads page. Sign in, then download the latest Game Porting Toolkit .dmg.")
+                ) { NSWorkspace.shared.open(GPTKImport.appleDownloads) },
                 action: StatusAction(
                     label: "Rescan",
                     help: "Look for the Game Porting Toolkit again and link it into the WineCX engine.",

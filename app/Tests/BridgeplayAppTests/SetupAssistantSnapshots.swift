@@ -45,11 +45,12 @@ struct SetupAssistantSnapshots {
             try wizard("frames/wave-\(step)", revealed: step) { $0.step = .mac; $0.rosettaInstalled = false }
         }
         let states: [[SetupAssistant.TaskState]] = [
-            [.running, .waiting, .waiting], [.done, .running, .waiting], [.done, .done, .running], [.done, .done, .done],
+            [.running, .waiting, .waiting, .waiting], [.done, .running, .waiting, .waiting],
+            [.done, .done, .running, .waiting], [.done, .done, .done, .running], [.done, .done, .done, .done],
         ]
         for (index, row) in states.enumerated() {
             let busy = SystemStatus()
-            busy.activity = ["Stopping Steam", "Unpacking WineCX 11.17", "Writing config.vdf", nil][index]
+            busy.activity = ["Downloading from github.com", "Stopping Steam", "Unpacking WineCX 11.17", "Writing config.vdf", nil][index]
             try wizard("frames/setup-\(index)", status: busy) { m in
                 m.step = .finish
                 for (i, state) in row.enumerated() { m.tasks[i].state = state }
@@ -69,16 +70,19 @@ struct SetupAssistantSnapshots {
         try wizard("2-wizard-4-setup", status: busy) { m in
             m.step = .finish
             m.tasks[0].state = .done
-            m.tasks[1].state = .running
+            m.tasks[1].state = .done
+            m.tasks[2].state = .running
         }
         try wizard("2-wizard-4b-permission") { m in
             m.step = .finish
-            m.tasks[0].state = .failed("macOS needs your permission first.")
+            m.tasks[0].state = .done
+            m.tasks[1].state = .failed("macOS needs your permission first.")
             m.needsAppManagement = true
         }
         try wizard("2-wizard-4c-repair") { m in
             m.step = .finish
-            m.tasks[0].state = .failed("Cartouche is already set up in Steam.")
+            m.tasks[0].state = .done
+            m.tasks[1].state = .failed("Cartouche is already set up in Steam.")
             m.needsSteamRepair = "Cartouche"
         }
         try wizard("2-wizard-5-done") { $0.step = .done }

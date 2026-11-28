@@ -145,7 +145,7 @@ private struct PreviewWizard: View {
                 Task { try? await Task.sleep(for: .seconds(3)); DownloadMeter.shared.togglePause() }
             }
             switch start {
-            case .steam: model.steamInstalled = false; await model.installSteam()
+            case .steam: model.steamInstalled = false; await model.installSteam(with: status)
             case .finish: await model.finish(with: status)
             default: break
             }

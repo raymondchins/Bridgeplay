@@ -141,8 +141,14 @@ final class SystemStatus {
     // if run on an actual user's machine.
     @ObservationIgnored var refreshAfterRun: @MainActor (SystemStatus) async -> Void = { await $0.refresh() }
     private var checkingLicense = false
+    // Setup's downloads, which run outside perform: busy, so no other action starts before
+    // Setup's own steps do.
+    var setupDownloading = false
+    // Runs perform started. A caller compares it before and after its call to tell a run that
+    // happened from one refused because another was in flight.
+    @ObservationIgnored private(set) var runsStarted = 0
 
-    var isBusy: Bool { activity != nil || runInFlight || checkingLicense }
+    var isBusy: Bool { activity != nil || runInFlight || checkingLicense || setupDownloading }
     var isIdle: Bool { !isBusy && !isRefreshing }
     // A pending 3.0 folder move blocks every install: anything written now would land in
     // the new folders before the old ones are moved in.
@@ -405,8 +411,12 @@ final class SystemStatus {
         panel.directoryURL = current.deletingLastPathComponent()
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let picked = URL(filePath: url.path)
+        await useSteam(URL(filePath: url.path))
+    }
 
+    // Also what Setup calls for a Steam it found, or installed, outside /Applications.
+    func useSteam(_ picked: URL) async {
+        let current = SupportPaths.Steam.app
         clearFailure()
         outcome = nil
 
@@ -552,6 +562,7 @@ final class SystemStatus {
             return
         }
         runInFlight = true
+        runsStarted += 1
         defer { runInFlight = false }
 
         clearFailure()
@@ -642,19 +653,48 @@ final class SystemStatus {
     static let rescanStep = "Look for the Game Porting Toolkit"
 
     // Looks for a Game Porting Toolkit again and links or unlinks it in the WineCX engine
-    // and in the runner copied from it, so both always carry the same Direct3D.
+    // and in the runner copied from it, so both always carry the same Direct3D. With none on
+    // this Mac, Apple's .dmg in Downloads is copied in first. Prefixes and saves are not touched.
     func rescanGameportingToolkit() async {
         guard canInstall else { return }
+        // The toolkit is copied into the support folder, which the 3.0 move has to find untouched.
+        let mayImport = MigrationLaunch.shared.refusal == nil
         await perform(from: Self.rescanStep) { _ in
             let lock = try DeploymentContent.acquireInstallationLock()
             defer { lock.release() }
             try await requireInstallableContent()
-            let found = await Task.detached(priority: .userInitiated) {
-                Self.relinkGameportingToolkit()
+            let added = await Task.detached(priority: .userInitiated) {
+                Self.addGameportingToolkit(downloads: { mayImport ? GPTKImport.candidates() : [] })
             }.value
-            return found.map { "Game Porting Toolkit linked from \($0)." }
+            if let failure = added.failure { AppLog.note("status: toolkit import failed: \(failure)") }
+            return added.linked.map { "Game Porting Toolkit linked from \($0)." }
+                ?? added.failure.map { String(localized: "The Game Porting Toolkit wasn't added. \($0)") }
                 ?? "Game Porting Toolkit not found."
         }
+    }
+
+    struct ToolkitAdded: Equatable { var linked: String?; var imported: URL?; var failure: String? }
+
+    // Adding the toolkit to an engine set up without it: copy Apple's image in when there is
+    // no toolkit yet, then relink the installed trees in place. A failed copy still relinks,
+    // so the engine matches whatever toolkit is on disk.
+    nonisolated static func addGameportingToolkit(
+        located: () -> WinecxD3DMetal.Payload? = { WinecxD3DMetal.locate() },
+        downloads: () -> [URL] = { GPTKImport.candidates() },
+        importImage: (URL) throws -> WinecxD3DMetal.Payload = { try GPTKImport.importImage($0) },
+        relink: () -> String? = { SystemStatus.relinkGameportingToolkit() }
+    ) -> ToolkitAdded {
+        var added = ToolkitAdded()
+        if located() == nil, let image = downloads().first {
+            do {
+                _ = try importImage(image)
+                added.imported = image
+            } catch {
+                added.failure = error.localizedDescription
+            }
+        }
+        added.linked = relink()
+        return added
     }
 
     nonisolated static func relinkGameportingToolkit(

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 // What the Setup Assistant checks and installs before Bridgeplay itself: the Mac, Rosetta,
@@ -33,6 +34,88 @@ enum SetupChecks {
         return values?.volumeAvailableCapacityForImportantUsage
     }
 
+    static func size(_ bytes: Int64) -> String {
+        bytes.formatted(.byteCount(style: .file))
+    }
+
+    static let storageSettings = URL(string: "x-apple.systempreferences:com.apple.settings.Storage")!
+
+    static let applications = URL(filePath: "/Applications", directoryHint: .isDirectory)
+    // Where Steam goes when this account can't add apps to /Applications.
+    static var homeSteam: URL { SupportPaths.home.appending(path: "Applications/Steam.app") }
+
+    static func canAddApplications(_ folder: URL = applications) -> Bool {
+        access(folder.path(percentEncoded: false), W_OK) == 0
+    }
+
+    // A Steam the saved path doesn't point at: ~/Applications first, then any copy Launch
+    // Services knows. Steam's own inner bundle, the Trash and read-only volumes (a mounted
+    // steam.dmg) don't count.
+    static func steamCandidates(
+        home: URL = SupportPaths.home,
+        known: () -> [URL] = { NSWorkspace.shared.urlsForApplications(withBundleIdentifier: SteamRepair.valveIdentifier) },
+        isSteam: (URL) -> Bool = { Bundle(url: $0)?.bundleIdentifier == SteamRepair.valveIdentifier },
+        isReadOnly: (URL) -> Bool = { (try? $0.resourceValues(forKeys: [.volumeIsReadOnlyKey]).volumeIsReadOnly) == true }
+    ) -> [URL] {
+        let excluded = [home.appending(path: "Library"), home.appending(path: ".Trash")].map(\.standardizedFileURL.plainPath)
+        var seen = Set<String>()
+        return ([home.appending(path: "Applications/Steam.app")] + known()).filter { url in
+            let path = url.standardizedFileURL.plainPath
+            guard seen.insert(path).inserted, !excluded.contains(where: { path.hasPrefix($0 + "/") }),
+                  !path.contains("/.Trashes/"), FileManager.default.fileExists(atPath: path) else { return false }
+            return isSteam(url) && !isReadOnly(url)
+        }
+    }
+
+    // What this account can do with Steam, told on the first step rather than when Set Up fails.
+    enum SteamAccess: Equatable {
+        case ok
+        // Another account owns Steam and already put Bridgeplay in it: Setup adds it for this account.
+        case thisAccountOnly
+        case otherAccount
+        case systemOwned
+        // No Steam, and /Applications isn't writable: Steam goes to ~/Applications.
+        case homeApplications
+
+        var needsOtherAccount: Bool { self == .otherAccount || self == .systemOwned }
+    }
+
+    static func steamAccess(
+        app: URL = SupportPaths.Steam.app,
+        present: Bool = SteamBundle.isPresent,
+        deployed: () -> Bool = { steamCarriesBridgeplay() },
+        lookup: Remedy.Lookup = Remedy.Lookup(),
+        applications: URL = applications
+    ) -> SteamAccess {
+        guard present else {
+            return lookup.writable(applications.path(percentEncoded: false)) ? .ok : .homeApplications
+        }
+        let owner = lookup.owner(app.path(percentEncoded: false))
+        guard let owner, owner != lookup.user else { return .ok }
+        if deployed() { return .thisAccountOnly }
+        return owner == 0 ? .systemOwned : .otherAccount
+    }
+
+    static func steamCarriesBridgeplay(app: URL = SupportPaths.Steam.app) -> Bool {
+        let dylib = SupportPaths.Steam.deployedDylib(inBundle: app).path(percentEncoded: false)
+        let insert = SteamBundle.currentInsert(at: SupportPaths.Steam.infoPlist(inBundle: app)) ?? ""
+        return insert.split(separator: ":").contains(Substring(dylib))
+    }
+
+    static func accessNote(_ access: SteamAccess, app: URL = SupportPaths.Steam.app) -> String? {
+        switch access {
+        case .ok: nil
+        case .thisAccountOnly:
+            String(localized: "Another account owns it. Setup adds Bridgeplay for you only.")
+        case .otherAccount:
+            String(localized: "Run Setup in the owner’s account first.")
+        case .systemOwned:
+            Remedy.rootOwned(handOver: app.path(percentEncoded: false)).advice
+        case .homeApplications:
+            String(localized: "Installs in ~/Applications.")
+        }
+    }
+
     // Rosetta's runtime lives here once installed; its absence is what softwareupdate fixes.
     static let rosettaRuntime = URL(filePath: "/Library/Apple/usr/libexec/oah/libRosettaRuntime")
 
@@ -51,12 +134,12 @@ enum SetupChecks {
     static func rosettaFailure(_ error: Error) -> String {
         let text = error.localizedDescription
         if rosettaCancelled(error) {
-            return String(localized: "Rosetta is still needed to run Windows games. The password window was closed, so it wasn't installed. Press Install to try again.")
+            return String(localized: "Still needed. Press Install to try again.")
         }
         if text.contains("(-60005)") || text.contains("(-60007)") {
-            return String(localized: "Rosetta wasn't installed because macOS didn't accept the password. Use the name and password of an administrator of this Mac.")
+            return String(localized: "Rosetta wasn't installed. Use an administrator's password.")
         }
-        return String(localized: "Rosetta wasn't installed. Check your internet connection and try again.")
+        return String(localized: "Rosetta wasn't installed. Check your internet and try again.")
     }
 
     // Closing the password window is a choice, not a failure to report.
@@ -89,6 +172,8 @@ enum SetupChecks {
             throw StepFailure(step: step, detail: "Valve answered \(http.statusCode).")
         }
         report(String(localized: "Installing Steam"))
+        // ~/Applications may not exist yet.
+        try FileManager.default.createDirectory(at: app.deletingLastPathComponent(), withIntermediateDirectories: true)
         try DiskImage.withMounted(download) { volume in
             try copySteam(from: volume, to: app)
         }
@@ -147,6 +232,7 @@ enum DiskImage {
 // Copies Game Porting Toolkit's redist/lib out of Apple's disk image into the folder
 // WinecxD3DMetal.locate looks in first.
 enum GPTKImport {
+    static let appleDownloads = URL(string: "https://developer.apple.com/download/all/?q=Game%20Porting%20Toolkit")!
     static var downloads: URL { SupportPaths.home.appending(path: "Downloads", directoryHint: .isDirectory) }
 
     // Downloads is only read while no Game Porting Toolkit is installed, so a Mac that has one

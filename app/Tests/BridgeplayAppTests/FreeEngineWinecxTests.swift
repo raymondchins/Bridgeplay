@@ -616,6 +616,35 @@ struct FreeEngineWinecxTests {
         #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock) == ["lib/wine/x86_64-windows/d3d11.dll"])
     }
 
+    @Test("An engine set up without the toolkit gains D3DMetal in place, and loses it again cleanly")
+    func toolkitAddedLater() throws {
+        let base = try makeDirectory("later")
+        defer { try? FileManager.default.removeItem(at: base) }
+        let fm = FileManager.default
+        let root = try makeEngineRoot(in: base)
+        // What Setup leaves without a toolkit: Wine's own builtins and the DXMT natives, no marker.
+        let dxmt = root.appending(path: "lib/notproton-backends/dxmt/x86_64-windows/d3d11.dll")
+        try fm.createDirectory(at: dxmt.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("dxmt d3d11".utf8).write(to: dxmt)
+        #expect(!WinecxD3DMetal.isLinked(root: root))
+        let before = Digest.sha256IfPresent(dxmt)
+
+        let lib = try makePayload(in: base.appending(path: "gptk"))
+        let payload = try #require(WinecxD3DMetal.locate(in: [lib]))
+        try WinecxD3DMetal.link(payload, root: root, stock: Self.stock)
+        #expect(WinecxD3DMetal.isLinked(root: root))
+        #expect(fm.fileExists(atPath: WinecxD3DMetal.enabledMarker(in: root).path(percentEncoded: false)))
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
+        #expect(Digest.sha256IfPresent(dxmt) == before)
+
+        WinecxD3DMetal.unlink(root: root)
+        #expect(!WinecxD3DMetal.isLinked(root: root))
+        for (name, hash) in Self.stock {
+            #expect(Digest.sha256IfPresent(root.appending(path: "lib/wine/x86_64-windows/\(name)")) == hash)
+        }
+        #expect(Digest.sha256IfPresent(dxmt) == before)
+    }
+
     @Test("Refresh never writes into a tree that is not WineCX")
     func refreshOnlyTouchesWinecx() throws {
         let base = try makeDirectory("refresh")

@@ -14,12 +14,15 @@ struct SetupAssistantView: View {
     @State private var revealed: Int
     @State private var forward = true
     @State private var confirmingRepair = false
+    @State private var showingRisks: Bool
     private let fixedReveal: Int?
     private let onClose: (() -> Void)?
 
-    init(model: SetupAssistant = SetupAssistant(), revealed: Int? = nil, onClose: (() -> Void)? = nil) {
+    init(model: SetupAssistant = SetupAssistant(), revealed: Int? = nil, showingRisks: Bool = false,
+         onClose: (() -> Void)? = nil) {
         _model = State(initialValue: model)
         _revealed = State(initialValue: revealed ?? 0)
+        _showingRisks = State(initialValue: showingRisks)
         fixedReveal = revealed
         self.onClose = onClose
     }
@@ -54,6 +57,12 @@ struct SetupAssistantView: View {
         .environment(\.colorScheme, .dark)
         .tint(BP.accent)
         .task(id: model.step) { await wave() }
+        .task { await model.locateSteam(status) }
+        // Space freed or Steam moved while Setup was in the background.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            _ = model.refreshSpace()
+            model.refreshSteam()
+        }
     }
 
     private var finishedFraction: Double {
@@ -77,7 +86,7 @@ struct SetupAssistantView: View {
                         if let message = model.message {
                             SetupCard {
                                 WizardRow(row: StatusRow(title: String(localized: "Something went wrong"), value: message, tone: .bad,
-                                          action: StatusAction(label: ErrorReport.reportLabel) { ErrorReport.open(message, in: "Setup") }))
+                                          action: failureAction(message, in: "Setup")))
                             }
                         }
                     }
@@ -162,34 +171,57 @@ struct SetupAssistantView: View {
 
     @ViewBuilder
     private var macStep: some View {
-        StepHeader(step: model.step, title: "Check your Mac",
-                   detail: "Bridgeplay runs Windows games from your Steam library. First, a few quick checks.")
+        StepHeader(step: model.step, title: "Check your Mac", detail: String(localized: "A few quick checks first."))
         SetupCard {
             checked(0, StatusRow(title: String(localized: "Apple silicon"),
-                      value: model.appleSilicon ? SetupChecks.chipName : String(localized: "Bridgeplay doesn't run on Intel Macs."),
+                      value: model.appleSilicon ? SetupChecks.chipName : String(localized: "Intel Macs aren't supported."),
                       tone: model.appleSilicon ? .ok : .bad))
             SetupHairline()
             checked(1, StatusRow(title: String(localized: "macOS \(SetupChecks.minimumMacOS) or later"),
                       value: model.macOSSupported ? SetupChecks.macOSDisplay : String(localized: "\(SetupChecks.macOSDisplay). Update macOS first."),
                       tone: model.macOSSupported ? .ok : .bad))
             SetupHairline()
-            checked(2, StatusRow(title: String(localized: "Free space"),
-                      value: model.freeBytes.map { String(localized: "\(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file)) available, 3 GB needed") },
-                      tone: model.hasSpace ? .ok : .bad))
+            checked(2, spaceRow)
             SetupHairline()
             checked(3, StatusRow(title: String(localized: "Rosetta 2"),
-                      value: model.rosettaInstalled ? String(localized: "Installed.") : model.rosettaNote ?? String(localized: "Apple's translator for Windows games. Asks for your Mac password."),
+                      value: model.rosettaInstalled ? String(localized: "Installed.") : model.rosettaNote ?? String(localized: "Asks for your Mac password."),
                       tone: model.rosettaInstalled ? .ok : .warning,
                       action: model.rosettaInstalled ? nil : StatusAction(
                         label: String(localized: "Install"), isProminent: true, isEnabled: !model.isWorking
                       ) { Task { await model.installRosetta() } }))
+            if let note = SetupChecks.accessNote(model.steamAccess) {
+                SetupHairline()
+                checked(4, StatusRow(title: String(localized: "Steam"), value: note,
+                                     tone: model.steamAccess.needsOtherAccount ? .warning : .info))
+            }
+        }
+    }
+
+    private var spaceRow: StatusRow {
+        let needed = SetupChecks.size(SetupChecks.requiredBytes)
+        let value = model.freeBytes.map { String(localized: "\(SetupChecks.size($0)) free, \(needed) needed.") }
+        guard !model.hasSpace else { return StatusRow(title: String(localized: "Free space"), value: value, tone: .ok) }
+        let short = SetupChecks.size(SetupChecks.requiredBytes - (model.freeBytes ?? 0))
+        return StatusRow(title: String(localized: "Free space"), value: value, tone: .bad,
+                         detail: String(localized: "Free up another \(short)."),
+                         secondaryAction: StatusAction(label: String(localized: "Open Storage")) { model.openStorageSettings() },
+                         action: StatusAction(label: String(localized: "Check Again"), isProminent: true) { _ = model.refreshSpace() })
+    }
+
+    // The size comes from the signature file published beside the zip; offline it is left out.
+    private var componentsNote: String {
+        switch (model.componentsBytes.map(SetupChecks.size), model.addsSteamWithComponents) {
+        case (let size?, true): String(localized: "\(size). Adds Steam too.")
+        case (let size?, false): String(localized: "\(size) download.")
+        case (nil, true): String(localized: "Adds Steam too.")
+        case (nil, false): String(localized: "Apple's files, unmodified.")
         }
     }
 
     @ViewBuilder
     private var graphicsStep: some View {
         StepHeader(step: model.step, title: "Add Apple's game graphics",
-                   detail: "Apple's Game Porting Toolkit (D3DMetal) runs DirectX 11 and 12 games on Metal. Bridgeplay can download it for you under Apple's non-commercial license, or add your own copy from Apple.")
+                   detail: String(localized: "Apple's toolkit for DirectX 11 and 12 games."))
         SetupCard {
             if let gptk = model.gptk {
                 WizardRow(row: StatusRow(title: String(localized: "Game Porting Toolkit"),
@@ -197,17 +229,21 @@ struct SetupAssistantView: View {
                           tone: .ok, trailing: gptk.version))
             } else {
                 // Apple's files unmodified, from Bridgeplay's installer release; Steam comes along when it's missing.
-                WizardRow(row: StatusRow(title: String(localized: "Download with Bridgeplay"),
-                          value: DownloadMeter.shared.title ?? model.gptkProgress
-                            ?? String(localized: "About 500 MB. Also installs Steam if this Mac doesn't have it yet."),
-                          action: StatusAction(label: String(localized: "Download"), isProminent: true, isEnabled: !model.isWorking) {
-                              Task { await model.downloadGPTK() }
-                          }), symbol: "arrow.down.circle")
-                SetupHairline()
+                // Not offered again once a download came without a toolkit it could use.
+                if model.toolkitPlan.offersComponentsDownload {
+                    WizardRow(row: StatusRow(title: String(localized: "Download with Bridgeplay"),
+                              value: DownloadMeter.shared.title ?? model.gptkProgress ?? componentsNote,
+                              action: StatusAction(label: String(localized: "Download"), isProminent: true,
+                                                   help: String(localized: "Apple's files, unmodified, under Apple's non-commercial license."),
+                                                   isEnabled: !model.isWorking) {
+                                  Task { await model.downloadGPTK() }
+                              }), symbol: "arrow.down.circle")
+                    SetupHairline()
+                }
                 WizardRow(row: StatusRow(title: String(localized: "Or download it from Apple"),
-                          value: String(localized: "Sign in, then download the latest Game Porting Toolkit .dmg."),
+                          value: String(localized: "Sign in and download the latest .dmg."),
                           action: StatusAction(label: String(localized: "Open Apple Downloads")) {
-                              NSWorkspace.shared.open(URL(string: "https://developer.apple.com/download/all/?q=Game%20Porting%20Toolkit")!)
+                              NSWorkspace.shared.open(GPTKImport.appleDownloads)
                           }), number: 1)
                 SetupHairline()
                 if let image = model.gptkImages.first {
@@ -218,7 +254,7 @@ struct SetupAssistantView: View {
                               }), number: 2)
                 } else {
                     WizardRow(row: StatusRow(title: String(localized: "Add the disk image"),
-                              value: String(localized: "Drag the .dmg onto this window, or choose it."),
+                              value: String(localized: "Drag the .dmg here, or choose it."),
                               action: StatusAction(label: String(localized: "Choose…"), isEnabled: !model.isWorking) { chooseImage() }),
                               number: 2)
                 }
@@ -229,8 +265,9 @@ struct SetupAssistantView: View {
             Task { await model.importGPTK(url) }
             return true
         }
+        .task { await model.loadComponentsSize() }
         if model.gptk == nil {
-            Text("Optional. If you skip it, games use DXMT, which runs DirectX 10 and 11 games only. You can add the toolkit later from Status.")
+            Text(ToolkitPlan.withoutNote.keepingLastWordsTogether)
                 .font(BP.sans(12))
                 .foregroundStyle(BP.fg3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -240,28 +277,25 @@ struct SetupAssistantView: View {
 
     @ViewBuilder
     private var steamStep: some View {
-        StepHeader(step: model.step, title: "Sign in to Steam",
-                   detail: "Sign in with your account in Steam. Bridgeplay continues on its own once you're in.")
+        StepHeader(step: model.step, title: "Sign in to Steam", detail: String(localized: "Setup continues once you're signed in."))
         // Above the rows, so it is read before the Set Up step patches Steam.
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Bridgeplay adds a library to Steam.app and re-signs Steam on this Mac. Valve doesn't support this, and it may go against Steam's terms. Repair Steam in Status undoes it.")
-            Text("Online games with anti-cheat often won't start and may flag Bridgeplay. Play them at your own risk.")
-        }
-        .font(BP.sans(12))
-        .foregroundStyle(BP.fg3)
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, 2)
+        RisksNote(expanded: $showingRisks)
         SetupCard {
+            // Choose… for a Steam somewhere Setup didn't look, such as an external drive.
             checked(0, StatusRow(title: String(localized: "Steam"),
                       value: model.steamInstalled ? SupportPaths.Steam.app.path(percentEncoded: false)
                         : DownloadMeter.shared.title ?? model.steamProgress ?? String(localized: "Not installed."),
                       tone: model.steamInstalled ? .ok : .warning,
+                      detail: model.steamInstalled ? nil : SetupChecks.accessNote(model.steamAccess),
+                      secondaryAction: model.steamInstalled ? nil : StatusAction(
+                        label: String(localized: "Choose…"), isEnabled: !model.isWorking
+                      ) { Task { await model.chooseSteam(status) } },
                       action: model.steamInstalled ? nil : StatusAction(
                         label: String(localized: "Install Steam"), isProminent: true, isEnabled: !model.isWorking
-                      ) { Task { await model.installSteam() } }))
+                      ) { Task { await model.installSteam(with: status) } }))
             SetupHairline()
             checked(1, StatusRow(title: String(localized: "Steam account"),
-                      value: model.signedIn ? String(localized: "Signed in.") : String(localized: "Waiting for you to sign in to Steam. Bridgeplay doesn't read or store your password."),
+                      value: model.signedIn ? String(localized: "Signed in.") : String(localized: "Waiting for sign-in."),
                       tone: model.signedIn ? .ok : .info,
                       action: model.signedIn || !model.steamInstalled ? nil : StatusAction(label: String(localized: "Open Steam"), isProminent: true) { model.openSteam() }))
             SetupHairline()
@@ -275,15 +309,17 @@ struct SetupAssistantView: View {
         switch model.trust {
         case .unknown, .needed:
             return StatusRow(title: title,
-                             value: String(localized: "Keeps your controller working after Bridgeplay updates. Adds a certificate for this Mac to your login keychain. If macOS then asks for your password, choose Always Allow."),
+                             value: String(localized: "Keeps controllers working after updates."),
                              tone: .info,
-                             action: StatusAction(label: String(localized: "Trust"), isEnabled: !model.isWorking && model.trust == .needed) {
+                             action: StatusAction(label: String(localized: "Trust"),
+                                                  help: String(localized: "Adds a certificate for this Mac to your login keychain."),
+                                                  isEnabled: !model.isWorking && model.trust == .needed) {
                                  Task { await model.trustThisMac() }
                              })
         case .working:
             return StatusRow(title: title, value: String(localized: "Adding the certificate…"), tone: .info)
         case .done:
-            return StatusRow(title: title, value: String(localized: "Done. Your controller keeps working after updates."), tone: .ok)
+            return StatusRow(title: title, value: String(localized: "Done."), tone: .ok)
         case .declined(let note):
             return StatusRow(title: title, value: note, tone: .warning,
                              action: StatusAction(label: String(localized: "Try Again"), isEnabled: !model.isWorking) {
@@ -294,21 +330,20 @@ struct SetupAssistantView: View {
 
     @ViewBuilder
     private var finishStep: some View {
-        StepHeader(step: model.step, title: "Set up Bridgeplay",
-                   detail: "Bridgeplay adds itself to Steam, sets up the WineCX engine and makes it Steam's default. Steam closes for a moment.")
+        StepHeader(step: model.step, title: "Set up Bridgeplay", detail: String(localized: "Steam closes for a moment."))
         // Above the tasks, so the button is in view without scrolling.
         if model.needsAppManagement {
             SetupCard {
                 WizardRow(row: StatusRow(title: String(localized: "App Management"),
-                          value: String(localized: "Turn on Bridgeplay in Privacy & Security › App Management. Setup continues by itself once it's on."),
+                          value: String(localized: "Turn on Bridgeplay in App Management."),
                           tone: .warning,
-                          detail: String(localized: "After a Bridgeplay update the switch can look on but no longer work. Turn it off and on again, or remove Bridgeplay from the list with − and add it back with +."),
+                          detail: String(localized: "Already on? Turn it off and on, or remove and re-add Bridgeplay."),
                           action: StatusAction(label: Remedy.settingsButton, isProminent: true) { model.openAppManagement() }))
             }
         } else if let tool = model.needsSteamRepair {
             SetupCard {
                 WizardRow(row: StatusRow(title: String(localized: "Steam needs repair"),
-                          value: String(localized: "\(tool) is already set up in Steam. Repair Steam to remove it, and Setup continues by itself."),
+                          value: String(localized: "\(tool) is set up in Steam. Repair Steam to remove it."),
                           tone: .warning,
                           action: StatusAction(label: String(localized: "Repair Steam"), isProminent: true) { confirmingRepair = true }))
             }
@@ -354,12 +389,12 @@ struct SetupAssistantView: View {
         SetupCard {
             if model.trust == .done, model.trustInLoginKeychain {
                 WizardRow(row: StatusRow(title: String(localized: "Confirm the Steam update"),
-                          value: String(localized: "macOS asks for your Mac password once, so Steam keeps working with Bridgeplay. Type it and choose Always Allow, and it won't ask again."),
+                          value: String(localized: "macOS asks for your password once. Choose Always Allow."),
                           tone: .info))
                 SetupHairline()
             }
             WizardRow(row: StatusRow(title: String(localized: "Allow Bridgeplay in App Management"),
-                      value: String(localized: "If macOS shows the switch, turn it on. Setup carries on by itself."),
+                      value: String(localized: "If macOS asks, turn the switch on."),
                       tone: .info))
         }
     }
@@ -368,10 +403,10 @@ struct SetupAssistantView: View {
     private var crossOverRow: StatusRow {
         let title = String(localized: "CrossOver")
         if CrossOverSource.discover().contains(where: \.isUsable) {
-            return StatusRow(title: title, value: String(localized: "Found. Set it up in Status to play on it."), tone: .ok)
+            return StatusRow(title: title, value: String(localized: "Found. Set it up in Status."), tone: .ok)
         }
         return StatusRow(title: title,
-                         value: String(localized: "Own CrossOver? Bridgeplay can run games on it. Buying it funds Wine."),
+                         value: String(localized: "Own CrossOver? Bridgeplay can use it. Buying it funds Wine."),
                          tone: .neutral,
                          action: .getCrossOver)
     }
@@ -379,19 +414,19 @@ struct SetupAssistantView: View {
     @ViewBuilder
     private var doneStep: some View {
         StepHeader(step: model.step, title: "You're all set",
-                   detail: "Open Steam, install a Windows game and press Play. Status, Prefixes and Prefix Backups in this window change engines, fix a game or undo everything.",
+                   detail: String(localized: "Install a Windows game in Steam and press Play."),
                    emphasized: true)
         SetupCard {
-            checked(0, StatusRow(title: String(localized: "Bridgeplay"), value: String(localized: "Installed into Steam."), tone: .ok))
+            checked(0, StatusRow(title: String(localized: "Bridgeplay"), value: String(localized: "Installed in Steam."), tone: .ok))
             SetupHairline()
-            checked(1, StatusRow(title: String(localized: "WineCX Engine"), value: String(localized: "Steam's default for Windows games."), tone: .ok))
+            checked(1, StatusRow(title: String(localized: "WineCX Engine"), value: String(localized: "Default for Windows games."), tone: .ok))
             SetupHairline()
             checked(2, StatusRow(title: String(localized: "Game Porting Toolkit"),
-                      value: model.gptk == nil ? String(localized: "Skipped. Games use DXMT; add it later from Status.") : String(localized: "Linked."),
+                      value: model.toolkitPlan.doneValue,
                       tone: model.gptk == nil ? .neutral : .ok))
             SetupHairline()
             checked(3, StatusRow(title: String(localized: "Controllers"),
-                      value: String(localized: "The first time a game uses a controller, macOS asks to let Steam use Input Monitoring. Click Allow. If you missed it, turn on Steam in Input Monitoring."),
+                      value: String(localized: "When macOS asks about Input Monitoring, click Allow."),
                       tone: .info,
                       action: StatusAction(label: String(localized: "Open Input Monitoring")) { SystemStatus.openInputMonitoring() }))
             SetupHairline()
@@ -404,16 +439,16 @@ struct SetupAssistantView: View {
             .padding(.top, 8)
         SetupCard {
             WizardRow(row: StatusRow(title: String(localized: "Metal HUD"),
-                      value: String(localized: "Shows frame rate and GPU details in a corner while you play."),
+                      value: String(localized: "Frame rate and GPU stats while you play."),
                       toggle: Binding(get: { model.metalHUD }, set: { model.setGameDefault(.metalHUD, $0) })),
                       symbol: "gauge.with.dots.needle.33percent")
             SetupHairline()
             WizardRow(row: StatusRow(title: String(localized: "High Resolution"),
-                      value: String(localized: "Sharper on Retina displays, but games run slower."),
+                      value: String(localized: "Sharper on Retina, but slower."),
                       toggle: Binding(get: { model.highResolution }, set: { model.setGameDefault(.highResolution, $0) })),
                       symbol: "display")
         }
-        Text("Both start off. You can change them here later, or for one game in its Steam Properties › Bridgeplay.")
+        Text("For one game: Steam Properties › Bridgeplay.")
             .font(BP.sans(12))
             .foregroundStyle(BP.fg3)
             .fixedSize(horizontal: false, vertical: true)
@@ -433,7 +468,14 @@ struct SetupAssistantView: View {
     private func report(_ task: SetupAssistant.SetupTask) -> StatusAction? {
         guard case .failed(let reason) = task.state, !model.needsAppManagement, model.needsSteamRepair == nil
         else { return nil }
-        return StatusAction(label: ErrorReport.reportLabel) { ErrorReport.open(reason, in: "Setup: \(task.title)") }
+        return failureAction(reason, in: "Setup: \(task.title)")
+    }
+
+    private func failureAction(_ failure: String, in place: String) -> StatusAction {
+        if model.isOutOfSpace(failure) {
+            return StatusAction(label: String(localized: "Open Storage")) { model.openStorageSettings() }
+        }
+        return StatusAction(label: ErrorReport.reportLabel) { ErrorReport.open(failure, in: place) }
     }
 
     private func tone(of task: SetupAssistant.SetupTask) -> StatusTone {
@@ -557,7 +599,7 @@ private struct StepBar: View {
 private struct StepHeader: View {
     let step: SetupAssistant.Step
     let title: LocalizedStringKey
-    let detail: LocalizedStringKey
+    let detail: String
     var emphasized = false
 
     var body: some View {
@@ -571,7 +613,7 @@ private struct StepHeader: View {
                 .font(BP.sans(28, .semibold))
                 .tracking(-0.9)
                 .foregroundStyle(emphasized ? AnyShapeStyle(BP.iridescent) : AnyShapeStyle(BP.fg))
-            Text(detail)
+            Text(detail.keepingLastWordsTogether)
                 .font(BP.sans(14))
                 .lineSpacing(2)
                 .foregroundStyle(BP.fg2)
@@ -625,14 +667,14 @@ private struct WizardRow: View {
                     }
                 }
                 if let value = row.value {
-                    Text(value)
+                    Text(value.keepingLastWordsTogether)
                         .font(BP.sans(13))
                         .foregroundStyle(BP.fg2)
                         .fixedSize(horizontal: false, vertical: true)
                         .contentTransition(.opacity)
                 }
                 if let detail = row.detail {
-                    Text(detail)
+                    Text(detail.keepingLastWordsTogether)
                         .font(BP.sans(12))
                         .foregroundStyle(BP.fg3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -664,6 +706,52 @@ private struct WizardRow: View {
             .fixedSize()
             .disabled(!action.isEnabled)
             .help(action.help ?? "")
+    }
+}
+
+// Steam's risks in one line, with the full points a click away.
+private struct RisksNote: View {
+    @Binding var expanded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : SetupAssistantView.rowSpring) { expanded.toggle() }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(BP.orange)
+                        .accessibilityHidden(true)
+                    Text(String(localized: "Risks: Valve doesn't support this, and anti-cheat games may not start.").keepingLastWordsTogether)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    // Under Reduce Motion the chevron swaps without turning.
+                    Image(systemName: reduceMotion && expanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .rotationEffect(.degrees(!reduceMotion && expanded ? 90 : 0))
+                        .accessibilityHidden(true)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(expanded ? String(localized: "Hides the risks") : String(localized: "Shows the risks"))
+            if expanded {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Bridgeplay adds a library to Steam.app and re-signs Steam on this Mac.")
+                    Text("It may go against Steam's terms.")
+                    Text("Anti-cheat games may also flag Bridgeplay.")
+                    Text("Repair Steam in Status undoes it.")
+                }
+                .padding(.leading, 18)
+                .fixedSize(horizontal: false, vertical: true)
+                .transition(.opacity)
+            }
+        }
+        .font(BP.sans(12))
+        .foregroundStyle(BP.fg3)
+        .padding(.horizontal, 2)
     }
 }
 

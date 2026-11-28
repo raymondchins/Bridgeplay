@@ -1,12 +1,15 @@
 #!/bin/sh
 # Assemble the one-click installer zip, out/Bridgeplay-Installer.zip.
 #
-#   scripts/package-installer.sh [--fingerprint-only]
+#   scripts/package-installer.sh [--fingerprint-only] [--no-gptk]
 #
 # The installer carries no app: Install.command downloads the latest Bridgeplay.zip from
 # the GitHub releases, so the zip only changes with the DXMT/DXVK archives, GPTK, the
 # configs or the installer itself, and release-local.sh uploads it only then. --fingerprint-only runs
-# every check and prints that fingerprint without writing the zip.
+# every check and prints that fingerprint without writing the zip. --no-gptk leaves Apple's
+# toolkit and its licence out: the app and the native installer still set up DXMT, DXVK and the
+# configs from such a zip, and the user adds the toolkit from Apple (docs/GPTK-LICENSE.md).
+# App versions before it refuse a zip without the toolkit.
 #
 # Takes the DXMT and DXVK archives from this Mac's engine cache, Apple's Game Porting
 # Toolkit from this Mac's support folder, and installer/ plus the licence files from the
@@ -27,7 +30,14 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
 cd "$repo"
 
 fingerprint_only=0
-[ "${1:-}" = "--fingerprint-only" ] && fingerprint_only=1
+with_gptk=1
+for arg in "$@"; do
+	case "$arg" in
+		--fingerprint-only) fingerprint_only=1 ;;
+		--no-gptk) with_gptk=0 ;;
+		*) echo "==> unknown option $arg" >&2; exit 2 ;;
+	esac
+done
 if [ -z "${ENGINE_CACHE:-}" ]; then
 	ENGINE_CACHE=$HOME/Library/Caches/bridgeplay
 	[ -d "$ENGINE_CACHE" ] || [ ! -d "$HOME/Library/Caches/notproton" ] || ENGINE_CACHE=$HOME/Library/Caches/notproton
@@ -81,30 +91,34 @@ need_file "$ENGINE_CACHE/engines/$dxvk_archive" "$dxvk_sha"
 
 # --- Game Porting Toolkit ---------------------------------------------------------
 
-[ -d "$GPTK_DIR" ] || die "missing $GPTK_DIR (Game Porting Toolkit redist/lib, set up in the app first)"
-[ -s "$GPTK_DIR/License.rtf" ] || die "missing $GPTK_DIR/License.rtf, Apple's licence must ship with GPTK"
-[ -d "$GPTK_DIR/external/D3DMetal.framework" ] || die "missing $GPTK_DIR/external/D3DMetal.framework"
-[ -d "$GPTK_DIR/wine" ] || die "missing $GPTK_DIR/wine"
-
-# GPTK is Apple's: every Mach-O file in it must carry Apple's own signature (anchor apple),
-# so a modified or swapped copy in the support folder is never shipped. The Windows DLLs
-# under wine/ are PE files that codesign cannot check.
-gptk_apple_signed() {
-	codesign --verify --strict --deep -R='anchor apple' "$1" 2>/dev/null \
-		|| die "$1 is not signed by Apple (codesign -R 'anchor apple'), refusing to ship it"
-}
-echo "==> checking Apple's signature on GPTK"
-gptk_apple_signed "$GPTK_DIR/external/D3DMetal.framework"
 gptk_list=$(mktemp)
 trap 'rm -f "$gptk_list"' EXIT
-find "$GPTK_DIR" -type f ! -path '*/D3DMetal.framework/*' >"$gptk_list"
-gptk_macho=0
-while IFS= read -r f; do
-	case "$(file -b "$f")" in
-		Mach-O*) gptk_apple_signed "$f"; gptk_macho=$((gptk_macho + 1)) ;;
-	esac
-done <"$gptk_list"
-[ "$gptk_macho" -gt 0 ] || die "no Mach-O files in $GPTK_DIR besides D3DMetal.framework (libd3dshared.dylib missing?)"
+if [ "$with_gptk" -eq 1 ]; then
+	[ -d "$GPTK_DIR" ] || die "missing $GPTK_DIR (Game Porting Toolkit redist/lib, set up in the app first)"
+	[ -s "$GPTK_DIR/License.rtf" ] || die "missing $GPTK_DIR/License.rtf, Apple's licence must ship with GPTK"
+	[ -d "$GPTK_DIR/external/D3DMetal.framework" ] || die "missing $GPTK_DIR/external/D3DMetal.framework"
+	[ -d "$GPTK_DIR/wine" ] || die "missing $GPTK_DIR/wine"
+
+	# GPTK is Apple's: every Mach-O file in it must carry Apple's own signature (anchor apple),
+	# so a modified or swapped copy in the support folder is never shipped. The Windows DLLs
+	# under wine/ are PE files that codesign cannot check.
+	gptk_apple_signed() {
+		codesign --verify --strict --deep -R='anchor apple' "$1" 2>/dev/null \
+			|| die "$1 is not signed by Apple (codesign -R 'anchor apple'), refusing to ship it"
+	}
+	echo "==> checking Apple's signature on GPTK"
+	gptk_apple_signed "$GPTK_DIR/external/D3DMetal.framework"
+	find "$GPTK_DIR" -type f ! -path '*/D3DMetal.framework/*' >"$gptk_list"
+	gptk_macho=0
+	while IFS= read -r f; do
+		case "$(file -b "$f")" in
+			Mach-O*) gptk_apple_signed "$f"; gptk_macho=$((gptk_macho + 1)) ;;
+		esac
+	done <"$gptk_list"
+	[ "$gptk_macho" -gt 0 ] || die "no Mach-O files in $GPTK_DIR besides D3DMetal.framework (libd3dshared.dylib missing?)"
+else
+	echo "==> --no-gptk: leaving Apple's Game Porting Toolkit out"
+fi
 
 # --- gamefixes --------------------------------------------------------------------
 
@@ -126,12 +140,14 @@ cp LICENSE LICENSE.* NOTICE "$stage/"
 # DXMT (LGPL-2.1, plus its pre-0.80 licence) and DXVK (zlib) ship in cache/engines/, so
 # their licence texts ship too, taken from upstream at the pinned commits (installer/licenses/).
 cp installer/licenses/* "$stage/"
-cp "$GPTK_DIR/License.rtf" "$stage/GPTK-License.rtf"
 rsync -a --exclude .DS_Store installer/config/ "$stage/config/"
 mkdir -p "$stage/config/gamefixes-default"
 cp gamefixes/*.conf "$stage/config/gamefixes-default/"
-# SOURCE.txt is Bridgeplay's own note of where this Mac's copy came from, not Apple's.
-rsync -a --exclude .DS_Store --exclude SOURCE.txt "$GPTK_DIR/" "$stage/gptk/"
+if [ "$with_gptk" -eq 1 ]; then
+	cp "$GPTK_DIR/License.rtf" "$stage/GPTK-License.rtf"
+	# SOURCE.txt is Bridgeplay's own note of where this Mac's copy came from, not Apple's.
+	rsync -a --exclude .DS_Store --exclude SOURCE.txt "$GPTK_DIR/" "$stage/gptk/"
+fi
 cp "$ENGINE_CACHE/engines/$dxmt_archive" "$ENGINE_CACHE/engines/$dxvk_archive" "$stage/cache/engines/"
 
 # Valve's software is downloaded from Valve on the user's Mac, never shipped.

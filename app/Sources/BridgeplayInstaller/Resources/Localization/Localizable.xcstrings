@@ -107,6 +107,52 @@
         }
       }
     },
+    "Apple's Game Porting Toolkit failed Apple's checks and was left out, so DirectX 12 games can't run yet. Add it from Bridgeplay's Status page." : {
+      "comment" : "Installer done screen, when the Game Porting Toolkit failed Apple's signature or licence check.",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Game Porting Toolkit di Apple non ha superato i controlli di Apple ed è stato escluso, quindi i giochi DirectX 12 non possono ancora funzionare. Aggiungilo dalla pagina Stato di Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Porting Toolkit от Apple не прошёл проверки Apple и не был установлен, поэтому игры на DirectX 12 пока не запустятся. Добавьте его на странице «Статус» в Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 的 Game Porting Toolkit 未通过 Apple 的检查，已被略过，因此 DirectX 12 游戏暂时无法运行。请在 Bridgeplay 的“状态”页面添加。"
+          }
+        }
+      }
+    },
+    "Apple's Game Porting Toolkit was not in this download, so DirectX 12 games can't run yet. Add it from Bridgeplay's Status page." : {
+      "comment" : "Installer done screen, when the components download carried no Game Porting Toolkit.",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Game Porting Toolkit di Apple non era in questo download, quindi i giochi DirectX 12 non possono ancora funzionare. Aggiungilo dalla pagina Stato di Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Porting Toolkit от Apple не входил в эту загрузку, поэтому игры на DirectX 12 пока не запустятся. Добавьте его на странице «Статус» в Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此次下载未包含 Apple 的 Game Porting Toolkit，因此 DirectX 12 游戏暂时无法运行。请在 Bridgeplay 的“状态”页面添加。"
+          }
+        }
+      }
+    },
     "Bridgeplay Installer" : {
       "localizations" : {
         "it" : {
@@ -527,6 +573,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完成 Bridgeplay 的设置"
+          }
+        }
+      }
+    },
+    "Game Porting Toolkit" : {
+      "comment" : "Row label on the installer's done screen; Apple's product name, not translated.",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Porting Toolkit"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Porting Toolkit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Porting Toolkit"
           }
         }
       }

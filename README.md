@@ -92,7 +92,7 @@ The Setup Assistant's graphics download carries Apple's Game Porting Toolkit red
 | Mac | Apple Silicon, M1 or later. Intel Macs are not supported. |
 | macOS | 26 or later ([macOS version guide](https://bridgeplay.dev/guides/macos-version-requirements)) |
 | Steam | A Steam account. Windows games install from Steam as usual. |
-| Download | About 550 MB: a 19 MB disk image, then about 530 MB, most of it the engine, that the Setup Assistant fetches. Installing Rosetta 2 and Steam, and signing in to Steam, need internet. |
+| Download | About 630 MB: a 22 MB disk image, then about 610 MB that the Setup Assistant fetches: the WineCX engine (461 MB), Valve's Steam files (101 MB) and Apple's graphics with DXMT and DXVK (47 MB). Installing Rosetta 2 and Steam, and signing in to Steam, need internet. |
 
 ## Guides and help
 

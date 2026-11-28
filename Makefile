@@ -95,7 +95,7 @@ DEPS := $(OBJS:.o=.d)
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
-        compatsvc-check prefixstate-check breakercheck clientgatecheck pauselistcheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck \
+        compatsvc-check prefixstate-check breakercheck clientgatecheck pauselistcheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck toolkitnotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck \
         gamefixescheck modloadercheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check compat-export-check steamcanarycheck FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
@@ -197,6 +197,10 @@ prefixnotecheck:
 powernotecheck:
 	@if [ ! -f dylib/tests/powernotecheck.sh ]; then $(call SKIP,powernotecheck,dylib/tests/powernotecheck.sh); exit 0; fi; \
 	sh dylib/tests/powernotecheck.sh dylib/feats/compat_run.sh
+
+toolkitnotecheck:
+	@if [ ! -f dylib/tests/toolkitnotecheck.sh ]; then $(call SKIP,toolkitnotecheck,dylib/tests/toolkitnotecheck.sh); exit 0; fi; \
+	sh dylib/tests/toolkitnotecheck.sh dylib/feats/compat_run.sh
 
 exitcheck:
 	@if [ ! -f dylib/tests/exitcheck.sh ]; then $(call SKIP,exitcheck,dylib/tests/exitcheck.sh); exit 0; fi; \
@@ -1077,7 +1081,7 @@ steamcanarycheck:
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck breakercheck clientgatecheck pauselistcheck compat-reported-import-check compat-export-check compat-regressions-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
-	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck launchercheck \
+	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck toolkitnotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck launchercheck \
 	seedcheck gamefixescheck modloadercheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check benchcheck benchabcheck steamcanarycheck np-native-tests native-shim-tests \
 	app-tests native-installercheck
 
