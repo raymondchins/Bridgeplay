@@ -227,6 +227,39 @@ struct UninstallPlanTests {
                                           inspect: { _ in .clean }).passed)
     }
 
+    @Test("Verify fails on a Steam library whose drive is not connected, not on a deleted one")
+    func verifyNamesUnpluggedLibraries() throws {
+        let fixture = try fixture(modified: false)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let away = SteamLibrary(root: fixture.root.appending(path: "Unplugged/SteamLibrary"), volume: "Unplugged")
+        let gone = SteamLibrary(root: fixture.root.appending(path: "DeletedLibrary"), volume: nil)
+        var paths = fixture.paths
+        paths.libraries += [away, gone]
+
+        let result = UninstallVerification.run(paths: paths, signature: { _ in .valve }, inspect: { _ in .clean })
+        #expect(!result.passed)
+        #expect(result.leftInSteam.map(\.url) == [away.root])
+        #expect(result.leftInSteam.first?.note?.hasPrefix("Not checked") == true)
+    }
+
+    @Test("Game fixes kept twice in the same second go to different folders")
+    func keptGamefixesNeverCollide() throws {
+        let root = try scratchDirectory("kept-gamefixes")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let kept = root.appending(path: "bridgeplay-gamefixes")
+        try write("old\n", kept.appending(path: "1.conf"))
+        try write("new\n", root.appending(path: "current/2.conf"))
+        try write("legacy\n", root.appending(path: "legacy/3.conf"))
+        let now = Date()
+
+        let first = try Uninstall.keepGamefixes(root.appending(path: "current"), in: kept, now: now)
+        let second = try Uninstall.keepGamefixes(root.appending(path: "legacy"), in: kept, now: now)
+        #expect(first != nil && second != nil && first != second)
+        #expect(FileManager.default.fileExists(atPath: kept.appending(path: "1.conf").plainPath))
+        #expect(FileManager.default.fileExists(atPath: first!.appending(path: "2.conf").plainPath))
+        #expect(FileManager.default.fileExists(atPath: second!.appending(path: "3.conf").plainPath))
+    }
+
     @Test("Verify fails when the list of changed Steam copies can't be read")
     func verifyNeedsTheTrackedList() throws {
         let fixture = try fixture(modified: false)

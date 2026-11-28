@@ -345,7 +345,14 @@ enum Uninstall {
             format.locale = Locale(identifier: "en_US_POSIX")
             format.dateFormat = "yyyy-MM-dd HH.mm.ss"
             let stamp = format.string(from: now)
-            destination = kept.deletingLastPathComponent().appending(path: "\(kept.lastPathComponent) \(stamp)")
+            let base = "\(kept.lastPathComponent) \(stamp)"
+            destination = kept.deletingLastPathComponent().appending(path: base)
+            // Two moves in the same second (current and legacy fixes) each get their own folder.
+            var count = 2
+            while UninstallPaths.exists(destination) {
+                destination = kept.deletingLastPathComponent().appending(path: "\(base) \(count)")
+                count += 1
+            }
         }
         try WriteRefused.catching(destination) { try files.moveItem(at: gamefixes, to: destination) }
         AppLog.note("uninstall: kept the user's game fixes in \(destination.path(percentEncoded: false))")

@@ -31,7 +31,7 @@ struct UninstallPlanSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
-                    .buttonStyle(.pillSecondary)
+                    .buttonStyle(.pillPlain)
                     .keyboardShortcut(.cancelAction)
                 Button("Remove Everything") {
                     dismiss()

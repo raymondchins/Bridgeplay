@@ -91,6 +91,12 @@ struct UninstallPaths: Sendable {
         return found.filter(Self.exists)
     }
 
+    // Libraries whose drive is not connected: their folder and the one holding it are both
+    // gone. A library deleted from a connected drive has nothing left to check.
+    func unreachableLibraries() -> [SteamLibrary] {
+        libraries.filter { !Self.exists($0.root) && !Self.exists($0.root.deletingLastPathComponent()) }
+    }
+
     // Other accounts with a home folder. Their Bridgeplay files are theirs to remove, and
     // their Library is not readable from here.
     func otherUsers() -> [String] {
@@ -217,6 +223,10 @@ struct UninstallVerification: Sendable {
             inSteam.append(UninstallItem(url: block, note: String(localized: "Updates still blocked")))
         }
         inSteam += paths.filesInSteamData().map { UninstallItem(url: $0) }
+        // A library on an unplugged drive may still hold a template or a Steam.dll link.
+        inSteam += paths.unreachableLibraries().map {
+            UninstallItem(url: $0.root, note: String(localized: "Not checked: its drive is not connected"))
+        }
         // Other copies of Steam Bridgeplay changed: one on a drive that is not connected was not checked.
         // A list that can't be read leaves the other copies unchecked, so the check fails.
         let checked = paths.app.standardizedFileURL.path
