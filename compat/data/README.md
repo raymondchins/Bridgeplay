@@ -22,7 +22,7 @@ reports from the app. The maintainers have not checked them.
 | `chip` | Chip family (`M1` … `M5 Max`), or `Other` |
 | `memory`, `macos` | RAM size (`16 GB`) and macOS version without the patch level (`macOS 26.1`) |
 | `version`, `build` | Bridgeplay version (`0.7.66 (83)`) and its build number |
-| `steam` | Steam client build, once reports carry it; `null` until then |
+| `steam`, `steam_channel` | Steam client build and branch (`stable`, `publicbeta`), from schema 2 reports; `null` before |
 | `engine`, `backend` | Wine engine (`WineCX 11.17 (msync, D3DMetal)`) and graphics backend (`d3dmetal`, `dxmt`, `dxvk`, `wined3d`) |
 | `source` | `tap` (the player answered) or `auto` (the app inferred it) |
 | `issue` | For `bronze`: `performance`, `crash`, `graphics`, `sound`, `controls` or `launcher` |
@@ -31,13 +31,21 @@ reports from the app. The maintainers have not checked them.
 | `health`, `minutes`, `exit_status` | From the run log: `healthy`, `failed` or `unknown`; session length; the game's exit status |
 | `gamefix` | Settings a gamefix applied, e.g. `{"BACKEND": "dxvk"}`. Launch arguments are left out |
 | `sig` | For reports that did not run well: the first crash line with numbers, addresses and paths taken out, or a known cause such as `anti-cheat` |
+| `schema` | The report's format: `1`, or `2` from Bridgeplay builds after 0.7.68 |
+| `voter` | Schema 2: a code that is the same for one Mac's reports of one game and unrelated across games, so a Mac counts once per game. `null` when the player agreed only to the older consent text |
+| `engine_id` | The engine's id (`winecx-11.17`), schema 2 |
+| `launch` | Schema 2: how the last launch ended, `{code, seconds, window}`. `code` is the run script's outcome word (`ok`, `crashed`, `quit_early` …); `window` is seconds to the first window, `null` when none was seen |
+| `bulk` | The answer came from Report Your Games…, one answer for several games |
+| `channel` | The Bridgeplay build's channel (`stable`, `beta`) |
 
 The verdict rule is in [`scripts/compat-export.md`](https://github.com/raymondchins/Bridgeplay/blob/main/scripts/compat-export.md).
 
 ## What is left out
 
 No logs, and nothing that points to a person: no GitHub or Steam account, install ID, email, IP
-address, Mac model, display, GPU core count or home-folder name. Hardware goes down to the chip
+address, Mac model, display, GPU core count or home-folder name. `voter` is made on the server
+from the install ID and the AppID with a key that is not published: it links one Mac's reports
+of the same game, never its reports of different games. Hardware goes down to the chip
 family. The export refuses to publish when a file still matches an email, Steam ID, IP address or
 home-folder pattern. A report deleted from the Discussions leaves this data within a day.
 

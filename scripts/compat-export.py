@@ -194,6 +194,8 @@ def engine_name(engine):
 
 # ---- Reading one report --------------------------------------------------------------------------
 def report_fields(body):
+    """The json block. Schema 1 and 2 share every schema 1 field; a later schema is read as 2,
+    its unknown fields ignored, so a newer bot never drops reports from the export."""
     m = re.search(r"```json\n(.*?)\n```", body or "", re.S)
     if not m:
         return None
@@ -204,6 +206,29 @@ def report_fields(body):
     if not isinstance(fields, dict) or not re.fullmatch(r"\d{1,10}", str(fields.get("appid"))):
         return None
     return fields if fields.get("status") in BUCKET else None
+
+
+def schema_of(fields):
+    schema = fields.get("schema")
+    return min(schema, 2) if isinstance(schema, int) and not isinstance(schema, bool) and schema >= 1 else 1
+
+
+def plain(value, pattern):
+    return value if isinstance(value, str) and re.fullmatch(pattern, value) else None
+
+
+def count(value, top):
+    return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= top else None
+
+
+def launch_of(launch):
+    """Schema 2's last launch: {code, seconds, window}. window null: watched, no window seen."""
+    if not isinstance(launch, dict) or not plain(launch.get("code"), r"[a-z0-9_]{1,32}"):
+        return None
+    out = {"code": launch["code"], "seconds": count(launch.get("seconds"), 10_000_000)}
+    if "window" in launch and (launch["window"] is None or count(launch["window"], 1_000_000) is not None):
+        out["window"] = launch["window"]
+    return out
 
 
 def player_note(body):
@@ -312,8 +337,12 @@ def parse_report(node, authors):
     run_log = next((v for k, v in blocks.items() if k.startswith("bridgeplay-run.log")), "")
     facts = run_facts(run_log)
     session = re.search(r"Session (\d{1,5}) min", section(body, "Notes"))
-    minutes = int(session.group(1)) if session else (round(facts["seconds"] / 60) if facts["seconds"] is not None else None)
-    steam = str(f.get("steam") or "")
+    schema = schema_of(f)
+    launch = launch_of(f.get("launch")) if schema >= 2 else None
+    seconds = facts["seconds"] if facts["seconds"] is not None else (launch or {}).get("seconds")
+    minutes = int(session.group(1)) if session else (round(seconds / 60) if seconds is not None else None)
+    # schema 2's steamBuild; "steam" is the name the export read before the bot sent one.
+    steam = str(f.get("steamBuild") or f.get("steam") or "")
     return {
         "n": number,
         "date": created[:19] + "Z",
@@ -339,6 +368,14 @@ def parse_report(node, authors):
         "exit_status": facts["exit_status"],
         "gamefix": facts["gamefix"],
         "sig": None if bucket == "playable" else signature(body, blocks),
+        # Schema 2 (null for schema 1). voter is the bot's per-game code for one install.
+        "schema": schema,
+        "voter": plain(f.get("voter"), r"[0-9a-f]{16}") if schema >= 2 else None,
+        "steam_channel": plain(f.get("steamChannel"), r"[A-Za-z0-9_.-]{1,40}") if schema >= 2 else None,
+        "engine_id": plain(f.get("engineID"), r"[A-Za-z0-9.-]{1,60}") if schema >= 2 else None,
+        "launch": launch,
+        "bulk": f.get("bulk") is True,
+        "channel": plain(f.get("buildChannel"), r"[a-z]{1,16}"),
     }
 
 
@@ -470,10 +507,12 @@ def parse_date(text):
 def votes(reports, now):
     """The reports a verdict counts: one per Mac, its newest, within the window.
 
-    Reports carry no install ID yet, so a Mac is its chip, memory and macOS. The app asks once
-    per game per Bridgeplay version, so reports of one setup on one build are different Macs;
-    the same setup on an older build is taken to be those Macs again and drops out.
-    CEILING: the setup is a proxy — a per-game install hash (roadmap A4) replaces it as `voter`.
+    A schema 2 report with a `voter` (the bot's per-game code for one install) is that Mac: its
+    newest report counts. Older reports carry none, so there a Mac is its chip, memory and
+    macOS. The app asks once per game per Bridgeplay version, so reports of one setup on one
+    build are different Macs; the same setup on an older build is taken to be those Macs again
+    and drops out, also when a voter's report of that setup is on the same or a newer build.
+    CEILING: the setup stays a proxy for reports without a voter; it fades as they age out of the window.
     """
     cutoff = now - datetime.timedelta(days=WINDOW_DAYS)
     recent = [r for r in reports if parse_date(r["date"]) >= cutoff] or list(reports)
@@ -481,11 +520,19 @@ def votes(reports, now):
     for r in recent:
         groups[r.get("voter") or (r["chip"], r["memory"], r["macos"])].append(r)
     counted = []
+    voted = defaultdict(int)  # setup -> newest build a voter reported it on
     for key, rows in groups.items():
         if isinstance(key, str):
-            counted.append(max(rows, key=lambda r: (r["date"], r["n"])))
+            newest = max(rows, key=lambda r: (r["date"], r["n"]))
+            counted.append(newest)
+            setup = (newest["chip"], newest["memory"], newest["macos"])
+            voted[setup] = max(voted[setup], newest["build"])
+    for key, rows in groups.items():
+        if isinstance(key, str):
             continue
         top = max(r["build"] for r in rows)
+        if key in voted and voted[key] >= top:
+            continue
         counted.extend(r for r in rows if r["build"] == top)
     return counted
 

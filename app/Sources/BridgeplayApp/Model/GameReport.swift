@@ -26,6 +26,9 @@ enum GameReport {
         // The updater state (stable, beta, leaving) and the running build's channel.
         var updateState: String?
         var buildChannel: String?
+        // The Steam client's build ("1795567705") and branch ("stable", "publicbeta").
+        var steamBuild: String? = nil
+        var steamChannel: String? = nil
     }
 
     static var thisMac: Machine {
@@ -35,7 +38,28 @@ enum GameReport {
                        bridgeplay: ProductVersion.build.map { "\(ProductVersion.short) (\($0))" } ?? ProductVersion.short,
                        model: sysctl("hw.model"),
                        newerRelease: LatestRelease.newer(than: ProductVersion.build, state: state),
-                       updateState: state.rawValue, buildChannel: ProductVersion.channel.rawValue)
+                       updateState: state.rawValue, buildChannel: ProductVersion.channel.rawValue,
+                       steamBuild: SteamHealthStore.installedSteamBuild().flatMap(steamBuild),
+                       steamChannel: steamChannel())
+    }
+
+    // The manifest's version, digits only.
+    static func steamBuild(_ version: String) -> String? {
+        version.wholeMatch(of: /\d{6,12}/) != nil ? version : nil
+    }
+
+    // package/beta names the branch, as np_steam_channel in dylib/feats/breaker.c reads it: no
+    // file is the stable client, anything but a plain name is "unknown". nil without Steam.
+    static func steamChannel(
+        package: URL = SupportPaths.Steam.innerApp.appending(path: "Contents/MacOS/package")
+    ) -> String? {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: package.path(percentEncoded: false), isDirectory: &isDirectory),
+              isDirectory.boolValue else { return nil }
+        guard let data = try? Data(contentsOf: package.appending(path: "beta")) else { return "stable" }
+        let text = String(decoding: data.prefix(256), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty { return "stable" }
+        return text.wholeMatch(of: /[A-Za-z0-9_.-]{1,63}/) != nil ? text : "unknown"
     }
 
     private static func sysctl(_ name: String) -> String? {
@@ -102,24 +126,24 @@ enum GameReport {
         return memorySizes.contains(gb) ? "\(gb) GB" : "Other"
     }
 
-    // The engine and backend of the most recent launch in bridgeplay-run.log:
+    // The engine, backend and engine id of the most recent launch in bridgeplay-run.log:
     //   runner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at /…
     //   graphics: backend=d3dmetal (carried over from the last launch)
     // A run aborted before launch (another tool picked to try a fix, refused by the prefix
     // check) never ran the game, so it does not replace the run before it. A log of nothing
     // but aborted runs still names what was tried.
-    static func lastLaunch(in log: String) -> (engine: String?, backend: String?) {
-        var engine: String?, backend: String?
-        var run: (engine: String?, backend: String?) = (nil, nil)
+    static func lastLaunch(in log: String) -> (engine: String?, backend: String?, id: String?) {
+        typealias Launch = (engine: String?, backend: String?, id: String?)
+        var found: Launch = (nil, nil, nil)
+        var run: Launch = (nil, nil, nil)
         var aborted = false
-        var tried: (engine: String?, backend: String?) = (nil, nil)
+        var tried: Launch = (nil, nil, nil)
         func finishRun() {
-            tried = (run.engine ?? tried.engine, run.backend ?? tried.backend)
+            tried = (run.engine ?? tried.engine, run.backend ?? tried.backend, run.id ?? tried.id)
             if !aborted {
-                engine = run.engine ?? engine
-                backend = run.backend ?? backend
+                found = (run.engine ?? found.engine, run.backend ?? found.backend, run.id ?? found.id)
             }
-            run = (nil, nil)
+            run = (nil, nil, nil)
             aborted = false
         }
         for line in log.split(separator: "\n") {
@@ -128,6 +152,8 @@ enum GameReport {
             } else if line.hasPrefix("runner: build "), let open = line.firstIndex(of: "("),
                let close = line.range(of: ") at ", options: .backwards) {
                 run.engine = String(line[line.index(after: open)..<close.lowerBound])
+                let id = line.dropFirst("runner: build ".count).prefix { !$0.isWhitespace }
+                if id.wholeMatch(of: /[A-Za-z0-9.-]{1,60}/) != nil { run.id = String(id) }
             } else if line.hasPrefix("graphics: backend=") {
                 let value = line.dropFirst("graphics: backend=".count).prefix { !$0.isWhitespace }
                 if backends.contains(String(value)) { run.backend = String(value) }
@@ -136,7 +162,7 @@ enum GameReport {
             }
         }
         finishRun()
-        return (engine ?? tried.engine, backend ?? tried.backend)
+        return (found.engine ?? tried.engine, found.backend ?? tried.backend, found.id ?? tried.id)
     }
 
     // Reports are public. Besides the home folder, run logs carry the Steam account name

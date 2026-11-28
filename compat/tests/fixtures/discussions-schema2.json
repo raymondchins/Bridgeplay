@@ -1,0 +1,85 @@
+{
+ "nodes": [
+  {
+   "number": 2001,
+   "createdAt": "2026-11-20T10:00:00Z",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   },
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nSame Mac Game\n\n### Steam AppID\n\n201\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.67 (89)\n\n### Mac chip\n\nM3\n\n### Memory (RAM)\n\n24 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Steam client\n\nbuild 1795000000, stable\n\n### Last launch\n\ncrashed, after 4 s, no window seen\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 30 min, exit status 0\n\n```json\n{\"schema\":2,\"appid\":\"201\",\"name\":\"Same Mac Game\",\"status\":\"borked\",\"chip\":\"M3\",\"memory\":\"24 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.67 (89)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\",\"steamBuild\":\"1795000000\",\"steamChannel\":\"stable\",\"engineID\":\"winecx-11.17\",\"launch\":{\"code\":\"crashed\",\"seconds\":4,\"window\":null},\"voter\":\"2cb933e3f6edaed9\"}\n```\n"
+  },
+  {
+   "number": 2002,
+   "createdAt": "2026-11-25T10:00:00Z",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   },
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nSame Mac Game\n\n### Steam AppID\n\n201\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.68 (90)\n\n### Mac chip\n\nM3\n\n### Memory (RAM)\n\n24 GB\n\n### macOS version\n\nmacOS 26.2\n\n### Mac model\n\nMac17,5\n\n### Steam client\n\nbuild 1795000000, stable\n\n### Last launch\n\nok, after 3590 s, first window after 14 s\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 30 min, exit status 0\n\n```json\n{\"schema\":2,\"appid\":\"201\",\"name\":\"Same Mac Game\",\"status\":\"platinum\",\"chip\":\"M3\",\"memory\":\"24 GB\",\"macos\":\"macOS 26.2\",\"version\":\"0.7.68 (90)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\",\"steamBuild\":\"1795000000\",\"steamChannel\":\"stable\",\"engineID\":\"winecx-11.17\",\"launch\":{\"code\":\"ok\",\"seconds\":3590,\"window\":14},\"voter\":\"2cb933e3f6edaed9\"}\n```\n"
+  },
+  {
+   "number": 2003,
+   "createdAt": "2026-11-18T10:00:00Z",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   },
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nUpgraded Mac Game\n\n### Steam AppID\n\n202\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.67 (89)\n\n### Mac chip\n\nM3\n\n### Memory (RAM)\n\n24 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 30 min, exit status 0\n\n```json\n{\"schema\":1,\"appid\":\"202\",\"name\":\"Upgraded Mac Game\",\"status\":\"borked\",\"chip\":\"M3\",\"memory\":\"24 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.67 (89)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\"}\n```\n\n<details><summary>bridgeplay-run.log (redacted)</summary>\n\n````text\n=== bridgeplay run 2026-11-26T10:00:00Z ===\nruntime: x\n=== exit summary: exit status 0 after 20s, the game quit normally ===\n\n````\n\n</details>\n"
+  },
+  {
+   "number": 2004,
+   "createdAt": "2026-11-24T10:00:00Z",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   },
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nUpgraded Mac Game\n\n### Steam AppID\n\n202\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.68 (90)\n\n### Mac chip\n\nM3\n\n### Memory (RAM)\n\n24 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Steam client\n\nbuild 1795000000, stable\n\n### Last launch\n\nok, after 1800 s\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 30 min, exit status 0\n\n```json\n{\"schema\":2,\"appid\":\"202\",\"name\":\"Upgraded Mac Game\",\"status\":\"platinum\",\"chip\":\"M3\",\"memory\":\"24 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.68 (90)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\",\"steamBuild\":\"1795000000\",\"steamChannel\":\"stable\",\"engineID\":\"winecx-11.17\",\"launch\":{\"code\":\"ok\",\"seconds\":1800},\"voter\":\"b8ae7a720328c33f\"}\n```\n"
+  },
+  {
+   "number": 2005,
+   "createdAt": "2026-11-24T11:00:00Z",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   },
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nUpgraded Mac Game\n\n### Steam AppID\n\n202\n\n### Status\n\ngold (perfect after tweaks)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.68 (90)\n\n### Mac chip\n\nM4 Pro\n\n### Memory (RAM)\n\n48 GB\n\n### macOS version\n\nmacOS 26.1\n\n### Mac model\n\nMac17,5\n\n### Steam client\n\nbuild 1795000000, stable\n\n### Last launch\n\n_No response_\n\n### Notes\n\nOne tap in the Bridgeplay app. One answer for several games. Session 30 min, exit status 0\n\n### What the player says\n\n> switched the backend to DXVK\n\n```json\n{\"schema\":2,\"appid\":\"202\",\"name\":\"Upgraded Mac Game\",\"status\":\"gold\",\"chip\":\"M4 Pro\",\"memory\":\"48 GB\",\"macos\":\"macOS 26.1\",\"version\":\"0.7.68 (90)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\",\"steamBuild\":\"1795000000\",\"steamChannel\":\"stable\",\"engineID\":\"winecx-11.17\",\"launch\":null,\"bulk\":true,\"voter\":\"869aa3d27e782528\"}\n```\n"
+  },
+  {
+   "number": 2006,
+   "createdAt": "2026-11-24T10:00:00Z",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   },
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nSteam Update Game\n\n### Steam AppID\n\n203\n\n### Status\n\nplatinum (perfect out of the box)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.68 (90)\n\n### Mac chip\n\nM2\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.4\n\n### Mac model\n\nMac17,5\n\n### Steam client\n\nbuild 1795000000, stable\n\n### Last launch\n\nok, after 2400 s\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 30 min, exit status 0\n\n```json\n{\"schema\":2,\"appid\":\"203\",\"name\":\"Steam Update Game\",\"status\":\"platinum\",\"chip\":\"M2\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.4\",\"version\":\"0.7.68 (90)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\",\"steamBuild\":\"1795000000\",\"steamChannel\":\"stable\",\"engineID\":\"winecx-11.17\",\"launch\":{\"code\":\"ok\",\"seconds\":2400},\"voter\":\"02ed7131a9cd9787\"}\n```\n"
+  },
+  {
+   "number": 2007,
+   "createdAt": "2026-11-25T10:00:00Z",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   },
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nSteam Update Game\n\n### Steam AppID\n\n203\n\n### Status\n\nsilver (playable with minor issues)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.68 (90)\n\n### Mac chip\n\nM2\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.5\n\n### Mac model\n\nMac17,5\n\n### Steam client\n\nbuild 1795000000, stable\n\n### Last launch\n\nok, after 2400 s\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 30 min, exit status 0\n\n```json\n{\"schema\":2,\"appid\":\"203\",\"name\":\"Steam Update Game\",\"status\":\"silver\",\"chip\":\"M2\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.5\",\"version\":\"0.7.68 (90)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\",\"steamBuild\":\"1795000000\",\"steamChannel\":\"stable\",\"engineID\":\"winecx-11.17\",\"launch\":{\"code\":\"ok\",\"seconds\":2400},\"voter\":\"8555cfba1cd8a417\"}\n```\n"
+  },
+  {
+   "number": 2008,
+   "createdAt": "2026-11-26T10:00:00Z",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   },
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nSteam Update Game\n\n### Steam AppID\n\n203\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.68 (90)\n\n### Mac chip\n\nM2\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.6\n\n### Mac model\n\nMac17,5\n\n### Steam client\n\nbuild 1795567705, stable\n\n### Last launch\n\nquit_early, after 6 s\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 30 min, exit status 0\n\n```json\n{\"schema\":2,\"appid\":\"203\",\"name\":\"Steam Update Game\",\"status\":\"borked\",\"chip\":\"M2\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.6\",\"version\":\"0.7.68 (90)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\",\"steamBuild\":\"1795567705\",\"steamChannel\":\"stable\",\"engineID\":\"winecx-11.17\",\"launch\":{\"code\":\"quit_early\",\"seconds\":6},\"voter\":\"2af17a5e4305a456\"}\n```\n"
+  },
+  {
+   "number": 2009,
+   "createdAt": "2026-11-27T10:00:00Z",
+   "author": {
+    "__typename": "Bot",
+    "login": "bridgeplay-reports"
+   },
+   "body": "> Sent from the Bridgeplay app by a player. Not checked by the maintainers.\n\n### Game name\n\nSteam Update Game\n\n### Steam AppID\n\n203\n\n### Status\n\nborked (does not run)\n\n### Backend used\n\nd3dmetal\n\n### Engine\n\nWineCX 11.17 (msync, D3DMetal)\n\n### Bridgeplay version\n\n0.7.68 (90)\n\n### Mac chip\n\nM2\n\n### Memory (RAM)\n\n16 GB\n\n### macOS version\n\nmacOS 26.7\n\n### Mac model\n\nMac17,5\n\n### Steam client\n\nbuild 1795567705, stable\n\n### Last launch\n\nquit_early, after 6 s\n\n### Notes\n\nOne tap in the Bridgeplay app. Session 30 min, exit status 0\n\n```json\n{\"schema\":2,\"appid\":\"203\",\"name\":\"Steam Update Game\",\"status\":\"borked\",\"chip\":\"M2\",\"memory\":\"16 GB\",\"macos\":\"macOS 26.7\",\"version\":\"0.7.68 (90)\",\"engine\":\"WineCX 11.17 (msync, D3DMetal)\",\"backend\":\"d3dmetal\",\"model\":\"Mac17,5\",\"source\":\"tap\",\"steamBuild\":\"1795567705\",\"steamChannel\":\"stable\",\"engineID\":\"winecx-11.17\",\"launch\":{\"code\":\"quit_early\",\"seconds\":6},\"voter\":\"0bd5a931d055b14e\"}\n```\n"
+  }
+ ]
+}

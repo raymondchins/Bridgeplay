@@ -27,10 +27,13 @@ Each game in `compat.json` gets
 
 1. **Window.** Reports from the last 120 days count. A game with nothing that recent keeps its
    older reports.
-2. **One vote per Mac.** Reports carry no install ID yet, so a Mac is its chip, memory and macOS.
+2. **One vote per Mac.** A schema 2 report carries `voter`, the report bot's code for one install
+   and one game (an HMAC of the install ID and the AppID; another game gets an unrelated code).
+   Each voter's newest report counts. A report without one (schema 1, a player who agreed to the
+   first consent text, or no key on the server) falls back to its setup: chip, memory and macOS.
    The app asks once per game per Bridgeplay version, so several reports of one setup on one build
    are several Macs. The same setup on an older build is taken to be those Macs again and drops
-   out. When reports carry a per-game install hash (roadmap A4), it replaces the setup.
+   out, also when a voter reported that setup on the same or a newer build.
 3. `n` counted Macs: `p` ran well (platinum, gold, silver), `i` ran with issues (bronze), `b` did
    not run (borked).
 4. The first rule that matches wins:
@@ -38,7 +41,7 @@ Each game in `compat.json` gets
 | Label | When | `answer` |
 |---|---|---|
 | `one_report` | n < 2 | "One report so far: it ran well." |
-| `broken_since` | It ran well on at least half the Macs up to the newest build it ran well on; then at least 2 Macs did not run it on newer Bridgeplay builds, and they are most of the reports on those builds. `since` is the oldest of those versions. The same test then runs on the Steam client build, once reports carry one: `since` reads "Steam build N" | "Ran well before 0.7.66, but did not run on 2 Macs since." |
+| `broken_since` | It ran well on at least half the Macs up to the newest build it ran well on; then at least 2 Macs did not run it on newer Bridgeplay builds, and they are most of the reports on those builds. `since` is the oldest of those versions. The same test then runs on the Steam client build (schema 2's `steamBuild`): `since` reads "Steam build N" | "Ran well before 0.7.66, but did not run on 2 Macs since." |
 | `playable` | p ≥ 2 and p ≥ 60% of n | "Ran well on 9 of 11 Macs." |
 | `doesnt_run` | b ≥ 2 and b ≥ 60% of n | "Did not run on 5 of 6 Macs." |
 | `mixed` | otherwise | "Mixed: 3 ran well, 2 had issues, 2 did not run." |
@@ -49,6 +52,15 @@ not part of the verdict; the site's merge decides how the two meet.
 
 The numbers live at the top of the script (`WINDOW_DAYS`, `MIN_REPORTS`, `SHARE`, `BROKEN_MIN`).
 A change to them is a new rule number (`RULE`), so readers can tell verdicts apart.
+
+## Report schemas
+
+The bot's ```json block says `schema: 1` or `schema: 2`; both are read, and a later number is
+read as 2 with its unknown fields ignored. Schema 2 (app builds after 0.7.68, bridgeplay-web
+`api/report.mjs`) adds `steamBuild`, `steamChannel`, `engineID`, `launch` (`code`, `seconds`,
+`window`: the last launch's outcome record, `window: null` when the launch panel saw no
+window), `bulk` (one answer from Report Your Games…) and, for consent 2, `voter`. `buildChannel`
+and `updateState` come with both.
 
 ## Signature board
 
