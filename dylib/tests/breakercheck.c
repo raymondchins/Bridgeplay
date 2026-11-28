@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/wait.h>
@@ -408,6 +409,38 @@ static void web_retry_case(void) {
     cJSON_Delete(j);
 }
 
+// Another start holds the boot record's lock: this one waits for it, up to a bound.
+static int locked_start(int hold_ms, int *written_while_held) {
+    char lock[PATH_MAX], boot[PATH_MAX];
+    snprintf(lock, sizeof lock, "%s/%s", support, NP_BOOT_LOCK_FILE);
+    snprintf(boot, sizeof boot, "%s/%s", support, NP_BOOT_FILE);
+    drop(support, NP_BOOT_FILE);
+    int fd = open(lock, O_RDWR | O_CREAT, 0600);
+    if (fd < 0 || flock(fd, LOCK_EX) != 0) return -1;
+    fflush(stdout);
+    pid_t pid = fork();
+    if (pid == 0) {
+        np_breaker_start();
+        _exit(0);
+    }
+    usleep((useconds_t)hold_ms * 1000);
+    struct stat st;
+    *written_while_held = stat(boot, &st) == 0;
+    close(fd);
+    int status = 0;
+    waitpid(pid, &status, 0);
+    return stat(boot, &st) == 0;
+}
+
+static void lock_cases(void) {
+    printf("boot lock\n");
+    int early = 1;
+    CHECK("a start waits while another holds the boot record",
+          locked_start(300, &early) == 1 && !early && boot_strikes() == 0);
+    CHECK("and goes on without the lock once the wait runs out",
+          locked_start(NP_BOOT_LOCK_MS + 500, &early) == 1 && early);
+}
+
 static int scrub(const char *path, const struct stat *st, int flag, struct FTW *ftw) {
     (void)st; (void)flag; (void)ftw;
     if (strncmp(path, root, strlen(root)) != 0) return -1;
@@ -432,6 +465,7 @@ int main(void) {
     runtime_cases();
     chunk_cases();
     web_retry_case();
+    lock_cases();
 
     // Only temp files could be left, and none may be.
     int strays = 0;

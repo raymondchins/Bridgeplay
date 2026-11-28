@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/proc_info.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -415,6 +416,36 @@ static void health_write_locked(void) {
     free(text);
 }
 
+// Two steam_osx starting at once must not both read no record and both count the start, so
+// the read, the decision and the write happen under one lock across processes. The lock is
+// waited on for at most NP_BOOT_LOCK_MS; past that the start goes on without it.
+#define NP_BOOT_LOCK_FILE "boot.lock"
+#define NP_BOOT_LOCK_MS   2000
+
+static int boot_lock(void) {
+    char path[PATH_MAX];
+    if (support_file(path, sizeof path, NP_BOOT_LOCK_FILE) != 0)
+        return -1;
+    int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (fd < 0)
+        return -1;
+    for (int waited = 0; flock(fd, LOCK_EX | LOCK_NB) != 0; waited += 10) {
+        if ((errno != EWOULDBLOCK && errno != EINTR) || waited >= NP_BOOT_LOCK_MS) {
+            NP_WARN("breaker: %s stayed locked, counting this start without it", path);
+            close(fd);
+            return -1;
+        }
+        struct timespec pause = { 0, 10 * 1000 * 1000 };
+        nanosleep(&pause, NULL);
+    }
+    return fd;
+}
+
+static void boot_unlock(int fd) {
+    if (fd >= 0)
+        close(fd);
+}
+
 void np_breaker_drop_insert(void) {
     unsetenv("DYLD_INSERT_LIBRARIES");
     unsetenv("SDL_JOYSTICK_BLACKLIST_DEVICES");
@@ -458,6 +489,7 @@ np_mode_t np_breaker_start(void) {
     np_steam_build(pkg, build, sizeof build);
     snprintf(key, sizeof key, "%s:%d", build, BRIDGEPLAY_BUILD);
 
+    int lock = boot_lock();
     np_boot_t prev;
     int have = np_boot_read(g_boot_path, &prev) == 0;
     np_boot_env_t env = {
@@ -481,6 +513,7 @@ np_mode_t np_breaker_start(void) {
         if (np_boot_write(g_boot_path, &next) != 0)
             NP_WARN("breaker: could not write %s, this start is not counted", g_boot_path);
     }
+    boot_unlock(lock);
 
     pthread_mutex_lock(&g_lock);
     g_mode = mode;
@@ -557,6 +590,7 @@ static void mark(const char *stage) {
     pthread_mutex_lock(&g_lock);
     int exiting = strcmp(stage, NP_STAGE_EXITED) == 0;
     np_boot_t s;
+    int lock = g_owner && !g_exited && g_boot_path[0] ? boot_lock() : -1;
     if (g_owner && !g_exited && g_boot_path[0] && np_boot_read(g_boot_path, &s) == 0 &&
         np_boot_advance(&s, getpid(), stage)) {
         if (np_boot_write(g_boot_path, &s) == 0)
@@ -566,6 +600,7 @@ static void mark(const char *stage) {
             health_write_locked();
         }
     }
+    boot_unlock(lock);
     if (exiting)
         g_exited = 1;
     pthread_mutex_unlock(&g_lock);
