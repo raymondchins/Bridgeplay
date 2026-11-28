@@ -723,6 +723,7 @@ private struct RisksNote: View {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(BP.orange)
+                        .accessibilityHidden(true)
                     Text(String(localized: "Risks: Valve doesn't support this, and anti-cheat games may not start.").keepingLastWordsTogether)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -730,6 +731,7 @@ private struct RisksNote: View {
                     Image(systemName: reduceMotion && expanded ? "chevron.down" : "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
                         .rotationEffect(.degrees(!reduceMotion && expanded ? 90 : 0))
+                        .accessibilityHidden(true)
                 }
                 .contentShape(Rectangle())
             }
