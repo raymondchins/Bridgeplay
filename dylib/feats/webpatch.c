@@ -403,6 +403,10 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     ".MSCXPanel .MSCXDrop>*{width:100%;max-width:none;margin:0}" \
     ".MSCXNoBottomGap{margin-bottom:0}" \
     ".MSCXPanel .MSCXDim{opacity:.45;pointer-events:none}" \
+    ".MSCXPanel .MSCXAdv{margin:10px 0}" \
+    ".MSCXPanel .MSCXAdv>summary{cursor:pointer;padding:6px 0;color:#dfe3e6;font-size:14px;user-select:none}" \
+    ".MSCXPanel .MSCXAdv>summary:focus-visible{outline:2px solid #fff;outline-offset:1px}" \
+    ".MSCXPanel .MSCXAdv>.MSCXRow{margin-top:6px}" \
     ".MSCXBtns{display:flex;gap:8px}" \
     ".MSCXBtn{background:#3d4450;color:#fff;border:none;border-radius:2px;padding:6px 14px;" \
     "font-size:14px;cursor:pointer}.MSCXBtn:hover{background:#4c5361}" \
@@ -595,6 +599,9 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "\"ROSETTA_ADVERTISE_AVX\",\"WINEMSYNC\",\"BRIDGEPLAY_RETINA\",\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",\"DXMT_CONFIG\"," \
     "\"BRIDGEPLAY_FRAMEGEN\",\"BRIDGEPLAY_FRAMEGEN_QUALITY\",\"BRIDGEPLAY_FRAMEGEN_UI\",\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"," \
     "\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"BRIDGEPLAY_VSYNC\",\"BRIDGEPLAY_BACKEND\",\"BRIDGEPLAY_PERF_OVERLAY\",\"BRIDGEPLAY_FPS_LIMIT\",\"BRIDGEPLAY_FPS_LIMIT_OFF\",\"BRIDGEPLAY_SCALING_FILTER\",\"BRIDGEPLAY_NVAPI\",\"BRIDGEPLAY_SUSTAINED\"].filter(k=>\"DXMT_CONFIG\"===k?fe.some(fk):!!A(k));" \
+    "const AO=globalThis.MSCXAdvOpen||(globalThis.MSCXAdvOpen={}),ga=(Fx.a||{})[t.unAppID]||{}," \
+    "ao=t.unAppID in AO?AO[t.unAppID]:[!fex&&\"ROSETTA_ADVERTISE_AVX\",\"WINEMSYNC\",\"BRIDGEPLAY_RAW_CONTROLLERS\",\"BRIDGEPLAY_DISABLE_HIDRAW\"," \
+    "fex&&\"FEX_X87REDUCEDPRECISION\",dx&&\"DXMT_METALFX_SPATIAL_SWAPCHAIN\"].some(k=>k&&(!!A(k)||k in ga))||dx&&fe.some(fk);" \
     "if(nat)return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
     "PO(" NP_L_PO_TITLE "," NP_L_PO_OPTIONS ")," \
@@ -623,8 +630,6 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "\"报告为 NVIDIA GPU（DLSS 需要。游戏崩溃或画面异常时关闭）\"," \
     "\"Segnala una GPU NVIDIA (serve per DLSS. Disattiva se il gioco si blocca o si vede male)\"),\"1\",\"0\")," \
     "\"dxmt\"===b&&T([\"DXMT_ENABLE_NVEXT\"],\"DLSS\",\"1\")," \
-    "!fex&&X(\"ROSETTA_ADVERTISE_AVX\",npL(\"Advertise AVX2 to Rosetta\",\"向 Rosetta 声明 AVX2 支持\",\"Segnala AVX2 a Rosetta\"))," \
-    "T([\"WINEMSYNC\"],\"MSync\",\"1\",\"0\")," \
     "T([\"BRIDGEPLAY_RETINA\"],npL(\"High Resolution\",\"高分辨率\",\"Alta risoluzione\"),\"1\",\"0\")" \
     "]},\"gfx\")," \
     "PO(" NP_L_PO_TITLE "," NP_L_PO_OPTIONS ")," \
@@ -633,13 +638,19 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "{data:\"0\",label:npL(\"Automatic (Wine keeps pixels sharp with High Resolution off)\"," \
     "\"自动（关闭高分辨率时 Wine 保持像素锐利）\",\"Automatico (con Alta risoluzione disattivata Wine mantiene i pixel nitidi)\")}," \
     NP_L_SQ_REST "])," \
+    "FG()," \
+    /* Expert settings, in a group that starts closed unless one of its settings is set, for \
+       this game in its launch options or its own conf, or the player opened it this session. */ \
+    "(0," RT ".jsxs)(\"details\",{className:\"MSCXAdv\",open:ao,onToggle:e=>{AO[t.unAppID]=!!e.target.open},children:[" \
+    "(0," RT ".jsx)(\"summary\",{children:npL(\"Advanced\",\"高级\",\"Avanzate\")})," \
+    "!fex&&X(\"ROSETTA_ADVERTISE_AVX\",npL(\"Advertise AVX2 to Rosetta\",\"向 Rosetta 声明 AVX2 支持\",\"Segnala AVX2 a Rosetta\"))," \
+    "T([\"WINEMSYNC\"],\"MSync\",\"1\",\"0\")," \
     "dx&&(0," RT ".jsx)(" BARREL ".XY," \
     "{label:npL(\"MetalFX Upscaling (Samples from the resolution the game is set to)\"," \
     "\"MetalFX 超分辨率（以游戏设置的分辨率为采样来源）\",\"Upscaling MetalFX (ingrandisce l'immagine dalla risoluzione impostata nel gioco)\")," \
     "children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:U," \
     "selectedOption:sw?(U.find(u=>u.data&&+u.data===fn)||{data:String(fn)}).data:\"\"," \
     "onChange:v=>s([[\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",v.data?\"1\":\"\"],[\"DXMT_CONFIG\",fx(v.data)]])})},\"usf\")," \
-    "FG()," \
     "(0," RT ".jsxs)(" BARREL ".XY,{label:" NP_L_CONTROLLERS ",children:[" \
     "T([\"BRIDGEPLAY_RAW_CONTROLLERS\"],npL(\"Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)\"," \
     "\"允许游戏直接读取控制器（Mac 上推荐，仅在需要 Steam Input 按键映射时关闭）\"," \
@@ -650,7 +661,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "children:X(\"FEX_X87REDUCEDPRECISION\"," \
     "npL(\"Reduced x87 Precision (Reducing precision improves game performance, is enabled by default in CrossOver Preview)\"," \
     "\"降低 x87 精度（降低精度可提升游戏性能，CrossOver Preview 中默认开启）\"," \
-    "\"Precisione x87 ridotta (ridurre la precisione migliora le prestazioni dei giochi, attiva di default in CrossOver Preview)\"))},\"fex\")," \
+    "\"Precisione x87 ridotta (ridurre la precisione migliora le prestazioni dei giochi, attiva di default in CrossOver Preview)\"))},\"fex\")" \
+    "]},\"adv\")," \
     "OV.length>0&&(0," RT ".jsx)(\"div\",{className:\"MSCXBtns\",children:(0," RT ".jsx)(\"button\",{className:\"MSCXBtn\"," \
     "onClick:()=>s(OV.map(k=>[k,\"DXMT_CONFIG\"===k?fx(\"\"):\"\"]))," \
     "children:npL(\"Use Bridgeplay defaults\",\"使用 Bridgeplay 默认设置\",\"Usa le impostazioni predefinite di Bridgeplay\")})},\"npdef\")" \

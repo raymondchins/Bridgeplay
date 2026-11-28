@@ -614,6 +614,7 @@ panel-behavior:
 	node $(PANEL_TESTS)/sustained.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/quick-settings.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/prefix-row.js $(OUT_DIR)/panel-emit && \
+	node $(PANEL_TESTS)/advanced.js $(OUT_DIR)/panel-emit && \
 	echo "==> panel behavior: renders as expected, no stale arguments"
 
 CX_ROOT ?= /Applications/CrossOver Preview.app

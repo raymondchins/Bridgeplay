@@ -62,6 +62,11 @@ struct BridgeplayApp: App {
         }
         .defaultSize(width: 900, height: 760)
         .commands { menus }
+
+        Settings {
+            SettingsView()
+                .environment(status)
+        }
     }
 
     private func checkSteamPatch(_ trigger: String) {
@@ -118,6 +123,18 @@ struct BridgeplayApp: App {
                 openWindow(id: "main")
             }
                 .keyboardShortcut("?", modifiers: .command)
+
+            Divider()
+
+            Button("Online Guides") { HelpLinks.open(HelpLinks.guides) }
+            Button("FAQ") { HelpLinks.open(HelpLinks.faq) }
+            Button("Compatibility List") { HelpLinks.open(HelpLinks.compatibility) }
+            Button("Release Notes") { HelpLinks.open(HelpLinks.releaseNotes) }
+
+            Divider()
+
+            Button("Report a Problem…") { HelpLinks.reportProblem() }
+            Button("Reveal Log in Finder") { ErrorReport.showLog() }
         }
 
         CommandMenu("Setup") {

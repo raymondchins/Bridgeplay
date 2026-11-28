@@ -104,10 +104,6 @@ struct GuideView: View {
                          note: String(localized: "How the game's DirectX reaches your GPU. Automatic picks per game. D3DMetal (Apple's Game Porting Toolkit) runs DirectX 11 and 12 and is the default. DXMT runs DirectX 10 and 11 directly on Metal. DXVK runs DirectX 9 to 11 through Vulkan. WineD3D is Wine's own translation, for very old games."))
                 SteamRow(.check("DLSS", true),
                          note: String(localized: "Lets the game offer NVIDIA DLSS. Apple's MetalFX does the upscaling, and DLSS Frame Generation is experimental and off by default. Turn DLSS on in the game's own settings as well."))
-                SteamRow(.check(String(localized: "Advertise AVX2 to Rosetta"), true),
-                         note: String(localized: "Tells the game the processor supports AVX2, which some recent games need to start."))
-                SteamRow(.check("MSync", true),
-                         note: String(localized: "A faster way for the game's threads to wait on each other. Leave it on unless a game hangs."))
                 SteamRow(.check(String(localized: "High Resolution"), true),
                          note: String(localized: "Draws at your display's full Retina resolution instead of half. Sharper, heavier on the GPU."))
             }
@@ -129,11 +125,6 @@ struct GuideView: View {
                          note: String(localized: "How the game's frames are scaled up to your screen. Automatic keeps what happens today: Wine doubles each pixel sharply with High Resolution off, and Mac games are smoothed. Linear smooths, Nearest keeps every pixel sharp, which suits pixel art, and Integer is sharp only at an exact 2x or 3x. MetalFX upscaling, when on, runs first."))
             }
 
-            SteamBlock(title: String(localized: "MetalFX Upscaling (Samples from the resolution the game is set to)")) {
-                SteamRow(.dropdown(nil, String(localized: "Off")),
-                         note: String(localized: "Shown with Automatic or DXMT. Renders below your display's resolution and scales up with MetalFX: 1.5×, 1.72×, 2× or 3×. Off keeps the resolution set in the game."))
-            }
-
             SteamBlock(title: String(localized: "Frame Generation (Experimental. Adds input lag)")) {
                 SteamRow(.dropdown(String(localized: "Mode"), "2x"),
                          note: String(localized: "Adds generated frames between the game's own: 2x, 3x, or Adaptive, which fills up to your display's refresh rate. Smoother motion, a little more input lag. Works with any game, native Mac games included."))
@@ -147,7 +138,18 @@ struct GuideView: View {
                          note: String(localized: "Built-in optical flow follows the mode above. MetalFX uses Apple's frame interpolation and makes one frame per pair."))
             }
 
-            SteamBlock(title: String(localized: "Controllers")) {
+            SteamBlock(title: String(localized: "Advanced")) {
+                Text("Closed until you open it, or until one of these is set for the game.")
+                    .font(BP.sans(12.5))
+                    .foregroundStyle(BP.fg2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 4)
+                SteamRow(.check(String(localized: "Advertise AVX2 to Rosetta"), true),
+                         note: String(localized: "Tells the game the processor supports AVX2, which some recent games need to start."))
+                SteamRow(.check("MSync", true),
+                         note: String(localized: "A faster way for the game's threads to wait on each other. Leave it on unless a game hangs."))
+                SteamRow(.dropdown(String(localized: "MetalFX Upscaling (Samples from the resolution the game is set to)"), String(localized: "Off")),
+                         note: String(localized: "Shown with Automatic or DXMT. Renders below your display's resolution and scales up with MetalFX: 1.5×, 1.72×, 2× or 3×. Off keeps the resolution set in the game."))
                 SteamRow(.check(String(localized: "Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)"), true),
                          note: String(localized: "On by default. Mac Steam has no virtual gamepad for Windows games, so games read the pad themselves. Turn it off only to use Steam Input's button remapping."))
                 SteamRow(.check(String(localized: "Disable hidraw"), false),
