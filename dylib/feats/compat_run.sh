@@ -1523,6 +1523,29 @@ launch_step() {
   [ -z "${launch_step_file:-}" ] || printf '%s\n' "$1" > "$launch_step_file" 2>/dev/null || true
 }
 
+# After a game launch that went wrong, Bridgeplay's panel says why in the Status card's words,
+# with one next step (LaunchEnded.swift). The app reads the record just written and decides;
+# this only skips the ends that look like a normal quit. Like the rebuild, the app is
+# reparented to launchd and leaves Steam's process group, so Steam shows Play at once.
+# Without the app nothing is shown. Arguments: the outcome code, the record's window value.
+launch_ended() {
+  [ "$verb" = waitforexitandrun ] && [ "$app_id" != 0 ] && [ -n "$STEAM_COMPAT_DATA_PATH" ] || return 0
+  case "$1" in
+    ok | launch_services) return 0 ;;
+    # Stopped after a window, or with nothing watching: a normal quit as far as anyone knows.
+    stopped_from_steam) [ -z "$2" ] || return 0 ;;
+  esac
+  ended_app=$(cat "$np_support/app-executable" 2>/dev/null) || ended_app=""
+  # An app from before the panel would open its main window for a flag it does not know.
+  [ -x "$ended_app" ] && LC_ALL=C grep -q -a -F -- --launch-ended-panel "$ended_app" 2>/dev/null || return 0
+  (
+    env -i HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+      "$ended_app" --launch-ended-panel "$STEAM_COMPAT_DATA_PATH" \
+      < /dev/null > /dev/null 2>&1 5>&- 6>&- 7>&- 8>&- 9>&- &
+  )
+  echo "launch: why-it-stopped panel started ($1)" >> "$log" 2>&1 || true
+}
+
 # Prints 1 when Low Power Mode is on, 0 when off, nothing when pmset does not say. pmset's
 # "Currently in use" values are what ProcessInfo.isLowPowerModeEnabled reports, the lowPower
 # field of compatibility reports (GameReport.swift). Macs with High Power Mode call it
@@ -4134,5 +4157,6 @@ np_window=-
 launch_times "$np_started" "$np_ended" "$wine_log" "$np_watched" >> "$log" 2>&1 || true
 outcome=$(exit_outcome "$status" "$np_ran" "$np_terminated" "$wine_log") || outcome="exit_code unknown"
 write_last_launch "${outcome%% *}" "$status" "$np_ran" "${outcome#* }" "$np_window"
+launch_ended "${outcome%% *}" "$np_window"
 echo "=== wine prefix killed, session ending ===" >> "$log" 2>&1 || true
 exit $status

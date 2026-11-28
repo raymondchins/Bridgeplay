@@ -51,6 +51,8 @@ final class ProgressPanel {
     private let phase = NSTextField(labelWithString: "")
     private let note = NSTextField(wrappingLabelWithString: "")
     private let bar = NSProgressIndicator()
+    private let buttons = NSStackView()
+    private var textStack = NSStackView()
 
     init(title: String, activates: Bool = true) {
         self.activates = activates
@@ -87,11 +89,17 @@ final class ProgressPanel {
         bar.isIndeterminate = true
         bar.startAnimation(nil)
 
-        let text = NSStackView(views: [message, bar, phase, note])
+        buttons.orientation = .horizontal
+        buttons.spacing = 8
+        buttons.isHidden = true
+
+        textStack = NSStackView(views: [message, bar, phase, note, buttons])
+        let text = textStack
         text.orientation = .vertical
         text.alignment = .leading
         text.spacing = 8
         text.setCustomSpacing(12, after: message)
+        text.setCustomSpacing(16, after: note)
         text.detachesHiddenViews = true
         let content = NSView()
         for view in [icon, text] as [NSView] {
@@ -110,6 +118,7 @@ final class ProgressPanel {
             bar.widthAnchor.constraint(equalTo: text.widthAnchor),
             message.widthAnchor.constraint(equalTo: text.widthAnchor),
             note.widthAnchor.constraint(equalTo: text.widthAnchor),
+            buttons.widthAnchor.constraint(equalTo: text.widthAnchor),
             content.bottomAnchor.constraint(greaterThanOrEqualTo: icon.bottomAnchor, constant: 20),
             content.bottomAnchor.constraint(greaterThanOrEqualTo: text.bottomAnchor, constant: 20),
         ])
@@ -133,12 +142,24 @@ final class ProgressPanel {
         if activates { NSApp.activate() }
     }
 
-    func show(message text: String, phase current: String, note detail: String? = nil) {
+    // Buttons sit under the text, right-aligned, the last one the default. No buttons and the
+    // bar shows, so the panel reads as work in progress; with buttons it reads as a question.
+    func show(message text: String, phase current: String, note detail: String? = nil,
+              buttons choices: [PanelButton] = []) {
         message.stringValue = text
         phase.stringValue = current
         note.stringValue = detail ?? ""
         note.isHidden = detail == nil
         bar.setAccessibilityLabel(current)
+        bar.isHidden = !choices.isEmpty
+        for old in buttons.arrangedSubviews { buttons.removeView(old) }
+        for (index, choice) in choices.enumerated() {
+            let button = ClosureButton(title: choice.title, run: choice.action)
+            if index == choices.count - 1 { button.keyEquivalent = "\r" }
+            buttons.addView(button, in: .trailing)
+        }
+        buttons.isHidden = choices.isEmpty
+        textStack.setCustomSpacing(note.isHidden && !choices.isEmpty ? 16 : 8, after: phase)
         panel.setContentSize(panel.contentView?.fittingSize ?? panel.frame.size)
     }
 
@@ -152,4 +173,25 @@ final class ProgressPanel {
         }
         show(message: text, phase: step)
     }
+}
+
+struct PanelButton {
+    let title: String
+    let action: @MainActor () -> Void
+}
+
+@MainActor
+private final class ClosureButton: NSButton {
+    private var run: @MainActor () -> Void = {}
+
+    convenience init(title: String, run: @escaping @MainActor () -> Void) {
+        self.init(frame: .zero)
+        self.title = title
+        bezelStyle = .push
+        self.run = run
+        target = self
+        action = #selector(fire)
+    }
+
+    @objc private func fire() { run() }
 }

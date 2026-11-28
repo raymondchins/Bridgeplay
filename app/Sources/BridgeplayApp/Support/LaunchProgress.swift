@@ -60,19 +60,37 @@ struct LaunchProgress {
     static let laterDelay: TimeInterval = 3
     // Long enough that a launch failing straight away does not flash the panel.
     static let firstDelay: TimeInterval = 1
-    // In case the game hangs before opening anything; Steam's Stop still ends it.
+    // The panel goes after this long, unless it is asking or stopping the game.
     static let limit: TimeInterval = 15 * 60
+    // This long in step start with no window and the panel asks whether to stop the game.
+    // hangNote says the number.
+    static let hangDelay: TimeInterval = 120
 
     let firstLaunch: Bool
 
     enum Action: Equatable {
         case hidden
         case shown(LaunchStep?)
+        // Keep Waiting or Stop Game.
+        case hang
+        // Stop Game was chosen and the run script is ending Wine.
+        case stopping
         case quit
     }
 
-    func action(step: LaunchStep?, elapsed: TimeInterval, launchEnded: Bool, gameWindow: Bool) -> Action {
-        if launchEnded || gameWindow || step == .ended || elapsed >= Self.limit { return .quit }
+    enum Answer {
+        case keepWaiting, stopGame
+    }
+
+    // waited: seconds since the step became start, nil in any other step. A question nobody
+    // answered stays up past the limit, and so does a stop: the panel must still be there when
+    // the script ends, or the outcome record cannot say no window ever showed.
+    func action(step: LaunchStep?, elapsed: TimeInterval, waited: TimeInterval? = nil, answer: Answer? = nil,
+                launchEnded: Bool, gameWindow: Bool) -> Action {
+        if launchEnded || gameWindow || step == .ended { return .quit }
+        if answer == .stopGame { return .stopping }
+        if step == .start, let waited, waited >= Self.hangDelay, answer == nil { return .hang }
+        if elapsed >= Self.limit { return .quit }
         if step == .dialog || elapsed < (firstLaunch ? Self.firstDelay : Self.laterDelay) { return .hidden }
         return .shown(step)
     }
@@ -97,6 +115,9 @@ struct LaunchProgress {
             ? String(localized: "The first launch takes longer. The game may show a black screen for a while after it opens.")
             : nil
     }
+
+    static var hangNote: String { String(localized: "No window after 2 minutes.") }
+    static var stopping: String { String(localized: "Stopping…") }
 }
 
 @MainActor
@@ -108,8 +129,16 @@ final class LaunchProgressWatcher {
     private let started = ProcessInfo.processInfo.systemUptime
     private lazy var name = Self.gameName(compatdata: compatdata)
     private var panel: ProgressPanel?
-    // The step on screen, nil while hidden.
-    private var showing: LaunchStep??
+    private enum Shown: Equatable {
+        case progress(LaunchStep?)
+        case hang
+        case stopping
+    }
+    // What is on screen, nil while hidden.
+    private var showing: Shown?
+    // When the step became start, for the hang question.
+    private var startSeen: TimeInterval?
+    private var answer: LaunchProgress.Answer?
     // Whether each window owner is this game's, by pid and start time so a reused pid is
     // looked at again. A process keeps the files it was started with.
     private var owners: [pid_t: (started: UInt64, game: Bool)] = [:]
@@ -126,8 +155,10 @@ final class LaunchProgressWatcher {
         let step = text.flatMap { LaunchStep(rawValue: $0.trimmingCharacters(in: .whitespacesAndNewlines)) }
         let launchEnded = getppid() != launcher
         let gameWindow = gameWindowShown()
+        let now = ProcessInfo.processInfo.systemUptime
+        if step == .start { startSeen = startSeen ?? now } else { startSeen = nil }
         let action = progress.action(
-            step: step, elapsed: ProcessInfo.processInfo.systemUptime - started,
+            step: step, elapsed: now - started, waited: startSeen.map { now - $0 }, answer: answer,
             launchEnded: launchEnded, gameWindow: gameWindow)
         switch action {
         case .quit:
@@ -137,14 +168,43 @@ final class LaunchProgressWatcher {
             guard showing != nil else { return }
             panel?.panel.orderOut(nil)
             showing = nil
-        case .shown(let step):
-            guard showing != .some(step) else { return }
-            let panel = panel ?? makePanel()
-            panel.show(message: LaunchProgress.message(game: name), phase: LaunchProgress.phase(step),
-                       note: progress.note)
-            panel.present()
-            showing = .some(step)
+        case .shown(let step): show(.progress(step))
+        case .hang: show(.hang)
+        case .stopping: show(.stopping)
         }
+    }
+
+    private func show(_ what: Shown) {
+        guard showing != what else { return }
+        let panel = panel ?? makePanel()
+        let message = LaunchProgress.message(game: name)
+        switch what {
+        case .progress(let step):
+            panel.show(message: message, phase: LaunchProgress.phase(step), note: progress.note)
+        case .hang:
+            panel.show(message: message, phase: LaunchProgress.phase(.start), note: LaunchProgress.hangNote, buttons: [
+                PanelButton(title: String(localized: "Stop Game")) { [weak self] in self?.stopGame() },
+                PanelButton(title: String(localized: "Keep Waiting")) { [weak self] in self?.keepWaiting() },
+            ])
+        case .stopping:
+            panel.show(message: message, phase: LaunchProgress.stopping)
+        }
+        panel.present()
+        showing = what
+    }
+
+    private func keepWaiting() {
+        answer = .keepWaiting
+        tick()
+    }
+
+    // What Steam's Stop does: TERM to the run script, whose trap ends Wine.
+    private func stopGame() {
+        // A launch that has ended may have handed its pid on.
+        guard getppid() == launcher else { exit(0) }
+        answer = .stopGame
+        kill(launcher, SIGTERM)
+        tick()
     }
 
     private func makePanel() -> ProgressPanel {

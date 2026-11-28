@@ -30,6 +30,39 @@ struct LaunchProgressTests {
         #expect(later.action(step: .start, elapsed: LaunchProgress.limit, launchEnded: false, gameWindow: false) == .quit)
     }
 
+    @Test("Two minutes in step start with no window, it asks to keep waiting or stop the game")
+    func hang() {
+        let wait = LaunchProgress.hangDelay
+        #expect(later.action(step: .start, elapsed: 200, waited: wait - 1, launchEnded: false, gameWindow: false) == .shown(.start))
+        #expect(later.action(step: .start, elapsed: 200, waited: wait, launchEnded: false, gameWindow: false) == .hang)
+        // Only in step start: a slow prefix setup is not a hang.
+        #expect(first.action(step: .setup, elapsed: 200, waited: nil, launchEnded: false, gameWindow: false) == .shown(.setup))
+        // The window or the end of the launch still wins.
+        #expect(later.action(step: .start, elapsed: 200, waited: wait, launchEnded: false, gameWindow: true) == .quit)
+        #expect(later.action(step: .start, elapsed: 200, waited: wait, launchEnded: true, gameWindow: false) == .quit)
+        // A question nobody answered outlives the old limit.
+        #expect(later.action(step: .start, elapsed: LaunchProgress.limit + 60, waited: LaunchProgress.limit,
+                             launchEnded: false, gameWindow: false) == .hang)
+    }
+
+    @Test("Keep Waiting goes back to the progress; Stop Game stays until the launch has ended")
+    func answers() {
+        let wait = LaunchProgress.hangDelay
+        #expect(later.action(step: .start, elapsed: 200, waited: wait + 30, answer: .keepWaiting,
+                             launchEnded: false, gameWindow: false) == .shown(.start))
+        #expect(later.action(step: .start, elapsed: LaunchProgress.limit, waited: wait, answer: .keepWaiting,
+                             launchEnded: false, gameWindow: false) == .quit)
+        #expect(later.action(step: .start, elapsed: 200, waited: wait, answer: .stopGame,
+                             launchEnded: false, gameWindow: false) == .stopping)
+        // Past the limit too, or the record could not say no window ever showed.
+        #expect(later.action(step: .start, elapsed: LaunchProgress.limit + 1, waited: wait, answer: .stopGame,
+                             launchEnded: false, gameWindow: false) == .stopping)
+        #expect(later.action(step: .ended, elapsed: 200, waited: wait, answer: .stopGame,
+                             launchEnded: false, gameWindow: false) == .quit)
+        #expect(LaunchProgress.hangNote.contains("2 minutes"))
+        #expect(LaunchProgress.hangDelay == 120)
+    }
+
     @Test("A Bridgeplay alert hides it until the next step")
     func dialogs() {
         #expect(first.action(step: .dialog, elapsed: 30, launchEnded: false, gameWindow: false) == .hidden)
@@ -104,8 +137,14 @@ struct LaunchProgressTests {
 
     // The run script checks the app binary for the flag before passing it.
     @Test("The flag is long enough to sit in the binary's strings")
-    func flagIsFindable() {
+    func flagIsFindable() throws {
         #expect(LaunchProgressCommand.flag.utf8.count > 15)
+        #expect(LaunchEndedCommand.flag.utf8.count > 15)
+        let script = try String(
+            contentsOf: URL(filePath: #filePath).deletingLastPathComponent()
+                .appending(path: "../../../dylib/feats/compat_run.sh").standardizedFileURL, encoding: .utf8)
+        #expect(script.contains("grep -q -a -F -- \(LaunchEndedCommand.flag) "))
+        #expect(script.contains("\"$ended_app\" \(LaunchEndedCommand.flag) "))
     }
 
     @Test("The game is named from its library's appmanifest")

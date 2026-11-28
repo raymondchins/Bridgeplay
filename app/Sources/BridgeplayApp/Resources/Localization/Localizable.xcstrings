@@ -9434,6 +9434,28 @@
         }
       }
     },
+    "Keep Waiting" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continua ad aspettare"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подождать ещё"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续等待"
+          }
+        }
+      }
+    },
     "Keeping the shipped %@ failed. " : {
       "localizations" : {
         "it" : {
@@ -11128,6 +11150,28 @@
         }
       }
     },
+    "No window after 2 minutes." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna finestra dopo 2 minuti."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет окна уже 2 минуты."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 分钟后仍无窗口。"
+          }
+        }
+      }
+    },
     "No window opened." : {
       "localizations" : {
         "it" : {
@@ -11916,6 +11960,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "或从 Apple 下载"
+          }
+        }
+      }
+    },
+    "Other Ways to Play" : {
+      "comment" : "Run script dialog button; also in the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Altri modi per giocare"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Другие способы играть"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他游玩方式"
           }
         }
       }
@@ -14758,6 +14826,28 @@
         }
       }
     },
+    "See Reports" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vedi le segnalazioni"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Смотреть отчёты"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看报告"
+          }
+        }
+      }
+    },
     "Select a copy of CrossOver." : {
       "localizations" : {
         "it" : {
@@ -16983,6 +17073,28 @@
         }
       }
     },
+    "Stop Game" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompi gioco"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановить игру"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止游戏"
+          }
+        }
+      }
+    },
     "Stop Processes" : {
       "localizations" : {
         "it" : {
@@ -17287,6 +17399,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在停止遗留的 Wine 进程"
+          }
+        }
+      }
+    },
+    "Stopping…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arresto…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановка…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在停止…"
           }
         }
       }
