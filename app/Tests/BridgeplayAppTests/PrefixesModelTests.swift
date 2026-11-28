@@ -152,7 +152,7 @@ struct PrefixesModelTests {
             try Data(bytes).write(to: root.appending(path: "pfx/drive_c/windows/system32/ntdll.dll"))
         }
 
-        let model = PrefixesModel(libraries: { [library] }, installedTools: { [Self.tool] })
+        let model = PrefixesModel.forTests(libraries: { [library] }, installedTools: { [Self.tool] })
         await model.load()
 
         func prefix(_ appID: String) throws -> WinePrefix {
@@ -190,7 +190,7 @@ struct PrefixesModelTests {
             try Data(bytes).write(to: root.appending(path: "pfx/drive_c/windows/system32/ntdll.dll"))
         }
 
-        let model = PrefixesModel(libraries: { [library] }, installedTools: { tools })
+        let model = PrefixesModel.forTests(libraries: { [library] }, installedTools: { tools })
         await model.load()
 
         func shown(_ appID: String) throws -> String? {
@@ -204,7 +204,7 @@ struct PrefixesModelTests {
     func loadsAndMeasures() async throws {
         let (dir, library) = try makeLibrary(appIDs: ["1574480", "1649240"])
         defer { try? FileManager.default.removeItem(at: dir) }
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
 
         await model.load()
 
@@ -223,7 +223,7 @@ struct PrefixesModelTests {
         defer { try? FileManager.default.removeItem(at: newDir) }
 
         let libraries = Libraries([oldLibrary])
-        let model = PrefixesModel(libraries: { libraries.current })
+        let model = PrefixesModel.forTests(libraries: { libraries.current })
 
         let first = Task { await model.load() }
         // Let the first load get past listing and into measuring.
@@ -256,7 +256,7 @@ struct PrefixesModelTests {
         let libraries = Libraries([oldLibrary])
         let scan = DelayedToolScan([Self.tool])
         defer { scan.resume.signal() }
-        let model = PrefixesModel(libraries: { libraries.current }, installedTools: { scan.list() })
+        let model = PrefixesModel.forTests(libraries: { libraries.current }, installedTools: { scan.list() })
         let first = Task { await model.load() }
         var entered = false
         for await _ in scan.entered { entered = true }
@@ -288,7 +288,7 @@ struct PrefixesModelTests {
 
         // Swapped between loads, the way deleting a prefix changes what is there.
         let libraries = Libraries([oldLibrary])
-        let model = PrefixesModel(libraries: { libraries.current })
+        let model = PrefixesModel.forTests(libraries: { libraries.current })
 
         await model.load()
         #expect(model.prefixes.count == 2)
@@ -308,7 +308,7 @@ struct PrefixesModelTests {
         let (dir, library) = try makeLibrary(appIDs: ["1574480", "1649240"])
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
         await model.load()
 
         let survivor = try #require(model.prefixes.first { $0.appID == "1649240" })
@@ -333,7 +333,7 @@ struct PrefixesModelTests {
     func selectedPrefixIsSingleSelectionOnly() async throws {
         let (dir, library) = try makeLibrary(appIDs: ["1574480", "1649240"])
         defer { try? FileManager.default.removeItem(at: dir) }
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
         await model.load()
 
         #expect(model.selectedPrefix == nil)
@@ -353,7 +353,7 @@ struct PrefixesModelTests {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         let asked = Asked()
-        let model = PrefixesModel(
+        let model = PrefixesModel.forTests(
             libraries: { [library] },
             rebuild: { prefix, tool, keep in
                 asked.add(prefix.appID, tool.build, keep)
@@ -379,7 +379,7 @@ struct PrefixesModelTests {
         let (dir, library) = try makeLibrary(appIDs: ["1574480"])
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        let model = PrefixesModel(
+        let model = PrefixesModel.forTests(
             libraries: { [library] },
             rebuild: { prefix, _, keep in keep ? Recorder.backup(of: prefix) : nil })
         await model.load()
@@ -398,7 +398,7 @@ struct PrefixesModelTests {
         let (dir, library) = try makeLibrary(appIDs: ["1574480", "1649240"])
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        let model = PrefixesModel(
+        let model = PrefixesModel.forTests(
             libraries: { [library] }, makeBackup: { Recorder.backup(of: $0) })
         await model.load()
         let targets = model.prefixes
@@ -422,7 +422,7 @@ struct PrefixesModelTests {
         // Records the order and asserts nothing overlaps: a second wineboot in the same
         // runner while the first is still going is the failure this queue exists to avoid.
         let log = Recorder()
-        let model = PrefixesModel(
+        let model = PrefixesModel.forTests(
             libraries: { [library] }, rebuild: { prefix, _, _ in try log.enter(prefix) })
         await model.load()
         model.selection = Set(model.prefixes.map(\.id))
@@ -448,7 +448,7 @@ struct PrefixesModelTests {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         let log = Recorder()
-        let model = PrefixesModel(
+        let model = PrefixesModel.forTests(
             libraries: { [library] },
             rebuild: { prefix, _, _ in try log.enter(prefix, failing: prefix.appID == "1649240") }
         )
@@ -471,7 +471,7 @@ struct PrefixesModelTests {
         let (dir, library) = try makeLibrary(appIDs: ["1574480", "1649240"])
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        let model = PrefixesModel(
+        let model = PrefixesModel.forTests(
             libraries: { [library] },
             rebuild: { prefix, _, _ in
                 throw WriteRefused(path: prefix.root.path(percentEncoded: false))
@@ -495,7 +495,7 @@ struct PrefixesModelTests {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         let log = Recorder()
-        let model = PrefixesModel(
+        let model = PrefixesModel.forTests(
             libraries: { [library] }, rebuild: { prefix, _, _ in try log.enter(prefix) })
         await model.load()
         let target = try #require(model.prefixes.first)
@@ -514,7 +514,7 @@ struct PrefixesModelTests {
         let (dir, library) = try makeLibrary(appIDs: ["1574480"])
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        let model = PrefixesModel(libraries: { [library] }, rebuild: { _, _, _ in nil })
+        let model = PrefixesModel.forTests(libraries: { [library] }, rebuild: { _, _, _ in nil })
         await model.load()
         let target = try #require(model.prefixes.first)
 
@@ -529,7 +529,7 @@ struct PrefixesModelTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         try park(["1574480": ["20260101-120000"], "1649240": ["20260103-090000"]], in: library)
 
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
         await model.load()
 
         #expect(model.backups.count == 2)
@@ -548,13 +548,13 @@ struct PrefixesModelTests {
             ],
             in: library)
 
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
         await model.load()
         #expect(model.backups.count == 4)
 
         await model.deleteBackups(model.backups)
 
-        #expect(model.outcome == "Deleted 4 backups across 2 prefixes.")
+        #expect(model.outcome == "Moved 4 backups to Trash.")
         #expect(model.report?.message == nil)
         #expect(model.backups.isEmpty)
         #expect(model.prefixes.allSatisfy { PrefixStore.backups(of: $0).isEmpty })
@@ -568,14 +568,14 @@ struct PrefixesModelTests {
             ["1574480": ["20260101-120000", "20260102-133000"], "1649240": ["20260105-101500"]],
             in: library)
 
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
         await model.load()
         let mine = model.backups.filter { $0.prefix.appID == "1574480" }
         #expect(mine.count == 2)
 
         await model.deleteBackups(mine)
 
-        #expect(model.outcome == "Deleted 2 backups for \(mine[0].title).")
+        #expect(model.outcome == "Moved 2 backups for \(mine[0].title) to Trash.")
         #expect(model.backups.map(\.prefix.appID) == ["1649240"])
     }
 
@@ -585,13 +585,13 @@ struct PrefixesModelTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         try park(["1574480": ["20260101-120000"]], in: library)
 
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
         await model.load()
         let only = try #require(model.backups.first)
 
         await model.deleteBackups([only])
 
-        #expect(model.outcome == "Deleted the backup for \(only.title).")
+        #expect(model.outcome == "Moved backup for \(only.title) to Trash.")
         #expect(model.backups.isEmpty)
     }
 
@@ -600,7 +600,7 @@ struct PrefixesModelTests {
         let (dir, library) = try makeLibrary(appIDs: ["1574480"])
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
         await model.load()
 
         await model.deleteBackups(model.backups)
@@ -624,7 +624,7 @@ struct PrefixesModelTests {
     @Test("Rebuilding nothing asks nothing of the disk")
     func rebuildOfAnEmptySelectionDoesNothing() async throws {
         let log = Recorder()
-        let model = PrefixesModel(
+        let model = PrefixesModel.forTests(
             libraries: { [] }, rebuild: { prefix, _, _ in try log.enter(prefix) })
         model.outcome = "untouched"
         await model.recreate([], as: Self.tool)
@@ -641,7 +641,7 @@ struct PrefixesModelTests {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         let log = Recorder(holdingEachTurn: true)
-        let model = PrefixesModel(
+        let model = PrefixesModel.forTests(
             libraries: { [library] }, rebuild: { prefix, _, _ in try log.enter(prefix) })
         await model.load()
         let targets = model.prefixes
@@ -669,7 +669,7 @@ struct PrefixesModelTests {
 
         let box = Libraries([library])
         let log = Recorder()
-        let model = PrefixesModel(
+        let model = PrefixesModel.forTests(
             libraries: { box.current }, rebuild: { prefix, _, _ in try log.enter(prefix) })
         await model.load()
         let targets = model.prefixes
@@ -689,7 +689,7 @@ struct PrefixesModelTests {
     func deleteTakesTheWholeSelection() async throws {
         let (dir, library) = try makeLibrary(appIDs: ["1574480", "1649240", "253750"])
         defer { try? FileManager.default.removeItem(at: dir) }
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
         await model.load()
 
         let doomed = model.prefixes.filter { $0.appID != "253750" }
@@ -702,7 +702,7 @@ struct PrefixesModelTests {
         #expect(model.report?.message == nil)
         #expect(
                 model.outcome
-                    == "Deleted 2 prefixes. Steam will make a new prefix if a game is launched again.")
+                    == "Moved 2 prefixes to Trash.")
         #expect(model.busy.isEmpty)
         #expect(!model.isLoading)
     }
@@ -719,7 +719,7 @@ struct PrefixesModelTests {
             $0.compatdata.appending(path: "1574480/pfx/drive_c/users/crossover/save.dat")
         }
         for save in saves { try write("save", to: save) }
-        let model = PrefixesModel(libraries: { [first, second] })
+        let model = PrefixesModel.forTests(libraries: { [first, second] })
         await model.load()
         #expect(model.prefixes.count == 2)
 
@@ -746,15 +746,14 @@ struct PrefixesModelTests {
             }
             """, to: library.steamapps.appending(path: "appmanifest_1574480.acf"))
 
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
         await model.load()
         await model.delete(model.prefixes)
 
         #expect(model.prefixes.isEmpty)
         #expect(
             model.outcome
-                == "Deleted the prefix for Agent 64: Spies Never Die. Steam will make a new prefix "
-                        + "if the game is launched again.")
+                == "Moved prefix for Agent 64: Spies Never Die to Trash.")
     }
 
     // A running game refuses, and it refuses in the middle of a list of them. Stopping
@@ -764,7 +763,7 @@ struct PrefixesModelTests {
         let (dir, library) = try makeLibrary(appIDs: ["1574480", "253750"])
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
         await model.load()
         #expect(model.prefixes.count == 2)
 
@@ -777,7 +776,7 @@ struct PrefixesModelTests {
         // The refusal happens before anything is unlinked, so the whole prefix is still
         // there and still listed.
         #expect(model.prefixes.map(\.appID) == ["253750"])
-        #expect(model.outcome?.contains("Deleted the prefix for App 1574480.") == true)
+        #expect(model.outcome?.contains("Moved prefix for App 1574480 to Trash.") == true)
         #expect(model.report?.message.contains("is running. Quit the game first.") == true)
         #expect(model.busy.isEmpty)
     }
@@ -800,7 +799,7 @@ struct PrefixesModelTests {
     func deletingNothingDoesNothing() async throws {
         let (dir, library) = try makeLibrary(appIDs: ["1574480"])
         defer { try? FileManager.default.removeItem(at: dir) }
-        let model = PrefixesModel(libraries: { [library] })
+        let model = PrefixesModel.forTests(libraries: { [library] })
         await model.load()
         model.outcome = "untouched"
 
@@ -820,7 +819,7 @@ struct PrefixesModelTests {
         defer { try? FileManager.default.removeItem(at: emptyDir) }
 
         let libraries = Libraries([library])
-        let model = PrefixesModel(libraries: { libraries.current })
+        let model = PrefixesModel.forTests(libraries: { libraries.current })
         await model.load()
         #expect(!model.usage.isEmpty)
 
@@ -830,5 +829,28 @@ struct PrefixesModelTests {
         #expect(model.prefixes.isEmpty)
         #expect(model.usage.isEmpty)
         #expect(!model.isLoading)
+    }
+}
+
+// Model tests never reach the real Trash: a delete moves into a hidden folder of the fixture,
+// which the test removes with the rest of it.
+extension PrefixesModel {
+    static let testTrash: PrefixTools.Trash = { url in
+        let bin = url.deletingLastPathComponent().deletingLastPathComponent().appending(path: ".test-trash")
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        try FileManager.default.moveItem(at: url, to: bin.appending(path: "\(UUID().uuidString)-\(url.lastPathComponent)"))
+    }
+
+    static func forTests(
+        libraries: @escaping @Sendable () -> [SteamLibrary] = { [] },
+        installedTools: @escaping @Sendable () -> [InstalledTool] = { CompatToolList.installed() },
+        rebuild: @escaping @Sendable (WinePrefix, InstalledTool, Bool) throws -> URL? = {
+            try PrefixTools.recreate($0, as: $1, keepBackup: $2)
+        },
+        makeBackup: @escaping @Sendable (WinePrefix) throws -> URL = { try PrefixTools.backUp($0) }
+    ) -> PrefixesModel {
+        PrefixesModel(
+            libraries: libraries, installedTools: installedTools, rebuild: rebuild,
+            makeBackup: makeBackup, trash: testTrash, caches: nil)
     }
 }

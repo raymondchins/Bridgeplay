@@ -65,6 +65,7 @@ struct BackupsView: View {
         } message: {
             Text(PrefixPrompt.deleteBackupsMessage(clearing))
         }
+        .prefixDialogs()
     }
 
     private var summary: String {
@@ -105,17 +106,23 @@ struct BackupsView: View {
         .disabled(selected.count != 1)
         .help("Show the selected backup in the Finder.")
 
+        Button("Restore", systemImage: "arrow.uturn.backward") {
+            if let backup = selected.first, selected.count == 1 { model.pendingConfirmation = .restore(backup) }
+        }
+        .disabled(selected.count != 1 || model.isLoading)
+        .help("Restore the selected backup.")
+
         Button("Delete", systemImage: "trash") {
             ask(selected)
         }
         .disabled(selected.isEmpty || model.isLoading)
-        .help("Delete the selected backups.")
+        .help("Move to Trash.")
 
         Button("Delete All", systemImage: "externaldrive.badge.minus") {
             ask(model.backups)
         }
         .disabled(model.backups.isEmpty || model.isLoading)
-        .help("Delete every backup that rebuilds have kept.")
+        .help("Move all to Trash.")
 
         Button("Refresh", systemImage: "arrow.clockwise") {
             Task { await model.load() }
@@ -183,6 +190,7 @@ struct BackupsView: View {
         Group {
             if targets.count == 1, let backup = targets.first {
                 Button("Reveal in Finder") { model.reveal(backup) }
+                Button("Restore Backup") { model.pendingConfirmation = .restore(backup) }
                 Divider()
             }
             if !targets.isEmpty {

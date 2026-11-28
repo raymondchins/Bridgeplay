@@ -316,7 +316,7 @@ struct PrefixStoreTests {
         try #require(flock(fd, LOCK_EX | LOCK_NB) == 0)
 
         #expect(PrefixStore.isInUse(prefix, root: root))
-        let deletion = try #require(throws: StepFailure.self) { try PrefixTools.delete(prefix) }
+        let deletion = try #require(throws: StepFailure.self) { try PrefixTools.delete(prefix, trash: { _ in Issue.record("reached the Trash") }) }
         #expect(deletion.detail.contains("is running"))
         let rebuild = try #require(throws: StepFailure.self) {
             try PrefixTools.recreate(prefix, runner: dir.appending(path: "runner"))

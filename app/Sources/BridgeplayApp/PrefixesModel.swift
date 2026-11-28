@@ -10,6 +10,7 @@ final class PrefixesModel {
 
     private(set) var prefixes: [WinePrefix] = []
     private(set) var usage: [String: PrefixUsage] = [:]
+    private(set) var shaderCaches: [String: ShaderCacheUsage] = [:]
     private(set) var isLoading = false
     private(set) var records: [String: PrefixBuildRecord] = [:]
     private(set) var tools: [InstalledTool] = []
@@ -49,6 +50,14 @@ final class PrefixesModel {
         case rebuild([WinePrefix], InstalledTool)
         case backUp([WinePrefix])
         case deleteBackups([PrefixBackup])
+        // A move to the Trash failed for these, so nothing of theirs was deleted.
+        case deletePermanently([WinePrefix], [PrefixBackup])
+        case restore(PrefixBackup)
+        case clearShaderCache([WinePrefix])
+    }
+
+    func backups(of prefix: WinePrefix) -> [PrefixBackup] {
+        backups.filter { $0.prefix.id == prefix.id }
     }
 
     var selectedPrefix: WinePrefix? {
@@ -64,6 +73,8 @@ final class PrefixesModel {
     private let installedTools: @Sendable () -> [InstalledTool]
     private let rebuild: @Sendable (WinePrefix, InstalledTool, Bool) throws -> URL?
     private let makeBackup: @Sendable (WinePrefix) throws -> URL
+    private let trash: PrefixTools.Trash
+    private let caches: URL?
 
     init(
         libraries: @escaping @Sendable () -> [SteamLibrary] = { PrefixStore.libraries() },
@@ -73,8 +84,12 @@ final class PrefixesModel {
         },
         makeBackup: @escaping @Sendable (WinePrefix) throws -> URL = {
             try PrefixTools.backUp($0)
-        }
+        },
+        trash: @escaping PrefixTools.Trash = PrefixTools.systemTrash,
+        caches: URL? = ShaderCache.userCaches
     ) {
+        self.trash = trash
+        self.caches = caches
         self.libraries = libraries
         self.installedTools = installedTools
         self.rebuild = rebuild
@@ -93,6 +108,7 @@ final class PrefixesModel {
         guard run == loadGeneration else { return }
         prefixes = found
         usage = usage.filter { id, _ in found.contains { $0.id == id } }
+        shaderCaches = shaderCaches.filter { id, _ in found.contains { $0.id == id } }
         let listTools = installedTools
         let resolved = await Task.detached {
             let tools = listTools()
@@ -131,6 +147,13 @@ final class PrefixesModel {
             guard run == loadGeneration else { return }
             usage[prefix.id] = measured
         }
+
+        let caches = caches
+        for prefix in found {
+            let measured = await Task.detached { ShaderCache.usage(of: prefix, caches: caches) }.value
+            guard run == loadGeneration else { return }
+            shaderCaches[prefix.id] = measured
+        }
     }
 
     func open(_ tool: WineTool, for prefix: WinePrefix) {
@@ -153,12 +176,79 @@ final class PrefixesModel {
     }
 
     func delete(_ targets: [WinePrefix]) async {
-        await eachInTurn(targets, { try PrefixTools.delete($0) }) { deleted in
-            if deleted.count == 1 {
-                return String(localized: "Deleted the prefix for \(deleted[0].prefix.title). Steam will make a new prefix if the game is launched again.")
+        let trash = trash
+        let done = await eachInTurn(targets, { prefix -> Bool in
+            do {
+                try PrefixTools.delete(prefix, trash: trash)
+                return true
+            } catch is TrashUnavailable {
+                return false
             }
-            guard deleted.count > 1 else { return nil }
-            return String(localized: "Deleted \(deleted.count) prefixes. Steam will make a new prefix if a game is launched again.")
+        }) { done in
+            let trashed = done.filter(\.made)
+            if trashed.count == 1 {
+                return String(localized: "Moved prefix for \(trashed[0].prefix.title) to Trash.")
+            }
+            guard trashed.count > 1 else { return nil }
+            return String(localized: "Moved \(trashed.count) prefixes to Trash.")
+        }
+        let kept = done.filter { !$0.made }.map(\.prefix)
+        if !kept.isEmpty { pendingConfirmation = .deletePermanently(kept, []) }
+    }
+
+    // What the no-Trash dialog frees: the prefixes with their backups, nil while unmeasured.
+    func permanentBytes(_ prefixes: [WinePrefix], _ backups: [PrefixBackup]) -> Int64? {
+        var total = backups.reduce(into: Int64(0)) { $0 += $1.bytes }
+        for prefix in prefixes {
+            guard let bytes = usage[prefix.id]?.bytes else { return nil }
+            total += bytes + backupsBytes(of: prefix)
+        }
+        return total
+    }
+
+    private func backupsBytes(of prefix: WinePrefix) -> Int64 {
+        backups(of: prefix).reduce(into: Int64(0)) { $0 += $1.bytes }
+    }
+
+    // Only from the no-Trash dialog, after the user chose Delete Permanently.
+    func deletePermanently(_ prefixes: [WinePrefix], _ targets: [PrefixBackup]) async {
+        if !prefixes.isEmpty {
+            await eachInTurn(prefixes, { try PrefixTools.deletePermanently($0) }) { deleted in
+                if deleted.count == 1 {
+                    return String(localized: "Deleted prefix for \(deleted[0].prefix.title).")
+                }
+                guard deleted.count > 1 else { return nil }
+                return String(localized: "Deleted \(deleted.count) prefixes.")
+            }
+        }
+        if !targets.isEmpty {
+            await removeBackups(targets, permanently: true)
+        }
+    }
+
+    func restore(_ backup: PrefixBackup) async {
+        await eachInTurn([backup.prefix], { _ in try PrefixTools.restore(backup) }) { done in
+            guard !done.isEmpty else { return nil }
+            return String(localized: "Restored \(backup.title). Old data is a new backup.")
+        }
+    }
+
+    func shaderCacheBytes(_ targets: [WinePrefix]) -> Int64 {
+        targets.reduce(into: Int64(0)) { $0 += shaderCaches[$1.id]?.bytes ?? 0 }
+    }
+
+    func clearShaderCaches(_ targets: [WinePrefix]) async {
+        let measured = shaderCaches
+        let caches = caches
+        let chosen = targets.filter { !(measured[$0.id]?.isEmpty ?? true) }
+        await eachInTurn(chosen, { prefix in
+            try ShaderCache.clear(prefix, folders: measured[prefix.id]?.folders ?? [], caches: caches)
+        }) { cleared in
+            if cleared.count == 1 {
+                return String(localized: "Cleared shader cache for \(cleared[0].prefix.title).")
+            }
+            guard cleared.count > 1 else { return nil }
+            return String(localized: "Cleared \(cleared.count) shader caches.")
         }
     }
 
@@ -202,39 +292,63 @@ final class PrefixesModel {
     }
 
     func deleteBackups(_ targets: [PrefixBackup]) async {
+        await removeBackups(targets, permanently: false)
+    }
+
+    private func removeBackups(_ targets: [PrefixBackup], permanently: Bool) async {
         guard !targets.isEmpty else { return }
         forgetOutcome()
         isLoading = true
 
         var cleared: [PrefixBackup] = []
+        var noTrash: [PrefixBackup] = []
         var refused: [Error] = []
+        let trash = trash
         for backup in targets {
             do {
-                try await Task.detached { try PrefixTools.deleteBackup(backup.url) }.value
+                try await Task.detached {
+                    if permanently {
+                        try PrefixTools.deleteBackupPermanently(backup.url)
+                    } else {
+                        try PrefixTools.deleteBackup(backup.url, trash: trash)
+                    }
+                }.value
                 cleared.append(backup)
+            } catch is TrashUnavailable {
+                noTrash.append(backup)
             } catch {
                 refused.append(error)
             }
         }
 
-        outcome = clearedSentence(cleared)
+        outcome = clearedSentence(cleared, permanently: permanently)
         report = FailureReport(refused)
         let gone = Set(cleared.map(\.id))
         backups.removeAll { gone.contains($0.id) }
         isLoading = false
         await load()
+        if !noTrash.isEmpty { pendingConfirmation = .deletePermanently([], noTrash) }
     }
 
-    private func clearedSentence(_ cleared: [PrefixBackup]) -> String? {
+    private func clearedSentence(_ cleared: [PrefixBackup], permanently: Bool) -> String? {
         guard !cleared.isEmpty else { return nil }
         let games = Set(cleared.map(\.prefix.id)).count
+        if permanently {
+            if cleared.count == 1 {
+                return String(localized: "Deleted backup for \(cleared[0].title).")
+            }
+            if games == 1 {
+                return String(localized: "Deleted \(cleared.count) backups for \(cleared[0].title).")
+            }
+            return String(localized: "Deleted \(cleared.count) backups.")
+        }
         if cleared.count == 1 {
-            return String(localized: "Deleted the backup for \(cleared[0].title).")
+            return String(localized: "Moved backup for \(cleared[0].title) to Trash.")
         }
         if games == 1 {
-            return String(localized: "Deleted \(cleared.count) backups for \(cleared[0].title).")
+            return String(localized: "Moved \(cleared.count) backups for \(cleared[0].title) to Trash.")
         }
-        return String(localized: "Deleted \(cleared.count) backups across \(games) prefixes.")
+        return String(localized: "Moved \(cleared.count) backups to Trash.")
     }
 
     private typealias Step<Made> = (prefix: WinePrefix, made: Made)

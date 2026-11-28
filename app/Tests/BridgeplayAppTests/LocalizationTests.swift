@@ -11,7 +11,7 @@ struct LocalizationTests {
     func chineseLookup() throws {
         let zh = try #require(chinese)
         #expect(String(localized: "Status", bundle: zh) == "状态")
-        #expect(String(localized: "Delete \(3) prefixes?", bundle: zh) == "删除 3 个游戏容器？")
+        #expect(String(localized: "Move \(3) prefixes to Trash?", bundle: zh) == "将 3 个游戏容器移到废纸篓？")
     }
 
     @Test("Chinese text can put interpolated values in another order")
@@ -27,7 +27,7 @@ struct LocalizationTests {
     func italianLookup() throws {
         let it = try #require(italian)
         #expect(String(localized: "Status", bundle: it) == "Stato")
-        #expect(String(localized: "Delete \(3) prefixes?", bundle: it) == "Eliminare 3 prefissi?")
+        #expect(String(localized: "Move \(3) prefixes to Trash?", bundle: it) == "Spostare 3 prefissi nel Cestino?")
         #expect(String(localized: "Opened \("Wine Configuration") in \("Zuma Deluxe").", bundle: it)
             == "Aperto Wine Configuration in Zuma Deluxe.")
     }
@@ -38,7 +38,7 @@ struct LocalizationTests {
     func russianLookup() throws {
         let ru = try #require(russian)
         #expect(String(localized: "Status", bundle: ru) == "Статус")
-        #expect(String(localized: "Delete \(3) prefixes?", bundle: ru) == "Удалить префиксы (3)?")
+        #expect(String(localized: "Move \(3) prefixes to Trash?", bundle: ru) == "Переместить префиксы (3) в Корзину?")
         #expect(String(localized: "Opened \("Wine Configuration") in \("Zuma Deluxe").", bundle: ru)
             == "Wine Configuration открыт в Zuma Deluxe.")
     }

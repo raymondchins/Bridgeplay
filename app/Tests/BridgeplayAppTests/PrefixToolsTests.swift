@@ -631,11 +631,16 @@ struct PrefixToolsTests {
 
         let calls = source.ranges(of: "  show_alert \"")
         #expect(!calls.isEmpty)
+        // Every alert ends the launch; an np_outcome= line for the outcome record may come first.
         for call in calls {
-            let rest = source[call.upperBound...]
-            let line = try #require(rest.firstIndex(of: "\n"))
-            let next = rest[rest.index(after: line)...].prefix { $0 != "\n" }
-            #expect(next.trimmingCharacters(in: .whitespaces) == "exit 1")
+            var rest = source[call.upperBound...]
+            var next = ""
+            repeat {
+                let line = try #require(rest.firstIndex(of: "\n"))
+                rest = rest[rest.index(after: line)...]
+                next = rest.prefix { $0 != "\n" }.trimmingCharacters(in: .whitespaces)
+            } while next.hasPrefix("np_outcome=")
+            #expect(next == "exit 1")
         }
     }
 
@@ -1896,7 +1901,7 @@ struct PrefixToolsTests {
         #expect(PrefixStore.backups(of: prefix).isEmpty)
     }
 
-    @Test("Deleting a backup takes that one and leaves the live prefix")
+    @Test("Deleting a backup permanently takes that one and leaves the live prefix")
     func deleteBackupsClearsThemAll() throws {
         let fm = FileManager.default
         let dir = fm.temporaryDirectory.appending(path: "np-clear-\(UUID().uuidString)")
@@ -1914,18 +1919,18 @@ struct PrefixToolsTests {
         let kept = PrefixStore.backups(of: prefix)
         #expect(kept.count == 2)
 
-        try PrefixTools.deleteBackup(kept[0])
+        try PrefixTools.deleteBackupPermanently(kept[0])
 
         #expect(PrefixStore.backups(of: prefix).map(\.lastPathComponent)
             == ["pfx.previous-20260102-133000"])
         #expect(fm.fileExists(atPath: prefix.pfx.path(percentEncoded: false)))
 
-        try PrefixTools.deleteBackup(kept[1])
+        try PrefixTools.deleteBackupPermanently(kept[1])
         #expect(PrefixStore.backups(of: prefix).isEmpty)
         #expect(fm.fileExists(atPath: prefix.pfx.path(percentEncoded: false)))
     }
 
-    @Test("Deleting takes the whole compatdata entry, not just the prefix inside it")
+    @Test("Deleting permanently takes the whole compatdata entry, not just the prefix inside it")
     func deleteRemovesTheEntry() throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "np-del-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -1936,7 +1941,7 @@ struct PrefixToolsTests {
         try Data("log".utf8).write(to: entry.appending(path: "bridgeplay-run.log"))
 
         let prefix = try #require(PrefixStore.all(libraries: [library]).first)
-        try PrefixTools.delete(prefix)
+        try PrefixTools.deletePermanently(prefix)
 
         #expect(!FileManager.default.fileExists(atPath: entry.path(percentEncoded: false)))
         // The compatdata directory itself belongs to Steam and stays.
