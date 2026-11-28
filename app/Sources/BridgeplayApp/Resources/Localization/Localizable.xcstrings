@@ -8026,6 +8026,28 @@
         }
       }
     },
+    "Game Controllers" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controller di gioco"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Игровые контроллеры"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏控制器"
+          }
+        }
+      }
+    },
     "Game Defaults" : {
       "localizations" : {
         "it" : {

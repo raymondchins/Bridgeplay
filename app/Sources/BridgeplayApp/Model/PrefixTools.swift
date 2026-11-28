@@ -9,12 +9,23 @@ enum WineTool: String, CaseIterable, Sendable {
     case winecfg
     case regedit
     case taskmgr
+    case joystick
 
     var label: String {
         switch self {
         case .winecfg: String(localized: "Wine Configuration")
         case .regedit: String(localized: "Registry Editor")
         case .taskmgr: String(localized: "Task Manager")
+        case .joystick: String(localized: "Game Controllers")
+        }
+    }
+
+    // What the loader runs. Game Controllers is Wine's joy.cpl, which lists the pads the
+    // game would see and tests their buttons, axes and rumble.
+    var arguments: [String] {
+        switch self {
+        case .joystick: ["control", "joy.cpl"]
+        default: [rawValue]
         }
     }
 }
@@ -238,7 +249,7 @@ enum PrefixTools {
         )
         try Shell.detach(
             loader.path(percentEncoded: false),
-            [tool.rawValue],
+            tool.arguments,
             environment: environment(prefix: prefix, runner: runner, flavor: flavor)
         )
     }

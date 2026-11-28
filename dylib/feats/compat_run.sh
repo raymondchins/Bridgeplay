@@ -491,6 +491,62 @@ $pad_maps"
 }
 np_pad_mappings
 
+# The pads attached at launch, for "controller not detected" reports: vendor:product,
+# transport and whether a gamecontrollerdb file maps it (SDL's built-in list may know pads
+# these files don't). A USB XInput pad has no HID interface on macOS, and Steam's SDL can
+# hold it exclusively (#4934). Read-only, in the background; no names or serials.
+np_pad_report() {
+  pad_ioreg=${np_ioreg:-/usr/sbin/ioreg}
+  pads=$({ "$pad_ioreg" -r -c IOHIDDevice -d 1 -w 0; echo '#usb'; "$pad_ioreg" -r -c IOUSBHostDevice -d 2 -w 0; } 2>/dev/null \
+    | awk '
+      function flush() {
+        u = p["PrimaryUsage"]
+        if (!usb && p["PrimaryUsagePage"] == 1 && (u == 4 || u == 5 || u == 8))
+          printf "hid %04x:%04x %s\n", p["VendorID"], p["ProductID"], (p["Transport"] == "" ? "?" : p["Transport"])
+        if (usb && cls == "IOUSBHostInterface" && p["bInterfaceClass"] == 255 \
+            && ((p["bInterfaceSubClass"] == 93 && p["bInterfaceProtocol"] == 1) \
+              || (p["bInterfaceSubClass"] == 71 && p["bInterfaceProtocol"] == 208))) {
+          v = ("idVendor" in p) ? p["idVendor"] : dv
+          d = ("idProduct" in p) ? p["idProduct"] : dp
+          printf "xinput %04x:%04x %s\n", v, d, (p["UsbExclusiveOwner"] != "" ? p["UsbExclusiveOwner"] : downer)
+        }
+        split("", p)
+      }
+      /^#usb$/ { flush(); usb = 1; cls = ""; next }
+      /\+-o / {
+        flush(); cls = $0; sub(/.*<class /, "", cls); sub(/,.*/, "", cls)
+        if (cls == "IOUSBHostDevice") { dv = ""; dp = ""; downer = "" }
+        next
+      }
+      /^[ |]*"[A-Za-z]+" = / {
+        key = $0; sub(/^[ |]*"/, "", key); sub(/".*/, "", key)
+        val = $0; sub(/^[^=]*= /, "", val); gsub(/"/, "", val)
+        p[key] = val
+        if (cls == "IOUSBHostDevice") {
+          if (key == "idVendor") dv = val
+          else if (key == "idProduct") dp = val
+          else if (key == "UsbExclusiveOwner") downer = val
+        }
+      }
+      END { flush() }' | awk '!seen[$1 " " $2]++')
+  [ -n "$pads" ] || { echo "controllers: no gamepad attached at launch"; return 0; }
+  printf '%s\n' "$pads" | while read -r kind id rest; do
+    v=${id%:*}; d=${id#*:}
+    le=$(printf '%s' "$v$d" | sed 's/^\(..\)\(..\)\(..\)\(..\)$/\2\10000\4\3/')
+    map="none in Bridgeplay's files"
+    for f in "$np_support/gamecontrollerdb.txt" "$np_support/gamecontrollerdb.merged.txt"; do
+      [ -f "$f" ] && LC_ALL=C cut -c9-20 "$f" | tr 'A-F' 'a-f' | grep -qx "$le" && { map=${f##*/}; break; }
+    done
+    case "$kind" in
+      hid) echo "controllers: pad $id over $rest, mapping: $map" ;;
+      xinput) echo "controllers: pad $id is USB XInput, which has no HID interface on macOS${rest:+; held exclusively by $rest}" ;;
+    esac
+  done
+}
+if [ "$verb" = waitforexitandrun ]; then
+  np_pad_report < /dev/null >> "$log" 2>&1 7>&- 8>&- 9>&- &
+fi
+
 # Settings for every game, then per-game fixes, the later file winning per key: the shipped
 # gamefixes-default/default.conf, the user's gamefixes/default.conf (Game Defaults in the
 # app), the shipped gamefixes-default/<appid>.conf, then the user's gamefixes/<appid>.conf.
