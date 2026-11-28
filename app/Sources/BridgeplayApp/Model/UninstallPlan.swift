@@ -31,6 +31,8 @@ struct UninstallPaths: Sendable {
     var appFiles: [URL]
     var users: URL
     var userName: String
+    // Every copy of Steam Bridgeplay changed, so verification checks the ones besides `app`.
+    var modifications: SteamModifications
 
     static var live: UninstallPaths {
         let home = SupportPaths.home
@@ -59,7 +61,8 @@ struct UninstallPaths: Sendable {
                 home.appending(path: "Library/Saved Application State/\(id).savedState"),
             ],
             users: URL(filePath: "/Users"),
-            userName: NSUserName())
+            userName: NSUserName(),
+            modifications: .shared)
     }
 
     // Login items Bridgeplay could have left. It adds none today; older or hand-made ones go too.
@@ -197,7 +200,11 @@ struct UninstallVerification: Sendable {
         }
     }
 
-    static func run(paths: UninstallPaths, signature: @Sendable (URL) -> Signature = liveSignature) -> UninstallVerification {
+    static func run(
+        paths: UninstallPaths,
+        signature: @Sendable (URL) -> Signature = liveSignature,
+        inspect: @Sendable (URL) throws -> SteamModifications.State = SteamModifications.inspect
+    ) -> UninstallVerification {
         var inSteam: [UninstallItem] = []
         let dylib = SupportPaths.Steam.deployedDylib(inBundle: paths.app)
         if UninstallPaths.exists(dylib) { inSteam.append(UninstallItem(url: dylib)) }
@@ -210,6 +217,19 @@ struct UninstallVerification: Sendable {
             inSteam.append(UninstallItem(url: block, note: String(localized: "Updates still blocked")))
         }
         inSteam += paths.filesInSteamData().map { UninstallItem(url: $0) }
+        // Other copies of Steam Bridgeplay changed: one on a drive that is not connected was not checked.
+        let checked = paths.app.standardizedFileURL.path
+        for copy in (try? paths.modifications.paths()) ?? [] where copy.standardizedFileURL.path != checked {
+            do {
+                switch try inspect(copy) {
+                case .absent, .clean: break
+                case .modified: inSteam.append(UninstallItem(url: copy, note: String(localized: "Still loads Bridgeplay")))
+                case .unreachable: inSteam.append(UninstallItem(url: copy, note: String(localized: "Not checked: its drive is not connected")))
+                }
+            } catch {
+                inSteam.append(UninstallItem(url: copy, note: String(localized: "Not checked: \(error.localizedDescription)")))
+            }
+        }
         let user = (paths.owned + paths.ourLaunchAgents()).filter(UninstallPaths.exists).map { UninstallItem(url: $0) }
         return UninstallVerification(signature: signature(paths.app), app: paths.app,
                                      leftInSteam: inSteam, leftForUser: user)

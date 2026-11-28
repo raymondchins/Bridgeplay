@@ -103,7 +103,9 @@ struct UninstallPlanTests {
             userdata: steamData.appending(path: "userdata"),
             appFiles: [bridgeplayApp, home.appending(path: "Library/Preferences/com.bridgeplay.Bridgeplay.plist")],
             users: users,
-            userName: "raymond")
+            userName: "raymond",
+            modifications: SteamModifications(file: root.appending(path: "tracked-bundles.json"),
+                                              legacyRecord: root.appending(path: "tracked-build.json")))
         return Fixture(root: root, paths: paths, library: library)
     }
 
@@ -198,6 +200,31 @@ struct UninstallPlanTests {
 
         #expect(!result.passed)
         #expect(result.leftInSteam.map(\.url) == [inner])
+    }
+
+    @Test("Verify checks every tracked copy of Steam and fails on one it cannot reach")
+    func verifyChecksTrackedCopies() throws {
+        let fixture = try fixture(modified: false)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let clean = URL(filePath: "/Volumes/Games/Clean/Steam.app")
+        let changed = URL(filePath: "/Volumes/Games/Changed/Steam.app")
+        let away = URL(filePath: "/Volumes/Away/Steam.app")
+        let states: [String: SteamModifications.State] = [clean.path: .clean, changed.path: .modified, away.path: .unreachable]
+        for app in [fixture.paths.app, clean, changed, away] { try fixture.paths.modifications.mark(app) }
+
+        let result = UninstallVerification.run(
+            paths: fixture.paths, signature: { _ in .valve },
+            inspect: { app in
+                guard let state = states[app.path] else { throw CocoaError(.fileReadUnknown) }
+                return state
+            })
+
+        #expect(!result.passed)
+        #expect(Set(result.leftInSteam.map(\.url)) == [changed, away])
+        #expect(result.leftInSteam.first { $0.url == away }?.note?.hasPrefix("Not checked") == true)
+        #expect(result.text.contains(away.path))
+        #expect(UninstallVerification.run(paths: fixture.paths, signature: { _ in .valve },
+                                          inspect: { _ in .clean }).passed)
     }
 
     @Test("Verify fails when Steam is not Valve's, even with nothing of Bridgeplay's in it")

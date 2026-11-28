@@ -10842,6 +10842,50 @@
         }
       }
     },
+    "Not checked: %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non verificato: %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не проверено: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未检查：%@"
+          }
+        }
+      }
+    },
+    "Not checked: its drive is not connected" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non verificato: il suo disco non è collegato"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не проверено: его диск не подключён"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未检查：其所在的磁盘未连接"
+          }
+        }
+      }
+    },
     "Not installed." : {
       "localizations" : {
         "it" : {
