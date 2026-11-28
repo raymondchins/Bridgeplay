@@ -173,14 +173,19 @@ final class SetupAssistant {
     }
 
     var spaceMessage: String {
-        let free = freeBytes.map(SetupChecks.size) ?? "0"
-        return String(localized: "\(free) free, \(SetupChecks.size(SetupChecks.requiredBytes)) needed.")
+        Self.spaceMessage(free: freeBytes.map(SetupChecks.size) ?? "0", needed: SetupChecks.size(SetupChecks.requiredBytes))
+    }
+
+    static func spaceMessage(free: String, needed: String) -> String {
+        String(localized: "\(free) free, \(needed) needed.")
     }
 
     // A full disk is not a bug to report: its failure offers Storage settings instead. Both
-    // the check before a download and a download that ran out of room mid-way count.
+    // the check before a download and a download that ran out of room mid-way count, with
+    // the sizes of when they failed.
     func isOutOfSpace(_ failure: String) -> Bool {
-        failure == spaceMessage || failure.hasSuffix(PinnedDownload.outOfSpaceDetail)
+        PinnedDownload.matches(failure, wholly: true) { Self.spaceMessage(free: $0, needed: $0) }
+            || PinnedDownload.endsOutOfSpace(failure)
     }
 
     func openStorageSettings() {

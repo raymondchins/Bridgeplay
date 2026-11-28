@@ -70,6 +70,21 @@ struct SetupDeadEndsTests {
         #expect(!model.isOutOfSpace("The download's signature didn't match."))
     }
 
+    @Test("A full disk still offers Storage after the free space changed")
+    @MainActor
+    func fullDiskAfterSpaceChanged() {
+        let model = SetupAssistant(preview: .fresh)
+        model.freeBytes = 1_000_000
+        let before = model.spaceMessage
+        let midway = "Download: \(PinnedDownload.outOfSpaceDetail(free: "1 MB"))"
+        model.freeBytes = 3_000_000_000
+        #expect(model.spaceMessage != before)
+        #expect(model.isOutOfSpace(before))
+        #expect(model.isOutOfSpace(midway))
+        #expect(!model.isOutOfSpace("Download: \(before) Something else."))
+        #expect(!model.isOutOfSpace("Download failed: the host answered 404."))
+    }
+
     @Test("A full disk is told apart from other download failures")
     func outOfSpace() {
         let posix = NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC))

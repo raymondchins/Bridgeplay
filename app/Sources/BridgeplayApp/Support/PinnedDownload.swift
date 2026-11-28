@@ -292,8 +292,27 @@ enum PinnedDownload {
     }
 
     static var outOfSpaceDetail: String {
-        let free = SetupChecks.freeBytes().map(SetupChecks.size) ?? "0"
-        return String(localized: "Out of space (\(free) free). Free some up and retry.")
+        outOfSpaceDetail(free: SetupChecks.freeBytes().map(SetupChecks.size) ?? "0")
+    }
+
+    static func outOfSpaceDetail(free: String) -> String {
+        String(localized: "Out of space (\(free) free). Free some up and retry.")
+    }
+
+    // A failure that ends in outOfSpaceDetail, whatever the free space was then.
+    static func endsOutOfSpace(_ failure: String) -> Bool {
+        matches(failure, wholly: false) { outOfSpaceDetail(free: $0) }
+    }
+
+    // Whether text is (or, unless wholly, ends with) the message `make` builds, with any values
+    // where `make` puts its argument. A failure keeps the numbers of when it happened.
+    static func matches(_ text: String, wholly: Bool, _ make: (String) -> String) -> Bool {
+        let mark = "\u{1}"
+        let parts = make(mark).components(separatedBy: mark)
+        let pattern = parts.map(NSRegularExpression.escapedPattern(for:)).joined(separator: ".+?")
+        guard let regex = try? NSRegularExpression(pattern: (wholly ? "^" : "") + pattern + "$", options: [.dotMatchesLineSeparators])
+        else { return false }
+        return regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
     }
 
     // ENOSPC or Foundation's out-of-space error anywhere in the chain, or the download task's
