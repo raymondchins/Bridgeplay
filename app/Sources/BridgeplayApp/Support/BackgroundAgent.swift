@@ -15,6 +15,13 @@ enum BackgroundAgent {
     // Unattended: a Steam the user opens meanwhile is left running.
     static let installArguments = [InstallIntoSteamCommand.flag, InstallIntoSteamCommand.unattendedFlag]
 
+    // Which watched folder an FSEvents batch touched: this app's bundle, or Steam's.
+    static func touched(_ paths: [String], bundle: String) -> (bundle: Bool, other: Bool) {
+        let root = bundle.hasSuffix("/") ? String(bundle.dropLast()) : bundle
+        let inBundle = { (path: String) in path == root || path.hasPrefix(root + "/") }
+        return (paths.contains(where: inBundle), paths.contains { !inBundle($0) })
+    }
+
     static func run() -> Never {
         MainActor.assumeIsolated { Loop.shared.start() }
         RunLoop.main.run()
@@ -200,7 +207,8 @@ enum BackgroundAgent {
             }
             let steam = SupportPaths.Steam.app.path(percentEncoded: false)
             watchedSteam = steam
-            let paths = [steam, Bundle.main.bundleURL.appending(path: "Contents/Info.plist").path(percentEncoded: false)]
+            // FSEvents watches folders: Bridgeplay's own bundle, for an update replacing it.
+            let paths = [steam, Self.ownBundle]
             let callback: FSEventStreamCallback = { _, _, count, rawPaths, _, _ in
                 let list = unsafeBitCast(rawPaths, to: NSArray.self) as? [String] ?? []
                 let touched = Array(list.prefix(count))
@@ -220,16 +228,19 @@ enum BackgroundAgent {
             stream = created
         }
 
+        private static let ownBundle = Bundle.main.bundleURL.path(percentEncoded: false)
+
         private func filesChanged(_ paths: [String]) {
-            let ownPlist = Bundle.main.bundleURL.appending(path: "Contents/Info.plist").path(percentEncoded: false)
-            if paths.contains(ownPlist) {
-                let onDisk = NSDictionary(contentsOfFile: ownPlist)?["CFBundleVersion"] as? String
+            let touched = BackgroundAgent.touched(paths, bundle: Self.ownBundle)
+            if touched.bundle {
+                let plist = URL(filePath: Self.ownBundle).appending(path: "Contents/Info.plist").path(percentEncoded: false)
+                let onDisk = NSDictionary(contentsOfFile: plist)?["CFBundleVersion"] as? String
                 if let onDisk, onDisk != ownBuild {
                     AppLog.note("background check: Bridgeplay updated to build \(onDisk), restarting")
                     exit(AppLog.finished(BackgroundAgent.restartStatus))
                 }
             }
-            if paths.contains(where: { $0 != ownPlist }) { look(after: afterEvent) }
+            if touched.other { look(after: afterEvent) }
         }
 
         // Steam under any macOS account, and this user's Bridgeplay app.

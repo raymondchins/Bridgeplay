@@ -258,4 +258,14 @@ struct BackgroundItemTests {
         #expect(BackgroundItem.state(for: .enabled, plistShipped: true) == .on)
         #expect(BackgroundItem.state(for: .requiresApproval, plistShipped: true) == .needsApproval)
     }
+
+    @Test("An update replacing the bundle counts as the app's change, Steam's as Steam's")
+    func touchedFolders() {
+        let bundle = "/Applications/Bridgeplay.app/"
+        #expect(BackgroundAgent.touched(["/Applications/Bridgeplay.app/Contents/Info.plist"], bundle: bundle) == (true, false))
+        #expect(BackgroundAgent.touched(["/Applications/Bridgeplay.app"], bundle: bundle) == (true, false))
+        #expect(BackgroundAgent.touched(["/Applications/Steam.app/Contents/MacOS/steam_osx"], bundle: bundle) == (false, true))
+        #expect(BackgroundAgent.touched(["/Applications/Bridgeplay.app.previous/Contents/Info.plist"], bundle: bundle) == (false, true))
+        #expect(BackgroundAgent.touched(["/Applications/Bridgeplay.app/Contents", "/Applications/Steam.app"], bundle: bundle) == (true, true))
+    }
 }
