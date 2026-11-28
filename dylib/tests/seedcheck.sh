@@ -331,12 +331,37 @@ for signal in TERM:143 INT:130 HUP:129; do
   check seeded_whole
 done
 
+# A dead launch's staging folders named after the pid macOS has since given this launch: no
+# live launch can own them, so they are swept and this build and seed go ahead.
 fixture
 mkdir -p "$template_dir/pfx.building.$$"
 printf partial > "$template_dir/pfx.building.$$/system.reg"
 rm -rf "$template_dir/pfx"
 check test "$(build_prefix_template && echo accepted || echo refused)" = refused
 check test ! -e "$template_dir/pfx"
+check grep -q "=== building the prefix template" "$log"
+check test ! -e "$template_dir/pfx.building.$$/system.reg"
+fixture
+mkdir "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$$"
+printf partial > "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$$/system.reg"
+finish_dead_seeds
+check test ! -e "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$$"
+check grep -q "dropped pfx.seeding.$$, an earlier launch's unfinished seed: it stopped before it moved anything in" "$log"
+
+# Another live launch's staging folders stay.
+fixture
+sleep 120 &
+live=$!
+mkdir -p "$template_dir/pfx.building.$live" "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$live"
+printf partial > "$template_dir/pfx.building.$live/system.reg"
+printf partial > "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$live/system.reg"
+rm -rf "$template_dir/pfx"
+build_prefix_template || true
+finish_dead_seeds
+check test "$(cat "$template_dir/pfx.building.$live/system.reg")" = partial
+check test "$(cat "$STEAM_COMPAT_DATA_PATH/pfx.seeding.$live/system.reg")" = partial
+kill "$live" 2>/dev/null || true
+wait "$live" 2>/dev/null || true
 
 fixture
 profile="$WINEPREFIX/drive_c/users/steamuser"
