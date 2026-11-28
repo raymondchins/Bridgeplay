@@ -154,7 +154,7 @@ chmod +x "$old_ended"
 
 # ended VERB CODE WINDOW [APP]: the end of one launch, with lock-like descriptors open
 ended() {
-	rm -f "$ended" "$ended.fds" "$ended.parent" "$(dirname "$old_ended")/ended"
+	rm -f "$ended" "$ended.fds" "$ended.parent" "$(dirname "$old_ended")/ended" "$work/took"
 	if [ -n "${4:-}" ]; then printf '%s' "$4" > "$support/app-executable"; else rm -f "$support/app-executable"; fi
 	env verb="$1" code="$2" window="$3" app_id=3372060 np_support="$support" log="$work/log" \
 		STEAM_COMPAT_DATA_PATH="$compat" functions="$functions" work="$work" \
@@ -163,7 +163,8 @@ exec 5>> "$work/log.lock" 6>> "$work/log.lock" 7>> "$work/log.lock" 8>> "$work/l
 before=$(date +%s)
 launch_ended "$code" "$window"
 echo $(($(date +%s) - before)) > "$work/took"'
-	took=$(cat "$work/took")
+	# No file: launch_ended failed under sh -e
+	took=$(cat "$work/took" 2>/dev/null || echo error)
 }
 wait_ended() { i=0; while [ ! -f "$ended" ] && [ "$i" -lt 30 ]; do sleep 0.1; i=$((i + 1)); done; }
 
@@ -188,7 +189,8 @@ ended waitforexitandrun access_violation 3 "$old_ended"
 sleep 0.8
 is "an app without the flag is not started" no "$([ -f "$(dirname "$old_ended")/ended" ] && echo yes || echo no)"
 ended waitforexitandrun access_violation 3 ""
-is "no app: nothing, and no error" 0 "$took"
+# Whole seconds: a quick call that crosses a second boundary reads 1
+is "no app: nothing, and no error" yes "$([ "$took" != error ] && [ "$took" -le 1 ] && [ ! -f "$ended" ] && echo yes || echo no)"
 end_record_at=$(at '^write_last_launch "${outcome')
 end_panel_at=$(at '^launch_ended "${outcome')
 if [ -n "$end_record_at" ] && [ -n "$end_panel_at" ] && [ $((end_panel_at - end_record_at)) -eq 1 ]; then
