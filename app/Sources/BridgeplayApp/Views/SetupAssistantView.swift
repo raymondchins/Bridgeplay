@@ -728,7 +728,7 @@ private struct RisksNote: View {
                         .fixedSize(horizontal: false, vertical: true)
                     // Under Reduce Motion the chevron swaps without turning.
                     Image(systemName: reduceMotion && expanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.system(size: 11, weight: .semibold))
                         .rotationEffect(.degrees(!reduceMotion && expanded ? 90 : 0))
                 }
                 .contentShape(Rectangle())

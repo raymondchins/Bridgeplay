@@ -282,6 +282,19 @@ struct ResumableDownloadTests {
         #expect(stopped.peak >= 1, "the other files ran on after the failure")
     }
 
+    @Test("An optional file that fails leaves the others and Setup going")
+    func prefetchOptionalFailureIsKept() async throws {
+        struct Refused: Error {}
+        let done = Running()
+        var files = ["a", "b"].map(pinned)
+        files[0].optional = true
+        try await SetupPrefetch.run(files) { file in
+            if file.file == "a" { throw Refused() }
+            done.enter(); done.leave()
+        }
+        #expect(done.finished == 1)
+    }
+
     @MainActor @Test("The bar counts every file of a batch, and shows a total only once each size is known")
     func meterCombinesFiles() {
         let meter = DownloadMeter()

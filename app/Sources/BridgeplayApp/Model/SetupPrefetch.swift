@@ -11,6 +11,8 @@ enum SetupPrefetch {
         let into: URL
         let step: String
         let source: String
+        // A file Setup can do without (the restore bundle): a failed download is logged, not fatal.
+        var optional = false
     }
 
     // The engine and its DXMT archive, Valve's packages when a bridge file misses its pin,
@@ -42,7 +44,7 @@ enum SetupPrefetch {
            SteamRepair.keptArchive(bundle, in: kept) == nil,
            Digest.sha256IfPresent(valveCache.appending(path: bundle.file)) != bundle.sha256 {
             files.append(Pinned(file: bundle.file, sha256: bundle.sha256, bases: valve.bases, into: kept,
-                                step: SteamRepair.step, source: "Valve"))
+                                step: SteamRepair.step, source: "Valve", optional: true))
         }
         return files
     }
@@ -61,6 +63,13 @@ enum SetupPrefetch {
                                                 into: pinned.into, step: pinned.step, from: pinned.source)
         }
     ) async throws {
+        // An optional file that fails leaves Setup going; it is fetched again where it is needed.
+        let fetch: @Sendable (Pinned) async throws -> Void = { pinned in
+            guard pinned.optional else { return try await obtain(pinned) }
+            do { try await obtain(pinned) } catch is CancellationError { throw CancellationError() } catch {
+                AppLog.note("setup: \(pinned.file) not fetched ahead, it is fetched when needed: \(error.localizedDescription)")
+            }
+        }
         try Task.checkCancellation()
         let keys = files.map(\.archivePath)
         await MainActor.run { DownloadMeter.shared.begin(batch: keys) }
@@ -69,10 +78,10 @@ enum SetupPrefetch {
                 var waiting = files.makeIterator()
                 for _ in 0..<max(limit, 1) {
                     guard let file = waiting.next() else { break }
-                    group.addTask { try await obtain(file) }
+                    group.addTask { try await fetch(file) }
                 }
                 while try await group.next() != nil {
-                    if let file = waiting.next() { group.addTask { try await obtain(file) } }
+                    if let file = waiting.next() { group.addTask { try await fetch(file) } }
                 }
             }
         } catch {
