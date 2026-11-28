@@ -2432,6 +2432,28 @@
         }
       }
     },
+    "Also removes Bridgeplay from Steam for %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuove Bridgeplay da Steam anche per %@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Также удаляет Bridgeplay из Steam для %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "也会为 %@ 从 Steam 移除 Bridgeplay。"
+          }
+        }
+      }
+    },
     "Another account on this Mac installed a beta. Bridgeplay %@ stays until a stable release includes build %@." : {
       "localizations" : {
         "it" : {
@@ -4129,6 +4151,28 @@
         }
       }
     },
+    "Bridgeplay removed" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay rimosso"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay удалён"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已移除 Bridgeplay"
+          }
+        }
+      }
+    },
     "Bridgeplay removes these settings from the game's conf and keeps a copy in its backups folder." : {
       "localizations" : {
         "it" : {
@@ -4569,6 +4613,28 @@
         }
       }
     },
+    "Check Again" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controlla di nuovo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверить снова"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次检查"
+          }
+        }
+      }
+    },
     "Check for Updates…" : {
       "localizations" : {
         "it" : {
@@ -4675,6 +4741,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "检查你的 Mac"
+          }
+        }
+      }
+    },
+    "Checked ones go to the Trash, saves included." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelli selezionati vanno nel Cestino, salvataggi inclusi."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отмеченные попадут в Корзину вместе с сохранениями."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "勾选的会连同存档移到废纸篓。"
           }
         }
       }
@@ -5577,6 +5665,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "复制 CrossOver 的引擎"
+          }
+        }
+      }
+    },
+    "Copy List" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia elenco"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопировать список"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝列表"
           }
         }
       }
@@ -7252,6 +7362,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下载 Valve 组件"
+          }
+        }
+      }
+    },
+    "Files left in Steam" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File rimasti in Steam"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В Steam остались файлы"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 中仍有文件"
           }
         }
       }
@@ -9126,6 +9258,28 @@
         }
       }
     },
+    "Kept" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conservato"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остаётся"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留"
+          }
+        }
+      }
+    },
     "Last played %@" : {
       "localizations" : {
         "it" : {
@@ -10710,6 +10864,28 @@
         }
       }
     },
+    "Not removed" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non rimosso"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалено"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未移除"
+          }
+        }
+      }
+    },
     "Not set" : {
       "localizations" : {
         "it" : {
@@ -10772,6 +10948,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未设置。Bridgeplay 仍可使用，但每次更新后你都需要重新允许控制器。"
+          }
+        }
+      }
+    },
+    "Not signed by Valve" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non firmato da Valve"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не подписан Valve"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未由 Valve 签名"
           }
         }
       }
@@ -12580,6 +12778,28 @@
         }
       }
     },
+    "Remove Bridgeplay?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovere Bridgeplay?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить Bridgeplay?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除 Bridgeplay？"
+          }
+        }
+      }
+    },
     "Remove Copy" : {
       "localizations" : {
         "it" : {
@@ -12668,28 +12888,6 @@
         }
       }
     },
-    "Remove everything Bridgeplay has created?" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rimuovere tutto ciò che Bridgeplay ha creato?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить всё, что создал Bridgeplay?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除 Bridgeplay 创建的所有内容？"
-          }
-        }
-      }
-    },
     "Remove from Favorites" : {
       "localizations" : {
         "it" : {
@@ -12752,6 +12950,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移除 %@ 的副本？"
+          }
+        }
+      }
+    },
+    "Removed" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimossi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалено"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已移除"
           }
         }
       }
@@ -12884,6 +13104,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请修复 Steam 将其移除，然后安装 Bridgeplay。"
+          }
+        }
+      }
+    },
+    "Repair or reinstall Steam." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripara o reinstalla Steam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановите или переустановите Steam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请修复或重新安装 Steam。"
           }
         }
       }
@@ -13878,6 +14120,28 @@
         }
       }
     },
+    "Saves for %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvataggi di %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранения %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的存档"
+          }
+        }
+      }
+    },
     "Saves go too." : {
       "localizations" : {
         "it" : {
@@ -14648,6 +14912,28 @@
         }
       }
     },
+    "Signed by Valve" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firmato da Valve"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подписан Valve"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 Valve 签名"
+          }
+        }
+      }
+    },
     "Signed in." : {
       "localizations" : {
         "it" : {
@@ -15333,6 +15619,50 @@
         }
       }
     },
+    "Steam is clean" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam è pulito"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam чист"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 已清理干净"
+          }
+        }
+      }
+    },
+    "Steam is downloaded again when it quits." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam viene riscaricato quando si chiude."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam скачается заново после выхода."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 退出后会重新下载。"
+          }
+        }
+      }
+    },
     "Steam is modified" : {
       "localizations" : {
         "it" : {
@@ -15377,24 +15707,24 @@
         }
       }
     },
-    "Steam is restored to its unmodified state and Bridgeplay is removed, including the compatibility tool that lives inside the Steam folder. Windows games and Steam Play prefixes are not removed." : {
+    "Steam is restored when it quits." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Steam viene riportato allo stato originale e Bridgeplay viene rimosso, compreso lo strumento di compatibilità nella cartella di Steam. I giochi Windows e i prefissi di Steam Play non vengono rimossi."
+            "value" : "Steam viene ripristinato quando si chiude."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Steam вернётся в исходное состояние, а Bridgeplay будет удалён, включая инструмент совместимости в папке Steam. Игры Windows и префиксы Steam Play не удаляются."
+            "value" : "Steam восстановится после выхода."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此操作会将 Steam 恢复为未修改的状态，并移除 Bridgeplay（包括 Steam 文件夹内的兼容工具）。不会删除 Windows 游戏及 Steam Play 游戏容器。"
+            "value" : "Steam 退出后即会恢复。"
           }
         }
       }
@@ -15461,6 +15791,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Steam 已配置为注入其他动态库。请先修复 Steam，再安装 Bridgeplay。"
+          }
+        }
+      }
+    },
+    "Steam is unchanged." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam non è stato modificato."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam не изменён."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 未被修改。"
           }
         }
       }
@@ -15549,6 +15901,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未找到 Steam。"
+          }
+        }
+      }
+    },
+    "Steam not installed" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam non installato"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam не установлен"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安装 Steam"
           }
         }
       }
@@ -15945,6 +16319,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "第 %lld 步，共 %lld 步，%@"
+          }
+        }
+      }
+    },
+    "Still loads Bridgeplay" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carica ancora Bridgeplay"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Всё ещё загружает Bridgeplay"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍会加载 Bridgeplay"
           }
         }
       }
@@ -17687,6 +18083,50 @@
         }
       }
     },
+    "Trash it after it quits" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cestinala dopo la chiusura"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалите после выхода"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出后移到废纸篓"
+          }
+        }
+      }
+    },
+    "Trashed" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nel Cestino"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В Корзине"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已移到废纸篓"
+          }
+        }
+      }
+    },
     "Trust" : {
       "localizations" : {
         "it" : {
@@ -18017,6 +18457,28 @@
         }
       }
     },
+    "Updates still blocked" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiornamenti ancora bloccati"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновления всё ещё заблокированы"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新仍被阻止"
+          }
+        }
+      }
+    },
     "Use Defaults" : {
       "localizations" : {
         "it" : {
@@ -18233,6 +18695,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "游戏开启 DLSS 时使用 MetalFX。"
+          }
+        }
+      }
+    },
+    "Verify" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verifica"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证"
           }
         }
       }
@@ -18987,6 +19471,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的 Mac"
+          }
+        }
+      }
+    },
+    "Your game fixes" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le tue correzioni"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ваши исправления игр"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的游戏修复"
+          }
+        }
+      }
+    },
+    "Your games stay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I tuoi giochi restano."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ваши игры останутся."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的游戏会保留。"
           }
         }
       }

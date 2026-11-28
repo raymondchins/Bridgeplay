@@ -1,4 +1,5 @@
 import Foundation
+import ServiceManagement
 
 enum UninstallPhase: Sendable {
     case stoppingClient
@@ -27,6 +28,10 @@ struct UninstallOutcome: Sendable {
     var keptGamefixes: URL?
     // Steam's default compatibility tool was ours and was put back or cleared.
     var restoredDefaultTool = false
+    // Prefixes the user picked, now in the Trash, and the ones that could not be moved.
+    var trashed: [UninstallItem] = []
+    var trashedPrefixes: [String] = []
+    var notTrashed: [UninstallItem] = []
 
     var steamNeedsRedownload: Bool { steamInstalled && !restoredValveSignature }
 
@@ -50,7 +55,7 @@ enum Uninstall {
     static func confirmation(modifications: SteamModifications = .shared) -> String {
         let missing = ((try? modifications.paths()) ?? []).filter { SupportPaths.Steam.isUnreachable($0) }
         guard !missing.isEmpty else {
-            return String(localized: "Steam is restored to its unmodified state and Bridgeplay is removed, including the compatibility tool that lives inside the Steam folder. Windows games and Steam Play prefixes are not removed.")
+            return String(localized: "Your games stay.")
         }
         return missing.map {
             String(localized: "Steam at \($0.path(percentEncoded: false)) isn't connected, so Bridgeplay can't be removed from it. All other Bridgeplay data is removed, except for Windows Games and prefixes.")
@@ -65,6 +70,8 @@ enum Uninstall {
     // game fixes go. No default in run(): the live paths are this Mac's, so tests name theirs.
     struct Leftovers: Sendable {
         var gamefixes: URL
+        // The same folder under the name before 3.0, when the migration left one behind.
+        var legacyGamefixes: URL?
         var keptGamefixes: URL
         var steamConfig: URL
         var defaultToolBackup: URL
@@ -73,17 +80,32 @@ enum Uninstall {
         // The password of Bridgeplay's signing keychain, kept in the login keychain.
         var forgetSigning: @Sendable () -> Void = {}
         var busyRunner: @Sendable () -> RunnerActivity? = { nil }
+        // Login items: unloaded, then removed with `files`.
+        var launchAgents: [URL] = []
+        var unloadAgent: @Sendable (URL) -> Void = { _ in }
+        // Settings › Check Steam in the Background, registered from inside the app (BackgroundItem).
+        var unregisterLoginItem: @Sendable () -> Void = {}
 
         static var live: Leftovers {
             Leftovers(
                 gamefixes: SupportPaths.gamefixes,
+                legacyGamefixes: SupportPaths.legacyApplicationSupport.appending(path: "gamefixes"),
                 keptGamefixes: SupportPaths.keptGamefixes,
                 steamConfig: SteamDefaultTool.config,
                 defaultToolBackup: SteamDefaultTool.backup,
-                files: [SupportPaths.homeDir],
+                files: [SupportPaths.homeDir, SupportPaths.legacyHomeDir],
                 steamRunning: { SteamBundle.isRunningForThisUser },
                 forgetSigning: { LocalSigning.forgetPrivateKeychain() },
-                busyRunner: { RunnerInstaller.activity() })
+                busyRunner: { RunnerInstaller.activity() },
+                launchAgents: UninstallPaths.live.ourLaunchAgents(),
+                unloadAgent: { agent in
+                    _ = try? Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())", agent.path(percentEncoded: false)])
+                },
+                unregisterLoginItem: {
+                    UserDefaults.standard.set(BackgroundCheck.Mode.off.rawValue, forKey: BackgroundCheck.modeKey)
+                    let agent = SMAppService.agent(plistName: BackgroundItem.plistName)
+                    if agent.status == .enabled || agent.status == .requiresApproval { try? agent.unregister() }
+                })
         }
     }
 
@@ -96,6 +118,8 @@ enum Uninstall {
         directories: [URL] = [
             SupportPaths.support,
             SupportPaths.caches,
+            SupportPaths.legacyApplicationSupport,
+            SupportPaths.legacyCaches,
         ],
         libraries: [SteamLibrary] = PrefixStore.libraries(),
         modifications: SteamModifications = .shared,
@@ -103,7 +127,10 @@ enum Uninstall {
         leftovers: Leftovers,
         report: @escaping @Sendable (UninstallPhase) -> Void = { _ in },
         repair: Repair? = nil,
-        stop: Stop = { app, onStopping in try SteamBundle.stopClient(app: app, step: step, onStopping: onStopping) }
+        stop: Stop = { app, onStopping in try SteamBundle.stopClient(app: app, step: step, onStopping: onStopping) },
+        // Only the prefixes the user picked; they go to the Trash, never deleted outright.
+        trashPrefixes: [WinePrefix] = [],
+        trash: @escaping PrefixTools.Trash = PrefixTools.systemTrash
     ) async throws -> UninstallOutcome {
         let lock = try DeploymentContent.acquireInstallationLock(in: lockFolder, steamFolder: nil)
         defer { lock.release() }
@@ -190,9 +217,31 @@ enum Uninstall {
             in: leftovers.steamConfig, backup: leftovers.defaultToolBackup, steamRunning: leftovers.steamRunning)
         try SteamDefaultTool.removeGameEntries(in: leftovers.steamConfig, steamRunning: leftovers.steamRunning)
         report(.removing)
+        // Steam has quit by now, so no game holds these.
+        var trashed: [UninstallItem] = []
+        var trashedPrefixes: [String] = []
+        var notTrashed: [UninstallItem] = []
+        for prefix in trashPrefixes {
+            let bytes = PrefixStore.directoryBytes(prefix.root)
+            do {
+                try PrefixTools.delete(prefix, trash: trash)
+                trashed.append(UninstallItem(url: prefix.root, bytes: bytes))
+                trashedPrefixes.append(prefix.id)
+                AppLog.note("uninstall: moved \(prefix.root.path(percentEncoded: false)) to the Trash")
+            } catch {
+                notTrashed.append(UninstallItem(url: prefix.root, bytes: bytes, note: error.localizedDescription))
+            }
+        }
         let kept = try keepGamefixes(leftovers.gamefixes, in: leftovers.keptGamefixes)
+        if let legacy = leftovers.legacyGamefixes {
+            _ = try keepGamefixes(legacy, in: leftovers.keptGamefixes)
+        }
+        leftovers.launchAgents.forEach(leftovers.unloadAgent)
+        leftovers.unregisterLoginItem()
+        AppLog.stopMakingFolder()
         var removed = try remove(
-            legacyCompat: legacyCompat, compatTools: compatTools, directories: directories + leftovers.files
+            legacyCompat: legacyCompat, compatTools: compatTools,
+            directories: directories + leftovers.files + leftovers.launchAgents
         )
         leftovers.forgetSigning()
         // The record of modified bundles is kept while one is out of reach, so a later
@@ -213,7 +262,10 @@ enum Uninstall {
             removed: removed,
             unreachableSteam: missing,
             keptGamefixes: kept,
-            restoredDefaultTool: restoredDefault
+            restoredDefaultTool: restoredDefault,
+            trashed: trashed,
+            trashedPrefixes: trashedPrefixes,
+            notTrashed: notTrashed
         )
     }
 

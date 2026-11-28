@@ -8,7 +8,7 @@ each folder is, which process it ends up in, and where new code belongs.
 
 | Folder | Runs in | How it gets there |
 |---|---|---|
-| `app/` | The Bridgeplay app (SwiftUI, Sparkle updates); also a CLI (`--install-into-steam`, `--setup-winecx`, `--remove-everything`, `--rebuild-prefix`, …) and the native installer | The user drags it from `Bridgeplay.dmg` to `/Applications`, or `Bridgeplay Installer.app` puts it there |
+| `app/` | The Bridgeplay app (SwiftUI, Sparkle updates); also a CLI (`--install-into-steam`, `--setup-winecx`, `--remove-everything`, `--uninstall-plan`, `--verify-uninstall`, `--rebuild-prefix`, …) and the native installer | The user drags it from `Bridgeplay.dmg` to `/Applications`, or `Bridgeplay Installer.app` puts it there |
 | `dylib/` (`notproton.dylib`: hooks, signature resolver, Steam web UI patches, compat tool registration, the run script `feats/compat_run.sh`) | The Steam client (`steam_osx`) and Steam Helper | The app copies it into `Steam.app/Contents/MacOS`, sets `DYLD_INSERT_LIBRARIES` in Steam's Info.plist and re-signs Steam |
 | `signatures/macos.arm64/` | Data the dylib reads to find Steam functions | Copied to Application Support; the highest-numbered file wins |
 | `lsteamclient/`, `steam-shim/` | Wine: the steamclient bridge and the Windows `steam.exe` | Built against the Wine tree in `bridge/`, shipped in the app payload, put into runners |

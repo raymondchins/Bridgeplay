@@ -11,6 +11,10 @@ enum AppLog {
     private static let queue = DispatchQueue(label: "bridgeplay.applog")
 
     private nonisolated(unsafe) static var isOn = false
+    // Off after Remove Everything: a log line must not bring the removed folder back.
+    private nonisolated(unsafe) static var makesFolder = true
+
+    static func stopMakingFolder() { queue.sync { makesFolder = false } }
 
     static func start() {
         queue.async {
@@ -101,6 +105,7 @@ enum AppLog {
     private static func append(_ line: String) {
         guard isOn else { return }
         let fm = FileManager.default
+        guard makesFolder || fm.fileExists(atPath: SupportPaths.support.path(percentEncoded: false)) else { return }
         try? fm.createDirectory(at: SupportPaths.support, withIntermediateDirectories: true)
 
         let path = file.path(percentEncoded: false)
