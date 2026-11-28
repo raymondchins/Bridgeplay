@@ -120,6 +120,25 @@ class CompareTests(unittest.TestCase):
         self.assertEqual(rows["first_frame_s"]["a_median"], 8.0)
         self.assertEqual(r["runs"]["A"]["logs"], 4)  # helper sections are not runs
 
+    def test_first_frame_needs_min_runs_of_its_own(self):
+        # Every launch counts for the game start, but only one per side logged a first frame.
+        for folder, start in ((self.a, 6.0), (self.b, 4.0)):
+            lines = []
+            for n in range(4):
+                lines += ["=== bridgeplay run Thu Nov 27 10:00:05 UTC 2026 ===", "verb=waitforexitandrun",
+                          f"time: game start at {start + n * 0.1:.3f}s", "time: game exited at 90.000s"]
+                if n == 1:
+                    lines.append("time: first frame 2.000s after the game started")
+            (folder / "runs.log").write_text("\n".join(lines) + "\n")
+        r = ab.compare([self.a], [self.b])
+        rows = {row["metric"]: row for row in r["rows"]}
+        self.assertEqual(rows["game_start_s"]["verdict"], "B better")
+        self.assertEqual(rows["first_frame_s"]["verdict"], "too few runs")
+        self.assertEqual((rows["first_frame_s"]["a_runs"], rows["first_frame_s"]["b_runs"]), (1, 1))
+        code, out, _ = quiet(ab.main, ["compare", str(self.a), "--vs", str(self.b)])
+        self.assertEqual(code, 0)
+        self.assertIn("to first frame     too few runs (A 1, B 1)", out)
+
     def test_text_and_json(self):
         self.fill(self.a, 12.0, (0.0, 0.1, -0.1), 40.0, 0)
         self.fill(self.b, 10.0, (0.0, 0.1, -0.1), 30.0, 30)

@@ -152,12 +152,16 @@ def bootstrap_change(a, b, rng):
     return point, lo, hi
 
 
-def compare_metric(key, label, unit, higher_better, a_runs, b_runs, min_effect, rng):
+def compare_metric(key, label, unit, higher_better, a_runs, b_runs, min_effect, rng, min_runs=1):
     a = [r[key] for r in a_runs if r.get(key) is not None]
     b = [r[key] for r in b_runs if r.get(key) is not None]
     row = {"metric": key, "label": label, "unit": unit, "a_runs": len(a), "b_runs": len(b)}
     if not a or not b:
         row["verdict"] = "no data"
+        return row
+    # Optional values (first frame) can leave fewer runs than the records counted.
+    if len(a) < min_runs or len(b) < min_runs:
+        row["verdict"] = "too few runs"
         return row
     row["a_median"], row["b_median"] = statistics.median(a), statistics.median(b)
     change = bootstrap_change(a, b, rng)
@@ -232,7 +236,7 @@ def compare(a_paths, b_paths, warmup=1, min_runs=3, skip_s=10.0, min_effect=1.0,
     for metrics, key in ((FRAME_METRICS, "frames"), (LAUNCH_METRICS, "launches")):
         if len(a[key]) >= min_runs and len(b[key]) >= min_runs:
             for m in metrics:
-                result["rows"].append(compare_metric(*m, a[key], b[key], min_effect, rng))
+                result["rows"].append(compare_metric(*m, a[key], b[key], min_effect, rng, min_runs))
     result["verdict"] = overall(result["rows"]) if a["frames"] else "launch times only"
     result["enough"] = True
     return result
@@ -247,6 +251,9 @@ def print_text(r):
     for row in r["rows"]:
         if row["verdict"] == "no data":
             print(f"  {row['label']:<18} no data")
+            continue
+        if row["verdict"] == "too few runs":
+            print(f"  {row['label']:<18} too few runs (A {row['a_runs']}, B {row['b_runs']})")
             continue
         print(f"  {row['label']:<18} A {row['a_median']:.2f} {row['unit']}  B {row['b_median']:.2f} {row['unit']}  "
               f"{row['change_pct']:+.1f}% [{row['ci_low']:+.1f}, {row['ci_high']:+.1f}]  {row['verdict']}")
