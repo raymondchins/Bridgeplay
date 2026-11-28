@@ -134,12 +134,12 @@ enum SetupChecks {
     static func rosettaFailure(_ error: Error) -> String {
         let text = error.localizedDescription
         if rosettaCancelled(error) {
-            return String(localized: "Rosetta is still needed to run Windows games. The password window was closed, so it wasn't installed. Press Install to try again.")
+            return String(localized: "Still needed. Press Install to try again.")
         }
         if text.contains("(-60005)") || text.contains("(-60007)") {
-            return String(localized: "Rosetta wasn't installed because macOS didn't accept the password. Use the name and password of an administrator of this Mac.")
+            return String(localized: "Rosetta wasn't installed. Use an administrator's password.")
         }
-        return String(localized: "Rosetta wasn't installed. Check your internet connection and try again.")
+        return String(localized: "Rosetta wasn't installed. Check your internet and try again.")
     }
 
     // Closing the password window is a choice, not a failure to report.

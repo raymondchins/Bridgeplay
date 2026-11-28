@@ -445,7 +445,7 @@ final class SetupAssistant {
     }
 
     static let untrustedNote =
-        String(localized: "Not set up. Bridgeplay still works, but after each update you'll need to allow your controller again.")
+        String(localized: "Not set up. Allow your controller again after each update.")
 
     // MARK: Finish
 

@@ -465,7 +465,7 @@ struct SetupChecksTests {
     func rosettaMessages() {
         let cancelled = CommandFailure(command: "osascript", status: 1, stderr: "0:120: execution error: User canceled. (-128)")
         #expect(SetupChecks.rosettaCancelled(cancelled))
-        #expect(SetupChecks.rosettaFailure(cancelled).contains("still needed"))
+        #expect(SetupChecks.rosettaFailure(cancelled).contains("Still needed"))
         #expect(SetupChecks.rosettaFailure(cancelled).contains("Press Install"))
         let denied = CommandFailure(command: "osascript", status: 1, stderr: "execution error: The administrator user name or password was incorrect. (-60005)")
         #expect(SetupChecks.rosettaFailure(denied).contains("administrator"))

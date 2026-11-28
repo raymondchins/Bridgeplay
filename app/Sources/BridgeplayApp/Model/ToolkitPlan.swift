@@ -61,7 +61,7 @@ enum ToolkitPlan: Equatable {
     }
 
     // What going without it means for games.
-    static let withoutNote = String(localized: "Optional. Needed for DirectX 12; add it later in Status.")
+    static let withoutNote = String(localized: "Optional. Needed for DirectX 12.")
 
     var doneValue: String {
         isReady ? String(localized: "Linked.")
