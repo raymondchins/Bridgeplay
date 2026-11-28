@@ -214,4 +214,27 @@ struct WinecxUpgradeTests {
         try Self.vdf([("0", Self.old)]).write(to: file, atomically: true, encoding: .utf8)
         #expect(try follow(dir) == .unchanged)
     }
+
+    @Test("A move whose record can't be written puts the default back and is tried again")
+    func followUndoesWithoutRecord() throws {
+        let dir = try scratchDirectory("winecx-default-unrecorded")
+        let backups = dir.appending(path: "backups")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: backups.path(percentEncoded: false))
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let file = dir.appending(path: "config.vdf")
+        let backup = backups.appending(path: "steam-default-tool.json")
+        let text = Self.vdf([("0", Self.old)])
+        try text.write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
+        try JSONEncoder().encode(SteamDefaultTool.Backup(previous: nil, applied: Self.old)).write(to: backup)
+        try FileManager.default.createDirectory(
+            at: dir.appending(path: "compatibilitytools.d/\(Self.new)"), withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: backups.path(percentEncoded: false))
+
+        #expect(try follow(dir) == .failed)
+        #expect(try String(contentsOf: file, encoding: .utf8) == text)
+        #expect(SteamDefaultTool.readBackup(backup)?.applied == Self.old)
+    }
 }

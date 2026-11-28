@@ -40,11 +40,15 @@ enum SteamDefaultTool {
 
     // The file only says which tool Bridgeplay wrote, so a failure here is not the write's.
     private static func recordApplied(_ tool: String, backup: URL) {
-        var saved = readBackup(backup) ?? Backup(previous: nil)
-        saved.applied = tool
-        do { try write(saved, to: backup) } catch {
+        do { try writeApplied(tool, backup: backup) } catch {
             AppLog.note("default tool: could not record \(tool): \(error.localizedDescription)")
         }
+    }
+
+    private static func writeApplied(_ tool: String, backup: URL) throws {
+        var saved = readBackup(backup) ?? Backup(previous: nil)
+        saved.applied = tool
+        try write(saved, to: backup)
     }
 
     struct SteamRunning: LocalizedError {
@@ -308,7 +312,14 @@ enum SteamDefaultTool {
         else { return .unchanged }
         guard !steamRunning() else { return .steamRunning }
         try WriteRefused.catching(file) { try result.write(to: file, atomically: true, encoding: .utf8) }
-        recordApplied(current, backup: backup)
+        // A backup that still names the older tool would move a user who picks it back later.
+        do {
+            try writeApplied(current, backup: backup)
+        } catch {
+            AppLog.note("default tool: could not record \(current), putting the default back: \(error.localizedDescription)")
+            try WriteRefused.catching(file) { try text.write(to: file, atomically: true, encoding: .utf8) }
+            return .failed
+        }
         return .updated
     }
 
