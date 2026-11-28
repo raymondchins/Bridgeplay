@@ -235,7 +235,8 @@ struct HeroState: Equatable {
                 actions: pause)
         }
         // Steam is up, but this start left no report: the dylib never loaded or died early.
-        if runningHere, health.freshness == .stale {
+        // A .lastStart report is from an earlier start, so it says nothing about this one.
+        if runningHere, health.freshness == .stale || health.freshness == .lastStart {
             return HeroState(
                 headline: String(localized: "Not confirmed"),
                 detail: String(localized: "Restart Steam. If it stays, send a report."),

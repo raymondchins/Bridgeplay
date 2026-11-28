@@ -226,6 +226,10 @@ struct SteamHealthTests {
 
         let unconfirmed = HeroState.make(Self.snapshot(running: true, health: Self.reading(.active, .stale)), offModes: true)
         #expect(unconfirmed.headline == "Not confirmed")
+        // A report left by the previous start says nothing about this running Steam
+        let earlier = HeroState.make(Self.snapshot(running: true, health: Self.reading(.active, .lastStart)), offModes: true)
+        #expect(earlier.headline == "Not confirmed")
+        #expect(!earlier.ready)
         // No health file at all (a dylib from before it): today's answer
         #expect(HeroState.make(Self.snapshot(running: true), offModes: true).ready)
     }
