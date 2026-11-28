@@ -133,9 +133,11 @@ static int open_patched(const char *path) {
     int drifted = 0;
     if (shape)
         np_webpatch_last_gates(&live, &total, &drifted);
+    // A required gate that no longer matches leaves Steam reading the file it shipped,
+    // so no gate counts as applied.
     if (!patched) {
         if (shape)
-            np_health_web(shape, live, total, drifted);
+            np_health_web(shape, 0, total, drifted);
         return -1;
     }
 

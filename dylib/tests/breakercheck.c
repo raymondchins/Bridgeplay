@@ -392,8 +392,8 @@ static void chunk_cases(void) {
 
     fake_patch = 0;
     got_reports = 0;
-    CHECK("a drifted chunk still reports what matched",
-          open_patched(chunk) < 0 && got_reports == 1 && got_applied == 5 && got_total == 6);
+    CHECK("a drifted chunk Steam reads unpatched reports no gate applied",
+          open_patched(chunk) < 0 && got_reports == 1 && got_applied == 0 && got_total == 6);
     fake_patch = 1;
 }
 
