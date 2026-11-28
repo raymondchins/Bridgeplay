@@ -120,11 +120,37 @@ static void wait_is_bounded(void) {
     pthread_join(t, NULL);
 }
 
+static void *lookup_thread(void *unused) {
+    (void)unused;
+    np_gate_run(NULL, 0, slow_install, 5000);
+    return NULL;
+}
+
+// The loader thread's wait ran out while a lookup's install went on: it still waits for that
+// install, so what follows it (the steamui hooks, the healthy timer) runs.
+static void late_install_is_awaited(void) {
+    reset();
+    atomic_store(&g_runs, 0);
+    atomic_store(&g_hooks_in, 0);
+    atomic_store(&g_started, 0);
+    pthread_t t;
+    pthread_create(&t, NULL, lookup_thread, NULL);
+    while (!atomic_load(&g_started)) usleep(1000);
+    np_gate_run(NULL, 0, slow_install, 20);
+    if (np_gate_state() == NP_GATE_DONE) wrong("a 20 ms wait saw a 200 ms install finish");
+    np_gate_wait_done();
+    if (!atomic_load(&g_hooks_in) || np_gate_state() != NP_GATE_DONE)
+        wrong("the wait for a late install returned before it finished");
+    pthread_join(t, NULL);
+    if (atomic_load(&g_runs) != 1) wrong("install ran %d times, not once", atomic_load(&g_runs));
+}
+
 int main(void) {
     lookup_waits_for_loader_thread();
     lookup_installs_first();
     reentry_does_not_wait();
     wait_is_bounded();
+    late_install_is_awaited();
     if (g_wrong) return 1;
     puts("clientgatecheck: ok");
     return 0;

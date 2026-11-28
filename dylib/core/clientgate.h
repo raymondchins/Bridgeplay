@@ -24,4 +24,9 @@ int np_gate_run(const struct mach_header_64 *mh, intptr_t slide, np_gate_install
 
 int np_gate_state(void);
 
+// Waits without a bound until the install that ran or is running has finished. For the
+// loader thread, which still has to finish what follows the install when another thread's
+// install outlasts its wait.
+void np_gate_wait_done(void);
+
 #endif // NOTPROTON_CORE_CLIENTGATE_H

@@ -28,3 +28,8 @@ int np_gate_run(const struct mach_header_64 *mh, intptr_t slide, np_gate_install
         usleep(1000);
     return 0;
 }
+
+void np_gate_wait_done(void) {
+    while (atomic_load(&g_state) != NP_GATE_DONE)
+        usleep(10 * 1000);
+}

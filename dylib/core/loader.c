@@ -173,9 +173,12 @@ static void *install_thread(void *unused) {
     if (np_gate_run(mh, slide, install_steamclient, WAIT_TIMEOUT_MS))
         NP_LOG("install_thread: steamclient hooks installed from the loader thread");
     if (np_gate_state() != NP_GATE_DONE) {
-        NP_ERR("install_thread: the steamclient install did not finish in %d ms",
-               WAIT_TIMEOUT_MS);
-        return NULL;
+        // Another thread's install: the steamui hooks, the profile and the healthy timer
+        // still wait on it, so this thread keeps waiting.
+        NP_ERR("install_thread: the steamclient install did not finish in %d ms, still "
+               "waiting for it", WAIT_TIMEOUT_MS);
+        np_gate_wait_done();
+        NP_LOG("install_thread: the steamclient install finished late");
     }
 
     np_input_access_check();
