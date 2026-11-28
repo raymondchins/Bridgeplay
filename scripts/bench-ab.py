@@ -331,6 +331,8 @@ def drive(appid, label, out, runs, cooldown, timeout, steam_root, support_dirs,
                 raise TimeoutError(f"run {n}: no 'game exited' line in {log} after {timeout:g} s")
             sleep(2)
         sleep(2)  # the shim flushes once a second
+        # The first window and frame times are written after "game exited": read them too.
+        text = read_from(log, offset)
         new = sorted(set(bench_dir.glob("*.csv")) - before) if bench_dir.is_dir() else []
         if not new:
             raise ValueError(f"run {n}: no new capture in {bench_dir}; is BRIDGEPLAY_BENCH=1 in the launch options?")

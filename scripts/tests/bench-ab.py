@@ -202,6 +202,35 @@ class RunTests(unittest.TestCase):
             self.assertIn(30, slept)  # cooldown between runs
             self.assertEqual(len(ab.log_runs(logs)), 2)
 
+    def test_drive_keeps_the_timings_written_after_the_exit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            steam = root / "Steam"
+            (steam / "steamapps/compatdata/4242").mkdir(parents=True)
+            (steam / "steamapps/appmanifest_4242.acf").write_text("")
+            bench_dir = root / "support/launchers/4242/bench"
+            bench_dir.mkdir(parents=True)
+            log = steam / "steamapps/compatdata/4242/bridgeplay-run.log"
+            log.write_text("")
+
+            def opener(url):
+                capture(bench_dir, 11, 10.0, 30.0)
+                with open(log, "a") as f:
+                    f.write("=== bridgeplay run Thu Nov 27 10:00:05 UTC 2026 ===\n"
+                            "time: game start at 5.000s\ntime: game exited at 90.000s\n")
+
+            def sleep(seconds):
+                # The run script's next lines land while drive waits.
+                with open(log, "a") as f:
+                    f.write("time: first frame 2.000s after the game started\n")
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                dest = ab.drive("4242", "A", root / "out", 1, 0, 60, steam, [root / "support"],
+                                opener=opener, sleep=sleep, clock=lambda: 0.0)
+            runs = ab.log_runs(sorted(dest.glob("*.log")))
+            self.assertEqual(len(runs), 1)
+            self.assertEqual(runs[0].get("first_frame_s"), 7.0)
+
     def test_drive_times_out(self):
         with tempfile.TemporaryDirectory() as tmp:
             steam = Path(tmp) / "Steam"
