@@ -201,6 +201,8 @@ int np_hooks_install_all(const struct mach_header_64 *mh, intptr_t slide,
                                 resolved, &total);
 
     np_hooks_compat_publish_originals();
+    np_hooks_compat_enabled_slot(mh, slide,
+        np_lookup_address(resolved, "CCompatManager::BIsCompatibilityToolEnabled"));
 
     if (total_out)
         *total_out = total;

@@ -9,6 +9,11 @@
 #include <stdbool.h>
 #include <signal.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <mach-o/getsect.h>
+#include <mach/mach.h>
+#include "../core/macho.h"
 
 static void *orig_CCompatManager_Init = NULL;
 typedef void *(*fn_CCompatManager_Init)(void *self, void *arg1);
@@ -136,6 +141,64 @@ static uint64_t hook_InternalSpecifyCompatTool(void *self, uint64_t appid,
     uint64_t result = orig(self, appid, name, config, priority);
     np_compatsvc_state_changed();
     return result;
+}
+
+typedef uint8_t (*fn_LayerEnabled)(void *self);
+static fn_LayerEnabled orig_LayerEnabled;
+
+static uint8_t hook_LayerEnabled(void *self) {
+    np_compat_force_enable(self);
+    return orig_LayerEnabled(self);
+}
+
+int np_hooks_compat_enabled_slot(const struct mach_header_64 *mh, intptr_t slide,
+                                 uintptr_t bis_enabled) {
+    uintptr_t text = 0;
+    size_t text_size = 0;
+    unsigned long data_size = 0;
+    uint8_t *data = mh ? getsectiondata(mh, "__DATA_CONST", "__const", &data_size) : NULL;
+    if (!bis_enabled || !data || np_find_segment(mh, slide, "__TEXT", &text, &text_size) != 0) {
+        NP_WARN("np_hooks_compat_enabled_slot: no vtable section or method to look in");
+        return 0;
+    }
+    uint64_t *words = (uint64_t *)data;
+    long slot = np_compat_vtable_slot0(words, data_size / sizeof *words, bis_enabled,
+                                       text, text_size);
+    if (slot < 0 || !np_compat_is_flag_getter((const uint32_t *)(uintptr_t)words[slot])) {
+        NP_WARN("np_hooks_compat_enabled_slot: the manager's vtable has no switch getter in "
+                "slot 0, Windows games may lose their depots at Steam start");
+        return 0;
+    }
+
+    uint64_t *at = &words[slot];
+    long page = sysconf(_SC_PAGESIZE);
+    uintptr_t start = (uintptr_t)at & ~(uintptr_t)(page - 1);
+    vm_address_t region = start;
+    vm_size_t region_size = 0;
+    vm_region_basic_info_data_64_t info;
+    mach_msg_type_number_t info_count = VM_REGION_BASIC_INFO_COUNT_64;
+    mach_port_t object = MACH_PORT_NULL;
+    if (vm_region_64(mach_task_self(), &region, &region_size, VM_REGION_BASIC_INFO_64,
+                     (vm_region_info_t)&info, &info_count, &object) != KERN_SUCCESS ||
+        region > start || !(info.max_protection & VM_PROT_WRITE)) {
+        NP_ERR("np_hooks_compat_enabled_slot: the vtable at %p cannot be made writable",
+               (void *)at);
+        return 0;
+    }
+    int prot = ((info.protection & VM_PROT_READ) ? PROT_READ : 0) |
+               ((info.protection & VM_PROT_WRITE) ? PROT_WRITE : 0);
+    if (!(prot & PROT_WRITE) &&
+        mprotect((void *)start, (size_t)page, PROT_READ | PROT_WRITE) != 0) {
+        NP_ERR("np_hooks_compat_enabled_slot: cannot write the vtable at %p", (void *)at);
+        return 0;
+    }
+    orig_LayerEnabled = (fn_LayerEnabled)(uintptr_t)*at;
+    __atomic_store_n(at, (uint64_t)(uintptr_t)hook_LayerEnabled, __ATOMIC_RELEASE);
+    if (!(prot & PROT_WRITE))
+        mprotect((void *)start, (size_t)page, prot);
+    NP_LOG("[compat] CCompatManager switch getter: vtable slot at %p now forces the layer on",
+           (void *)at);
+    return 1;
 }
 
 // The trampoline is the client's own resolution without the CrossOver default.

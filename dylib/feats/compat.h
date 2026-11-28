@@ -50,6 +50,20 @@ int np_compat_layout_known(void);
 int np_compat_probe_enabled_off(uintptr_t bis_enabled);
 uint32_t np_compat_enabled_off(void);
 
+// Steam reads the switch through the manager's first virtual, a two-instruction getter, when
+// it builds an app's system configuration: the oslist that picks its depots. The manager the
+// user's apps go through starts with the switch off on macOS, and that pass runs for every
+// installed app before anything asks BIsCompatibilityToolEnabled, so each Windows game was
+// configured for macOS, lost its Windows depots and showed Update Required.
+//
+// Index of slot 0 in the one primary vtable that holds `method`, among `count` pointers, or
+// -1 when there is none or more than one. Code pointers lie in [text, text + text_size).
+long np_compat_vtable_slot0(const uint64_t *words, size_t count, uint64_t method,
+                            uintptr_t text, size_t text_size);
+
+// 1 when `code` is LDRB W0,[X0,#enabled flag]; RET, with the flag found by the probe above.
+int np_compat_is_flag_getter(const uint32_t *code);
+
 // Reads the windows-only table's offset out of the lookup call in GetWildcardMapping,
 // returns 0 when the call is not found.
 int  np_compat_probe_windows_only_off(uintptr_t get_wildcard_mapping, uintptr_t lookup);

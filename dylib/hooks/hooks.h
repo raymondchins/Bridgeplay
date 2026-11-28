@@ -29,6 +29,10 @@ int               np_hooks_compat_count(void);
 np_patch_entry_t *np_hooks_compat_defs(void);
 
 void np_hooks_compat_publish_originals(void);
+// Points the compat manager's switch getter (vtable slot 0) at one that turns the layer on
+// first. Returns 1 when it did. See np_compat_vtable_slot0.
+int np_hooks_compat_enabled_slot(const struct mach_header_64 *mh, intptr_t slide,
+                                 uintptr_t bis_enabled);
 
 void np_hooks_compat_set_helpers(uintptr_t yld_register_tool,
                                  uintptr_t get_valid_platforms,

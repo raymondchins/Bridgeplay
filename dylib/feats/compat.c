@@ -440,6 +440,7 @@ int np_compat_probe_tool_layout(uintptr_t appid_gate, uintptr_t oslist_gate) {
 // enabled flag sits above it and does. Reading the flag's own offset back keeps
 // the two independent.
 static uint32_t g_enabled_off = COMPAT_MANAGER_ENABLED_OFF;
+static int g_enabled_probed;
 
 int np_compat_probe_enabled_off(uintptr_t bis_enabled) {
     if (!bis_enabled) return 0;
@@ -482,11 +483,38 @@ int np_compat_probe_enabled_off(uintptr_t bis_enabled) {
         NP_LOG("np_compat_probe_enabled_off: enabled flag at 0x%x, %+d from the "
                "baseline", off, (int32_t)off - COMPAT_MANAGER_ENABLED_OFF);
     g_enabled_off = off;
+    g_enabled_probed = 1;
     return 1;
 }
 
 uint32_t np_compat_enabled_off(void) {
     return g_enabled_off;
+}
+
+static int in_range(uint64_t p, uintptr_t base, size_t size) {
+    return p >= base && p < base + size;
+}
+
+long np_compat_vtable_slot0(const uint64_t *words, size_t count, uint64_t method,
+                            uintptr_t text, size_t text_size) {
+    long found = -1;
+    for (size_t i = 0; i < count; i++) {
+        if (words[i] != method) continue;
+        size_t j = i;
+        while (j > 0 && in_range(words[j - 1], text, text_size))
+            j--;
+        // A primary vtable: offset-to-top 0, then the type info, which is data.
+        if (j < 2 || words[j - 2] != 0 || !words[j - 1]) continue;
+        if (found >= 0) return -1;
+        found = (long)j;
+    }
+    return found;
+}
+
+int np_compat_is_flag_getter(const uint32_t *code) {
+    if (!g_enabled_probed || !code) return 0;
+    // LDRB W0,[X0,#off] then RET
+    return code[0] == (0x39400000u | (g_enabled_off << 10)) && code[1] == 0xD65F03C0u;
 }
 
 static uint32_t g_windows_only_off;
