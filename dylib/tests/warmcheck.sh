@@ -41,7 +41,7 @@ $part"
 	[ -n "$route" ] || { echo "FAIL: the helper route not found in $1" >&2; return 1; }
 	printf '%s\n' "$p" '
 kernel_anticheat_notice() { :; }
-prepare_prefix_directory() { mkdir -p "$WINEPREFIX/drive_c"; }
+prepare_prefix_directory() { mkdir -p "$WINEPREFIX/drive_c"; exec 8>> "$STEAM_COMPAT_DATA_PATH/.notproton-prefix.lock"; }
 note_other_build() { :; }
 refuse_foreign_prefix() { :; }
 claim_prefix() { :; }
@@ -63,6 +63,7 @@ write_owned_controllers() { :; }
 np_now_ms
 np_t0=$np_ms' "$d4" '
 warm_server_dir() { printf "%s" "$FAKE_SERVER"; }' "$prefix" '
+exec 8>&-
 if [ "$verb" = waitforexitandrun ]; then
   mark "game start"
   "$WINELOADER" game.exe >> "$log" 2>&1
@@ -87,6 +88,8 @@ cat > "$engine/bin/wine" <<'EOF'
 #!/bin/sh
 [ -S "$FAKE_SERVER/socket" ] || "$WINESERVER" --by-client
 if [ ! -f "$FAKE_SERVER/booted" ]; then
+	# Wine's system processes outlive the launch in a warm session; they must not hold its lock.
+	/usr/sbin/lsof -a -p $$ 2>/dev/null | grep -q notproton-prefix.lock && echo "boot holds the prefix lock" >> "$FAKE_EVENTS"
 	printf 'boot by %s: SDL_PLAYTEST=%s SDL_HELPERTEST=%s\n' "$1" "${SDL_PLAYTEST-unset}" "${SDL_HELPERTEST-unset}" >> "$FAKE_EVENTS"
 	: > "$FAKE_SERVER/booted"
 	[ "${FAKE_BOOT_SECONDS:-0}" = 0 ] || sleep "$FAKE_BOOT_SECONDS"
@@ -104,6 +107,7 @@ case "$1" in
 	-p*|--by-client)
 		if [ -S "$FAKE_SERVER/socket" ]; then [ "$1" = --by-client ] && exit 0; exit 2; fi
 		mkdir -p "$FAKE_SERVER"
+		/usr/sbin/lsof -a -p $$ 2>/dev/null | grep -q notproton-prefix.lock && echo "server holds the prefix lock" >> "$FAKE_EVENTS"
 		perl -e 'use Socket; socket(my $s, PF_UNIX, SOCK_STREAM, 0) or die; bind($s, pack_sockaddr_un($ARGV[0])) or die' "$FAKE_SERVER/socket"
 		echo "server started $1 WINEMSYNC=${WINEMSYNC:-}" >> "$FAKE_EVENTS" ;;
 esac
@@ -186,6 +190,7 @@ logged "the game reuses it" "warm start: reusing the Wine session the helper lef
 is "the game ran in that session" "client game.exe: SDL_PLAYTEST=same" "$(grep '^client game' "$case_dir/events")"
 is "the note is used once" no "$([ -e "$case_dir/compat/bridgeplay-warm-server" ] && echo yes || echo no)"
 is "the game ends the session" no "$([ -e "$case_dir/server" ] && echo yes || echo no)"
+is "no Wine process the session keeps holds the prefix lock" "" "$(grep 'holds the prefix lock' "$case_dir/events")"
 play p2
 is "every Play boots once" 2 "$(boots)"
 

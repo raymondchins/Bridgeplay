@@ -225,9 +225,11 @@ else
   export ROSETTA_ADVERTISE_AVX="${ROSETTA_ADVERTISE_AVX:-1}"
 fi
 
-# Keeps Wine from inheriting the prefix and template locks (fd 8 and 9).
+# Keeps Wine from inheriting the prefix and template locks (fd 8 and 9). A redirection on a
+# shell function makes /bin/sh (bash 3.2) keep a copy of the fd, at 10 or above, open in every
+# program the function starts, so boot_client closes the locks on its own programs instead.
 without_lock_fds() {
-  "$@" 8>&- 9>&-
+  if [ "$1" = boot_client ]; then "$@"; else "$@" 8>&- 9>&-; fi
 }
 
 # If two WINEDLLPATH directories have the same DLL, Wine uses the one listed first.
@@ -3704,8 +3706,9 @@ BEGIN {
 }'
 
 # Runs "$@" with the boot environment of the game's last launch in place of the helper's.
+# It closes the lock fds itself: callers must not put lock redirections on it (without_lock_fds).
 boot_mirror() {
-  if [ -z "$np_mirror_file" ]; then "$@"; return; fi
+  if [ -z "$np_mirror_file" ]; then "$@" 5>&- 7>&- 8>&- 9>&-; return; fi
   while IFS= read -r line; do
     case "${line%%=*}" in ''|*[!A-Za-z0-9_]*|[0-9]*) continue ;; esac
     set -- "$line" "$@"
@@ -3714,7 +3717,7 @@ boot_mirror() {
   for name in $(/usr/bin/awk -v unset="$np_mirror_file" "$boot_env_awk"); do
     set -- -u "$name" "$@"
   done
-  /usr/bin/env "$@"
+  /usr/bin/env "$@" 5>&- 7>&- 8>&- 9>&-
 }
 
 # The session's first Wine program boots its system processes, so only it gets boot_mirror:
@@ -3856,7 +3859,7 @@ warm_session_begin() {
   np_boot_client=""
   [ "$np_warm" = 1 ] || return 0
   rc=0
-  boot_mirror "$WINESERVER" -p"$np_warm_seconds" < /dev/null >> "$log" 2>&1 5>&- 7>&- 8>&- 9>&- || rc=$?
+  boot_mirror "$WINESERVER" -p"$np_warm_seconds" < /dev/null >> "$log" 2>&1 || rc=$?
   case "$rc" in
     0)
       np_boot_fp=$np_my_fp
