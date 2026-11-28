@@ -138,7 +138,8 @@ $name $secs"
 DOBBY_COMMIT=$(sed -n 's/^[[:space:]]*DOBBY_COMMIT:[[:space:]]*"\([0-9a-f]*\)".*/\1/p' .github/workflows/app.yml)
 [ -n "$DOBBY_COMMIT" ] || { echo "==> DOBBY_COMMIT not found in .github/workflows/app.yml" >&2; exit 1; }
 
-if [ ! -d vendor/dobby/.git ]; then
+# -e: a worktree or submodule checkout has a .git file, not a folder
+if [ ! -e vendor/dobby/.git ]; then
 	git clone --no-checkout https://github.com/jmpews/Dobby.git vendor/dobby
 	git -C vendor/dobby checkout -q "$DOBBY_COMMIT"
 fi
