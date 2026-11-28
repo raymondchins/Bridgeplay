@@ -227,16 +227,19 @@ struct SetupAssistantView: View {
                           tone: .ok, trailing: gptk.version))
             } else {
                 // Apple's files unmodified, from Bridgeplay's installer release; Steam comes along when it's missing.
-                WizardRow(row: StatusRow(title: String(localized: "Download with Bridgeplay"),
-                          value: DownloadMeter.shared.title ?? model.gptkProgress ?? componentsNote,
-                          action: StatusAction(label: String(localized: "Download"), isProminent: true, isEnabled: !model.isWorking) {
-                              Task { await model.downloadGPTK() }
-                          }), symbol: "arrow.down.circle")
-                SetupHairline()
+                // Not offered again once a download came without a toolkit it could use.
+                if model.toolkitPlan.offersComponentsDownload {
+                    WizardRow(row: StatusRow(title: String(localized: "Download with Bridgeplay"),
+                              value: DownloadMeter.shared.title ?? model.gptkProgress ?? componentsNote,
+                              action: StatusAction(label: String(localized: "Download"), isProminent: true, isEnabled: !model.isWorking) {
+                                  Task { await model.downloadGPTK() }
+                              }), symbol: "arrow.down.circle")
+                    SetupHairline()
+                }
                 WizardRow(row: StatusRow(title: String(localized: "Or download it from Apple"),
                           value: String(localized: "Sign in, then download the latest Game Porting Toolkit .dmg."),
                           action: StatusAction(label: String(localized: "Open Apple Downloads")) {
-                              NSWorkspace.shared.open(URL(string: "https://developer.apple.com/download/all/?q=Game%20Porting%20Toolkit")!)
+                              NSWorkspace.shared.open(GPTKImport.appleDownloads)
                           }), number: 1)
                 SetupHairline()
                 if let image = model.gptkImages.first {
@@ -260,7 +263,7 @@ struct SetupAssistantView: View {
         }
         .task { await model.loadComponentsSize() }
         if model.gptk == nil {
-            Text("Optional. If you skip it, games use DXMT, which runs DirectX 10 and 11 games only. You can add the toolkit later from Status.")
+            Text(ToolkitPlan.withoutNote.keepingLastWordsTogether)
                 .font(BP.sans(12))
                 .foregroundStyle(BP.fg3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -422,7 +425,7 @@ struct SetupAssistantView: View {
             checked(1, StatusRow(title: String(localized: "WineCX Engine"), value: String(localized: "Steam's default for Windows games."), tone: .ok))
             SetupHairline()
             checked(2, StatusRow(title: String(localized: "Game Porting Toolkit"),
-                      value: model.gptk == nil ? String(localized: "Skipped. Games use DXMT; add it later from Status.") : String(localized: "Linked."),
+                      value: model.toolkitPlan.doneValue,
                       tone: model.gptk == nil ? .neutral : .ok))
             SetupHairline()
             checked(3, StatusRow(title: String(localized: "Controllers"),

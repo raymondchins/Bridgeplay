@@ -28,3 +28,17 @@ only symlinks to `external/libd3dshared.dylib`. Bridgeplay's own `SOURCE.txt` no
 local GPTK folder is left out of the installer.
 
 When Apple ships a new toolkit version, reread its license and update this table.
+
+## Without the toolkit
+
+`scripts/package-installer.sh --no-gptk` builds the installer zip with no Apple file and no
+`GPTK-License.rtf`. From such a zip the app's Setup and the native installer still place
+DXMT, DXVK and the configs, and keep any toolkit already on the Mac; Setup then offers the
+user's own copy from Apple, and games other than DirectX 12 run without it. A toolkit in the
+zip is placed only whole, Apple-signed and with Apple's `License.rtf` beside it
+(`InstallerComponents.toolkit`); otherwise it is left out and the rest is placed.
+
+Adding the toolkit later (Status › Rescan, which also takes Apple's `.dmg` from Downloads)
+links it into the installed WineCX engine and runner in place; prefixes and saves are not
+touched. App and installer versions up to 0.7.68 refuse a zip without the toolkit, so publish
+one only once those are rare.

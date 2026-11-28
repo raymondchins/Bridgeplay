@@ -232,6 +232,7 @@ enum DiskImage {
 // Copies Game Porting Toolkit's redist/lib out of Apple's disk image into the folder
 // WinecxD3DMetal.locate looks in first.
 enum GPTKImport {
+    static let appleDownloads = URL(string: "https://developer.apple.com/download/all/?q=Game%20Porting%20Toolkit")!
     static var downloads: URL { SupportPaths.home.appending(path: "Downloads", directoryHint: .isDirectory) }
 
     // Downloads is only read while no Game Porting Toolkit is installed, so a Mac that has one

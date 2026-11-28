@@ -144,8 +144,11 @@ if [ "$migrate_later" -eq 1 ]; then
 fi
 mkdir -p "$support/gamefixes" "$support/gamefixes-default" "$support/.installer" "$caches" \
     || die "Folder Bridgeplay di Library tidak bisa dibuat."
-rm -rf "$support/gptk" || die "Game Porting Toolkit lama tidak bisa dihapus."
-ditto "$here/gptk" "$support/gptk" || die "Game Porting Toolkit gagal disalin."
+# A zip made with --no-gptk has no toolkit; the one already on this Mac stays.
+if [ -d "$here/gptk" ]; then
+    rm -rf "$support/gptk" || die "Game Porting Toolkit lama tidak bisa dihapus."
+    ditto "$here/gptk" "$support/gptk" || die "Game Porting Toolkit gagal disalin."
+fi
 # Bridgeplay reuses any cached file whose hash matches its pin, so DXMT and DXVK are not
 # downloaded again. The WineCX runtime is not in the zip; the app downloads it.
 ditto "$here/cache" "$caches" || die "File engine gagal disalin."

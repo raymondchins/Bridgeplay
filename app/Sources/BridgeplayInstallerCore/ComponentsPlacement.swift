@@ -18,10 +18,13 @@ struct ComponentsPlacement {
     }
     var oldConfs = ComponentsPlacement.oldInstallerConfs
     var addsSteam = true
+    /// False leaves this Mac's toolkit as it is: the zip has none, or one that failed Apple's checks.
+    var placesToolkit = true
     var log: (String) -> Void = { InstallerLog.write($0) }
 
     static let steamStatus = "Installing Steam from Valve"
     static let copyStatus = "Copying the Game Porting Toolkit, DXMT, DXVK and configs"
+    static let copyWithoutToolkitStatus = "Copying DXMT, DXVK and configs"
 
     // Installers up to 3.0.1 copied their own per-game confs into the user's gamefixes/,
     // where they override the shipped defaults. A copy still byte-identical to one of those
@@ -40,7 +43,7 @@ struct ComponentsPlacement {
             try installSteam(applications, download, log)
         }
 
-        status(Self.copyStatus)
+        status(placesToolkit ? Self.copyStatus : Self.copyWithoutToolkitStatus)
         let (support, caches) = folders()
         for folder in [support.appending(path: "gamefixes"), support.appending(path: "gamefixes-default"),
                        support.appending(path: ".installer"), caches] {
@@ -50,8 +53,10 @@ struct ComponentsPlacement {
         }
 
         // Copied beside the old one first, so a failed copy leaves the working toolkit alone.
-        try fail("The Game Porting Toolkit could not be copied.") {
-            try Self.put(source.appending(path: "gptk"), at: support.appending(path: "gptk"))
+        if placesToolkit {
+            try fail("The Game Porting Toolkit could not be copied.") {
+                try Self.put(source.appending(path: "gptk"), at: support.appending(path: "gptk"))
+            }
         }
         // Bridgeplay reuses any cached file whose hash matches its pin, so DXMT and DXVK are
         // not downloaded again. The WineCX runtime is not in the zip; the app downloads it.

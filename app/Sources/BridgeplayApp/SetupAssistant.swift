@@ -56,6 +56,8 @@ final class SetupAssistant {
     var gptkProgress: String?
     // The components zip's length, from the signature file published beside it.
     var componentsBytes: Int64?
+    var toolkitAttempt: ToolkitPlan.Attempt = .none
+    var toolkitPlan: ToolkitPlan { .decide(located: gptk, attempt: toolkitAttempt) }
     @ObservationIgnored private var componentsRate = DownloadRate()
 
     // Steam
@@ -307,12 +309,14 @@ final class SetupAssistant {
             }
             meter.clear()
             gptkProgress = String(localized: "Installing the Game Porting Toolkit")
-            try await Task.detached(priority: .userInitiated) {
+            let toolkit = try await Task.detached(priority: .userInitiated) {
                 // The failure's reason also goes to app.log, which the error report includes.
                 try InstallerComponents.install(archive: archive, work: work, addsSteam: addsSteam,
                                                 status: { AppLog.note("setup: components: \($0)") },
                                                 log: { InstallerLog.write($0); AppLog.note("setup: components: \($0)") })
             }.value
+            AppLog.note("setup: components placed, toolkit: \(toolkit)")
+            toolkitAttempt = .components(toolkit)
         } catch {
             AppLog.note("setup: components failed: \(error.localizedDescription)")
             // The step's own reason, without the core's generic sentence in front of it.
@@ -321,12 +325,13 @@ final class SetupAssistant {
             freeBytes = SetupChecks.freeBytes()
             // The download's own error says nothing about space; a disk that can't hold the zip does.
             if let free = freeBytes, let expected, free < expected * 2 {
-                message = String(localized: "The Game Porting Toolkit wasn't added. \(PinnedDownload.outOfSpaceDetail)")
+                toolkitAttempt = .failed(PinnedDownload.outOfSpaceDetail)
             } else {
-                message = String(localized: "The Game Porting Toolkit wasn't added. \(detail)")
+                toolkitAttempt = .failed(detail)
             }
         }
         gptk = WinecxD3DMetal.locate()
+        message = toolkitPlan.message
         refreshSteam()
         if gptk != nil { gptkImages = [] }
     }

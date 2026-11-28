@@ -7652,6 +7652,28 @@
         }
       }
     },
+    "Failed Apple’s checks." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non ha superato i controlli di Apple."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не прошёл проверку Apple."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未通过 Apple 的检查。"
+          }
+        }
+      }
+    },
     "Fast-Motion Fallback" : {
       "localizations" : {
         "it" : {
@@ -8484,6 +8506,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "获取 CrossOver"
+          }
+        }
+      }
+    },
+    "Get It from Apple" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scaricalo da Apple"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузить с сайта Apple"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Apple 获取"
           }
         }
       }
@@ -11480,6 +11524,28 @@
         }
       }
     },
+    "Not added. Needed for DirectX 12, DLSS and ray tracing. Get the .dmg from Apple, then click Rescan." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non aggiunto. Serve per DirectX 12, DLSS e ray tracing. Scarica il .dmg da Apple, poi fai clic su Ripeti scansione."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не добавлен. Нужен для DirectX 12, DLSS и трассировки лучей. Скачайте .dmg с сайта Apple и нажмите «Пересканировать»."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未添加。DirectX 12、DLSS 和光线追踪需要它。从 Apple 下载 .dmg，然后点“重新扫描”。"
+          }
+        }
+      }
+    },
     "Not checked: %@" : {
       "localizations" : {
         "it" : {
@@ -11520,6 +11586,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未检查：其所在的磁盘未连接"
+          }
+        }
+      }
+    },
+    "Not included. DXMT still works." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non incluso. DXMT funziona comunque."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не включён. DXMT работает."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未包含。DXMT 仍可使用。"
           }
         }
       }
@@ -11920,6 +12008,28 @@
         }
       }
     },
+    "Open Apple's downloads page. Sign in, then download the latest Game Porting Toolkit .dmg." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apre la pagina dei download di Apple. Accedi, poi scarica il .dmg più recente del Game Porting Toolkit."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открывает страницу загрузок Apple. Войдите и загрузите последний .dmg Game Porting Toolkit."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Apple 的下载页面。登录后，下载最新的 Game Porting Toolkit .dmg。"
+          }
+        }
+      }
+    },
     "Open Bridgeplay to put it back." : {
       "localizations" : {
         "it" : {
@@ -12162,24 +12272,24 @@
         }
       }
     },
-    "Optional. If you skip it, games use DXMT, which runs DirectX 10 and 11 games only. You can add the toolkit later from Status." : {
+    "Optional. Needed for DirectX 12; add it later in Status." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Facoltativo. Se lo salti, i giochi usano DXMT, che esegue solo giochi DirectX 10 e 11. Potrai aggiungere il toolkit più tardi da Stato."
+            "value" : "Facoltativo. Serve per DirectX 12; aggiungilo poi da Stato."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Необязательно. Если пропустить, игры будут использовать DXMT, который запускает только игры на DirectX 10 и 11. Toolkit можно добавить позже в разделе «Статус»."
+            "value" : "Необязательно. Нужен для DirectX 12; добавьте позже в «Статусе»."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "可选。若跳过，游戏将使用 DXMT，它只能运行 DirectX 10 和 11 游戏。你之后可以在“状态”中添加该工具包。"
+            "value" : "可选。DirectX 12 需要它，之后可在“状态”中添加。"
           }
         }
       }
@@ -15926,24 +16036,24 @@
         }
       }
     },
-    "Skipped. Games use DXMT; add it later from Status." : {
+    "Skipped. Add it in Status." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Saltato. I giochi usano DXMT; potrai aggiungerlo più tardi da Stato."
+            "value" : "Saltato. Aggiungilo da Stato."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пропущено. Игры используют DXMT; добавить можно позже в разделе «Статус»."
+            "value" : "Пропущено. Добавьте в «Статусе»."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已跳过。游戏将使用 DXMT；你可以稍后在“状态”中添加。"
+            "value" : "已跳过。可在“状态”中添加。"
           }
         }
       }
@@ -19291,6 +19401,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "兼容工具"
+          }
+        }
+      }
+    },
+    "Toolkit not added. %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toolkit non aggiunto. %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toolkit не добавлен. %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未添加工具包。%@"
           }
         }
       }
