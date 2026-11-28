@@ -48,7 +48,7 @@ is rejected, and the rejection logged, when:
 | `ROSETTA_ADVERTISE_AVX` | `0`, `1` | `1` makes Rosetta report AVX/AVX2 to the game (needed by AVX-only titles) |
 | `ARGS` | space-separated arguments of `A-Za-z0-9_+./:=,-` | Added to the game's command line after the launch options' own arguments. Ignored for installers and other helpers |
 | `DLLOVERRIDES` | Wine syntax, e.g. `dinput8=n,b;xinput1_3=n` | Added to `WINEDLLOVERRIDES` after the backend's entries and before the launch options' |
-| `MSYNC` | `0`, `1` | `1` turns msync on when the engine supports it; `0` turns it off |
+| `MSYNC` | `0`, `1` | `1` turns msync on when the engine supports it; `0` turns it off. Engines with msync (WineCX, and CrossOver runners whose binaries handle it) default to on |
 | `RETINA` | `0`, `1` | Same as `BRIDGEPLAY_RETINA` (High Resolution). DPI-unaware games on the OpenGL/wined3d path (D3D9, OpenGL) can draw into the top-left quarter with RETINA=1; set RETINA=0 in their gamefix, as gamefixes/49520.conf does. |
 | `FRAMEGEN` | `0`, `1`, `2`, `3`, `adaptive` | Same as `BRIDGEPLAY_FRAMEGEN`: experimental frame generation in overlay-shim, adds up to half a frame of latency. `2` and `3` multiply the frame rate, `adaptive` fills up to the display refresh, `1` is the same as `2`, `0` is off (the default) |
 | `FRAMEGEN_QUALITY` | `performance`, `balanced`, `quality` | Same as `BRIDGEPLAY_FRAMEGEN_QUALITY`. `balanced` when unset |

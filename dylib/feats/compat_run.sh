@@ -58,6 +58,27 @@ read_app_meta() {
   fi
 }
 
+fetch_client_icon() {
+  url="https://shared.fastly.steamstatic.com/community_assets/images/apps/$app_id/$meta_clienticon.ico"
+  code=$(curl -fsL --connect-timeout 5 --max-time 20 -w '%{http_code}' -o "$ico.new.$$" "$url" 2>>"$log")
+  magic=$(od -An -tx1 -N4 "$ico.new.$$" 2>/dev/null | tr -d ' \n')
+  if [ "$magic" = "00000100" ]; then
+    mv -f "$ico.new.$$" "$ico"
+    echo "fetched client icon $meta_clienticon" >> "$log" 2>&1 || true
+  else
+    rm -f "$ico.new.$$"
+    if [ "$code" = "404" ]; then
+      : > "$absent"
+      echo "no client icon published for $meta_clienticon" >> "$log" 2>&1 || true
+    else
+      : > "$failed"
+      echo "client icon fetch for $meta_clienticon failed (http ${code:-none}), will retry in an hour" >> "$log" 2>&1 || true
+    fi
+  fi
+}
+
+# With icon_fetch_bg=1 (a game launch) the download runs beside the launch, which uses other art
+# until a later launch finds the icon cached, so an offline Mac does not wait up to 20 s.
 resolve_icon() {
   set +e
   art_dir="$client_root/appcache/librarycache/$app_id"
@@ -67,25 +88,17 @@ resolve_icon() {
     ico="$icon_root/clienticon-$meta_clienticon.ico"
     absent="$icon_root/clienticon-$meta_clienticon.absent"
     failed="$icon_root/clienticon-$meta_clienticon.failed"
+    fetching="$icon_root/clienticon-$meta_clienticon.fetching"
     find "$icon_root" -maxdepth 1 -name 'clienticon-*'   ! -name "clienticon-$meta_clienticon.*" -delete 2>/dev/null || true
     find "$absent" -mtime +14 -delete 2>/dev/null || true
     find "$failed" -mmin +60 -delete 2>/dev/null || true
+    find "$fetching" -mmin +2 -delete 2>/dev/null || true
     if [ ! -s "$ico" ] && [ ! -f "$absent" ] && [ ! -f "$failed" ]; then
-      url="https://shared.fastly.steamstatic.com/community_assets/images/apps/$app_id/$meta_clienticon.ico"
-      code=$(curl -fsL --connect-timeout 5 --max-time 20 -w '%{http_code}' -o "$ico.new" "$url" 2>>"$log")
-      magic=$(od -An -tx1 -N4 "$ico.new" 2>/dev/null | tr -d ' \n')
-      if [ "$magic" = "00000100" ]; then
-        mv -f "$ico.new" "$ico"
-        echo "fetched client icon $meta_clienticon" >> "$log" 2>&1 || true
-      else
-        rm -f "$ico.new"
-        if [ "$code" = "404" ]; then
-          : > "$absent"
-          echo "no client icon published for $meta_clienticon" >> "$log" 2>&1 || true
-        else
-          : > "$failed"
-          echo "client icon fetch for $meta_clienticon failed (http ${code:-none}), will retry in an hour" >> "$log" 2>&1 || true
-        fi
+      if [ "${icon_fetch_bg:-0}" != 1 ]; then
+        fetch_client_icon
+      elif (set -C; : > "$fetching") 2>/dev/null; then
+        (fetch_client_icon; rm -f "$fetching") < /dev/null > /dev/null 2>&1 5>&- 7>&- 8>&- 9>&- &
+        echo "client icon $meta_clienticon is downloading beside the launch, a later launch uses it" >> "$log" 2>&1 || true
       fi
     fi
     [ -s "$ico" ] && art="$ico"
@@ -738,7 +751,31 @@ pe_rva_offset() {
 # A game whose exe imports d3d12.dll is D3D12, which needs Wine's own dxgi (vkd3d), since
 # DXMT's dxgi refuses swap chains for devices it did not make. Only the static import
 # table counts, and anything that does not parse as a PE detects nothing.
+# Whether the game's exe imports d3d12.dll, worked out once per exe: per run, and with launch
+# stamps across launches.
 imports_d3d12() {
+  pe_key="$1 $(stat -f '%d:%i:%z:%Fm:%Fc' "$1" 2>/dev/null)"
+  if [ -n "${np_pe_result:-}" ] && [ "$pe_key" = "${np_pe_key:-}" ]; then
+    return "$np_pe_result"
+  fi
+  pe_result=1
+  if [ "${np_stamps_ready:-0}" = 1 ]; then
+    stamp_key "$pe_key"
+    if stamp_hit "pe-$verb" 0; then
+      pe_result=0
+    elif ! stamp_hit "pe-$verb" 1; then
+      ! pe_imports_d3d12 "$1" || pe_result=0
+      stamp_put "pe-$verb" "$pe_result"
+    fi
+  else
+    ! pe_imports_d3d12 "$1" || pe_result=0
+  fi
+  np_pe_key=$pe_key
+  np_pe_result=$pe_result
+  return "$pe_result"
+}
+
+pe_imports_d3d12() {
   pe=$1
   [ -f "$pe" ] || return 1
   pe_size=$(stat -f %z "$pe" 2>/dev/null) || return 1
@@ -936,6 +973,18 @@ restore_stock_dll() {
 
 # Copies the chosen backend's DLLs into the prefix and sets them native, and sets every
 # other DLL a backend could have left there builtin.
+# Every file the staging below reads or writes, and what it chose.
+backend_inputs() {
+  printf '%s\n' "$backend $backend_root $d3d12_stub" "$managed" "$shipped"
+  ! d3dmetal_engine || echo d3dmetal
+  for name in $managed; do
+    stat -f '%N %d:%i:%z:%Fm:%Fc' "$WINEPREFIX/drive_c/windows/system32/$name.dll" \
+      "$WINEPREFIX/drive_c/windows/syswow64/$name.dll" "$CX_ROOT/lib/wine/x86_64-windows/$name.dll" \
+      "$CX_ROOT/lib/wine/i386-windows/$name.dll" 2>/dev/null || echo "$name -"
+  done
+  [ ! -d "$backend_root" ] || find "$backend_root" \( -type f -o -type l \) -exec stat -f '%N %d:%i:%z:%Fm:%Fc' {} + 2>/dev/null | LC_ALL=C sort
+}
+
 activate_backend() {
   backend_overrides=""
   [ "$backend" != dxmt-builtin ] || return 0
@@ -956,7 +1005,17 @@ activate_backend() {
     fi
   fi
   staging_failed=0
+  backend_warned=0
+  backend_stamped=0
+  if [ "${np_stamps_ready:-0}" = 1 ]; then
+    stamp_key "$(backend_inputs)"
+    if stamp_hit backend; then
+      backend_stamped=1
+      graphics_log "$backend DLLs in the prefix unchanged since the last good launch, not staged again"
+    fi
+  fi
   for pair in x86_64-windows:system32 i386-windows:syswow64; do
+    [ "$backend_stamped" = 0 ] || break
     arch=${pair%%:*}
     dir="$WINEPREFIX/drive_c/windows/${pair##*:}"
     [ -n "$WINEPREFIX" ] && [ -d "$dir" ] || continue
@@ -976,17 +1035,17 @@ activate_backend() {
           fi ;;
         *)
           restore_stock_dll "$arch" "$name" "$dir/$name.dll" \
-            || graphics_log "could not restore Wine's $arch/$name.dll in the prefix" ;;
+            || { backend_warned=1; graphics_log "could not restore Wine's $arch/$name.dll in the prefix"; } ;;
       esac
     done
   done
   # d3d12 is managed only on a D3DMetal engine, so a stub left from before the engine's
   # D3DMetal was unlinked goes back to Wine's copy here.
   stub="$backend_root/d3d12-stub/x86_64-windows/d3d12.dll"
-  if ! d3dmetal_engine && [ -n "$WINEPREFIX" ] && [ -f "$stub" ] \
+  if [ "$backend_stamped" = 0 ] && ! d3dmetal_engine && [ -n "$WINEPREFIX" ] && [ -f "$stub" ] \
     && cmp -s "$stub" "$WINEPREFIX/drive_c/windows/system32/d3d12.dll"; then
     restore_stock_dll x86_64-windows d3d12 "$WINEPREFIX/drive_c/windows/system32/d3d12.dll" \
-      || graphics_log "could not restore Wine's x86_64-windows/d3d12.dll in the prefix"
+      || { backend_warned=1; graphics_log "could not restore Wine's x86_64-windows/d3d12.dll in the prefix"; }
   fi
   if [ "$staging_failed" -eq 1 ]; then
     if d3dmetal_engine; then next=d3dmetal; else next=wined3d; fi
@@ -995,6 +1054,10 @@ activate_backend() {
     backend_from="$backend_from, fell back after staging failed"
     activate_backend
     return
+  fi
+  if [ "$backend_stamped" = 0 ] && [ "$backend_warned" = 0 ] && [ "${np_stamps_ready:-0}" = 1 ]; then
+    stamp_key "$(backend_inputs)"
+    stamp_put backend
   fi
   native=""
   builtin=""
@@ -2173,6 +2236,7 @@ refuse_broken_prefix() {
   # set_up_prefix_contents runs reg import, which can leave wineserver holding the prefix
   # while Bridgeplay tries to claim it for the rebuild.
   if [ -n "$WINESERVER" ]; then
+    np_boot_fp=""
     without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
     without_lock_fds "$WINESERVER" -w >> "$log" 2>&1 || true
   fi
@@ -2775,10 +2839,10 @@ import_prefix_settings() {
     [ -z "$settings_file" ] || rm -f "$settings_file"
     echo "=== could not write the prefix settings, launching without them ===" >> "$log" 2>&1 || true
     # the bridge staging still needs a built prefix
-    without_lock_fds "$WINELOADER" wineboot --init >> "$log" 2>&1 || true
+    without_lock_fds ${np_boot_client:+"$np_boot_client"} "$WINELOADER" wineboot --init >> "$log" 2>&1 || true
     return 0
   fi
-  without_lock_fds "$WINELOADER" reg import "C:\\${settings_file##*/}" >> "$log" 2>&1 \
+  without_lock_fds ${np_boot_client:+"$np_boot_client"} "$WINELOADER" reg import "C:\\${settings_file##*/}" >> "$log" 2>&1 \
     && import_status=0 || import_status=$?
   rm -f "$settings_file"
   if [ "$import_status" -eq 0 ] && [ "$hidraw_planned" -eq 1 ] && [ "$NOTPROTON_DISABLE_HIDRAW" != "1" ]; then
@@ -2786,6 +2850,7 @@ import_prefix_settings() {
   fi
   if [ "$import_status" -eq 0 ] && [ -n "$controllers_add$controllers_remove$hidraw_value$dpi_value" ]; then
     # Wine only reads these keys when it starts, so restart Wine to apply them.
+    np_boot_fp=""
     without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
     without_lock_fds "$WINESERVER" -w >> "$log" 2>&1 || true
   fi
@@ -3325,6 +3390,7 @@ record_game_drive() {
 
 restart_for_drive() {
   # Wine only picks up a new drive when it starts.
+  np_boot_fp=""
   without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
   without_lock_fds "$WINESERVER" -w >> "$log" 2>&1 || true
 }
@@ -3403,6 +3469,14 @@ link_fonts() {
   [ -f "$WINEPREFIX/system.reg" ] || return 0
   fonts_dir="$WINEPREFIX/drive_c/windows/Fonts"
   mkdir -p "$fonts_dir" 2>> "$log" || return 0
+  # A folder's times change with any entry added, removed or renamed in it.
+  if [ "${np_stamps_ready:-0}" = 1 ]; then
+    stamp_key "$(fonts_inputs)"
+    if stamp_hit fonts; then
+      echo "fonts: unchanged since the last good launch, links kept" >> "$log" 2>&1 || true
+      return 0
+    fi
+  fi
   # Windows finds a font by name in any case, so on a case-sensitive volume a font that
   # Winetricks installed as Arial.TTF keeps the arial.ttf link out, and drops one made before.
   # -L -type f: fonts and links that reach one; a dangling link holds no name.
@@ -3431,6 +3505,16 @@ link_fonts() {
       fi
     done
   done
+  if [ "${np_stamps_ready:-0}" = 1 ]; then
+    stamp_key "$(fonts_inputs)"
+    stamp_put fonts
+  fi
+}
+
+fonts_inputs() {
+  printf '%s\n' "$app_id"
+  stat -f '%N %d:%i:%Fm:%Fc' "$fonts_dir" "$np_support/fonts" "$np_support/fonts/alt" \
+    "$CX_ROOT/share/wine/fonts" "$CX_ROOT/share/wine/fonts/alt" 2>/dev/null
 }
 
 # Lays out the profile, drives, settings and fonts of the prefix the launch will use.
@@ -3444,6 +3528,7 @@ set_up_prefix_contents() {
   mark "game drive"
   map_game_drive
   mark "prefix settings"
+  warm_session_begin
   import_prefix_settings
   mark "fonts"
   link_fonts
@@ -3462,6 +3547,347 @@ native_vc_runtime() {
       printf '%s=n,b;' "$name"
     fi
   done
+}
+
+# Launch stamps. A step whose inputs (file identities, the engine, the prefix, this script) match
+# what the last launch recorded is skipped. A last launch that did not end well, no outcome on
+# record, or BRIDGEPLAY_FULL_LAUNCH=1 runs every step in full; full steps record again.
+np_uid=$(id -u)
+np_full_launch=0
+[ "${NOTPROTON_FULL_LAUNCH:-0}" != 1 ] || np_full_launch=1
+np_stamps=0
+np_stamps_ready=0
+np_stamp_text=""
+np_stamp_base=""
+stamp_file=""
+
+# The prefix (dev:ino) and the engine files (dev:ino:size:mtime), from one stat. Engine files
+# go by size and mtime: each launch links ntdll.so into the game's bundle, which changes its ctime.
+launch_ids() {
+  np_prefix_id=""
+  np_engine_ids=""
+  ids=$(stat -f '%d:%i %z:%Fm' "$WINEPREFIX" "$WINESERVER" "$WINELOADER" "$wine_unix/ntdll.so" 2>/dev/null) || true
+  np_prefix_id=${ids%%' '*}
+  case "$ids" in *"
+"*) np_engine_ids=${ids#*"
+"} ;; esac
+  np_server_ids=${np_engine_ids%%"
+"*}
+}
+
+stamps_load() {
+  [ -n "$STEAM_COMPAT_DATA_PATH" ] && [ -n "$WINEPREFIX" ] || return 0
+  stamp_file="$STEAM_COMPAT_DATA_PATH/bridgeplay-launch-stamps"
+  launch_ids
+  script_sum=$(cksum < "$0" 2>/dev/null) || script_sum=""
+  np_stamp_base="$np_uid $np_build ${wine_unix##*/} $CX_ROOT
+$script_sum
+$np_prefix_id
+$np_engine_ids"
+  np_stamps_ready=1
+  stamps_why=""
+  last_code=""
+  if [ -f "$STEAM_COMPAT_DATA_PATH/bridgeplay-last-launch" ]; then
+    while IFS= read -r line; do
+      case "$line" in code=*) last_code=${line#code=}; break ;; esac
+    done < "$STEAM_COMPAT_DATA_PATH/bridgeplay-last-launch" 2>/dev/null || true
+  fi
+  if [ "$np_full_launch" = 1 ]; then
+    stamps_why="BRIDGEPLAY_FULL_LAUNCH=1"
+  elif [ "${np_rebuilt:-0}" = 1 ]; then
+    stamps_why="the prefix was rebuilt"
+  else
+    case "$last_code" in
+      ok|quit_early|stopped_from_steam) ;;
+      '') stamps_why="no last launch on record" ;;
+      *) stamps_why="the last launch ended $last_code" ;;
+    esac
+  fi
+  if [ -z "$stamps_why" ] && own_note "$stamp_file"; then
+    np_stamp_text=""
+    while IFS= read -r line; do
+      np_stamp_text="$np_stamp_text$line
+"
+    done < "$stamp_file" 2>/dev/null || true
+    np_stamps=1
+  fi
+  if [ "$np_stamps" = 1 ]; then
+    echo "launch stamps: steps whose inputs match the last launch are skipped" >> "$log" 2>&1 || true
+  else
+    echo "launch stamps: every step runs in full (${stamps_why:-nothing recorded yet})" >> "$log" 2>&1 || true
+  fi
+}
+
+# Sets stamp_new to the checksum of this launch's base and $1.
+stamp_key() {
+  stamp_new=$(printf '%s\n%s' "$np_stamp_base" "$1" | cksum) || stamp_new=""
+  case "$stamp_new" in *' '*) stamp_new="${stamp_new%% *}:${stamp_new#* }" ;; *) stamp_new="" ;; esac
+}
+
+# Succeeds when the stamp named $1 holds stamp_new, plus $2 when given.
+stamp_hit() {
+  [ "$np_stamps" = 1 ] && [ "${np_rebuilt:-0}" != 1 ] && [ -n "$stamp_new" ] || return 1
+  case "
+$np_stamp_text" in
+    *"
+$1 $stamp_new${2:+ $2}
+"*) return 0 ;;
+  esac
+  return 1
+}
+
+# Records stamp_new (and $2) under the name $1; with no stamp_new it drops the name.
+stamp_put() {
+  [ "$np_stamps_ready" = 1 ] && [ -n "$stamp_file" ] || return 0
+  kept_text=""
+  while IFS= read -r line; do
+    case "$line" in ''|"$1 "*) ;; *) kept_text="$kept_text$line
+" ;; esac
+  done <<STAMPS
+$np_stamp_text
+STAMPS
+  [ -z "$stamp_new" ] || kept_text="$kept_text$1 $stamp_new${2:+ $2}
+"
+  np_stamp_text=$kept_text
+  rm -f "$stamp_file.$$" 2>/dev/null || true
+  if ! { (set -C; printf '%s' "$np_stamp_text" > "$stamp_file.$$") && mv -f "$stamp_file.$$" "$stamp_file"; } 2>/dev/null; then
+    rm -f "$stamp_file.$$" 2>/dev/null || true
+  fi
+}
+
+# After a helper that failed, the game runs every step in full.
+stamps_clear() {
+  np_stamps=0
+  np_stamp_text=""
+  [ -z "$stamp_file" ] || rm -f "$stamp_file" 2>/dev/null || true
+}
+
+# The warm Wine session. Steam runs the install-script helper ("run") just before the game, and
+# each booted Wine: the game's first step killed the helper's session and booted another. Now
+# the first Wine program of a launch starts the server with -p, so it outlives its last program
+# by np_warm_seconds, and a helper that ends well leaves bridgeplay-warm-server. The game reuses
+# that session when the note is under np_warm_reuse seconds old and names this user, engine,
+# wineserver, prefix, WINEMSYNC and boot environment, and its server is still the one running;
+# anything else kills it as before.
+#
+# Wine's system processes (services, winedevice with winebus, explorer) take the environment of
+# the session's first program. So the helper boots its session with the game's: the variables
+# boot_env_awk lists, as the game last had them (bridgeplay-boot-env), and the reuse needs the
+# game's to be the same now. The helper's own program keeps the helper's environment.
+np_warm=0
+np_warm_seconds=30
+np_warm_reuse=10
+np_boot_fp=""
+np_boot_sock=""
+np_boot_client=""
+np_mirror_file=""
+case "$verb" in run|waitforexitandrun) [ "$np_full_launch" = 1 ] || np_warm=1 ;; esac
+
+# The boot environment: every variable of these families as "R NAME=value", R being + for one a
+# helper may copy (not the engine's paths, the SDL mappings built from files or DYLD_, and no
+# backslash or newline in the value, which come out escaped) and - for the rest. With
+# unset=<record>, the names a helper has that the record lacks.
+boot_env_awk='
+function boot(k) { return k ~ /^(SDL_|WINE|CX_|ROSETTA_|FEX_|DYLD_|D3DM_|DXMT_|DXVK_|VKD3D_|MVK_|MTL_|STAGING_|LC_)/ || k == "LANG" || k == "TZ" }
+function kept(k) { return k ~ /^(WINEPREFIX|WINELOADER|WINESERVER|WINEDLLPATH|WINEMSYNC|CX_ROOT|CX_HOME|CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG|SDL_GAMECONTROLLERCONFIG_FILE)$/ || k ~ /^DYLD_/ }
+BEGIN {
+  if (unset != "") {
+    while ((getline l < unset) > 0) { n = l; sub(/=.*/, "", n); have[n] = 1 }
+    for (k in ENVIRON) if (boot(k) && !kept(k) && !(k in have)) print k
+    exit
+  }
+  for (k in ENVIRON) if (boot(k)) {
+    v = ENVIRON[k]; copy = !kept(k) && v !~ /[\\\n]/
+    gsub(/\\/, "\\\\", v); gsub(/\n/, "\\n", v)
+    print (copy ? "+ " : "- ") k "=" v
+  }
+}'
+
+# Runs "$@" with the boot environment of the game's last launch in place of the helper's.
+boot_mirror() {
+  if [ -z "$np_mirror_file" ]; then "$@"; return; fi
+  while IFS= read -r line; do
+    case "${line%%=*}" in ''|*[!A-Za-z0-9_]*|[0-9]*) continue ;; esac
+    set -- "$line" "$@"
+  done < "$np_mirror_file"
+  # shellcheck disable=SC2013 # one variable name per line, which has no spaces
+  for name in $(/usr/bin/awk -v unset="$np_mirror_file" "$boot_env_awk"); do
+    set -- -u "$name" "$@"
+  done
+  /usr/bin/env "$@"
+}
+
+# The session's first Wine program boots its system processes, so only it gets boot_mirror:
+# warm_session_begin sets np_boot_client=boot_client and the first use clears it.
+# shellcheck disable=SC2329 # run through $np_boot_client
+boot_client() {
+  np_boot_client=""
+  boot_mirror "$@"
+}
+
+# The environment this launch's session boots with: np_my_fp (its checksum), np_env_copy (the
+# lines a helper may copy) and np_env_lens ("len=NAME length" lines, to name what differs).
+boot_env_scan() {
+  listed=$(boot_mirror /usr/bin/awk "$boot_env_awk" | LC_ALL=C sort) || listed=""
+  all=""
+  np_env_copy=""
+  np_env_lens=""
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    entry=${line#? }
+    all="$all$entry
+"
+    [ "${line%% *}" != + ] || np_env_copy="$np_env_copy$entry
+"
+    np_env_lens="${np_env_lens}len=${entry%%=*} ${#entry}
+"
+  done <<LISTED
+$listed
+LISTED
+  np_my_fp=$(printf '%s' "$all" | cksum) || np_my_fp=""
+  np_my_fp="${np_my_fp%% *}:${np_my_fp#* }"
+}
+
+# A note this user wrote, not a link, up to 64 KiB.
+own_note() {
+  [ -f "$1" ] && [ ! -L "$1" ] || return 1
+  note_stat=$(stat -f '%u %z' "$1" 2>/dev/null) || return 1
+  [ "${note_stat%% *}" = "$np_uid" ] && [ "${note_stat#* }" -le 65536 ]
+}
+
+warm_identity() {
+  printf 'version=1\nuid=%s\nbuild=%s\narch=%s\nserver=%s\nprefix=%s\nmsync=%s\nenv=%s\n' \
+    "$np_uid" "$np_build" "${wine_unix##*/}" "$np_server_ids" "$np_prefix_id" "$WINEMSYNC" "$np_my_fp"
+}
+
+# Where Wine keeps this prefix's server: /tmp/.wine-<uid>/server-<dev>-<inode>, in hex.
+warm_server_dir() {
+  printf '/tmp/.wine-%s/server-%x-%x' "$np_uid" "${np_prefix_id%%:*}" "${np_prefix_id#*:}"
+}
+
+# The running server: its socket, which each new server makes afresh. The folders and socket are
+# this user's and no links, as for prefix_server_dir.
+warm_server_id() {
+  case "$np_prefix_id" in *[!0-9:]*|''|:*|*:) return 1 ;; esac
+  server_dir=$(warm_server_dir) || return 1
+  server_ids=$(stat -f '%Sp %u %d:%i:%B' "${server_dir%/*}" "$server_dir" "$server_dir/socket" 2>/dev/null) \
+    || return 1
+  # shellcheck disable=SC2086 # three lines of three words without spaces
+  set -- $server_ids
+  [ "$#" = 9 ] && [ "$2" = "$np_uid" ] && [ "$5" = "$np_uid" ] && [ "$8" = "$np_uid" ] || return 1
+  # The first letter of each mode: two folders, then a socket.
+  [ "${1%"${1#?}"}${4%"${4#?}"}${7%"${7#?}"}" = dds ] || return 1
+  printf '%s' "$9"
+}
+
+# The game writes the boot environment its own session would get, for the next helper to copy.
+boot_env_record() {
+  record="$STEAM_COMPAT_DATA_PATH/bridgeplay-boot-env"
+  was=""
+  if [ -f "$record" ]; then
+    while IFS= read -r line; do
+      was="$was$line
+"
+    done < "$record" 2>/dev/null || true
+  fi
+  [ "$was" != "$np_env_copy" ] || return 0
+  rm -f "$record.$$" 2>/dev/null || true
+  { (umask 077; set -C; printf '%s' "$np_env_copy" > "$record.$$") && mv -f "$record.$$" "$record"; } 2>/dev/null \
+    || rm -f "$record.$$" 2>/dev/null || true
+}
+
+# Decides at the launch's first kill whether the session the helper left up is reused.
+warm_session_decide() {
+  np_boot_fp=""
+  np_mirror_file=""
+  note="$STEAM_COMPAT_DATA_PATH/bridgeplay-warm-server"
+  if [ "$np_warm" != 1 ]; then
+    rm -f "$note" 2>/dev/null || true
+    return 1
+  fi
+  if [ "$verb" != waitforexitandrun ] && own_note "$STEAM_COMPAT_DATA_PATH/bridgeplay-boot-env"; then
+    np_mirror_file="$STEAM_COMPAT_DATA_PATH/bridgeplay-boot-env"
+  fi
+  boot_env_scan
+  [ "$verb" != waitforexitandrun ] || boot_env_record
+  own_note "$note" || { rm -f "$note" 2>/dev/null || true; return 1; }
+  left=""
+  left_lens=""
+  ended=""
+  sock=""
+  while IFS= read -r line; do
+    case "$line" in
+      ended=*) ended=${line#ended=} ;;
+      sock=*) sock=${line#sock=} ;;
+      len=*) left_lens="$left_lens$line
+" ;;
+      *) left="$left$line
+" ;;
+    esac
+  done < "$note" 2>/dev/null || true
+  rm -f "$note" 2>/dev/null || true
+  case "$ended" in ''|*[!0-9]*) return 1 ;; esac
+  np_now_ms
+  age=$((np_ms / 1000 - ended))
+  why=""
+  if [ "$age" -lt 0 ] || [ "$age" -gt "$np_warm_reuse" ]; then
+    why="it is ${age}s old"
+  elif [ "$left" != "$(warm_identity)
+" ]; then
+    why="the engine, prefix, WINEMSYNC or boot environment differs"
+    differs=$(printf '%s%s' "$left_lens" "$np_env_lens" | LC_ALL=C sort | uniq -u | sed 's/^len=//;s/ .*//' \
+      | LC_ALL=C sort -u | tr '\n' ' ') || differs=""
+    [ -z "$differs" ] || why="$why (${differs% })"
+  elif [ -z "$sock" ] || [ "$sock" != "$(warm_server_id)" ]; then
+    why="its Wine server is gone or was replaced"
+  fi
+  if [ -n "$why" ]; then
+    echo "warm start: not reusing the helper's Wine session, $why" >> "$log" 2>&1 || true
+    return 1
+  fi
+  np_boot_fp=$np_my_fp
+  np_boot_sock=$sock
+  echo "warm start: reusing the Wine session the helper left ${age}s ago" >> "$log" 2>&1 || true
+}
+
+# Before the launch's first Wine program: starts the server with -p unless one is up. Its first
+# program, run through boot_client, then boots Wine's system processes.
+warm_session_begin() {
+  np_boot_client=""
+  [ "$np_warm" = 1 ] || return 0
+  rc=0
+  boot_mirror "$WINESERVER" -p"$np_warm_seconds" < /dev/null >> "$log" 2>&1 5>&- 7>&- 8>&- 9>&- || rc=$?
+  case "$rc" in
+    0)
+      np_boot_fp=$np_my_fp
+      np_boot_sock=$(warm_server_id) || np_boot_sock=""
+      np_boot_client=boot_client
+      echo "warm start: Wine server started, it stays up ${np_warm_seconds}s after its last program" >> "$log" 2>&1 || true ;;
+    2)
+      [ -n "$np_boot_fp" ] \
+        || echo "warm start: a Wine server this launch did not start is up, it is not left for the game" >> "$log" 2>&1 || true ;;
+    *)
+      np_boot_fp=""
+      echo "warm start: the Wine server did not start (status $rc), Wine starts its own" >> "$log" 2>&1 || true ;;
+  esac
+}
+
+# A helper that ended well leaves its session to the game; any other end kills one it started.
+warm_session_end() {
+  note="$STEAM_COMPAT_DATA_PATH/bridgeplay-warm-server"
+  [ -n "$np_boot_fp" ] || return 0
+  if [ "$1" = 0 ] && [ "$np_boot_fp" = "$np_my_fp" ] && [ -n "$np_boot_sock" ] \
+    && [ "$np_boot_sock" = "$(warm_server_id)" ]; then
+    np_now_ms
+    rm -f "$note.$$" 2>/dev/null || true
+    if { (umask 077; set -C; { warm_identity; printf '%ssock=%s\nended=%s\n' "$np_env_lens" "$np_boot_sock" \
+      "$((np_ms / 1000))"; } > "$note.$$") && mv -f "$note.$$" "$note"; } 2>/dev/null; then
+      echo "warm start: Wine session left up for the game" >> "$log" 2>&1 || true
+      return 0
+    fi
+    rm -f "$note.$$" 2>/dev/null || true
+  fi
+  without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
 }
 
 if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
@@ -3492,7 +3918,8 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   else
     echo "avx: ROSETTA_ADVERTISE_AVX=$ROSETTA_ADVERTISE_AVX from $avx_from" >> "$log" 2>&1 || true
   fi
-  without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
+  stamps_load
+  warm_session_decide || without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
   if [ "$prefix_was_new" = 1 ]; then launch_progress setup; else launch_progress prepare; fi
   mark "prefix seed"
   seed_prefix_from_template
@@ -3536,13 +3963,23 @@ verify_runner() {
     echo "=== no patched ntdll for build $np_build in the bridge, set it up in Bridgeplay ===" >> "$log" 2>&1 || true
     return
   fi
+  runner_warned=0
+  if [ "${np_stamps_ready:-0}" = 1 ]; then
+    stamp_key "$(runner_inputs)"
+    if stamp_hit runner; then
+      echo "runner check: unchanged since the last good launch" >> "$log" 2>&1 || true
+      return
+    fi
+  fi
   for arch in x86_64-windows i386-windows aarch64-windows; do
     staged="$bridge_src/wine/$np_build/$arch/ntdll.dll"
     live="$CX_ROOT/lib/wine/$arch/ntdll.dll"
     [ -f "$staged" ] || continue
     if [ ! -f "$live" ]; then
+      runner_warned=1
       echo "=== runner has no $arch ntdll, set up the runner in Bridgeplay ===" >> "$log" 2>&1 || true
     elif ! cmp -s "$staged" "$live"; then
+      runner_warned=1
       echo "=== runner $arch ntdll is not the patched copy, set up the runner in Bridgeplay ===" >> "$log" 2>&1 || true
     fi
   done
@@ -3552,8 +3989,20 @@ verify_runner() {
       *) name="lsteamclient.dll" ;;
     esac
     [ -f "$CX_ROOT/lib/wine/$arch/$name" ] && continue
+    runner_warned=1
     echo "=== runner is missing $arch/$name, set up the runner in Bridgeplay ===" >> "$log" 2>&1 || true
   done
+  [ "$runner_warned" = 1 ] || [ "${np_stamps_ready:-0}" != 1 ] || stamp_put runner
+}
+
+runner_inputs() {
+  for arch in x86_64-windows i386-windows aarch64-windows; do
+    stat -f '%N %d:%i:%z:%Fm:%Fc' "$bridge_src/wine/$np_build/$arch/ntdll.dll" \
+      "$CX_ROOT/lib/wine/$arch/ntdll.dll" 2>/dev/null || echo "$arch ntdll missing"
+  done
+  stat -f '%N %d:%i:%z:%Fm:%Fc' "$CX_ROOT/lib/wine/i386-windows/lsteamclient.dll" \
+    "$CX_ROOT/lib/wine/x86_64-windows/lsteamclient.dll" "$wine_unix/lsteamclient.so" 2>/dev/null \
+    || echo "lsteamclient missing"
 }
 install_lsteamclient_trigger() {
   src="$bridge_src/i386-windows/lsteamclient.dll"
@@ -3660,6 +4109,14 @@ place_bridge_file() {
   bridge_origin "$1"
   cp -c -fp "$origin" "$2" 2>/dev/null || cp -fp "$bridge_src/$1" "$2" 2>> "$log"
 }
+bridge_inputs() {
+  printf '%s\n' "$bridge_cache"
+  for f in $bridge_files; do
+    src="$bridge_src/$f"
+    [ "$f" != lsteamclient.so ] || src="$bridge_src/${wine_unix##*/}/$f"
+    stat -f '%N %d:%i:%z:%Fm:%Fc' "$src" "$prefix_steam/$f" 2>/dev/null || echo "$f missing"
+  done
+}
 if [ -d "$bridge_src" ] && [ -n "$WINEPREFIX" ]; then
   mark "bridge staging"
   mkdir -p "$prefix_steam"
@@ -3669,7 +4126,13 @@ if [ -d "$bridge_src" ] && [ -n "$WINEPREFIX" ]; then
     bridge_cache="$(dirname "$STEAM_COMPAT_DATA_PATH")/notproton-template/bridge"
   fi
   bridge_matches=1
+  bridge_stamped=0
+  if [ "${np_stamps_ready:-0}" = 1 ]; then
+    stamp_key "$(bridge_inputs)"
+    ! stamp_hit bridge || bridge_stamped=1
+  fi
   for f in $bridge_files; do
+    [ "$bridge_stamped" = 0 ] || break
     src="$bridge_src/$f"
     if [ "$f" = lsteamclient.so ]; then
       src="$bridge_src/${wine_unix##*/}/$f"
@@ -3679,7 +4142,9 @@ if [ -d "$bridge_src" ] && [ -n "$WINEPREFIX" ]; then
       break
     fi
   done
-  if [ "$bridge_matches" -eq 1 ]; then
+  if [ "$bridge_stamped" = 1 ]; then
+    echo "=== bridge already staged (unchanged since the last good launch) ===" >> "$log" 2>&1 || true
+  elif [ "$bridge_matches" -eq 1 ]; then
     echo "=== bridge already staged ===" >> "$log" 2>&1 || true
   else
     unstaged=0
@@ -3704,11 +4169,15 @@ if [ -d "$bridge_src" ] && [ -n "$WINEPREFIX" ]; then
       exit 1
     fi
   fi
+  if [ "$bridge_stamped" = 0 ] && [ "${np_stamps_ready:-0}" = 1 ]; then
+    stamp_key "$(bridge_inputs)"
+    stamp_put bridge
+  fi
   for f in "$prefix_steam"/*.dll "$prefix_steam"/*.so "$prefix_steam"/*.exe; do
     [ -f "$f" ] || continue
     case " $bridge_files " in
-      *" $(basename "$f") "*) ;;
-      *) rm -f "$f" && echo "=== pruned stale $(basename "$f") ===" >> "$log" 2>&1 ;;
+      *" ${f##*/} "*) ;;
+      *) rm -f "$f" && echo "=== pruned stale ${f##*/} ===" >> "$log" 2>&1 ;;
     esac
   done
   verify_runner
@@ -3767,6 +4236,8 @@ if [ "$foreground" = 0 ]; then
       "$WINELOADER" "$shim_exe" "$@" >> "$log" 2>&1 || status=$?
       ;;
   esac
+  [ "${np_warm:-0}" != 1 ] || warm_session_end "$status"
+  [ "$status" = 0 ] || [ "${np_stamps_ready:-0}" != 1 ] || stamps_clear
   echo "=== helper exited status=$status ===" >> "$log" 2>&1 || true
   exit $status
 fi
@@ -3799,6 +4270,7 @@ loader_macos="$loader_contents/MacOS"
 loader_res="$loader_contents/Resources"
 mkdir -p "$loader_macos" "$loader_res"
 
+icon_fetch_bg=1
 icon_arg=""
 icon_root="$loader_root"
 if resolve_icon && cp -f "$icon_cache" "$loader_res/game.icns"; then
@@ -3841,6 +4313,53 @@ $icon_arg
 </plist>
 PLIST
 
+# Launch stamps: a bundle the last good launch installed, with every input the same and its files
+# untouched, is used as it is. Its Info.plist and icon are compared with the ones made above.
+bundle_stamp="$loader_root/.bridgeplay-bundle-stamp"
+bundle_engine_loader=$WINELOADER
+bundle_inputs() {
+  printf '%s\n' "$np_stamp_base" "$loader_app" "$app_id ${SteamGameId:-}" "$np_support" "$bundle_engine_loader"
+  ls -a "$wine_unix" "${wine_unix%/*}" 2>/dev/null || true
+  stat -f '%N %d:%i:%z:%Fm' "$bundle_engine_loader" "$wine_unix/ntdll.so" "${wine_unix%/*/*/*}/share/wine" 2>/dev/null || true
+  [ ! -d "$loader_app" ] || find "$loader_app" -exec stat -f '%N %d:%i:%z:%Fm:%Lp' {} + 2>/dev/null | LC_ALL=C sort || true
+}
+bundle_reusable() {
+  [ "${np_stamps:-0}" = 1 ] && own_note "$bundle_stamp" || return 1
+  [ -d "$loader_app" ] && [ ! -L "$loader_app" ] || return 1
+  for b in "$loader_root"/*.app "$loader_root"/.[!.]*.app; do
+    [ -e "$b" ] || [ -L "$b" ] || continue
+    [ "$b" = "$loader_app" ] || return 1
+  done
+  saved=$(cat "$bundle_stamp" 2>/dev/null) || return 1
+  stamp_key "$(bundle_inputs)"
+  [ -n "$stamp_new" ] && [ "$(printf '%s\n' "$saved" | sed -n 's/^key=//p')" = "$stamp_new" ] || return 1
+  bundle_loader=$(printf '%s\n' "$saved" | sed -n 's/^loader=//p')
+  bundle_hosts=$(printf '%s\n' "$saved" | sed -n 's/^hosts=//p')
+  bundle_registered=$(printf '%s\n' "$saved" | sed -n 's/^registered=//p')
+  case "$bundle_hosts" in 0|1) ;; *) return 1 ;; esac
+  [ "$bundle_loader" = "$loader_app/Contents/MacOS/wine" ] || [ "$bundle_loader" = "$bundle_engine_loader" ] || return 1
+  [ -x "$loader_app/Contents/MacOS/wine" ] && [ -x "$loader_app/Contents/MacOS/launcher" ] || return 1
+  [ "$bundle_hosts" = 0 ] || [ "$loader_app/Contents/MacOS/ntdll.so" -ef "$wine_unix/ntdll.so" ] || return 1
+  cmp -s "$loader_contents/Info.plist" "$loader_app/Contents/Info.plist" || return 1
+  if [ -f "$loader_res/game.icns" ]; then
+    cmp -s "$loader_res/game.icns" "$loader_app/Contents/Resources/game.icns" || return 1
+  else
+    [ ! -e "$loader_app/Contents/Resources/game.icns" ] || return 1
+  fi
+}
+bundle_record() {
+  stamp_key "$(bundle_inputs)"
+  rm -f "$bundle_stamp.$$" 2>/dev/null || true
+  [ -n "$stamp_new" ] || return 0
+  { (umask 077; set -C; printf 'key=%s\nloader=%s\nhosts=%s\nregistered=%s\n' "$stamp_new" "$WINELOADER" \
+      "$loader_hosts_ntdll" "$1" > "$bundle_stamp.$$") && mv -f "$bundle_stamp.$$" "$bundle_stamp"; } 2>/dev/null \
+    || rm -f "$bundle_stamp.$$" 2>/dev/null || true
+}
+bundle_fast=0
+bundle_registered=0
+[ "${np_stamps_ready:-0}" != 1 ] || ! bundle_reusable || bundle_fast=1
+[ "$bundle_fast" = 1 ] || rm -f "$bundle_stamp" 2>/dev/null || true
+
 # macOS Game Mode reads the Info.plist of the bundle holding a process's executable. Wine starts
 # every child process from "<folder of ntdll.so>/wine", so the bundle gets its own APFS clone of
 # the loader and a hard link of ntdll.so (dyld matches the unix libraries' @rpath/ntdll.so to it
@@ -3881,7 +4400,7 @@ stage_loader() {
     ln "$WINELOADER" "$loader_macos/wine" 2>/dev/null || cp "$WINELOADER" "$loader_macos/wine"
   fi
 }
-stage_loader
+[ "$bundle_fast" = 1 ] || stage_loader
 original_loader=$WINELOADER
 if [ -x "$loader_macos/wine" ]; then
   WINELOADER="$loader_app/Contents/MacOS/wine"
@@ -3897,6 +4416,10 @@ if [ -x "$loader_macos/wine" ]; then
   else
     echo "loader staged in bundle for game mode" >> "$log" 2>&1 || true
   fi
+elif [ "$bundle_fast" = 1 ]; then
+  WINELOADER=$bundle_loader
+  loader_hosts_ntdll=$bundle_hosts
+  echo "loader in the bundle unchanged since the last good launch" >> "$log" 2>&1 || true
 else
   echo "loader staging failed, game mode unavailable" >> "$log" 2>&1 || true
 fi
@@ -3941,6 +4464,11 @@ bundle_listing() {
   done)
 }
 install_bundle() (
+  if [ "${bundle_fast:-0}" = 1 ]; then
+    rm -rf "$loader_work" || true
+    echo "launcher bundle unchanged since the last good launch" >> "$log" 2>&1 || true
+    exit 0
+  fi
   exec 7>> "$loader_root/.lock"
   /usr/bin/lockf -s -t 30 7 || exit 1
   same=""
@@ -3995,6 +4523,7 @@ install_bundle() (
   rm -rf "$loader_work" || true
 )
 install_bundle
+[ "$bundle_fast" = 1 ] || [ "${np_stamps_ready:-0}" != 1 ] || bundle_record 0
 
 # CrossOver's ntdll (CW HACK 22144) starts each process from a hard link to the loader in
 # winetemp-<inode>-<size>-<mtime s>-<mtime ns>/<exe>, outside the bundle, when WINEDLLPATH is
@@ -4097,7 +4626,11 @@ set -- \
   --env NOTPROTON_GAME_CWD="$game_cwd" "$@"
 lsregister="/System/Library/Frameworks/CoreServices.framework/Versions/A"
 lsregister="$lsregister/Frameworks/LaunchServices.framework/Support/lsregister"
-[ -x "$lsregister" ] && "$lsregister" -f "$loader_app" >> "$log" 2>&1 || true
+if [ "$bundle_fast" = 1 ] && [ "$bundle_registered" = 1 ]; then
+  echo "launcher bundle registered with Launch Services by the last good launch" >> "$log" 2>&1 || true
+elif [ -x "$lsregister" ] && "$lsregister" -f "$loader_app" >> "$log" 2>&1; then
+  [ "${np_stamps_ready:-0}" != 1 ] || bundle_record 1
+fi
 trap - EXIT
 mark "game start"
 np_started=$np_ms

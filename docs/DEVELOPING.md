@@ -160,6 +160,32 @@ stays up past the panel's 15-minute limit.
 without a crash, `failed` for a crash within the first minute that Steam did not stop, and
 `unknown` with its reason otherwise.
 
+### Warm start and launch stamps
+
+A Play runs the install-script helper (`run`) and then the game (`waitforexitandrun`). The
+helper starts the prefix's wineserver with `-p30` and, when it exits cleanly, leaves it up and
+writes `bridgeplay-warm-server` in the compat folder: the engine, prefix, msync and boot
+environment it booted with, and the server's socket. The game reuses that server only when the
+note is under 10 seconds old, every field matches and the socket is the same one; otherwise it
+kills it and boots as before. The run log says which, as `warm start: reusing …` or
+`warm start: not reusing …, <why>` (the why names the variables that differ). Wine's system
+processes take the environment of the session's first client, so the helper boots with the
+variables the game booted with last time, from `bridgeplay-boot-env`.
+
+`bridgeplay-launch-stamps` in the compat folder records the inputs (file identities, the engine,
+the prefix and the run script) of the steps that finished on the last launch whose outcome was
+`ok`, `quit_early` or `stopped_from_steam`. A step whose inputs match is skipped and logged as
+`… unchanged since the last good launch`: the font links, the bridge files, the runner check,
+the backend DLLs, the PE import scan and the launcher bundle
+(`launchers/<appid>/.bridgeplay-bundle-stamp`). Every step runs in full, logged as
+`launch stamps: every step runs in full (<why>)`, after any other outcome, a failed helper, a
+prefix rebuild, or with `BRIDGEPLAY_FULL_LAUNCH=1`, which also turns the warm start off.
+
+The game's icon downloads in the background on the first launch, so that launch's bundle uses
+the fallback art. `make warmcheck` covers both with a stubbed Wine;
+`sh dylib/tests/warmcheck.sh dylib/feats/compat_run.sh --bench <old script>` prints the boots
+and `time:` lines of each Play for an old script and the current one.
+
 ## Checks
 
 | Command | Runs |

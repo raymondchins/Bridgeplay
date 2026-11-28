@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define NP_C1 "\001"
 #define NP_C2 "\002"
@@ -1452,7 +1453,9 @@ static int fx_build(char *buf, size_t cap) {
     if (!fx_json_apps(buf, cap, &len, root, dirs, 2, 0)) return 0;
 
     // Engines: a tool whose description names msync runs with it on (tools: name, build,
-    // arch, description, tab separated). "" stands for the default tool.
+    // arch, description, tab separated), and so does a CrossOver build whose runner has the
+    // .notproton-msync marker the app writes, which the run script reads from the same
+    // place. "" stands for the default tool.
     n = snprintf(buf + len, cap - len, ",\"e\":{");
     if (n < 0 || (size_t)n >= cap - len) return 0;
     len += (size_t)n;
@@ -1467,6 +1470,17 @@ static int fx_build(char *buf, size_t cap) {
             *tab = '\0';
             if (!*line || !fx_word(line, sizeof(g_fallback_tool) - 1)) continue;
             const char *ms = strstr(tab + 1, "msync") ? "1" : "0";
+            char *build = tab + 1, *build_end = strchr(build, '\t');
+            if (*ms == '0' && build_end) {
+                *build_end = '\0';
+                char marker[sizeof(root) + 128];
+                int m = snprintf(marker, sizeof(marker),
+                                 "%s/runners/crossover-%s/CrossOver/.notproton-msync", root, build);
+                if (*build && fx_word(build, 64) && !strchr(build, '_') &&
+                    m > 0 && (size_t)m < sizeof(marker) && access(marker, F_OK) == 0)
+                    ms = "1";
+                *build_end = '\t';
+            }
             int fallback = g_fallback_tool[0] && strcmp(line, g_fallback_tool) == 0;
             n = snprintf(buf + len, cap - len, "%s\"%s\":{\"WINEMSYNC\":\"%s\"}",
                          first ? "" : ",", line, ms);

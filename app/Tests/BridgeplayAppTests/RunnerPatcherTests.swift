@@ -24,6 +24,8 @@ struct RunnerPatcherTests {
         // not a machine that cannot answer, so it fails rather than skipping.
         try #require(copied.status == 0)
         try #require(RunnerPatcher.verify(build: build, root: scratch).isEmpty)
+        // An install also leaves the msync marker on a runner that handles it.
+        _ = RunnerPatcher.markMsync(build: build, root: scratch)
 
         return (scratch, build)
     }
@@ -192,5 +194,39 @@ struct RunnerPatcherTests {
         #expect(
             arches == RunnerPatcher.windowsBuiltins.map(\.arch) + ["aarch64-unix", "x86_64-unix"])
         #expect(RunnerPatcher.builtins(in: root).allSatisfy { $0.name.hasPrefix("lsteamclient") })
+    }
+
+    // A CrossOver runner whose Wine handles WINEMSYNC gets the marker compat_run.sh and the
+    // Steam panel read; one with a binary that lacks it, or that is marked already, is left alone.
+    @Test("A runner gets the msync marker only when its ntdll.so files and wineservers handle it")
+    func marksMsyncRunners() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appending(path: "bridgeplay-msync-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: root) }
+        let build = RunnerBuild(bundleVersion: "test-build", releaseVersion: "test-build", flavor: nil,
+                                loaderSHA256: "", cleanNtdll: [:], patchedNtdll: [:])
+        func write(_ path: String, _ text: String) throws {
+            let file = root.appending(path: path)
+            try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: file)
+        }
+        let marker = FreeEngineWinecx.msyncMarker(in: root)
+
+        try write("lib/wine/aarch64-unix/ntdll.so", "\u{7f}ELF getenv WINEMSYNC")
+        try write("lib/wine/x86_64-unix/ntdll.so", "\u{7f}ELF getenv WINEMSYNC")
+        try write("bin/wineserver-arm64", "server WINEMSYNC")
+        try write("bin/wineserver-x86", "server without it")
+        #expect(!RunnerPatcher.handlesMsync(root: root))
+        #expect(!RunnerPatcher.markMsync(build: build, root: root))
+        #expect(!fm.fileExists(atPath: marker.path(percentEncoded: false)))
+
+        try write("bin/wineserver-x86", "server WINEMSYNC")
+        #expect(RunnerPatcher.markMsync(build: build, root: root))
+        #expect(try String(contentsOf: marker, encoding: .utf8) == "test-build\n")
+        #expect(!RunnerPatcher.markMsync(build: build, root: root))
+
+        try fm.removeItem(at: marker)
+        try fm.removeItem(at: root.appending(path: "bin"))
+        #expect(!RunnerPatcher.handlesMsync(root: root))
     }
 }
