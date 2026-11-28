@@ -20443,24 +20443,24 @@
         }
       }
     },
-    "Thanks! Report sent." : {
+    "Thanks! Report on its way." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Grazie! Segnalazione inviata."
+            "value" : "Grazie! Invio della segnalazione in corso."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Спасибо! Отчёт отправлен."
+            "value" : "Спасибо! Отчёт отправляется."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "谢谢！报告已发送。"
+            "value" : "谢谢！报告正在发送。"
           }
         }
       }

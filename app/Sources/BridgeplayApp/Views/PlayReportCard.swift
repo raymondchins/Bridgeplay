@@ -154,7 +154,7 @@ struct PlayReportThanks: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(BP.green)
                 .accessibilityHidden(true)
-            Text("Thanks! Report sent.")
+            Text("Thanks! Report on its way.")
                 .font(BP.sans(13, .semibold))
             Spacer(minLength: 0)
         }
