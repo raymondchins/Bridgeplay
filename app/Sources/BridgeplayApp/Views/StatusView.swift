@@ -647,7 +647,7 @@ struct StatusView: View {
         let tools = SupportedRunners.tools(for: snapshot.installedRunners)
         if rows.isEmpty {
             StatusRow(
-                title: "Wine Engine",
+                title: String(localized: "Wine Engine"),
                 value: String(localized: "None set up yet. Choose one below."),
                 tone: .bad
             )
@@ -671,16 +671,15 @@ struct StatusView: View {
         if winehq != .current {
             let outdated = winehq == .outdated
             StatusRow(
-                title: "Free Wine Engine",
+                title: String(localized: "Free Wine Engine"),
                 value: outdated
-                    ? "Needs \(FreeEngine.current.renderer.name) for fast Direct3D 11."
-                    : "\(FreeEngine.current.bundleName.replacingOccurrences(of: ".app", with: "")) with \(FreeEngine.current.renderer.name), "
-                        + "no CrossOver license needed.",
+                    ? String(localized: "Needs \(FreeEngine.current.renderer.name) for fast Direct3D 11.")
+                    : String(localized: "\(FreeEngine.current.bundleName.replacingOccurrences(of: ".app", with: "")) with \(FreeEngine.current.renderer.name), no CrossOver license needed."),
                 tone: outdated ? .warning : .neutral,
                 action: StatusAction(
-                    label: outdated ? "Update & Set Up" : "Download & Set Up",
+                    label: outdated ? String(localized: "Update & Set Up") : String(localized: "Download & Set Up"),
                     isProminent: rows.isEmpty,
-                    help: "Download WineHQ and set the compatibility tool up from it.",
+                    help: String(localized: "Download WineHQ and set it up."),
                     isEnabled: status.canInstall
                 ) { Task { await status.installFreeEngine() } }
             )
@@ -703,14 +702,13 @@ struct StatusView: View {
         } else if winecx != .current {
             let outdated = winecx == .outdated
             StatusRow(
-                title: "WineCX Engine",
-                value: "\(FreeEngineWinecx.current.runner.releaseVersion) with msync and D3DMetal, "
-                    + "no CrossOver license needed.",
+                title: String(localized: "WineCX Engine"),
+                value: String(localized: "\(FreeEngineWinecx.current.runner.releaseVersion) with msync and D3DMetal, no CrossOver license needed."),
                 tone: outdated ? .warning : .neutral,
                 action: StatusAction(
-                    label: outdated ? "Update & Set Up" : "Download & Set Up",
+                    label: outdated ? String(localized: "Update & Set Up") : String(localized: "Download & Set Up"),
                     isProminent: rows.isEmpty,
-                    help: "Download WineCX and set the compatibility tool up from it.",
+                    help: String(localized: "Download WineCX and set it up."),
                     isEnabled: status.canInstall
                 ) { Task { await status.installWinecxEngine() } }
             )
@@ -718,7 +716,7 @@ struct StatusView: View {
         if let source = snapshot.gptkSource {
             StatusRow(
                 title: "Game Porting Toolkit",
-                value: "Linked from \(source).",
+                value: String(localized: "Linked from \(source)."),
                 tone: .ok
             )
         } else {
@@ -731,8 +729,8 @@ struct StatusView: View {
                     help: String(localized: "Open Apple's downloads page. Sign in, then download the latest Game Porting Toolkit .dmg.")
                 ) { NSWorkspace.shared.open(GPTKImport.appleDownloads) },
                 action: StatusAction(
-                    label: "Rescan",
-                    help: "Look for the Game Porting Toolkit again and link it into the WineCX engine.",
+                    label: String(localized: "Rescan"),
+                    help: String(localized: "Look for the Game Porting Toolkit again."),
                     isEnabled: status.canInstall
                 ) { Task { await status.rescanGameportingToolkit() } }
             )

@@ -244,7 +244,9 @@ struct SetupAssistantView: View {
                               }), symbol: "arrow.down.circle")
                     SetupHairline()
                 }
-                WizardRow(row: StatusRow(title: String(localized: "Or download it from Apple"),
+                WizardRow(row: StatusRow(title: model.toolkitPlan.offersComponentsDownload
+                                         ? String(localized: "Or download it from Apple")
+                                         : String(localized: "Download it from Apple"),
                           value: String(localized: "Sign in and download the latest .dmg."),
                           action: StatusAction(label: String(localized: "Open Apple Downloads")) {
                               NSWorkspace.shared.open(GPTKImport.appleDownloads)

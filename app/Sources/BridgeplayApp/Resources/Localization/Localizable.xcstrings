@@ -1083,6 +1083,50 @@
         }
       }
     },
+    "%@ with %@, no CrossOver license needed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ con %2$@, senza licenza CrossOver."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ с %2$@, лицензия CrossOver не нужна."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 搭配 %2$@，无需 CrossOver 许可证。"
+          }
+        }
+      }
+    },
+    "%@ with msync and D3DMetal, no CrossOver license needed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ con msync e D3DMetal, senza licenza CrossOver."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ с msync и D3DMetal, лицензия CrossOver не нужна."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 搭配 msync 和 D3DMetal，无需 CrossOver 许可证。"
+          }
+        }
+      }
+    },
     "%@, %@" : {
       "localizations" : {
         "en" : {
@@ -3377,7 +3421,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Создать копию и пересобрать"
+            "value" : "Создать копию и пересоздать"
           }
         },
         "zh-Hans" : {
@@ -4152,7 +4196,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bridgeplay не удалось переместить файлы в новые папки Bridgeplay: %@ Повторите попытку или сначала пропустите этот шаг на странице «Состояние»."
+            "value" : "Bridgeplay не удалось переместить файлы в новые папки Bridgeplay: %@ Повторите попытку или сначала пропустите этот шаг на странице «Статус»."
           }
         },
         "zh-Hans" : {
@@ -7393,6 +7437,94 @@
         }
       }
     },
+    "Download & Set Up" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scarica e configura"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скачать и настроить"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载并设置"
+          }
+        }
+      }
+    },
+    "Download WineCX and set it up." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scarica WineCX e configuralo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скачать WineCX и настроить его."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载 WineCX 并完成设置。"
+          }
+        }
+      }
+    },
+    "Download WineHQ and set it up." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scarica WineHQ e configuralo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скачать WineHQ и настроить его."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载 WineHQ 并完成设置。"
+          }
+        }
+      }
+    },
+    "Download it from Apple" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scaricalo da Apple"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузите его с сайта Apple"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Apple 下载"
+          }
+        }
+      }
+    },
     "Download missing Valve binaries." : {
       "localizations" : {
         "it" : {
@@ -8673,6 +8805,28 @@
         }
       }
     },
+    "Free Wine Engine" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motore Wine gratuito"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бесплатный движок Wine"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费 Wine 引擎"
+          }
+        }
+      }
+    },
     "Free about 2 GB on this library's drive, then rebuild in Bridgeplay." : {
       "comment" : "Run script alert.",
       "extractionState" : "manual",
@@ -8856,7 +9010,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Impostazioni predefinite dei giochi"
+            "value" : "Predefiniti"
           }
         },
         "ru" : {
@@ -8912,7 +9066,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Game Porting Toolkit 由 Apple 提供"
+            "value" : "Apple 的 Game Porting Toolkit"
           }
         }
       }
@@ -9115,28 +9269,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用内核级反作弊的游戏"
-          }
-        }
-      }
-    },
-    "Games with launch options reset in their Steam Properties › Bridgeplay." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I giochi con opzioni di avvio si ripristinano da Proprietà di Steam › Bridgeplay."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Игры с параметрами запуска сбрасываются в Свойствах Steam › Bridgeplay."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "带启动选项的游戏请在 Steam 属性 › Bridgeplay 中重置。"
           }
         }
       }
@@ -9810,19 +9942,19 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nel Steam del tuo Mac."
+            "value" : "Nello Steam su Mac."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "В Steam на вашем Mac."
+            "value" : "В Steam на Mac."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在你 Mac 上的 Steam 中。"
+            "value" : "在 Mac 版 Steam 里。"
           }
         }
       }
@@ -11109,6 +11241,28 @@
         }
       }
     },
+    "Linked from %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collegato da %@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подключён из %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已从 %@ 链接。"
+          }
+        }
+      }
+    },
     "Linked." : {
       "localizations" : {
         "it" : {
@@ -11149,6 +11303,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "位置"
+          }
+        }
+      }
+    },
+    "Look for the Game Porting Toolkit again." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerca di nuovo Game Porting Toolkit."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Снова найти Game Porting Toolkit."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新查找 Game Porting Toolkit。"
           }
         }
       }
@@ -11967,6 +12143,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最近邻"
+          }
+        }
+      }
+    },
+    "Needs %@ for fast Direct3D 11." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Richiede %@ per un Direct3D 11 veloce."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нужен %@ для быстрого Direct3D 11."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要 %@ 才能快速运行 Direct3D 11。"
           }
         }
       }
@@ -13221,7 +13419,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Открыть «Мониторинг ввода»"
+            "value" : "Мониторинг ввода"
           }
         },
         "zh-Hans" : {
@@ -13354,7 +13552,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Открыть Системные настройки"
+            "value" : "Системные настройки"
           }
         },
         "zh-Hans" : {
@@ -13988,7 +14186,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Backup dei prefissi"
+            "value" : "Backup prefissi"
           }
         },
         "ru" : {
@@ -16000,6 +16198,28 @@
         }
       }
     },
+    "Rescan" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripeti scansione"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пересканировать"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新扫描"
+          }
+        }
+      }
+    },
     "Reset" : {
       "localizations" : {
         "it" : {
@@ -16040,6 +16260,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全部重置"
+          }
+        }
+      }
+    },
+    "Reset a game's own settings in its Steam Properties › Bridgeplay." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina le impostazioni di un gioco da Proprietà di Steam › Bridgeplay."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сбросить настройки игры можно в Свойствах Steam › Bridgeplay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要重置某个游戏自己的设置，请前往它的 Steam 属性 › Bridgeplay。"
           }
         }
       }
@@ -22047,6 +22289,28 @@
         }
       }
     },
+    "Update & Set Up" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiorna e configura"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновить и настроить"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新并设置"
+          }
+        }
+      }
+    },
     "Update available (%@)." : {
       "localizations" : {
         "it" : {
@@ -23061,6 +23325,28 @@
         }
       }
     },
+    "Wine Engine" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motore Wine"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Движок Wine"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine 引擎"
+          }
+        }
+      }
+    },
     "Wine Log" : {
       "localizations" : {
         "it" : {
@@ -23476,7 +23762,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "[Купите CrossOver](https://www.codeweavers.com/crossover), чтобы поддержать Wine."
+            "value" : "[Купите CrossOver](https://www.codeweavers.com/crossover) в поддержку Wine."
           }
         },
         "zh-Hans" : {
