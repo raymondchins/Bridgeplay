@@ -409,7 +409,10 @@ static void web_retry_case(void) {
     cJSON_Delete(j);
 }
 
-// Another start holds the boot record's lock: this one waits for it, up to a bound.
+// Another start holds the boot record's lock: this one waits for it, up to a bound. The
+// child closes its copy of the lock's fd, so only the parent holds it, and says over a pipe
+// that it is about to start. hold_ms < 0 holds the lock until the child has exited, so the
+// bound running out is seen whatever the machine's load.
 static int locked_start(int hold_ms, int *written_while_held) {
     char lock[PATH_MAX], boot[PATH_MAX];
     snprintf(lock, sizeof lock, "%s/%s", support, NP_BOOT_LOCK_FILE);
@@ -417,28 +420,49 @@ static int locked_start(int hold_ms, int *written_while_held) {
     drop(support, NP_BOOT_FILE);
     int fd = open(lock, O_RDWR | O_CREAT, 0600);
     if (fd < 0 || flock(fd, LOCK_EX) != 0) return -1;
+    int ready[2];
+    if (pipe(ready) != 0) { close(fd); return -1; }
     fflush(stdout);
     pid_t pid = fork();
     if (pid == 0) {
+        close(fd);
+        close(ready[0]);
+        char go = 1;
+        if (write(ready[1], &go, 1) != 1) _exit(1);
+        close(ready[1]);
         np_breaker_start();
         _exit(0);
     }
-    usleep((useconds_t)hold_ms * 1000);
+    close(ready[1]);
+    char go = 0;
+    ssize_t got = read(ready[0], &go, 1);
+    close(ready[0]);
+    if (pid < 0 || got != 1) { close(fd); return -1; }
     struct stat st;
-    *written_while_held = stat(boot, &st) == 0;
-    close(fd);
     int status = 0;
-    waitpid(pid, &status, 0);
+    if (hold_ms < 0) {
+        waitpid(pid, &status, 0);
+        *written_while_held = stat(boot, &st) == 0;
+        close(fd);
+    } else {
+        usleep((useconds_t)hold_ms * 1000);
+        *written_while_held = stat(boot, &st) == 0;
+        close(fd);
+        waitpid(pid, &status, 0);
+    }
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) return -1;
     return stat(boot, &st) == 0;
 }
 
 static void lock_cases(void) {
     printf("boot lock\n");
     int early = 1;
+    // 200 ms is a tenth of the bound: the child can't have given up yet.
     CHECK("a start waits while another holds the boot record",
-          locked_start(300, &early) == 1 && !early && boot_strikes() == 0);
+          locked_start(200, &early) == 1 && !early && boot_strikes() == 0);
+    early = 0;
     CHECK("and goes on without the lock once the wait runs out",
-          locked_start(NP_BOOT_LOCK_MS + 500, &early) == 1 && early);
+          locked_start(-1, &early) == 1 && early);
 }
 
 static int scrub(const char *path, const struct stat *st, int flag, struct FTW *ftw) {
