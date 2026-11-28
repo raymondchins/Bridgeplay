@@ -19,7 +19,7 @@ struct PrefixesView: View {
                     String(localized: "No Prefixes"),
                     systemImage: "externaldrive",
                     description: Text(
-                        String(localized: "A prefix appears here once a Windows game has been launched through Bridgeplay.")
+                        String(localized: "Launch a Windows game with Bridgeplay.")
                     )
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -78,7 +78,7 @@ struct PrefixesView: View {
             .disabled(PrefixTools.winetricksVerbs(winetricksVerbs).isEmpty)
             Button("Cancel", role: .cancel) {}
         } message: { prefix in
-            Text("Enter the Winetricks verbs to install in \(prefix.title), separated by spaces.")
+            Text("Verbs for \(prefix.title), separated by spaces.")
         }
     }
 
@@ -90,19 +90,19 @@ struct PrefixesView: View {
             Label("Tools", systemImage: "wrench.and.screwdriver")
         }
         .disabled(model.selectedPrefix == nil || model.isBusy)
-        .help("Run a program or open a Wine tool in the selected prefix.")
+        .help("Run a program or Wine tool.")
 
         Button("Reveal in Finder", systemImage: "folder") {
             if let prefix = model.selectedPrefix { model.reveal(prefix) }
         }
         .disabled(model.selectedPrefix == nil)
-        .help("Show the selected prefix in the Finder.")
+        .help("Show in Finder.")
 
         Button("Refresh", systemImage: "arrow.clockwise") {
             Task { await model.load() }
         }
         .disabled(model.isLoading)
-        .help("List the prefixes again and update their sizes.")
+        .help("Reload the list.")
     }
 
     private func lastUsed(_ prefix: WinePrefix) -> String {
@@ -126,7 +126,7 @@ struct PrefixesView: View {
             var width = min(TextWidth.of(prefix.title), TextWidth.maxTitle)
             if model.isStale(prefix) { width += 22 }
             if prefix.name == nil {
-                width += TextWidth.of(String(localized: "No longer installed"), size: NSFont.smallSystemFontSize) + 6
+                width += TextWidth.of(String(localized: "Uninstalled"), size: NSFont.smallSystemFontSize) + 6
             }
             return width
         }
@@ -185,7 +185,7 @@ struct PrefixesView: View {
                     }
                     Text(prefix.title).lineLimit(1).help(prefix.title)
                     if prefix.name == nil {
-                        Text("No longer installed")
+                        Text("Uninstalled")
                             .font(.caption)
                             .modifier(CellGrey())
                             .fixedSize()
@@ -221,7 +221,7 @@ struct PrefixesView: View {
             }
             .width(min: 44, ideal: libraryWidth)
 
-            TableColumn("Private Size", value: \.size) { row in
+            TableColumn("Size", value: \.size) { row in
                 if let usage = model.usage[row.id] {
                     Text(usage.bytes.formatted(.byteCount(style: .file)))
                         .monospacedDigit()
@@ -249,7 +249,7 @@ struct PrefixesView: View {
             }
             .width(min: 56, ideal: 90)
 
-            TableColumn("Last used", value: \.lastUsed) { row in
+            TableColumn("Used", value: \.lastUsed) { row in
                 Text(lastUsed(row.prefix))
                     .modifier(CellGrey())
                     .help(lastUsed(row.prefix))

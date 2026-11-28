@@ -177,15 +177,15 @@ arch_case() {
 		refuse_foreign_prefix
 	)
 }
-is "an architecture mismatch offers rebuilding" 'rebuild: This game needs its prefix rebuilt: Rosetta prefixes cannot be used with versions of CrossOver that run through FEX unless they are rebuilt.
+is "an architecture mismatch offers rebuilding" 'rebuild: Prefix rebuild needed: A Rosetta prefix must be rebuilt for FEX.
 
-Rebuild the prefix for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Your saves will be kept.' "$(arch_case aarch64-unix)"
-is "the build that set up the prefix is named" 'rebuild: This game needs its prefix rebuilt: This game'"'"'s prefix was last used by CrossOver 26.3, running through Rosetta. Rosetta prefixes cannot be used with versions of CrossOver that run through FEX unless they are rebuilt.
+Rebuild for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Saves are kept.' "$(arch_case aarch64-unix)"
+is "the build that set up the prefix is named" 'rebuild: Prefix rebuild needed: Last used by CrossOver 26.3, running through Rosetta. A Rosetta prefix must be rebuilt for FEX.
 
-Rebuild the prefix for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Your saves will be kept.' "$(arch_case aarch64-unix 'CrossOver 26.3')"
-is "a tool name's own arch suffix is not repeated" 'rebuild: This game needs its prefix rebuilt: This game'"'"'s prefix was last used by CrossOver Preview 2026 10 15‑ARM64, running through Rosetta. Rosetta prefixes cannot be used with versions of CrossOver that run through FEX unless they are rebuilt.
+Rebuild for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Saves are kept.' "$(arch_case aarch64-unix 'CrossOver 26.3')"
+is "a tool name's own arch suffix is not repeated" 'rebuild: Prefix rebuild needed: Last used by CrossOver Preview 2026 10 15‑ARM64, running through Rosetta. A Rosetta prefix must be rebuilt for FEX.
 
-Rebuild the prefix for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Your saves will be kept.' "$(arch_case aarch64-unix 'CrossOver 2026 10 15-ARM64 - Rosetta')"
+Rebuild for CrossOver Preview 2026 10 15‑ARM64, running through FEX? Saves are kept.' "$(arch_case aarch64-unix 'CrossOver 2026 10 15-ARM64 - Rosetta')"
 is "a matching architecture needs no rebuild" "" "$(arch_case x86_64-unix)"
 rebuild="$(extract launch_step)
 $(extract alert_language)
@@ -269,12 +269,12 @@ is "a failed rebuild says so" "rebuild failed" "$(cat "$data/alerts")"
 rebuild_case 'Rebuild Prefix' 0 run
 is "install helpers refuse silently" 1 "$status"
 is "install helpers never prompt" no "$([ -f "$data/prompt" ] && echo yes || echo no)"
-rebuild_case cancel 0 waitforexitandrun 'Launch Without Rebuilding'
+rebuild_case cancel 0 waitforexitandrun 'Launch Anyway'
 is "skipping an offered rebuild goes on with the launch" 0 "$status"
 is "a skipped rebuild retakes the lock and launches" "locked
 launched" "$(cat "$data/checks")"
 is "a skipped rebuild never calls the app" no "$([ -f "$data/arguments" ] && echo yes || echo no)"
-is "the skip button is labelled as asked" "Launch Without Rebuilding" "$(tail -5 "$data/prompt-args" | head -1)"
+is "the skip button is labelled as asked" "Launch Anyway" "$(tail -5 "$data/prompt-args" | head -1)"
 is "a missing Bridgeplay icon falls back to caution" "" "$(tail -4 "$data/prompt-args" | head -1)"
 is "an offered rebuild keeps the backup choice" "" "$(tail -3 "$data/prompt-args" | head -1)"
 is "the rebuild buttons are labelled in the player's language" "Rebuild Prefix
@@ -289,7 +289,7 @@ rebuild_case 'Rebuild Prefix' 0 waitforexitandrun '' keep-backup
 second_rebuild=
 is "a second rebuild in one launch stops" 1 "$status"
 is "a second rebuild reports rebuild failure" "rebuild failed" "$(cat "$data/alerts")"
-rebuild_case 'Rebuild Prefix' 0 run 'Launch Without Rebuilding'
+rebuild_case 'Rebuild Prefix' 0 run 'Launch Anyway'
 is "install helpers skip an offered rebuild silently" 0 "$status"
 rebuild_case 'Rebuild Prefix' 0 waitforexitandrun
 is "the app gets none of Steam's environment" 0 "$status"
@@ -442,12 +442,12 @@ session new-build "$crash_log" 5
 is "a crash after the switch is recorded" failed "$(state)"
 is "nothing is offered in the session that crashed" no "$([ -f "$data/offers" ] && echo yes || echo no)"
 session new-build "$crash_log" 5
-is "the next launch offers a rebuild for the selected tool" "This game may need its prefix rebuilt|The last launch failed. Rebuilding the prefix may help.
+is "the next launch offers a rebuild for the selected tool" "Prefix rebuild may help|The last launch failed.
 
-Rebuild the prefix for New Tool, running through Rosetta? Your saves will be kept.|Launch Without Rebuilding" "$(cat "$data/offers")"
+Rebuild for New Tool, running through Rosetta? Saves are kept.|Launch Anyway" "$(cat "$data/offers")"
 is "the offer is made once per switch" none "$([ -f "$data/notproton-switch" ] && state || echo none)"
 session new-build "$crash_log" 5
-is "a crash after the offer is not offered again" 1 "$(grep -c "^This game may need" "$data/offers")"
+is "a crash after the offer is not offered again" 1 "$(grep -c "^Prefix rebuild may help" "$data/offers")"
 
 switch_world ""
 session new-build "$crash_log" 5

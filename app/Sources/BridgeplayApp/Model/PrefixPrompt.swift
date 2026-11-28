@@ -56,7 +56,7 @@ enum PrefixPrompt {
         let with = tool.map { String(localized: " with \($0.display)") } ?? ""
         switch targets.count {
         case 0: return String(localized: "Rebuild prefix\(with)?")
-        case 1: return String(localized: "Rebuild the prefix for \(targets[0].title)\(with)?")
+        case 1: return String(localized: "Rebuild prefix for \(targets[0].title)\(with)?")
         default: return String(localized: "Rebuild \(targets.count) prefixes\(with)?")
         }
     }
@@ -67,19 +67,19 @@ enum PrefixPrompt {
 
     static func rebuildWithBackupButton(_ targets: [WinePrefix]) -> String {
         targets.count > 1
-            ? String(localized: "Back Up and Rebuild \(targets.count) Prefixes") : String(localized: "Back Up and Rebuild")
+            ? String(localized: "Back Up and Rebuild \(targets.count)") : String(localized: "Back Up and Rebuild")
     }
 
     static func rebuildWithoutBackupButton(_ targets: [WinePrefix]) -> String {
         targets.count > 1
-            ? String(localized: "Rebuild \(targets.count) Prefixes Without Backing Up")
-            : String(localized: "Rebuild Without Backing Up")
+            ? String(localized: "Rebuild \(targets.count) Without Backup")
+            : String(localized: "Rebuild Without Backup")
     }
 
     static func backUpTitle(_ targets: [WinePrefix]) -> String {
         switch targets.count {
         case 0: String(localized: "Back up prefix?")
-        case 1: String(localized: "Back up the prefix for \(targets[0].title)?")
+        case 1: String(localized: "Back up prefix for \(targets[0].title)?")
         default: String(localized: "Back up \(targets.count) prefixes?")
         }
     }
@@ -140,10 +140,8 @@ enum PrefixPrompt {
 
     static func rebuildMessage() -> String {
         sentences([
-            String(localized: "This tool is intended to repair a prefix after switching between Rosetta/FEX CrossOver."),
-            String(localized: "It will replace the DLLs used by CrossOver with ones that match your compatibility tool."),
-            String(localized: "This can also fix issues where a game previously started/worked and does not work now, even if you did not switch CrossOver types."),
-            String(localized: "You will not lose saves by using this tool."),
+            String(localized: "Fixes a game that stopped working, or after a Rosetta/FEX switch."),
+            String(localized: "Saves are kept."),
         ])
     }
 

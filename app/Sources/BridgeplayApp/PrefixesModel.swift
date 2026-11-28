@@ -267,7 +267,7 @@ final class PrefixesModel {
         await eachInTurn(targets, makeBackup) { saved in
             guard let first = saved.first else { return nil }
             guard saved.count == 1 else { return String(localized: "Backed up \(saved.count) prefixes.") }
-            return String(localized: "Backed up the prefix for \(first.prefix.title).")
+            return String(localized: "Backed up \(first.prefix.title).")
         }
     }
 
@@ -297,12 +297,12 @@ final class PrefixesModel {
             let kept = rebuilt.compactMap(\.made)
             if rebuilt.count == 1 {
                 let title = rebuilt[0].prefix.title
-                guard let backup = kept.first else { return String(localized: "Rebuilt the prefix for \(title).") }
-                return String(localized: "Rebuilt the prefix for \(title). The original is at \(backup.path(percentEncoded: false)). Check that your save is present in the game, then delete the backup to save space.")
+                guard let backup = kept.first else { return String(localized: "Rebuilt \(title).") }
+                return String(localized: "Rebuilt \(title). Check your save, then delete the backup at \(backup.path(percentEncoded: false)).")
             }
             guard rebuilt.count > 1 else { return nil }
             guard !kept.isEmpty else { return String(localized: "Rebuilt \(rebuilt.count) prefixes.") }
-            return String(localized: "Rebuilt \(rebuilt.count) prefixes. Each original is kept beside the game's prefix. Check that your saves are present in the games, then delete the backups to save space.")
+            return String(localized: "Rebuilt \(rebuilt.count) prefixes. Check your saves, then delete the backups.")
         }
     }
 

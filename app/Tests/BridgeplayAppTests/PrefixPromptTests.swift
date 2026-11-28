@@ -82,10 +82,10 @@ struct PrefixPromptTests {
     @Test("Rebuild does not claim Steam makes the prefix again")
     func rebuildDescribesItself() {
         let message = PrefixPrompt.rebuildMessage()
-        #expect(PrefixPrompt.rebuildTitle([ikaruga]) == "Rebuild the prefix for IKARUGA?")
+        #expect(PrefixPrompt.rebuildTitle([ikaruga]) == "Rebuild prefix for IKARUGA?")
         #expect(PrefixPrompt.rebuildButton([ikaruga]) == "Rebuild Prefix")
-        #expect(message.contains("switching between Rosetta/FEX CrossOver"))
-        #expect(message.contains("You will not lose saves by using this tool."))
+        #expect(message.contains("Rosetta/FEX"))
+        #expect(message.contains("Saves are kept."))
         #expect(!message.contains("Steam"))
         #expect(!message.contains("Continue"))
     }
@@ -118,14 +118,9 @@ struct PrefixPromptTests {
         let targets = [agent, ikaruga, orphan]
 
         #expect(PrefixPrompt.rebuildWithBackupButton([agent]) == "Back Up and Rebuild")
-        #expect(
-            PrefixPrompt.rebuildWithoutBackupButton([agent]) == "Rebuild Without Backing Up")
-        #expect(
-            PrefixPrompt.rebuildWithBackupButton(targets) == "Back Up and Rebuild 3 Prefixes")
-        #expect(
-            PrefixPrompt.rebuildWithoutBackupButton(targets)
-                == "Rebuild 3 Prefixes Without Backing Up")
-
+        #expect(PrefixPrompt.rebuildWithoutBackupButton([agent]) == "Rebuild Without Backup")
+        #expect(PrefixPrompt.rebuildWithBackupButton(targets) == "Back Up and Rebuild 3")
+        #expect(PrefixPrompt.rebuildWithoutBackupButton(targets) == "Rebuild 3 Without Backup")
     }
 
     @Test("Backing up names the game for one and counts many")
@@ -133,7 +128,7 @@ struct PrefixPromptTests {
         let targets = [agent, ikaruga, orphan]
 
         #expect(PrefixPrompt.backUpTitle([]) == "Back up prefix?")
-        #expect(PrefixPrompt.backUpTitle([agent]) == "Back up the prefix for Agent 64: Spies Never Die?")
+        #expect(PrefixPrompt.backUpTitle([agent]) == "Back up prefix for Agent 64: Spies Never Die?")
         #expect(PrefixPrompt.backUpTitle(targets) == "Back up 3 prefixes?")
 
         #expect(PrefixPrompt.backUpButton([agent]) == "Back Up Prefix")

@@ -387,10 +387,10 @@ struct PrefixesModelTests {
         let title = try #require(targets.first).title
 
         await model.recreate(targets, as: Self.tool, keepBackup: false)
-        #expect(model.outcome == "Rebuilt the prefix for \(title).")
+        #expect(model.outcome == "Rebuilt \(title).")
 
         await model.recreate(targets, as: Self.tool)
-        #expect(model.outcome?.contains("The original is at") == true)
+        #expect(model.outcome?.contains("delete the backup at") == true)
     }
 
     @Test("Backing up reports where the copy landed")
@@ -405,7 +405,7 @@ struct PrefixesModelTests {
         let first = try #require(targets.first)
 
         await model.backUp([first])
-        #expect(model.outcome == "Backed up the prefix for \(first.title).")
+        #expect(model.outcome == "Backed up \(first.title).")
         #expect(model.report?.message == nil)
 
         await model.backUp(targets)
@@ -433,9 +433,7 @@ struct PrefixesModelTests {
 
         #expect(log.visited == targets.map(\.title))
         #expect(!log.overlapped)
-        #expect(model.outcome == "Rebuilt 3 prefixes. Each original is kept beside the game's "
-            + "prefix. Check that your saves are present in the games, then delete the backups "
-            + "to save space.")
+        #expect(model.outcome == "Rebuilt 3 prefixes. Check your saves, then delete the backups.")
         #expect(model.report?.message == nil)
         #expect(model.busy.isEmpty)
         #expect(!model.isBusy)
@@ -457,9 +455,7 @@ struct PrefixesModelTests {
         await model.recreate(targets, as: Self.tool)
 
         #expect(log.visited.count == 3)
-        #expect(model.outcome == "Rebuilt 2 prefixes. Each original is kept beside the game's "
-            + "prefix. Check that your saves are present in the games, then delete the backups "
-            + "to save space.")
+        #expect(model.outcome == "Rebuilt 2 prefixes. Check your saves, then delete the backups.")
         #expect(model.report?.message == "1649240 refused")
         #expect(model.busy.isEmpty)
     }
@@ -503,9 +499,7 @@ struct PrefixesModelTests {
         await model.recreate([target], as: Self.tool)
 
         let backup = Recorder.backup(of: target).path(percentEncoded: false)
-        #expect(model.outcome == "Rebuilt the prefix for \(target.title). The original is at "
-            + "\(backup). Check that your save is present in the game, then delete the backup "
-            + "to save space.")
+        #expect(model.outcome == "Rebuilt \(target.title). Check your save, then delete the backup at \(backup).")
         #expect(model.report?.message == nil)
     }
 
@@ -520,7 +514,7 @@ struct PrefixesModelTests {
 
         await model.recreate([target], as: Self.tool)
 
-        #expect(model.outcome == "Rebuilt the prefix for \(target.title).")
+        #expect(model.outcome == "Rebuilt \(target.title).")
     }
 
     @Test("Backups from every prefix are listed newest first")

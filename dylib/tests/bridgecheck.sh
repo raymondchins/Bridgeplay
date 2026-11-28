@@ -168,7 +168,7 @@ chmod 700 "$steam"
 is "the launch stops" "" "$(grep -x reached "$work/out")"
 logged "the failure is logged" "=== could not copy steam.exe to $steam/steam.exe ==="
 is "the reason is logged" yes "$(grep -q 'Permission denied' "$work/log" && echo yes || echo no)"
-logged "the player is told" "alert: Steam files could not be copied"
+logged "the player is told" "alert: Couldn't copy Steam files"
 stage
 is "the next launch stages it" reached "$(cat "$work/out")"
 is "every file is copied" 8 "$(staged)"

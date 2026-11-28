@@ -598,7 +598,7 @@ final class SetupAssistant {
         guard !isWorking else { return }
         // perform() drops a run that overlaps another without a failure, which would read as success.
         guard !status.isBusy else {
-            set("steam", .failed(String(localized: "Bridgeplay is still busy with another task. Try again when it finishes.")))
+            set("steam", .failed(String(localized: "Another task is running. Retry when it ends.")))
             return
         }
         isWorking = true

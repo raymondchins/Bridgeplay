@@ -615,7 +615,7 @@ struct StatusView: View {
 
     private func updateBlockRow(_ blocked: Bool) -> some View {
         StatusRow(
-            title: String(localized: "Block Steam client updates"),
+            title: String(localized: "Block Steam Updates"),
             value: blocked
                 ? String(localized: "Steam updates are blocked, security fixes included.")
                 : String(localized: "A Steam client update may break Bridgeplay."),

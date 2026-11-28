@@ -96,23 +96,23 @@ struct LaunchProgress {
     }
 
     static func message(game name: String?) -> String {
-        name.map { String(localized: "Bridgeplay is starting \($0).") }
-            ?? String(localized: "Bridgeplay is starting this game.")
+        name.map { String(localized: "Starting \($0)") }
+            ?? String(localized: "Starting the game")
     }
 
     // Without a step the script is somewhere it does not report, so this says no more than that.
     static func phase(_ step: LaunchStep?) -> String {
         switch step {
-        case .setup: String(localized: "Setting up Windows for this game…")
-        case .prepare: String(localized: "Getting the game ready…")
-        case .start: String(localized: "Waiting for the game to open…")
+        case .setup: String(localized: "Setting up Windows…")
+        case .prepare: String(localized: "Preparing…")
+        case .start: String(localized: "Waiting for a window…")
         default: String(localized: "Still starting…")
         }
     }
 
     var note: String? {
         firstLaunch
-            ? String(localized: "The first launch takes longer. The game may show a black screen for a while after it opens.")
+            ? String(localized: "First launch is slower and may show a black screen.")
             : nil
     }
 
