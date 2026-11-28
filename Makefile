@@ -67,6 +67,7 @@ SRCS := \
 	dylib/feats/prefixstate.c \
 	dylib/feats/usershortcuts.c \
 	dylib/feats/webpatch.c \
+	dylib/feats/compatverdict.c \
 	dylib/feats/nativeplatform.c \
 	dylib/feats/displayrate.c \
 	dylib/feats/input_access.c \
@@ -474,7 +475,7 @@ peicon-fixtures:
 GATECHECK         := $(OUT_DIR)/gatecheck
 WEBPATCH_FIXTURES := dylib/tests/webpatch-fixtures
 
-$(GATECHECK): dylib/tests/gatecheck.c dylib/feats/webpatch.c dylib/feats/webpatch.h
+$(GATECHECK): dylib/tests/gatecheck.c dylib/feats/webpatch.c dylib/feats/webpatch.h dylib/feats/compatverdict.c
 	@mkdir -p $(dir $@)
 	$(TEST_CC) -O1 -o $@ dylib/tests/gatecheck.c
 
@@ -621,6 +622,7 @@ panel-behavior:
 	node $(PANEL_TESTS)/quick-settings.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/prefix-row.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/advanced.js $(OUT_DIR)/panel-emit && \
+	node $(PANEL_TESTS)/verdict.js $(OUT_DIR)/panel-emit && \
 	echo "==> panel behavior: renders as expected, no stale arguments"
 
 CX_ROOT ?= /Applications/CrossOver Preview.app

@@ -56,6 +56,16 @@ not part of the verdict; the site's merge decides how the two meet.
 The numbers live at the top of the script (`WINDOW_DAYS`, `MIN_REPORTS`, `SHARE`, `BROKEN_MIN`).
 A change to them is a new rule number (`RULE`), so readers can tell verdicts apart.
 
+## Anti-cheat names
+
+`build --anticheat FILE` reads AreWeAntiCheatYet's `games.json` (MIT; the workflow downloads it
+and builds without it when the download fails) and adds `anticheat: {"<appid>": ["eac", …]}` to
+`compat-index.json`. Names map to the ids the Bridgeplay panel knows (`eac`, `battleye`,
+`ricochet`, `vanguard`, `ace`, `xigncode3`, `nprotect`, `javelin`, `denuvo`, `vac`); any other
+name is `other`, at most 4 per game. Games it lists as Running are left out, since they start
+under Proton anyway. The app writes the names with the verdicts into `compat-verdicts.tsv` for the
+panel ([dylib/feats/compatverdict.c](../dylib/feats/compatverdict.c)).
+
 ## Report schemas
 
 The bot's ```json block says `schema: 1` or `schema: 2`; both are read, and a later number is

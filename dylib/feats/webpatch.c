@@ -3,6 +3,7 @@
 #include "webpatch.h"
 #include "nativeplatform.h"
 #include "displayrate.h"
+#include "compatverdict.h"
 #include "../util/log.h"
 #include "../util/file.h"
 
@@ -398,6 +399,125 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "term='',refresh())};const stop=e.npStop=()=>{stopped=1;clearTimeout(timer);observer?.disconnect();globalThis.removeEventListener?.('mscxstat" \
     "e',on)};const observer=globalThis.MutationObserver?new globalThis.MutationObserver(()=>{if(!e.isConnected)stop()}):null;observer?.observe(e.ownerDocument,{childList:true,subtree:true});globalThis.addEventListener?.('mscxstate',on);refresh()};"
 
+// Players' verdict and anti-cheat note: a row in the panel (MSCXVerdictRow) and, for a game
+// that is not installed and is known not to run, a warning on its library page (MSCXWarnRow).
+// Both read globalThis.MSCXVerdicts, which the transform builds from compat-verdicts.tsv
+// (compatverdict.c), and a maintainer-confirmed ANTICHEAT gamefix from MSCXFx. No file, an
+// unknown game or a verdict over 30 days old shows nothing. Text goes in with textContent only.
+#define NP_CX_VERDICT_CSS \
+    ".MSCXVerdictHead{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#8b929a}" \
+    ".MSCXVerdictMain{font-size:15px;color:#fff;text-wrap:balance}" \
+    ".MSCXVerdictDim{font-size:13px;color:#8b929a;text-wrap:pretty}" \
+    ".MSCXVerdictNote{font-size:14px;color:#e8c46d;text-wrap:pretty}" \
+    ".MSCXVerdictBtns{display:flex;gap:8px;margin-top:4px}" \
+    ".MSCXWarn{position:relative;display:flex;margin:12px 24px;padding:12px 44px 12px 14px;" \
+    "border-left:3px solid #e8a800;border-radius:3px;background:rgba(59,63,72,.6);color:#dfe3e6;" \
+    "font-size:14px;line-height:1.45}" \
+    ".MSCXWarnBody{display:flex;flex-direction:column;gap:6px;min-width:0}" \
+    ".MSCXWarnHead{font-weight:700;color:#fff;text-wrap:balance}" \
+    ".MSCXWarnBody>div{text-wrap:pretty}" \
+    ".MSCXWarnBtn{background:#3d4450;color:#fff;border:none;border-radius:2px;padding:6px 14px;" \
+    "font-size:14px;cursor:pointer}.MSCXWarnBtn:hover{background:#4c5361}" \
+    ".MSCXWarnClose{position:absolute;top:6px;right:6px;width:28px;height:28px;padding:0;background:none;" \
+    "border:none;border-radius:2px;color:#8b929a;font-size:20px;line-height:1;cursor:pointer}" \
+    ".MSCXWarnClose:hover{color:#fff;background:rgba(255,255,255,.08)}" \
+    ".MSCXWarnBtn:focus-visible,.MSCXWarnClose:focus-visible{outline:2px solid #fff;outline-offset:1px}"
+
+#define NP_CX_VERDICT \
+    "\n;(()=>{const G=globalThis," \
+    "N={eac:'Easy Anti-Cheat',battleye:'BattlEye',ricochet:'Ricochet',vanguard:'Vanguard',ace:'Anti-Cheat Expert'," \
+    "xigncode3:'XIGNCODE3',nprotect:'nProtect GameGuard',javelin:'EA Javelin',denuvo:'Denuvo Anti-Cheat',vac:'VAC'}," \
+    /* Kernel anti-cheat, which needs a Windows driver Wine cannot load. */ \
+    "K=['ricochet','vanguard','javelin','xigncode3','nprotect','denuvo']," \
+    "U='https://bridgeplay.dev/guides/anti-cheat-on-mac#alternatives',W='MSCXWarnDismissed';" \
+    "let M=null,S=null,D=null;" \
+    "const lang=()=>" NP_WEB_IS_ZH "?'zh':" NP_WEB_IS_IT "?'it':" NP_WEB_IS_RU "?'ru':'en'," \
+    "tr=g=>(e,z,i,r)=>g==='zh'?z:g==='it'?i:g==='ru'&&r?r:e," \
+    "fill=(s,x)=>s.replace(/\\{(\\w+)\\}/g,(m,k)=>String(x[k]))," \
+    "table=()=>{const d=G.MSCXVerdicts;if(M&&S===d)return M;S=d;M=new Map;" \
+    "if(d&&typeof d.g==='string')for(const r of d.g.split(';')){const c=r.indexOf(':'),f=r.slice(c+1).split(',');" \
+    "c>0&&f.length===7&&M.set(+r.slice(0,c),{v:f[0],n:+f[1],p:+f[2],i:+f[3],b:+f[4],since:f[5],ac:f[6]?f[6].split('+'):[]})}" \
+    "return M}," \
+    /* A kernel anti-cheat is a hard no only when a maintainer confirmed it, or no recent Mac \
+       ran the game well: some of these games run offline. */ \
+    "info=id=>{id=+id;if(!(id>0&&id<2147483648))return null;" \
+    "const r=table().get(id),u=+(G.MSCXVerdicts||{}).u||0,days=Math.max(0,Math.floor((Date.now()/1e3-u)/86400))," \
+    "c=(((G.MSCXFx||{}).a||{})[id]||{}).ANTICHEAT,conf=typeof c==='string'&&(c in N||c==='other')?c:''," \
+    "v=r&&r.v!=='-'&&r.n>0&&u>0&&days<=30?r.v:'',ac=(conf?[conf]:[]).concat(r?r.ac.filter(a=>a!==conf):[]);" \
+    "if(!v&&!ac.length)return null;" \
+    "const well=v==='p'||(v==='m'||v==='o')&&r.p>0,k=ac.find(a=>K.includes(a));" \
+    "return{id,v,n:v?r.n:0,p:v?r.p:0,i:v?r.i:0,b:v?r.b:0,since:v?r.since:'',days,ac,conf:!!conf," \
+    "hard:conf||(k&&!well?k:'')}}," \
+    "since=(L,s)=>/^s\\d+$/.test(s)?L('Steam build ','Steam 版本 ','Steam build ','сборки Steam ')+s.slice(1):'Bridgeplay '+s," \
+    "main=(L,x)=>fill(x.v==='p'?L('Ran well on {p} of {n} Macs','在 {n} 台 Mac 中有 {p} 台运行良好','Funziona bene su {p} Mac su {n}','Хорошо работает на {p} из {n} Mac')" \
+    ":x.v==='d'?L('Did not run on {b} of {n} Macs','在 {n} 台 Mac 中有 {b} 台无法运行','Non si avvia su {b} Mac su {n}','Не запустилась на {b} из {n} Mac')" \
+    ":x.v==='s'?L('Ran well before {s}, but not on newer builds','在 {s} 之前运行良好，但在更新的版本上无法运行'," \
+    "'Funzionava bene prima di {s}, ma non con le versioni più recenti','Хорошо работала до {s}, но не в более новых версиях')" \
+    ":x.v==='m'?L('Mixed: {p} ran well, {i} had issues, {b} did not run','结果不一：{p} 台运行良好，{i} 台有问题，{b} 台无法运行'," \
+    "'Risultati misti: {p} bene, {i} con problemi, {b} non si avvia','По-разному: хорошо — {p}, с проблемами — {i}, не запустилась — {b}')" \
+    ":x.p?L('One report so far: it ran well','目前只有 1 份报告：运行良好','Per ora una sola segnalazione: funziona bene','Пока один отчёт: работает хорошо')" \
+    ":x.i?L('One report so far: it ran with issues','目前只有 1 份报告：运行有问题','Per ora una sola segnalazione: funziona con problemi','Пока один отчёт: работает с проблемами')" \
+    ":L('One report so far: it did not run','目前只有 1 份报告：无法运行','Per ora una sola segnalazione: non si avvia','Пока один отчёт: не запускается')," \
+    "Object.assign({s:since(L,x.since)},x))," \
+    "dim=(L,x)=>(x.v==='p'||x.v==='d'||x.v==='s'?fill(L('{p} ran well · {i} had issues · {b} did not run'," \
+    "'{p} 台运行良好 · {i} 台有问题 · {b} 台无法运行','{p} bene · {i} con problemi · {b} non si avvia','хорошо: {p} · с проблемами: {i} · не запустилась: {b}'),x)+' · ':'')" \
+    "+(x.days<1?L('updated today','今天更新','aggiornato oggi','обновлено сегодня'):x.days<2?L('updated 1 day ago','1 天前更新','aggiornato 1 giorno fa','обновлено 1 день назад')" \
+    ":fill(L('updated {d} days ago','{d} 天前更新','aggiornato {d} giorni fa','обновлено {d} дн. назад'),{d:x.days}))," \
+    "acl=(L,x)=>{if(x.hard){const n=N[x.hard];" \
+    "return(n?fill(L('Uses {a}, anti-cheat that Wine on macOS can’t run, so the game will most likely not start.'," \
+    "'使用 {a}，macOS 上的 Wine 无法运行这种反作弊，游戏很可能无法启动。'," \
+    "'Usa {a}, un anti-cheat che Wine su macOS non può eseguire, quindi molto probabilmente il gioco non si avvierà.','Использует {a} — античит, который Wine на macOS не может запустить, поэтому игра, скорее всего, не запустится.'),{a:n})" \
+    ":L('Uses anti-cheat that Wine on macOS can’t run, so the game will most likely not start.'," \
+    "'使用了 macOS 上的 Wine 无法运行的反作弊，游戏很可能无法启动。'," \
+    "'Usa un anti-cheat che Wine su macOS non può eseguire, quindi molto probabilmente il gioco non si avvierà.','Использует античит, который Wine на macOS не может запустить, поэтому игра, скорее всего, не запустится.'))" \
+    "+(x.conf?' '+L('Bridgeplay asks before launching it.','Bridgeplay 会在启动前询问。','Bridgeplay chiede conferma prima di avviarlo.','Bridgeplay спросит перед запуском.'):'')}" \
+    "const a=x.ac.find(a=>a!=='vac')||x.ac[0];if(!a)return'';" \
+    "if(a==='vac')return L('Uses VAC: online matchmaking may not work.','使用 VAC：在线匹配可能无法使用。'," \
+    "'Usa VAC: il matchmaking online potrebbe non funzionare.','Использует VAC: онлайн-подбор игроков может не работать.');" \
+    "return N[a]?fill(L('Uses {a}: online play may fail.','使用 {a}：在线游戏可能无法进行。'," \
+    "'Usa {a}: il gioco online potrebbe non funzionare.','Использует {a}: игра по сети может не работать.'),{a:N[a]})" \
+    ":L('Uses anti-cheat: online play may fail.','使用了反作弊：在线游戏可能无法进行。','Usa un anti-cheat: il gioco online potrebbe non funzionare.','Использует античит: игра по сети может не работать.')}," \
+    /* A plain link to Bridgeplay's own guide: no service is named or linked from here. */ \
+    "away=(L,el,cls)=>{const k=[el('div','MSCXVerdictDim',L('You may still play it through cloud gaming, if a service carries it, " \
+    "or Steam Remote Play from a Windows PC.','如果有云游戏服务提供此游戏，仍可通过云游戏游玩，或从 Windows 电脑使用 Steam 远程畅玩。'," \
+    "'Puoi ancora giocarci con il cloud gaming, se un servizio lo offre, o con Steam Remote Play da un PC Windows.','В неё всё ещё можно поиграть через облачный гейминг, если сервис её предлагает, или через Steam Remote Play с ПК на Windows.'))]," \
+    "s=G.SteamClient&&G.SteamClient.System;" \
+    "if(s&&typeof s.OpenInSystemBrowser==='function'){const b=el('button',cls,L('Other Ways to Play','其他游玩方式','Altri modi per giocare','Другие способы играть'));" \
+    "b.onclick=()=>{try{G.SteamClient.System.OpenInSystemBrowser(U)}catch(e){}};const r=el('div','MSCXVerdictBtns');r.append(b);k.push(r)}" \
+    "return k}," \
+    "mk=d=>(t,c,s)=>{const n=d.createElement(t);if(c)n.className=c;if(s!=null)n.textContent=s;return n}," \
+    "css=d=>{try{if(d.getElementById('MSCXVerdictCSS'))return;const s=d.createElement('style');s.id='MSCXVerdictCSS';" \
+    "s.textContent='" NP_CX_VERDICT_CSS "';(d.head||d.documentElement).appendChild(s)}catch(e){}}," \
+    "gone=()=>{if(!D)try{D=JSON.parse(G.localStorage.getItem(W)||'{}')||{}}catch(e){D={}}return D};" \
+    "G.MSCXVerdictFor=info;" \
+    "G.MSCXVerdictRow=(e,id)=>{if(e.npVerdict===id)return;e.npVerdict=id;const x=info(id),d=e.ownerDocument;" \
+    "if(!x||!d){e.style.display='none';return}css(d);const L=tr(lang()),el=mk(d),k=[];" \
+    "x.v&&k.push(el('div','MSCXVerdictHead',L('Players report','玩家反馈','Segnalazioni dei giocatori','Отчёты игроков'))," \
+    "el('div','MSCXVerdictMain',main(L,x)),el('div','MSCXVerdictDim',dim(L,x)));" \
+    "const a=acl(L,x);a&&k.push(el('div','MSCXVerdictNote',a));(x.hard||x.v==='d')&&k.push(...away(L,el,'MSCXBtn'));" \
+    "e.style.flexDirection='column';e.style.gap='4px';e.replaceChildren(...k);e.style.display=k.length?'':'none'};" \
+    /* a anti-cheat, d players report it does not run, s it broke on a newer build. */ \
+    "G.MSCXWarnFor=id=>{const x=info(id),r=x?x.hard?'a':x.v==='d'?'d':x.v==='s'?'s':'':'';return r&&gone()[x.id]!==r?r:''};" \
+    "G.MSCXWarnRow=(e,id)=>{if(e.npWarn===id)return;e.npWarn=id;const r=G.MSCXWarnFor(id),x=info(id),d=e.ownerDocument;" \
+    "if(!r||!d){e.style.display='none';return}css(d);const L=tr(lang()),el=mk(d),b=el('div','MSCXWarnBody');" \
+    "e.className='MSCXWarn';e.setAttribute&&e.setAttribute('role','note');" \
+    "b.append(el('div','MSCXWarnHead',L('Before you download','下载前请注意','Prima di scaricare','Перед загрузкой'))," \
+    "el('div','',r==='a'?acl(L,x):r==='d'?fill(L('Players report it did not run on {b} of {n} Macs.'," \
+    "'玩家反馈：在 {n} 台 Mac 中有 {b} 台无法运行。','Secondo i giocatori non si avvia su {b} Mac su {n}.','По отчётам игроков, игра не запустилась на {b} из {n} Mac.'),x)" \
+    ":fill(L('Players report it ran well before {s}, but not on newer builds.','玩家反馈：在 {s} 之前运行良好，但在更新的版本上无法运行。'," \
+    "'Secondo i giocatori funzionava bene prima di {s}, ma non con le versioni più recenti.','По отчётам игроков, игра хорошо работала до {s}, но не в более новых версиях.'),{s:since(L,x.since)})));" \
+    "r!=='s'&&b.append(...away(L,el,'MSCXWarnBtn'));" \
+    "const c=el('button','MSCXWarnClose','×'),t=L('Dismiss','关闭','Chiudi','Закрыть');c.title=t;c.setAttribute&&c.setAttribute('aria-label',t);" \
+    "c.onclick=()=>{const s=gone();s[x.id]=r;try{G.localStorage.setItem(W,JSON.stringify(s))}catch(e){}e.style.display='none'};" \
+    "e.replaceChildren(b,c);e.style.display=''}})();"
+
+// The banner Steam shows a 32-bit Mac game that is not installed. A game with no such banner
+// that is known not to run gets Bridgeplay's warning in the same place instead.
+#define NP_INSTALL_BANNER \
+    "!" NP_C1 ".local_per_client_data?.installed&&(" NP_C1 ".most_available_per_client_data?.is_invalid_os_type?" \
+    "(0," NP_C2 ".jsx)(" NP_C3 ",{}):typeof MSCXWarnFor==\"function\"&&MSCXWarnFor(" NP_C1 ".appid)?" \
+    "(0," NP_C2 ".jsx)(\"div\",{ref:npW=>npW&&MSCXWarnRow(npW," NP_C1 ".appid)}):null)"
+
 #define NP_CX_OPTIONS_CSS \
     "\".MSCXPanel{margin-top:10px}" \
     ".MSCXPanel .MSCXRow{display:flex;flex-direction:row;padding:9px;margin:0;" \
@@ -622,6 +742,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "]})});" \
     "return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
+    "typeof MSCXVerdictFor==\"function\"&&MSCXVerdictFor(t.unAppID)&&(0," RT ".jsx)(\"div\",{className:\"MSCXRow\"," \
+    "ref:e=>e&&MSCXVerdictRow(e,t.unAppID)},\"npverdict\")," \
     "typeof MSCXPrefixRow==\"function\"&&(0," RT ".jsx)(\"div\",{className:\"MSCXRow\",ref:e=>e&&MSCXPrefixRow(e,t.unAppID)},\"npstate\")," \
     "(0," RT ".jsxs)(" BARREL ".XY,{label:npL(\"Graphics\",\"图形\",\"Grafica\",\"Графика\"),children:[" \
     "(0," RT ".jsx)(" BARREL ".m,{rgOptions:B,selectedOption:b," \
@@ -814,9 +936,7 @@ static const np_gate_t g_gates_forcetool[] = {
       "get is_invalid_os_type(){return false}", 1, 0 },
     // Reminder banner for 32 bit Mac games
     { NP_C1 ".is_invalid_os_type&&(0," NP_C2 ".jsx)(" NP_C3 ",{})",
-      "!" NP_C1 ".local_per_client_data?.installed&&"
-      NP_C1 ".most_available_per_client_data?.is_invalid_os_type&&"
-      "(0," NP_C2 ".jsx)(" NP_C3 ",{})", 1, 0 },
+      NP_INSTALL_BANNER, 1, 0 },
     { "(0," NP_C1 ".we)(\"#GameList_Entry_Invalid_OSType2\")",
       NP_COMPAT_HINT, 1, 0 },
 };
@@ -864,9 +984,7 @@ static const np_gate_t g_gates_selecttool[] = {
       "get is_invalid_os_type(){return false}", 1, 0 },
     // Reminder banner for 32 bit Mac games
     { NP_C1 ".is_invalid_os_type&&(0," NP_C2 ".jsx)(" NP_C3 ",{})",
-      "!" NP_C1 ".local_per_client_data?.installed&&"
-      NP_C1 ".most_available_per_client_data?.is_invalid_os_type&&"
-      "(0," NP_C2 ".jsx)(" NP_C3 ",{})", 1, 0 },
+      NP_INSTALL_BANNER, 1, 0 },
     { "(0," NP_C1 ".we)(\"#GameList_Entry_Invalid_OSType2\")",
       NP_COMPAT_HINT, 1, 0 },
 };
@@ -911,9 +1029,7 @@ static const np_gate_t g_gates_selecttool_vite[] = {
     { "get is_invalid_os_type(){return this.most_available_per_client_data.is_invalid_os_type}",
       "get is_invalid_os_type(){return false}", 1, 0 },
     { NP_C1 ".is_invalid_os_type&&(0," NP_C2 ".jsx)(" NP_C3 ",{})",
-      "!" NP_C1 ".local_per_client_data?.installed&&"
-      NP_C1 ".most_available_per_client_data?.is_invalid_os_type&&"
-      "(0," NP_C2 ".jsx)(" NP_C3 ",{})", 1, 0 },
+      NP_INSTALL_BANNER, 1, 0 },
     { NP_C1 "(`#GameList_Entry_Invalid_OSType2`)",
       NP_COMPAT_HINT, 1, 0 },
 };
@@ -1257,6 +1373,8 @@ static const char *fx_bridgeplay_key(const char *key, const char *prefix) {
 static const char *fx_panel_key(const char *key) {
     static const char *const same[] = {
         "MTL_HUD_ENABLED", "ROSETTA_ADVERTISE_AVX", "D3DM_ENABLE_METALFX", "DXMT_ENABLE_NVEXT",
+        // A maintainer-confirmed anti-cheat (docs/GAMEFIXES.md), for the verdict row.
+        "ANTICHEAT",
     };
     if (strcmp(key, "MSYNC") == 0) return "WINEMSYNC";
     // RETINA=1, which the run script also takes as BRIDGEPLAY_RETINA=1.
@@ -1752,6 +1870,12 @@ char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
                     "show launch options only", shape->name);
         int ok = !built || out_put(&out, fx, strlen(fx));
         free(fx);
+        if (!ok) { free(out.buf); return NULL; }
+        // Players' verdicts, then the code that reads them: without the file it shows nothing.
+        char *verdicts = np_compatverdict_javascript(getenv("HOME"));
+        ok = (!verdicts || out_put(&out, verdicts, strlen(verdicts)))
+            && out_put(&out, NP_CX_VERDICT, sizeof(NP_CX_VERDICT) - 1);
+        free(verdicts);
         if (!ok) { free(out.buf); return NULL; }
     }
 

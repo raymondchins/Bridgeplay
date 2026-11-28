@@ -1,0 +1,13 @@
+[
+  {"name": "Kernel shooter", "status": "Denied", "anticheats": ["RICOCHET"], "storeIds": {"steam": "1962663"}},
+  {"name": "Two at once", "status": "Broken", "anticheats": ["Easy Anti-Cheat", "BattlEye", "EA anticheat"], "storeIds": {"steam": "1172470"}},
+  {"name": "Proton enabled", "status": "Supported", "anticheats": ["Easy Anti-Cheat"], "storeIds": {"steam": 1245620}},
+  {"name": "Runs under Proton", "status": "Running", "anticheats": ["XIGNCODE3"], "storeIds": {"steam": "300"}},
+  {"name": "Odd one", "status": "Broken", "anticheats": ["Nexon Game Security", "Valve Anti-Cheat", "PunkBuster", "FACEIT", "VAC"], "storeIds": {"steam": "400"}},
+  {"name": "Not on Steam", "status": "Broken", "anticheats": ["Vanguard"], "storeIds": {"epic": "x"}},
+  {"name": "No store", "status": "Broken", "anticheats": ["Vanguard"]},
+  {"name": "Bad id", "status": "Broken", "anticheats": ["Vanguard"], "storeIds": {"steam": "12a"}},
+  {"name": "Zero id", "status": "Broken", "anticheats": ["Vanguard"], "storeIds": {"steam": "0"}},
+  {"name": "No names", "status": "Broken", "anticheats": [], "storeIds": {"steam": "500"}},
+  "not a game"
+]

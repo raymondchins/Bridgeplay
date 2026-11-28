@@ -1,6 +1,7 @@
 // The gate table is static, so the unit under test is included rather than
 // linked.
 #include "../feats/webpatch.c"
+#include "../feats/compatverdict.c"
 #include "../util/file.c"
 
 #include <stdarg.h>

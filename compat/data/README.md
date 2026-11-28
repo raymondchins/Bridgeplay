@@ -8,7 +8,7 @@ reports from the app. The maintainers have not checked them.
 |---|---|
 | `reports/YYYY-MM.ndjson` | One JSON object per line, one line per report, by the month it was sent |
 | `compat.json` | Reports grouped per game, with a verdict (the data behind bridgeplay.dev/compatibility) |
-| `compat-index.json` | AppID → verdict, counts, newest Bridgeplay build and date |
+| `compat-index.json` | AppID → verdict, counts, newest Bridgeplay build and date; `anticheat`: AppID → anti-cheat ids from [AreWeAntiCheatYet](https://github.com/AreWeAntiCheatYet/AreWeAntiCheatYet) (MIT, see LICENSE) |
 | `board.md` | Failing reports grouped by crash signature, for maintainers |
 
 ## A report line

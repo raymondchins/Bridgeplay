@@ -123,6 +123,31 @@ class Export(unittest.TestCase):
         self.assertNotIn("since", self.index["101"])
         self.assertEqual(set(self.index), {str(a) for a in self.games})
 
+    def test_index_has_no_anticheat_without_the_file(self):
+        self.assertNotIn("anticheat", json.loads((self.out / "compat-index.json").read_text()))
+
+    def test_anticheat_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            run("fetch", out, "--from", FIXTURE)
+            run("build", out, "--now", NOW, "--anticheat", HERE / "fixtures" / "awacy.json")
+            index = json.loads((out / "compat-index.json").read_text())
+            self.assertEqual(index["games"], self.index)
+            self.assertEqual(index["anticheat"], {
+                "400": ["other", "vac"],
+                "1172470": ["battleye", "eac", "javelin"],
+                "1245620": ["eac"],
+                "1962663": ["ricochet"],
+            })
+            # An unreadable copy leaves the names out and still publishes the verdicts.
+            bad = Path(tmp) / "awacy.json"
+            bad.write_text("{not json")
+            with contextlib.redirect_stderr(io.StringIO()):
+                run("build", out, "--now", NOW, "--anticheat", bad)
+            index = json.loads((out / "compat-index.json").read_text())
+            self.assertNotIn("anticheat", index)
+            self.assertEqual(index["games"], self.index)
+
     def test_not_counted(self):
         # 43 nodes: another user's post, a non-report, an unknown status and a user named like the bot.
         self.assertEqual(len(self.records), 39)

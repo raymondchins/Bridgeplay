@@ -500,6 +500,8 @@ final class PlayReports {
             defer { scanning = false }
             let chip = GameReport.chip(GameReport.thisMac.chip)
             verifiedHere = await Task.detached { await VerifiedGames.load(chip: chip) }.value
+            // Not waited on: the panel in Steam reads the file the next time it loads.
+            Task.detached(priority: .utility) { await CompatVerdicts.refresh() }
             let found = await Task.detached { PlayReports.findSessions(prefixes: PrefixStore.all()) }.value
             handle(found)
             finding = false

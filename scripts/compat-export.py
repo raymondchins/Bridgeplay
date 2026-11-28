@@ -8,13 +8,14 @@ report bot (bridgeplay-web api/report.mjs). `fetch` keeps a field-only copy of e
 
   reports/YYYY-MM.ndjson  one line per report: fields only, no logs, nothing about the person
   compat.json             the shape bridgeplay.dev's /api/compat returns, plus a verdict per game
-  compat-index.json       AppID -> verdict, counts, newest build and date, for the app
+  compat-index.json       AppID -> verdict, counts, newest build and date, for the app; with
+                          --anticheat, also AppID -> anti-cheat ids from AreWeAntiCheatYet
   board.md                failing reports grouped by log signature, for maintainers
   README.md, LICENSE      the open-data notes, copied from compat/data/
 
 Usage:
   compat-export.py fetch DIR [--full] [--prune] [--force] [--from NODES.json]
-  compat-export.py build DIR [--now 2026-11-27T12:00:00Z]
+  compat-export.py build DIR [--now 2026-11-27T12:00:00Z] [--anticheat AWACY-games.json]
 
 fetch reads GitHub with GH_TOKEN (discussions: read) unless --from gives the Discussion nodes as
 JSON. The verdict rule and the file formats are in scripts/compat-export.md.
@@ -674,6 +675,34 @@ def index_of(games, by_game):
     return index
 
 
+# ---- anti-cheat names from AreWeAntiCheatYet (MIT) --------------------------------------------------
+# The ids the app and the panel know (dylib/feats/compatverdict.c); any other name is "other".
+ANTICHEAT_IDS = {
+    "easyanticheat": "eac", "battleye": "battleye", "ricochet": "ricochet", "vanguard": "vanguard",
+    "anticheatexpert": "ace", "xigncode3": "xigncode3", "nprotectgameguard": "nprotect",
+    "eaanticheat": "javelin", "eajavelin": "javelin", "denuvoanticheat": "denuvo", "vac": "vac",
+    "valveanticheat": "vac",
+}
+ANTICHEAT_MAX = 4
+
+
+def anticheat_index(awacy):
+    """AppID -> sorted anti-cheat ids, from AreWeAntiCheatYet's games.json. Games it lists as
+    Running (they start under Proton anyway) are left out."""
+    out = {}
+    for g in awacy if isinstance(awacy, list) else []:
+        if not isinstance(g, dict) or g.get("status") == "Running":
+            continue
+        steam = (g.get("storeIds") or {}).get("steam") if isinstance(g.get("storeIds"), dict) else None
+        if not isinstance(steam, (str, int)) or not re.fullmatch(r"[1-9]\d{0,9}", str(steam)) or int(steam) >= 2 ** 31:
+            continue
+        names = g.get("anticheats") if isinstance(g.get("anticheats"), list) else []
+        ids = {ANTICHEAT_IDS.get(re.sub(r"[^a-z0-9]", "", n.lower()), "other") for n in names if isinstance(n, str) and n.strip()}
+        if ids:
+            out.setdefault(str(int(steam)), set()).update(ids)
+    return {k: sorted(v)[:ANTICHEAT_MAX] for k, v in sorted(out.items(), key=lambda kv: int(kv[0]))}
+
+
 # ---- board.md: failing reports by signature ---------------------------------------------------------
 def cell(text):
     return str(text).replace("|", "\\|").replace("`", "'").replace("\n", " ")
@@ -754,18 +783,24 @@ def check_private(name, text):
                          f"{text[max(0, m.start() - 30):m.start()]!r}; nothing written")
 
 
-def build(out, now):
+def build(out, now, anticheat=None):
     store = load_store(out)
     if not store and not (out / EMPTIED).exists():
         # No store at all is a failed or missing first fetch; an emptied one is a real result.
         raise SystemExit("compat-export: no reports in the store, nothing to publish")
     games, by_game = aggregate(store, now)
     updated = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    index = {"schema": 1, "rule": RULE, "updated": updated, "games": index_of(games, by_game)}
+    if anticheat:
+        try:
+            index["anticheat"] = anticheat_index(json.loads(Path(anticheat).read_text(encoding="utf-8")))
+        except (OSError, ValueError) as e:
+            # The verdicts still go out; the names come back with the next readable copy.
+            print(f"compat-export: {anticheat} not read ({e}), no anti-cheat names this time", file=sys.stderr)
     files = {
         "compat.json": json.dumps({"category": CATEGORY, "updated": updated, "rule": RULE, "games": games, "art": {}},
                                   ensure_ascii=False, separators=(",", ":")),
-        "compat-index.json": json.dumps({"schema": 1, "rule": RULE, "updated": updated, "games": index_of(games, by_game)},
-                                        ensure_ascii=False, separators=(",", ":")),
+        "compat-index.json": json.dumps(index, ensure_ascii=False, separators=(",", ":")),
         "board.md": board(store, games, now),
     }
     for path in sorted((out / "reports").glob("*.ndjson")):
@@ -793,12 +828,13 @@ def main(argv=None):
     b = sub.add_parser("build", help="write compat.json, compat-index.json and board.md")
     b.add_argument("dir", type=Path)
     b.add_argument("--now", help="the export time, ISO 8601 UTC (default: now)")
+    b.add_argument("--anticheat", help="AreWeAntiCheatYet's games.json, for the anti-cheat names")
     args = ap.parse_args(argv)
     if args.cmd == "fetch":
         fetch(args.dir, full=args.full, prune=args.prune, force=args.force, source=args.source)
     else:
         now = parse_date(args.now) if args.now else datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
-        build(args.dir, now)
+        build(args.dir, now, anticheat=args.anticheat)
 
 
 if __name__ == "__main__":
