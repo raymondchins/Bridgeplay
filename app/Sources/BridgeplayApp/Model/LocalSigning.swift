@@ -79,8 +79,11 @@ enum LocalSigning {
                 read[kSecReturnData as String] = true
                 read[kSecMatchLimit as String] = kSecMatchLimitOne
                 var result: CFTypeRef?
-                guard SecItemCopyMatching(read as CFDictionary, &result) == errSecSuccess,
-                      let data = result as? Data else { return nil }
+                let status = SecItemCopyMatching(read as CFDictionary, &result)
+                guard status == errSecSuccess, let data = result as? Data else {
+                    if status != errSecItemNotFound { AppLog.note("signing: reading the keychain password failed (\(status))") }
+                    return nil
+                }
                 return String(data: data, encoding: .utf8)
             },
             delete: { SecItemDelete(query as CFDictionary) }
@@ -241,6 +244,15 @@ enum LocalSigning {
         }
         defer { SecKeychainLock(keychain) }
         return try body(identity)
+    }
+
+    // Only the build that saved the keychain password reads it without asking. Any other build,
+    // a local test build for one, gets a macOS prompt, and a run nobody watches (a script, the
+    // background check) waited on it forever behind a locked screen. With prompts off the read
+    // fails at once and Steam is signed ad hoc, as when the password is missing.
+    // kSecUseAuthenticationUIFail does not cover this prompt; this switch does (macOS 27).
+    static func allowPrompts(_ allowed: Bool) {
+        SecKeychainSetUserInteractionAllowed(allowed)
     }
 
     // Uninstall: the keychain file goes with the support folder, its password goes here.

@@ -148,7 +148,9 @@ struct SteamInstallerTests {
             steamClosed: { true },
             register: register ?? { calls.register($0) },
             resetInputAccess: { calls.resetInputAccess(); return refusedResets },
-            onInputReset: onInputReset
+            onInputReset: onInputReset,
+            // Ad hoc, as on a Mac without the identity: this one's keychain stays out of tests.
+            signingIdentity: { nil }
         )
         if recordBuild {
             try SteamInstaller.finish(outcome, deployedVersion: fixture.deployedVersion, isCurrent: { _ in true })

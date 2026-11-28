@@ -11,6 +11,8 @@ enum InstallIntoSteamCommand {
     }
 
     private static func perform() async -> Int32 {
+        // Scripts and the background check run this unattended: a keychain prompt would hang it.
+        LocalSigning.allowPrompts(false)
         do {
             if DeploymentContent.current(version: AppVersion.bundled).blocksInstallation {
                 throw StepFailure(step: SteamInstaller.step,

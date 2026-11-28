@@ -216,4 +216,38 @@ struct LocalSigningTests {
         let requirement = try Shell.run("/usr/bin/codesign", ["-d", "-r-", binary.path(percentEncoded: false)])
         #expect((requirement.stdout + requirement.stderr).lowercased().contains("h\"\(hash.lowercased())\""))
     }
+
+    // A password saved by another program (here `security`, the only app its ACL names) is
+    // what a test build meets: with prompts on, macOS asks and the read waits for an answer.
+    // With prompts off it must fail at once, so an unattended install signs ad hoc instead.
+    @Test("With prompts off, a password another program saved is refused at once",
+          .enabled(if: ProcessInfo.processInfo.environment["NOTPROTON_KEYCHAIN_TEST"] != nil))
+    func refusedWithoutPrompt() throws {
+        let work = try directory("prompt")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let keychain = work.appending(path: "other.keychain-db").path(percentEncoded: false)
+        try Shell.check("/usr/bin/security", ["create-keychain", "-p", "kc", keychain])
+        defer { _ = try? Shell.run("/usr/bin/security", ["delete-keychain", keychain]) }
+        LocalSigning.leaveSearchList(URL(filePath: keychain))
+        try Shell.check("/usr/bin/security", ["unlock-keychain", "-p", "kc", keychain])
+        try Shell.check("/usr/bin/security", ["add-generic-password", "-s", LocalSigning.Secrets.service,
+                                              "-a", "keychain", "-w", "secret", keychain])
+
+        var opened: SecKeychain?
+        #expect(SecKeychainOpen(keychain, &opened) == errSecSuccess)
+        let read: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecAttrService as String: LocalSigning.Secrets.service,
+                                   kSecAttrAccount as String: "keychain",
+                                   kSecMatchSearchList as String: [try #require(opened)],
+                                   kSecReturnData as String: true,
+                                   kSecMatchLimit as String: kSecMatchLimitOne]
+        LocalSigning.allowPrompts(false)
+        defer { LocalSigning.allowPrompts(true) }
+        let started = Date()
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(read as CFDictionary, &result)
+        #expect(status != errSecSuccess)
+        #expect(result == nil)
+        #expect(Date().timeIntervalSince(started) < 5)
+    }
 }
