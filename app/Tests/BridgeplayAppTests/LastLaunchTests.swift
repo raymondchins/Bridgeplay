@@ -191,4 +191,16 @@ struct LastLaunchTests {
         try Data("no header here\n".utf8).write(to: folder.appending(path: "bridgeplay-run.log"))
         #expect(PrefixTools.lastRunFile(for: prefix, folder: out) == nil)
     }
+
+    @Test("The last run skips a Steam helper's block and keeps older logs without a verb")
+    func lastRunSkipsHelpers() {
+        let game = "=== bridgeplay run Wed Oct 21 20:00:00 WIB 2026 ===\ntime: x\nverb=waitforexitandrun\nstep\n"
+        let helper = "=== bridgeplay run Wed Oct 21 20:00:05 WIB 2026 ===\ntime: x\nverb=run\nhelper\n"
+        let exit = "=== game exited status=0\n"
+        let old = "=== notproton run Mon Oct 19 20:00:00 WIB 2026 ===\nold run line\n"
+        #expect(LastLaunch.lastRun(in: old + game + helper + exit).map(String.init) == game + helper + exit)
+        #expect(LastLaunch.lastRun(in: game + old + helper).map(String.init) == old + helper)
+        #expect(LastLaunch.lastRun(in: helper).map(String.init) == helper)
+        #expect(LastLaunch.lastRun(in: "no header\n") == nil)
+    }
 }

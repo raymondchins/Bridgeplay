@@ -200,16 +200,29 @@ struct LastLaunch: Equatable, Sendable, Identifiable {
                           ended: modified, hasPrefix: hasPrefix)
     }
 
-    // The last run block of a run log: from its last "=== bridgeplay run" header to the end.
-    // nil when the log has no header.
+    // The game's last run in a run log: from its last "=== bridgeplay run" header to the end.
+    // Steam's helpers (verb=run) write the same header, so a block naming another verb is
+    // passed over; older logs without a verb line count as the game's. The last header of
+    // any kind when no block is the game's, nil when the log has none.
     static func lastRun(in log: String) -> Substring? {
         let headers = ["=== bridgeplay run ", "=== notproton run "]
-        let starts = headers.compactMap { header -> String.Index? in
-            if let found = log.range(of: "\n" + header, options: .backwards) { return log.index(after: found.lowerBound) }
-            return log.hasPrefix(header) ? log.startIndex : nil
+        var starts: [String.Index] = []
+        for header in headers {
+            if log.hasPrefix(header) { starts.append(log.startIndex) }
+            var from = log.startIndex
+            while let found = log.range(of: "\n" + header, range: from..<log.endIndex) {
+                starts.append(log.index(after: found.lowerBound))
+                from = found.upperBound
+            }
         }
-        guard let start = starts.max() else { return nil }
-        return log[start...]
+        starts.sort()
+        guard let last = starts.last else { return nil }
+        for (index, start) in starts.enumerated().reversed() {
+            let end = index + 1 < starts.count ? starts[index + 1] : log.endIndex
+            let verb = log[start..<end].split(separator: "\n").prefix(4).first { $0.hasPrefix("verb=") }
+            if verb == nil || verb == "verb=waitforexitandrun" { return log[start...] }
+        }
+        return log[last...]
     }
 
     // The last run block of a run log, sorted into a verdict. A block with neither an exit
