@@ -130,6 +130,8 @@ struct UninstallPlan: Sendable {
     // This account's Bridgeplay files that exist now.
     var remove: [UninstallItem]
     var steamModified: Bool
+    // Other tracked Steam copies that removal restores too, besides the selected one.
+    var otherSteamCopies: [URL] = []
     // Restoring needs no download: Valve's pinned bundle is kept on this Mac.
     var steamKeptOffline: Bool
     var prefixes: [UninstallPrefix]
@@ -151,9 +153,15 @@ struct UninstallPlan: Sendable {
         let remove = owned.filter(UninstallPaths.exists).map { UninstallItem(url: $0, bytes: measure($0)) }
         let prefixes = PrefixStore.all(libraries: paths.libraries, userdata: paths.userdata)
             .map { UninstallPrefix(prefix: $0, bytes: measure($0.root)) }
+        // Uninstall.run restores every tracked copy, so the plan names the modified ones.
+        let selected = paths.app.standardizedFileURL.path
+        let others = ((try? paths.modifications.paths()) ?? [])
+            .filter { $0.standardizedFileURL.path != selected }
+            .filter { UninstallPaths.exists($0) && steamModified($0) }
         return UninstallPlan(
             remove: remove,
-            steamModified: steamModified(paths.app),
+            steamModified: steamModified(paths.app) || !others.isEmpty,
+            otherSteamCopies: others,
             steamKeptOffline: keptOffline(),
             prefixes: prefixes,
             keeps: remainders(paths: paths, prefixes: prefixes.map(\.prefix), trashed: []),

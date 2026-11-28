@@ -36,6 +36,7 @@ enum UninstallCheckCommand {
                 ? "Steam.app: restored from Valve's signed copy kept on this Mac (no download)"
                 : "Steam.app: restored from Valve's signed copy, downloaded from Valve")
             : "Steam.app: no Bridgeplay changes found")
+        lines += plan.otherSteamCopies.map { "Also restored: \($0.plainPath)" }
         lines.append("Steam quits first. Steam's own settings are changed only after it has quit.")
         if !plan.prefixes.isEmpty {
             lines.append("Game prefixes (kept unless named with \(RemoveEverythingCommand.trashFlag) <appid,...|all>; then moved to the Trash):")

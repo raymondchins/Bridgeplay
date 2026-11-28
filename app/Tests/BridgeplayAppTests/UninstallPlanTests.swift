@@ -151,6 +151,26 @@ struct UninstallPlanTests {
         #expect(plan.steamModified && plan.steamKeptOffline)
     }
 
+    @Test("Another tracked Steam copy that removal restores is named in the plan")
+    func planNamesOtherTrackedCopies() throws {
+        let fixture = try fixture(modified: false)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let other = fixture.root.appending(path: "Other/Steam.app")
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        try fixture.paths.modifications.mark(other)
+        let selected = fixture.paths.app.standardizedFileURL.path
+
+        let plan = UninstallPlan.make(
+            paths: fixture.paths, steamModified: { $0.standardizedFileURL.path != selected },
+            keptOffline: { true }, measure: { _ in 0 })
+        #expect(plan.steamModified)
+        #expect(plan.otherSteamCopies.map(\.standardizedFileURL.path) == [other.standardizedFileURL.path])
+        // A clean tracked copy is not named, and the selected one never is.
+        let clean = UninstallPlan.make(paths: fixture.paths, steamModified: { _ in false },
+                                       keptOffline: { true }, measure: { _ in 0 })
+        #expect(!clean.steamModified && clean.otherSteamCopies.isEmpty)
+    }
+
     @Test("Other accounts are named, without this one, Shared or plain files")
     func otherAccounts() throws {
         let fixture = try fixture(modified: false)

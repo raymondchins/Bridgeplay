@@ -46,9 +46,12 @@ struct UninstallPlanSheet: View {
 
     private var steamLine: String {
         guard plan.steamModified else { return String(localized: "Steam is unchanged.") }
-        return plan.steamKeptOffline
+        let line = plan.steamKeptOffline
             ? String(localized: "Steam is restored when it quits.")
             : String(localized: "Steam is downloaded again when it quits.")
+        guard !plan.otherSteamCopies.isEmpty else { return line }
+        let copies = plan.otherSteamCopies.map(\.plainPath).joined(separator: ", ")
+        return line + "\n" + String(localized: "Also restored: \(copies)")
     }
 
     private var prefixes: some View {

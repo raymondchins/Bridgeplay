@@ -2520,6 +2520,28 @@
         }
       }
     },
+    "Also restored: %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristinato anche: %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Также будет восстановлено: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同时恢复：%@"
+          }
+        }
+      }
+    },
     "Another account on this Mac installed a beta. Bridgeplay %@ stays until a stable release includes build %@." : {
       "localizations" : {
         "it" : {
