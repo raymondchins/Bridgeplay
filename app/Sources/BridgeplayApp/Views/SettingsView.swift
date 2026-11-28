@@ -135,6 +135,10 @@ struct SettingsView: View {
         )
         .disabled(background == .unavailable)
         .onAppear(perform: readBackground)
+        // Login Items approval and the agent's mode change outside the app.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            readBackground()
+        }
     }
 
     private func setBackground(_ mode: BackgroundCheck.Mode) {
