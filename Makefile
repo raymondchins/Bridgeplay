@@ -1037,13 +1037,17 @@ native-shim-tests:
 	sh native-shim/tests/run.sh
 
 # Inventory fixtures exercise modern and legacy Steam libraries offline.
-.PHONY: np-inventory-check benchcheck
+.PHONY: np-inventory-check benchcheck benchabcheck
 np-inventory-check:
 	@python3 scripts/tests/np-inventory.py
 
 # BRIDGEPLAY_BENCH capture reader against a fixed capture.
 benchcheck:
 	@python3 scripts/tests/bench-summary.py
+
+# A/B harness: compare and the Steam-driving run mode, offline with stubs.
+benchabcheck:
+	@python3 -I scripts/tests/bench-ab.py
 
 # Offline tests for the Steam build canary's manifest, state and download handling.
 steamcanarycheck:
@@ -1058,7 +1062,7 @@ CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck breakercheck clientgatecheck pauselistcheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck launchercheck \
-	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check benchcheck steamcanarycheck np-native-tests native-shim-tests \
+	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check benchcheck benchabcheck steamcanarycheck np-native-tests native-shim-tests \
 	app-tests native-installercheck
 
 # app.yml runs the checks that need the built app in its build job and the rest in a

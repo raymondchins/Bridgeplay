@@ -221,6 +221,24 @@ lows (the frame rate over the slowest 1% and 0.1% of frames), frame-time percent
 (frames over 50 ms). `--skip 10` leaves out the first 10 seconds, `--json` prints JSON. Gaps of a
 second or more (loading, the game in the background) are left out and counted as pauses.
 
+`scripts/bench-ab.py` compares two settings or backends for one game. Collect each side's
+captures (and, for launch times, the `time:` lines of `bridgeplay-run.log`) in its own folder,
+then run `scripts/bench-ab.py compare A/ --vs B/`. It leaves out the first run of each side
+(`--warmup 1`) and the first 10 seconds of each capture (`--skip 10`), needs 3 runs per side
+after that (`--min-runs 3`), and compares the median frame time, 1% low, average frame rate,
+time to game start and time to first frame. A change counts only when a bootstrap over runs
+puts its 95% interval clear of zero and the median moved by at least 1% (`--min-effect 1`).
+It warns when the chip, macOS or frame rate limit differ between sides.
+
+To collect the runs, set the game's launch options for side A by hand (with
+`BRIDGEPLAY_BENCH=1`), then `scripts/bench-ab.py run --appid <id> --label A --out runs --runs 4
+--launch-steam`. Each run opens `steam://rungameid/<id>`, waits until the run log says the game
+exited (quit it, or let its benchmark finish), copies the new captures and that run's log to
+`runs/A/`, and cools down 30 seconds. Then set B's options and repeat with `--label B`. For ABAB
+order, use `--runs 1` and alternate. Without `--launch-steam` it opens nothing. It only reads
+Steam's files, and finds the run log through `libraryfolders.vdf`, so games on other library
+folders work.
+
 ## Native macOS games
 
 A Mac build with no compatibility tool pinned runs through `~/.bridgeplay/np-native`, not the
