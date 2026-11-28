@@ -13053,30 +13053,6 @@
         }
       }
     },
-    "Nothing was moved. See this prefix's bridgeplay-run.log before retrying." : {
-      "comment" : "Run script alert.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Non è stato spostato nulla. Prima di riprovare, vedi il bridgeplay-run.log di questo prefisso."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ничего не перемещено. Прежде чем повторить, смотрите bridgeplay-run.log этого префикса."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未移动任何文件。重试前请查看此游戏容器的 bridgeplay-run.log。"
-          }
-        }
-      }
-    },
     "Notify Only" : {
       "localizations" : {
         "it" : {
@@ -18340,6 +18316,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "其余全部为流畅"
+          }
+        }
+      }
+    },
+    "Some files may have moved. Check this prefix's bridgeplay-run.log before retrying." : {
+      "comment" : "Run script alert.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alcuni file potrebbero essere stati spostati. Prima di riprovare, controlla il bridgeplay-run.log di questo prefisso."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Часть файлов могла быть перемещена. Прежде чем повторить, проверьте bridgeplay-run.log этого префикса."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分文件可能已被移动。重试前请检查此游戏容器的 bridgeplay-run.log。"
           }
         }
       }

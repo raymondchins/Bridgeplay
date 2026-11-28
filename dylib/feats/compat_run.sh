@@ -4011,7 +4011,7 @@ fonts_inputs() {
 set_up_prefix_contents() {
   mark "profile layout"
   if ! lay_out_proton_profile; then
-    show_alert "Saved-game folders need attention" "Nothing was moved. See this prefix's bridgeplay-run.log before retrying."
+    show_alert "Saved-game folders need attention" "Some files may have moved. Check this prefix's bridgeplay-run.log before retrying."
     exit 1
   fi
   [ "$verb" != waitforexitandrun ] || echo "video: RetinaMode=${NOTPROTON_RETINA:-0}" >> "$log" 2>&1 || true
