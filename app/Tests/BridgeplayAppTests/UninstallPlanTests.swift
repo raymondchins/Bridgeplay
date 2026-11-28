@@ -186,6 +186,20 @@ struct UninstallPlanTests {
         #expect(result.leftForUser.contains { $0.url == fixture.support })
     }
 
+    @Test("Verify names an update block left only in the inner Steam client's steam.cfg")
+    func verifyFindsTheInnerUpdateBlock() throws {
+        let fixture = try fixture(modified: false)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let inner = fixture.paths.updateBlocks[1]
+        try FileManager.default.createDirectory(at: inner.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(UpdateBlock.contents.utf8).write(to: inner)
+
+        let result = UninstallVerification.run(paths: fixture.paths, signature: { _ in .valve })
+
+        #expect(!result.passed)
+        #expect(result.leftInSteam.map(\.url) == [inner])
+    }
+
     @Test("Verify fails when Steam is not Valve's, even with nothing of Bridgeplay's in it")
     func verifyNeedsValvesSignature() throws {
         let fixture = try fixture(modified: false)

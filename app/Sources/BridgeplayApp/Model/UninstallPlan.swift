@@ -205,8 +205,9 @@ struct UninstallVerification: Sendable {
         for file in [plist, paths.innerPlist] where Self.declaresBridgeplay(file) {
             inSteam.append(UninstallItem(url: file, note: String(localized: "Still loads Bridgeplay")))
         }
-        if UpdateBlock.isPresent(at: paths.updateBlocks) {
-            inSteam.append(UninstallItem(url: paths.updateBlocks[0], note: String(localized: "Updates still blocked")))
+        // isPresent reads only the first file it is given, so each steam.cfg is asked on its own.
+        for block in paths.updateBlocks where UpdateBlock.isPresent(at: [block]) {
+            inSteam.append(UninstallItem(url: block, note: String(localized: "Updates still blocked")))
         }
         inSteam += paths.filesInSteamData().map { UninstallItem(url: $0) }
         let user = (paths.owned + paths.ourLaunchAgents()).filter(UninstallPaths.exists).map { UninstallItem(url: $0) }
