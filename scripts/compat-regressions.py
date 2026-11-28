@@ -80,12 +80,15 @@ def short(r, key):
     return f"Steam build {r['steam']}" if key == "steam" else f"{ce.short_version(r['version']) or '?'} ({r['build']})"
 
 
-def recovery(store, appid, key, since):
-    """The newest report that ran well on the build the game broke on or a newer one, sent after
-    the first failure there, or None."""
+def recovery(store, appid, key, since, now):
+    """The newest counted report (one per Mac, as the verdict counts them) that ran well on the
+    build the game broke on or a newer one, sent after the first failure there, or None. A Mac
+    whose success was followed by a failure of its own does not count as a recovery."""
     game = [r for r in store.values() if r["appid"] == appid and (r.get(key) or 0) >= since]
     broke = min((r["date"] for r in game if ce.BUCKET[r["status"]] == "broken"), default="")
-    rows = [r for r in game if ce.BUCKET[r["status"]] == "playable" and r["date"] > broke]
+    counted = ce.votes([r for r in store.values() if r["appid"] == appid], now)
+    rows = [r for r in counted if (r.get(key) or 0) >= since
+            and ce.BUCKET[r["status"]] == "playable" and r["date"] > broke]
     return max(rows, key=lambda r: (r["date"], r["n"])) if rows else None
 
 
@@ -187,7 +190,7 @@ def plan(store, issues, now, max_open=MAX_OPEN):
             continue
         if i["state"] != "open":
             continue
-        ok = recovery(store, appid, i["key"], i["since"])
+        ok = recovery(store, appid, i["key"], i["since"], now)
         if ok:
             where = short(ok, i["key"])
             actions += [{"do": "comment", "appid": appid, "number": n,

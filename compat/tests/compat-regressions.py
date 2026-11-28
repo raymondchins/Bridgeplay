@@ -135,6 +135,25 @@ class Watch(unittest.TestCase):
         self.assertEqual([(a["do"], a["number"]) for a in actions], [("comment", 1), ("edit", 1)])
         self.assertIn("state=quiet", actions[1]["body"])
 
+    def test_replaced_success_is_not_recovery(self):
+        # One Mac ran it well on the new build, then ran it with issues: its newest report counts,
+        # so the rule lapses (with a second Mac with issues) but the issue is not closed.
+        opened = self.first()
+        store = self.with_report(status="gold", voter="mac-a", chip="M4 Max", memory="64 GB",
+                                 macos="macOS 26.2", date="2026-11-27T09:00:00Z")
+        success = max(store)
+        for n, fields in ((success + 1, dict(status="bronze", date="2026-11-27T10:00:00Z")),
+                          (success + 2, dict(status="bronze", voter="mac-b", chip="M2", memory="16 GB"))):
+            store[n] = dict(store[success], n=n, **fields)
+        issues = [issue(1, opened[105]), issue(2, opened[111])]
+        actions, _ = self.plan(issues, store)
+        self.assertEqual([(a["do"], a["number"]) for a in actions], [("comment", 1), ("edit", 1)])
+        self.assertIn("state=quiet", actions[1]["body"])
+        # Without the later report, its success closes the issue.
+        del store[success + 1]
+        actions, _ = self.plan(issues, store)
+        self.assertIn(("close", 1), [(a["do"], a["number"]) for a in actions])
+
     def test_rule_lapse_comments_once(self):
         opened = self.first()
         # Two Macs that ran with issues on the new build: the failures are no longer most of it.
