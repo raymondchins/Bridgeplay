@@ -240,7 +240,10 @@ def unpack(zip_path, dest):
                 target = zf.read(info).decode()
                 link = os.path.join(root, *parts)
                 resolved = os.path.realpath(os.path.join(os.path.dirname(link), target))
-                if os.path.isabs(target) or not resolved.startswith(root + os.sep):
+                # An earlier member can have turned a folder on the way into a link that leads out.
+                parent = os.path.realpath(os.path.dirname(link))
+                if os.path.isabs(target) or not resolved.startswith(root + os.sep) \
+                        or not (parent == root or parent.startswith(root + os.sep)):
                     raise CanaryError(f"{os.path.basename(zip_path)}: link leaves the folder: {name!r}")
                 os.makedirs(os.path.dirname(link), exist_ok=True)
                 if os.path.lexists(link):

@@ -12,6 +12,7 @@ import os
 import stat
 import tempfile
 import unittest
+import warnings
 import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -220,6 +221,28 @@ class Downloads(unittest.TestCase):
                 canary.unpack(z, dest)
         self.assertFalse(os.path.exists(os.path.join(self.t, "evil")))
         self.assertFalse(os.path.exists(os.path.join(self.t, "outside")))
+
+    def test_unpack_refuses_links_made_through_a_moved_link(self):
+        # a is pointed elsewhere after b was checked through it, so b now leads to the sibling
+        # folder and b/link would be made there.
+        dest = os.path.join(self.t, "client-beta")
+        sibling = os.path.join(self.t, "client-stable")
+        os.makedirs(dest)
+        os.makedirs(sibling)
+        z = os.path.join(self.t, "ordered.zip")
+        members = [("d/e/f", b"x"), ("a", "d/e"), ("b", "a/../../client-stable"), ("a", "d"),
+                   ("b/link", "../client-beta/safe")]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")  # the second "a" is a duplicate name on purpose
+            with zipfile.ZipFile(z, "w") as zf:
+                for name, body in members:
+                    info = zipfile.ZipInfo(name)
+                    kind = stat.S_IFREG if isinstance(body, bytes) else stat.S_IFLNK
+                    info.external_attr = (kind | 0o755) << 16
+                    zf.writestr(info, body)
+        with self.assertRaises(canary.CanaryError):
+            canary.unpack(z, dest)
+        self.assertEqual(os.listdir(sibling), [])
 
 
 class Commands(unittest.TestCase):
