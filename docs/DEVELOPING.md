@@ -85,6 +85,15 @@ nothing counted. It is off until its public key is in `dylib/feats/pauselist_key
 | `pause_list_serial`, `pause_list_expires` | its serial and expiry, `0` without a readable list |
 | `pause_note`, `pause_fixed_in`, `pause_url` | the entry that paused this start; empty otherwise |
 
+Background check (Settings › Check Steam in the Background, off by default). It registers
+`app/LaunchAgents/com.bridgeplay.Bridgeplay.background.plist` with `SMAppService`, which runs
+`BridgeplayApp --background-check` as the user at login. The agent waits on FSEvents for
+`Steam.app` and on Steam or the app quitting, then decides with `Model/BackgroundCheck.swift`:
+it notifies once per Steam update that removed Bridgeplay, or, in its second mode, runs
+`--install-into-steam` once Steam and every game are closed. `paused`, a passive breaker
+verdict for this build, Repair Steam and an open Bridgeplay app all stop it. Its lines in the
+app log start with `background check:`.
+
 ## Checks
 
 | Command | Runs |

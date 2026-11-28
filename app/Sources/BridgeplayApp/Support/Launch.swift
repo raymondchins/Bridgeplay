@@ -23,6 +23,8 @@ enum Launch {
         // The command line paths log as well, so a scripted run leaves the same trail.
         AppLog.start()
         MainActor.assumeIsolated { MigrationLaunch.shared.logLaunchResult() }
+        // The login agent (Settings › Check Steam in the Background): no window, no Dock icon.
+        if CommandLine.arguments.dropFirst().first == BackgroundAgent.flag { BackgroundAgent.run() }
         if rebuilding {
             AppLog.note("command line: \(RebuildPrefixCommand.flag)")
             refuseWhileMigrating()

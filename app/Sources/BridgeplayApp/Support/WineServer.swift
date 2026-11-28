@@ -11,4 +11,10 @@ enum WineServer {
     static func isRunning(pgrep: String = "/usr/bin/pgrep") -> Bool {
         Shell.processIsRunning(named: processPattern, pgrep: pgrep)
     }
+
+    // The running servers' pids, so a caller can wait for the game to quit.
+    static func pids(pgrep: String = "/usr/bin/pgrep") -> [pid_t] {
+        let out = (try? Shell.run(pgrep, ["-x", "-U", String(getuid()), processPattern]))?.stdout ?? ""
+        return out.split(whereSeparator: \.isNewline).compactMap { pid_t($0) }
+    }
 }

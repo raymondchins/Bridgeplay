@@ -110,6 +110,8 @@ enum SteamInstaller {
         register: BundleRegistrar = { SteamBundle.register($0) },
         resetInputAccess: () -> [String] = resetInputAccess,
         onInputReset: ([String]) -> Void = { _ in },
+        // Tests pass { nil }: the real identity's keychain asks the user for each new test build.
+        signingIdentity: () -> LocalSigning.Identity? = SteamInstaller.signingIdentity,
         report: @escaping @Sendable (InstallPhase) -> Void = { _ in }
     ) throws -> InstallOutcome {
         report(.checkingPayload)

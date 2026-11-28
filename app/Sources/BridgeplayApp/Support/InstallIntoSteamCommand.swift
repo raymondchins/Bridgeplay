@@ -4,6 +4,13 @@ import Foundation
 // into Steam and exits. Refuses the same cases the button refuses.
 enum InstallIntoSteamCommand {
     static let flag = "--install-into-steam"
+    // With it, a Steam that is open by the time the install starts is left running and the
+    // install fails, rather than Steam being asked to quit. The background check passes it.
+    static let unattendedFlag = "--unattended"
+
+    static func isUnattended(_ arguments: [String]) -> Bool {
+        arguments.dropFirst().contains(unattendedFlag)
+    }
 
     static func run() -> Never {
         Task.detached { exit(AppLog.finished(await perform())) }
@@ -11,6 +18,8 @@ enum InstallIntoSteamCommand {
     }
 
     private static func perform() async -> Int32 {
+        // Scripts and the background check run this unattended: a keychain prompt would hang it.
+        LocalSigning.allowPrompts(false)
         do {
             if DeploymentContent.current(version: AppVersion.bundled).blocksInstallation {
                 throw StepFailure(step: SteamInstaller.step,
@@ -22,7 +31,9 @@ enum InstallIntoSteamCommand {
             }
             let lock = try DeploymentContent.acquireInstallationLock()
             defer { lock.release() }
-            let result = try SteamInstaller.run(holdingInstallationLock: true, report: { say($0.label) })
+            let stopClient = isUnattended(CommandLine.arguments) ? SteamInstaller.leaveTheClient : SteamInstaller.stopTheClient
+            let result = try SteamInstaller.run(holdingInstallationLock: true, stopClient: stopClient,
+                                                report: { say($0.label) })
 
             let valve = try ValvePackageManifest.bundled()
             if valve.files.contains(where: {

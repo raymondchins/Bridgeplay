@@ -7,15 +7,37 @@ import UserNotifications
 // without opening a window. macOS asks once whether Bridgeplay may send notifications.
 enum NotifyCommand {
     static let flag = "--notify"
+    // `--notify-result <file> --notify <title> <body>`: the background agent's form. The
+    // helper writes "delivered" or "failed" there before it exits, since `open` can't pass
+    // an exit status back.
+    static let resultFlag = "--notify-result"
+    static let deliveredMark = "delivered"
 
-    static func requested() -> [String]? {
-        let arguments = CommandLine.arguments
+    static func requested(_ arguments: [String] = CommandLine.arguments) -> [String]? {
         guard let index = arguments.firstIndex(of: flag) else { return nil }
         return Array(arguments[(index + 1)...])
     }
 
+    static func resultFile(_ arguments: [String] = CommandLine.arguments) -> URL? {
+        guard let index = arguments.firstIndex(of: resultFlag), index + 1 < arguments.count,
+              arguments.firstIndex(of: flag).map({ index < $0 }) ?? false
+        else { return nil }
+        return URL(filePath: arguments[index + 1])
+    }
+
+    static func arguments(_ parts: [String], result: URL) -> [String] {
+        [resultFlag, result.path(percentEncoded: false), flag] + parts
+    }
+
     static func run(_ parts: [String]) -> Never {
-        Task.detached { exit(await post(parts) ? 0 : 1) }
+        let result = resultFile()
+        Task.detached {
+            let delivered = await post(parts)
+            if let result {
+                try? Data((delivered ? deliveredMark : "failed").utf8).write(to: result, options: .atomic)
+            }
+            exit(delivered ? 0 : 1)
+        }
         dispatchMain()
     }
 

@@ -79,8 +79,11 @@ enum LocalSigning {
                 read[kSecReturnData as String] = true
                 read[kSecMatchLimit as String] = kSecMatchLimitOne
                 var result: CFTypeRef?
-                guard SecItemCopyMatching(read as CFDictionary, &result) == errSecSuccess,
-                      let data = result as? Data else { return nil }
+                let status = SecItemCopyMatching(read as CFDictionary, &result)
+                guard status == errSecSuccess, let data = result as? Data else {
+                    if status != errSecItemNotFound { AppLog.note("signing: reading the keychain password failed (\(status))") }
+                    return nil
+                }
                 return String(data: data, encoding: .utf8)
             },
             delete: { SecItemDelete(query as CFDictionary) }
@@ -223,9 +226,19 @@ enum LocalSigning {
     // Runs `body` with Bridgeplay's keychain unlocked and locks it again after. `body` gets
     // the identity to sign with: nil when the keychain can't be unlocked, so Steam is signed
     // ad hoc. codesign must never meet that keychain locked: on macOS 27 an attempt leaves it
-    // refusing its own password afterwards. An identity in the search list needs nothing.
-    static func unlocked<T>(_ identity: Identity?, secrets: Secrets = .live, _ body: (Identity?) throws -> T) rethrows -> T {
-        guard let identity, let path = identity.keychain?.path(percentEncoded: false) else { return try body(identity) }
+    // refusing its own password afterwards. An identity in the search list needs nothing, but
+    // codesign may ask to use its key, and a run with prompts off has nobody to answer: it signs
+    // ad hoc instead.
+    static func unlocked<T>(_ identity: Identity?, secrets: Secrets = .live, promptsAllowed: () -> Bool = promptsAllowed,
+                            _ body: (Identity?) throws -> T) rethrows -> T {
+        guard let identity else { return try body(nil) }
+        guard let path = identity.keychain?.path(percentEncoded: false) else {
+            guard promptsAllowed() else {
+                AppLog.note("signing: the login keychain's identity may ask for approval and nobody is watching, signing ad hoc")
+                return try body(nil)
+            }
+            return try body(identity)
+        }
         var keychain: SecKeychain?
         guard SecKeychainOpen(path, &keychain) == errSecSuccess, let keychain, let password = secrets.load() else {
             AppLog.note("signing: Bridgeplay's keychain or its password is missing, signing ad hoc")
@@ -241,6 +254,20 @@ enum LocalSigning {
         }
         defer { SecKeychainLock(keychain) }
         return try body(identity)
+    }
+
+    // Only the build that saved the keychain password reads it without asking. Any other build,
+    // a local test build for one, gets a macOS prompt, and a run nobody watches (a script, the
+    // background check) waited on it forever behind a locked screen. With prompts off the read
+    // fails at once and Steam is signed ad hoc, as when the password is missing.
+    // kSecUseAuthenticationUIFail does not cover this prompt; this switch does (macOS 27).
+    static func allowPrompts(_ allowed: Bool) {
+        SecKeychainSetUserInteractionAllowed(allowed)
+    }
+
+    static func promptsAllowed() -> Bool {
+        var allowed: DarwinBoolean = true
+        return SecKeychainGetUserInteractionAllowed(&allowed) != errSecSuccess || allowed.boolValue
     }
 
     // Uninstall: the keychain file goes with the support folder, its password goes here.

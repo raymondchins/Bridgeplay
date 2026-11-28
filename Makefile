@@ -917,6 +917,8 @@ app: stamp-check app-payload $(ICON_CAR)
 	@if [ -z "$(APP_VERSION)" ] || [ -z "$(APP_BUILD)" ] || [ -z "$(APP_UPSTREAM)" ]; then \
 		echo "dylib/version.h needs BRIDGEPLAY_VERSION, BRIDGEPLAY_BUILD and NOTPROTON_VERSION" >&2; exit 1; fi
 	cp app/Info.plist "$(APP_BUNDLE)/Contents/Info.plist"
+	@mkdir -p "$(APP_BUNDLE)/Contents/Library/LaunchAgents"
+	cp app/LaunchAgents/com.bridgeplay.Bridgeplay.background.plist "$(APP_BUNDLE)/Contents/Library/LaunchAgents/"
 	/usr/libexec/PlistBuddy -c \
 		"Set :CFBundleShortVersionString $(APP_VERSION)" -c \
 		"Set :CFBundleVersion $(APP_BUILD)" -c \
