@@ -10,7 +10,7 @@ extract() { sed -n "/^$1() {\$/,/^}\$/p" "$SRC"; }
 functions=""
 for name in kernel_anticheat_name exit_anticheat exit_meaning exit_signal wine_crash_pattern exit_crash_lines \
 	exit_summary exit_outcome np_now_ms np_seconds mark first_window_ms first_frame_ms launch_times \
-	write_last_launch report_early_exit; do
+	write_last_launch report_early_exit abandon_seed; do
 	body=$(extract "$name")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
@@ -259,6 +259,9 @@ is "with no abort line" "" "$(cat "$log")"
 early 'kill -TERM $$; sleep 1'
 is "Steam's Stop before the game started" "code=aborted exit= seconds=0 stopped=steam" "$(record_line)"
 is "and the log says it stopped there" "=== stopped during prefix lock before launch ===" "$(cat "$log")"
+early 'stage_step="prefix seed"; trap "abandon_seed 143" TERM; kill -TERM $$; sleep 1'
+is "Steam's Stop while the prefix is seeded, whose trap exits 143" "code=aborted exit= seconds=0 stopped=steam" "$(record_line)"
+is "and the log says it stopped there" "=== stopped during prefix seed before launch ===" "$(cat "$log")"
 
 echo "== order =="
 at() { grep -n -- "$1" "$SRC" | head -1 | cut -d: -f1; }

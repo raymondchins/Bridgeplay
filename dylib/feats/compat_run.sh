@@ -340,8 +340,8 @@ mark startup
 report_early_exit() {
   status=$?
   # A signal (Steam's Stop) reaches this with status 0, as does only the anti-cheat
-  # prompt's exit, which sets its outcome.
-  if [ "$status" != 0 ]; then
+  # prompt's exit, which sets its outcome. One the seed's traps caught carries its status.
+  if [ "$status" != 0 ] && [ "${np_signalled:-0}" != 1 ]; then
     echo "=== aborted during $stage_step (exit $status) before launch ===" \
       >> "$log" 2>&1 || true
     write_last_launch "${np_outcome:-aborted}" "" 0 unknown -
@@ -2855,6 +2855,8 @@ seed_building=0
 seed_merging=0
 # shellcheck disable=SC2329 # the traps in seed_prefix_from_template invoke this
 abandon_seed() {
+  # A signal, as Steam's Stop sends: the exit status it carries is not a failure.
+  np_signalled=1
   if [ -n "$seed_scratch" ]; then
     if [ "$seed_building" -eq 1 ]; then
       in_template_env "$seed_scratch" "$WINESERVER" -k >/dev/null 2>&1 || true
