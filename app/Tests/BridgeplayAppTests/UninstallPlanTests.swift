@@ -353,6 +353,37 @@ struct UninstallPlanTests {
         #expect(FileManager.default.fileExists(atPath: fixture.prefix("200").path))
     }
 
+    @Test("A login item macOS keeps is listed as remaining, and the rest is still removed")
+    func refusedLoginItemRemains() async throws {
+        let fixture = try fixture(modified: false)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let leftovers = Uninstall.Leftovers(
+            gamefixes: fixture.support.appending(path: "gamefixes"), keptGamefixes: fixture.root.appending(path: "kept"),
+            steamConfig: fixture.root.appending(path: "config.vdf"),
+            defaultToolBackup: fixture.support.appending(path: "backups/x.json"), files: [], steamRunning: { false },
+            unregisterLoginItem: { throw CocoaError(.featureUnsupported) })
+        let plan = plan(fixture, modified: false)
+
+        let outcome = try await Uninstall.run(
+            app: fixture.root.appending(path: "Missing/Steam.app"), innerPlist: fixture.paths.innerPlist,
+            updateBlocks: fixture.paths.updateBlocks, legacyCompat: fixture.paths.legacyCompat,
+            compatTools: [], directories: [fixture.support], libraries: [fixture.library],
+            modifications: SteamModifications(file: fixture.root.appending(path: "bundles.json"),
+                                              legacyRecord: fixture.support.appending(path: "install-build.json")),
+            lockFolder: fixture.root, leftovers: leftovers,
+            stop: { _, _ in false },
+            trashPrefixes: [],
+            trash: { _ in Issue.record("nothing was picked for the Trash") })
+        let verification = UninstallVerification.run(paths: fixture.paths, signature: { _ in .valve })
+        let list = UninstallChecklist.make(plan: plan, outcome: outcome, paths: fixture.paths, verification: verification)
+
+        let item = try #require(outcome.loginItem)
+        #expect(item.url.lastPathComponent == BackgroundItem.plistName)
+        #expect(item.note?.contains("Login Items") == true)
+        #expect(list.remains.contains(item))
+        #expect(!FileManager.default.fileExists(atPath: fixture.support.path))
+    }
+
     @Test("--trash-prefixes takes all or app ids, and refuses an unknown id before anything runs")
     func trashFlag() throws {
         let found = [

@@ -32,6 +32,8 @@ struct UninstallOutcome: Sendable {
     var trashed: [UninstallItem] = []
     var trashedPrefixes: [String] = []
     var notTrashed: [UninstallItem] = []
+    // The login item macOS would not turn off.
+    var loginItem: UninstallItem?
 
     var steamNeedsRedownload: Bool { steamInstalled && !restoredValveSignature }
 
@@ -84,7 +86,7 @@ enum Uninstall {
         var launchAgents: [URL] = []
         var unloadAgent: @Sendable (URL) -> Void = { _ in }
         // Settings › Check Steam in the Background, registered from inside the app (BackgroundItem).
-        var unregisterLoginItem: @Sendable () -> Void = {}
+        var unregisterLoginItem: @Sendable () throws -> Void = {}
 
         static var live: Leftovers {
             Leftovers(
@@ -104,7 +106,7 @@ enum Uninstall {
                 unregisterLoginItem: {
                     UserDefaults.standard.set(BackgroundCheck.Mode.off.rawValue, forKey: BackgroundCheck.modeKey)
                     let agent = SMAppService.agent(plistName: BackgroundItem.plistName)
-                    if agent.status == .enabled || agent.status == .requiresApproval { try? agent.unregister() }
+                    if agent.status == .enabled || agent.status == .requiresApproval { try agent.unregister() }
                 })
         }
     }
@@ -237,7 +239,15 @@ enum Uninstall {
             _ = try keepGamefixes(legacy, in: leftovers.keptGamefixes)
         }
         leftovers.launchAgents.forEach(leftovers.unloadAgent)
-        leftovers.unregisterLoginItem()
+        var loginItem: UninstallItem?
+        do {
+            try leftovers.unregisterLoginItem()
+        } catch {
+            AppLog.note("uninstall: login item stays: \(error.localizedDescription)")
+            loginItem = UninstallItem(
+                url: Bundle.main.bundleURL.appending(path: "Contents/Library/LaunchAgents/\(BackgroundItem.plistName)"),
+                note: String(localized: "Still opens at login: \(error.localizedDescription). Turn it off in System Settings › General › Login Items."))
+        }
         AppLog.stopMakingFolder()
         var removed = try remove(
             legacyCompat: legacyCompat, compatTools: compatTools,
@@ -265,7 +275,8 @@ enum Uninstall {
             restoredDefaultTool: restoredDefault,
             trashed: trashed,
             trashedPrefixes: trashedPrefixes,
-            notTrashed: notTrashed
+            notTrashed: notTrashed,
+            loginItem: loginItem
         )
     }
 

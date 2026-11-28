@@ -240,6 +240,7 @@ struct UninstallChecklist: Sendable {
         var remains = verification.leftForUser.map {
             UninstallItem(url: $0.url, note: String(localized: "Not removed"))
         }
+        remains += [outcome.loginItem].compactMap { $0 }
         remains += remainders(paths: paths, plan: plan, outcome: outcome)
         return UninstallChecklist(removed: removed, trashed: outcome.trashed, remains: remains,
                                   otherUsers: plan.otherUsers, verification: verification)

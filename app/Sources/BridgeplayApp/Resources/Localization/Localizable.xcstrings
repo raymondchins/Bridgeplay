@@ -16345,6 +16345,28 @@
         }
       }
     },
+    "Still opens at login: %@. Turn it off in System Settings › General › Login Items." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si apre ancora all'accesso: %@. Disattivalo in Impostazioni di Sistema › Generali › Elementi di login."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "По-прежнему открывается при входе: %@. Отключите это в Системных настройках › Основные › Объекты входа."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录时仍会打开：%@。请在“系统设置 › 通用 › 登录项”中将其关闭。"
+          }
+        }
+      }
+    },
     "Still starting…" : {
       "localizations" : {
         "it" : {
