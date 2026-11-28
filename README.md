@@ -143,7 +143,7 @@ Bridgeplay is a fork of [NotProton](https://github.com/NotProtonNot/NotProton) b
 - **Graphics:** Apple's [Game Porting Toolkit](https://developer.apple.com/games/game-porting-toolkit/) (Apple's license), [DXMT](https://github.com/3Shain/dxmt) by 3Shain and [DXVK-macOS](https://github.com/Gcenx/DXVK-macOS) by Gcenx.
 - **Steam bridge:** `lsteamclient` and `steam.exe` come from Valve's [Proton](https://github.com/ValveSoftware/Proton).
 - **Controllers and Game Mode:** [sn0wst0rm](https://github.com/sn0wst0rm) wrote the DualSense Bluetooth bridge, Steam rumble forwarding and game-mode host that Bridgeplay 0.7.51 and earlier shipped. They are paused until NotProton merges the same work ([NotProton#90](https://github.com/NotProtonNot/NotProton/pull/90)).
-- **Libraries:** [Dobby](https://github.com/jmpews/Dobby) (Apache-2.0), [Sparkle](https://sparkle-project.org) (MIT), [SDL](https://www.libsdl.org) (zlib) and [cJSON](https://github.com/DaveGamble/cJSON) (MIT).
+- **Libraries:** [Dobby](https://github.com/jmpews/Dobby) (Apache-2.0), [Sparkle](https://sparkle-project.org) (MIT), [SDL](https://www.libsdl.org) (zlib), [cJSON](https://github.com/DaveGamble/cJSON) (MIT) and Orson Peters' [ed25519](https://github.com/orlp/ed25519) (zlib).
 - **Bridgeplay:** [everyone who has contributed](https://github.com/raymondchins/Bridgeplay/graphs/contributors).
 
 NotProton in turn thanks the people who came before it, among them Nat Brown's Kaon, mont127's Neutron and Gio's work on Steam Play in Mac Steam; see [docs/UPSTREAM.md](docs/UPSTREAM.md).

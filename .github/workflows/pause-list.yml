@@ -1,0 +1,89 @@
+# The pause list (pause-list/README.md). A pull request that edits pause-list/ only gets its
+# list checked. On main, or when run by hand, the list is signed with the
+# BRIDGEPLAY_PAUSE_LIST_KEY secret of the `pause-list` environment and uploaded to the
+# `pause-list` release, a prerelease that is never Latest (Latest is the update feed).
+# Give that environment required reviewers so a second maintainer approves each publish.
+# A signed copy lasts the list's `days` (at most 31); run this again to extend a pause.
+name: pause-list
+
+on:
+  pull_request:
+    paths:
+      - pause-list/**
+      - scripts/pause-list.py
+  push:
+    branches: [main]
+    paths:
+      - pause-list/pause-list.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pause-list
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: check the list
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Check
+        run: python3 -I scripts/pause-list.py check pause-list/pause-list.json
+
+  publish:
+    name: sign and publish
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pause-list
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Read the published list
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir -p build/pause-list/previous
+          if gh release view pause-list -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release download pause-list -R "$GITHUB_REPOSITORY" -p pause-list.json \
+              -D build/pause-list/previous || echo "no list on the release yet"
+          fi
+
+      - name: Sign
+        env:
+          BRIDGEPLAY_PAUSE_LIST_KEY: ${{ secrets.BRIDGEPLAY_PAUSE_LIST_KEY }}
+        run: |
+          set -eu
+          out=build/pause-list/out
+          prev=build/pause-list/previous/pause-list.json
+          if [ -f "$prev" ]; then set -- --previous "$prev"; else set --; fi
+          python3 -I scripts/pause-list.py sign pause-list/pause-list.json "$out" "$@"
+          python3 -I scripts/pause-list.py verify "$out/pause-list.json" "$out/pause-list.json.sig"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          out=build/pause-list/out
+          if ! gh release view pause-list -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create pause-list -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --prerelease --latest=false --title "Pause list" \
+              --notes "Steam builds where Bridgeplay stays off until a fix ships. Steam checks this list when it starts. Format and signing: pause-list/README.md in the repository."
+          fi
+          gh release upload pause-list -R "$GITHUB_REPOSITORY" --clobber \
+            "$out/pause-list.json.sig" "$out/pause-list.json"
+          echo "published: $(python3 -I scripts/pause-list.py verify "$out/pause-list.json" "$out/pause-list.json.sig")"

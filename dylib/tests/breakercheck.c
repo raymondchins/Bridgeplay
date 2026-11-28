@@ -152,7 +152,12 @@ static int start(char how) {
 static np_mode_t helper_mode(void) {
     fflush(stdout);
     pid_t pid = fork();
-    if (pid == 0) _exit((int)np_breaker_mode());
+    if (pid == 0) {
+        // A fresh Steam Helper: this process may have peeked already (np_health_web).
+        g_peek_once = (pthread_once_t)PTHREAD_ONCE_INIT;
+        g_peek_mode = NP_MODE_ACTIVE;
+        _exit((int)np_breaker_mode());
+    }
     int st = 0;
     waitpid(pid, &st, 0);
     return WIFEXITED(st) ? (np_mode_t)WEXITSTATUS(st) : (np_mode_t)-1;
@@ -225,6 +230,14 @@ static void decide_cases(void) {
     CHECK("paused is off and counts nothing",
           np_boot_decide(&prev, &env, &next, &mode, &notify) == NP_BOOT_PAUSED &&
           mode == NP_MODE_OFF);
+    env.listed = 1;
+    CHECK("paused wins over the pause list",
+          np_boot_decide(&prev, &env, &next, &mode, &notify) == NP_BOOT_PAUSED && mode == NP_MODE_OFF);
+    env.paused = 0;
+    env.prev_running = 1;
+    CHECK("the pause list is passive and counts nothing, even beside another Steam",
+          np_boot_decide(&prev, &env, &next, &mode, &notify) == NP_BOOT_LISTED &&
+          mode == NP_MODE_PASSIVE && !notify);
 
     np_boot_t s = { .key = "1:2", .pid = 9, .stage = "boot", .strikes = 1, .notified = 1 };
     CHECK("client follows boot", np_boot_advance(&s, 9, "client") && strcmp(s.stage, "client") == 0);
@@ -284,7 +297,10 @@ static void file_cases(void) {
                       .channel = "publicbeta", .sigdb_build = 1795567705ULL,
                       .mode = NP_MODE_PASSIVE, .strikes = 2, .signatures_resolved = 17,
                       .signatures_required = 18, .hooks_installed = 3, .hooks_total = 9,
-                      .layout_known = 1 };
+                      .layout_known = 1, .reason = "pause_list", .pause_list = "ok",
+                      .pause_serial = 1800000000ULL, .pause_expires = 1801209600LL,
+                      .pause_note = "closes at start", .pause_fixed_in = "0.7.70",
+                      .pause_url = "https://example.invalid/1" };
     char *text = np_health_format(&h);
     cJSON *j = text ? cJSON_Parse(text) : NULL;
     free(text);
@@ -295,7 +311,12 @@ static void file_cases(void) {
           jnum(j, "strikes") == 2 && jnum(j, "signatures_resolved") == 17 &&
           jnum(j, "signatures_required") == 18 && jnum(j, "hooks_installed") == 3 &&
           jnum(j, "hooks_total") == 9 &&
-          cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j, "layout_known")));
+          cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j, "layout_known")) &&
+          strcmp(jstr(j, "mode_reason"), "pause_list") == 0 && strcmp(jstr(j, "pause_list"), "ok") == 0 &&
+          jnum(j, "pause_list_serial") == 1800000000.0 && jnum(j, "pause_list_expires") == 1801209600.0 &&
+          strcmp(jstr(j, "pause_note"), "closes at start") == 0 &&
+          strcmp(jstr(j, "pause_fixed_in"), "0.7.70") == 0 &&
+          strcmp(jstr(j, "pause_url"), "https://example.invalid/1") == 0);
     cJSON_Delete(j);
 }
 
@@ -315,7 +336,9 @@ static int boot_stage_is(const char *stage) {
 
 static int health_is(const char *mode, int strikes, int hooks) {
     cJSON *j = load_json(support, NP_HEALTH_FILE);
+    const char *reason = strcmp(mode, "off") == 0 ? "paused" : strcmp(mode, "passive") == 0 ? "strikes" : "";
     int ok = j && strcmp(jstr(j, "mode"), mode) == 0 && jnum(j, "strikes") == strikes &&
+             strcmp(jstr(j, "mode_reason"), reason) == 0 && strcmp(jstr(j, "pause_list"), "unkeyed") == 0 &&
              jnum(j, "hooks_installed") == hooks && jnum(j, "steam_build") == 1794536281.0 &&
              jnum(j, "patch_build") == BRIDGEPLAY_BUILD && strcmp(jstr(j, "channel"), "stable") == 0;
     cJSON_Delete(j);
@@ -324,6 +347,7 @@ static int health_is(const char *mode, int strikes, int hooks) {
 
 static void runtime_cases(void) {
     printf("starts\n");
+    g_off_modes = 1;
     CHECK("a first start is active", start('c') == NP_MODE_ACTIVE);
     CHECK("health.json says what it installed", health_is("active", 0, 9));
     CHECK("it died, so the second start carries a strike", start('c') == NP_MODE_ACTIVE && boot_strikes() == 1);
@@ -465,6 +489,26 @@ static void lock_cases(void) {
           locked_start(-1, &early) == 1 && early);
 }
 
+// The shipped setting: a paused file, the strikes or a stale passive report never start Steam
+// without the hooks, because that Steam removes Windows games' content.
+static void off_modes_disabled_cases(void) {
+    printf("off modes disabled\n");
+    g_off_modes = 0;
+    drop(support, NP_BOOT_FILE);
+    put(support, NP_PAUSED_FILE, "");
+    CHECK("a paused file is ignored and the insert stays", start('c') == NP_MODE_ACTIVE);
+    CHECK("Steam Helper ignores the paused file", helper_mode() == NP_MODE_ACTIVE);
+    drop(support, NP_PAUSED_FILE);
+    CHECK("a second bad start stays active", start('c') == NP_MODE_ACTIVE && boot_strikes() == 1);
+    CHECK("past the strikes it stays active and is counted as a normal start",
+          start('c') == NP_MODE_ACTIVE && boot_strikes() == 2 && boot_stage_is("client") &&
+          health_is("active", 2, 9));
+    CHECK("a healthy start clears the strikes", start('h') == NP_MODE_ACTIVE && boot_strikes() == 0);
+    put(support, NP_HEALTH_FILE, "{\"mode\":\"passive\"}");
+    CHECK("Steam Helper ignores a passive report", helper_mode() == NP_MODE_ACTIVE);
+    drop(support, NP_HEALTH_FILE);
+}
+
 static int scrub(const char *path, const struct stat *st, int flag, struct FTW *ftw) {
     (void)st; (void)flag; (void)ftw;
     if (strncmp(path, root, strlen(root)) != 0) return -1;
@@ -490,6 +534,7 @@ int main(void) {
     chunk_cases();
     web_retry_case();
     lock_cases();
+    off_modes_disabled_cases();
 
     // Only temp files could be left, and none may be.
     int strays = 0;

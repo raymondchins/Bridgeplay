@@ -2,8 +2,12 @@
 // steamclient.dylib by the same path the dylib uses, then checks each against the address
 // and bytes recorded when the database was cut. Loaded rather than on disk because dyld
 // rebases and ObjC rewrites selector slots. Other builds must land on the live addresses.
-// Usage: out/anchorcheck [path-to-sigdb.json ...]
-//        out/anchorcheck --rebase TEMPLATE OUT   (see rebase_fixture)
+// Usage: out/anchorcheck [--client-dir DIR] [--build N] [path-to-sigdb.json ...]
+//        out/anchorcheck [--client-dir DIR] --rebase TEMPLATE OUT   (see rebase_fixture)
+// --client-dir loads the modules from DIR instead of the installed client, e.g. Valve's
+// packages unzipped into one folder (scripts/steam-canary.py). --build names the client's
+// build, so the database for it is the one held to its recorded addresses, and none is when
+// none has that build; without it the build is recognised from the addresses (pick_live).
 
 #include "cJSON.h"
 #include "../util/file.h"
@@ -56,6 +60,7 @@ typedef struct {
 
 static image_t g_images[MAX_IMAGES];
 static int     g_image_count;
+static const char *g_client_dir;
 
 static const image_t *image_for(const char *module) {
     for (int i = 0; i < g_image_count; i++)
@@ -67,9 +72,13 @@ static int load_image(const char *module) {
     if (image_for(module)) return 0;
     if (g_image_count >= MAX_IMAGES) return -1;
 
-    const char *home = getenv("HOME");
     char path[1024], suffix[128];
-    snprintf(path, sizeof(path), "%s%s%s", home ? home : "", STEAM_MACOS, module);
+    if (g_client_dir) {
+        snprintf(path, sizeof(path), "%s/%s", g_client_dir, module);
+    } else {
+        const char *home = getenv("HOME");
+        snprintf(path, sizeof(path), "%s%s%s", home ? home : "", STEAM_MACOS, module);
+    }
     snprintf(suffix, sizeof(suffix), "/%s", module);
 
     if (!dlopen(path, RTLD_LAZY | RTLD_LOCAL)) {
@@ -317,6 +326,12 @@ static int check_aob_fallback(const char *path) {
     return bad;
 }
 
+static int pick_by_build(const dbcheck_t *dbs, int n, uint64_t build) {
+    for (int i = 0; i < n; i++)
+        if (dbs[i].build == build) return i;
+    return -1;
+}
+
 // The database whose recorded addresses the anchors actually landed on describes
 // the running client. Nothing in the app bundle reports the client build, so it
 // has to be recognised rather than read.
@@ -513,8 +528,27 @@ static int rebase_fixture(const char *tmpl, const char *out) {
 // unable to answer. Callers feeding deliberately broken databases need those apart: a
 // rejected database is a result, an unloadable client image means nothing was checked.
 int main(int argc, char **argv) {
-    const char *home = getenv("HOME");
-    if (!home) { fprintf(stderr, "HOME unset\n"); return 3; }
+    uint64_t build = 0;
+    while (argc > 2 && (strcmp(argv[1], "--client-dir") == 0 || strcmp(argv[1], "--build") == 0)) {
+        if (strcmp(argv[1], "--build") == 0) {
+            char *end = NULL;
+            build = strtoull(argv[2], &end, 10);
+            if (!build || *end) { fprintf(stderr, "bad --build '%s'\n", argv[2]); return 2; }
+        } else {
+            DIR *dh = argv[2][0] ? opendir(argv[2]) : NULL;
+            if (!dh) { fprintf(stderr, "cannot open client dir '%s'\n", argv[2]); return 3; }
+            closedir(dh);
+            g_client_dir = argv[2];
+            printf("client : %s\n", g_client_dir);
+        }
+        argv += 2;
+        argc -= 2;
+    }
+    if (argc > 1 && (strcmp(argv[1], "--client-dir") == 0 || strcmp(argv[1], "--build") == 0)) {
+        fprintf(stderr, "usage: anchorcheck [--client-dir DIR] [--build N] [sigdb.json ...]\n");
+        return 2;
+    }
+    if (!g_client_dir && !getenv("HOME")) { fprintf(stderr, "HOME unset\n"); return 3; }
 
     if (load_image(NP_MODULE_DEFAULT) != 0) return 3;
 
@@ -550,7 +584,7 @@ int main(int argc, char **argv) {
         if (check_db(&dbs[i]) != 0) return 2;
     }
 
-    int live = pick_live(dbs, n);
+    int live = build ? pick_by_build(dbs, n, build) : pick_live(dbs, n);
 
     int bad = 0;
     for (int i = 0; i < n; i++) bad += report_db(&dbs[i], i == live, live >= 0 && i != live);

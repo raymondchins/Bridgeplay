@@ -35,6 +35,10 @@ DOBBY_LIBS := $(DOBBY_DIR)/libdobby.a \
               $(DOBBY_DIR)/external/osbase/libosbase.a \
               $(DOBBY_DIR)/external/logging/liblogging.a
 
+# Ed25519 verification for the pause list (vendor/ed25519/README.md).
+ED25519_SRCS := vendor/ed25519/fe.c vendor/ed25519/ge.c vendor/ed25519/sc.c \
+	vendor/ed25519/sha512.c vendor/ed25519/verify.c
+
 SRCS := \
 	dylib/feats/quicksettings.c \
 	dylib/core/loader.c \
@@ -67,7 +71,9 @@ SRCS := \
 	dylib/feats/displayrate.c \
 	dylib/feats/input_access.c \
 	dylib/feats/breaker.c \
-	vendor/cJSON.c
+	dylib/feats/pauselist.c \
+	vendor/cJSON.c \
+	$(ED25519_SRCS)
 
 OUT_DIR     := out
 TEST_CC     := $(CC) -arch $(ARCH) -mmacosx-version-min=$(MIN_VER) -std=c17 -g \
@@ -89,8 +95,8 @@ DEPS := $(OBJS:.o=.d)
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
-        compatsvc-check prefixstate-check breakercheck clientgatecheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck \
-        gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check FORCE
+        compatsvc-check prefixstate-check breakercheck clientgatecheck pauselistcheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck \
+        gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check steamcanarycheck FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
 
@@ -305,8 +311,21 @@ breakercheck:
 	@if [ ! -f dylib/tests/breakercheck.c ]; then $(call SKIP,breakercheck,dylib/tests/breakercheck.c); exit 0; fi; \
 	mkdir -p $(OUT_DIR) && \
 	$(TEST_CC) -O1 -Ivendor -o $(BREAKERCHECK) dylib/tests/breakercheck.c \
-	  dylib/util/log.c dylib/util/file.c vendor/cJSON.c && \
+	  dylib/feats/pauselist.c dylib/util/log.c dylib/util/file.c vendor/cJSON.c $(ED25519_SRCS) && \
 	$(BREAKERCHECK)
+
+PAUSELISTCHECK := $(OUT_DIR)/pauselistcheck
+
+# The signed pause list: signatures, expiry, rollback, the cache, an offline or hanging fetch,
+# then a list signed by scripts/pause-list.py with OpenSSL and checked by the dylib's code.
+pauselistcheck:
+	@if [ ! -f dylib/tests/pauselistcheck.c ]; then $(call SKIP,pauselistcheck,dylib/tests/pauselistcheck.c); exit 0; fi; \
+	mkdir -p $(OUT_DIR) && \
+	$(TEST_CC) -O1 -Ivendor -o $(PAUSELISTCHECK) dylib/tests/pauselistcheck.c \
+	  dylib/util/log.c dylib/util/file.c vendor/cJSON.c $(ED25519_SRCS) \
+	  vendor/ed25519/sign.c vendor/ed25519/keypair.c && \
+	$(PAUSELISTCHECK) && \
+	python3 -I scripts/tests/pause-list.py $(PAUSELISTCHECK)
 
 quicksettings-check:
 	@if [ ! -f dylib/tests/quicksettings-check.c ]; then $(call SKIP,quicksettings-check,dylib/tests/quicksettings-check.c); exit 0; fi; \
@@ -344,7 +363,8 @@ sigcheck:
 	@if [ ! -f dylib/tests/sigcheck.py ]; then $(call SKIP,sigcheck,dylib/tests/sigcheck.py); exit 0; fi; \
 	python3 dylib/tests/sigcheck.py
 
-# Validates anchors against a real dlopen'd steamclient.dylib
+# Validates anchors against a real dlopen'd steamclient.dylib: the installed one, or the
+# modules in STEAM_CLIENT_DIR (unzipped Valve packages, see scripts/steam-canary.py)
 ANCHORCHECK := $(OUT_DIR)/anchorcheck
 ANCHORCHECK_SRCS := dylib/tests/anchorcheck.c \
 	dylib/core/macho.c dylib/resolver/aob.c dylib/resolver/anchor.c \
@@ -358,7 +378,7 @@ $(ANCHORCHECK): $(ANCHORCHECK_SRCS) FORCE
 
 anchorcheck:
 	@if [ ! -f dylib/tests/anchorcheck.c ]; then $(call SKIP,anchorcheck,dylib/tests/anchorcheck.c); exit 0; fi; \
-	$(MAKE) -s $(ANCHORCHECK) && $(ANCHORCHECK)
+	$(MAKE) -s $(ANCHORCHECK) && $(ANCHORCHECK) $(if $(STEAM_CLIENT_DIR),--client-dir "$(STEAM_CLIENT_DIR)")
 
 CALLSCHECK := $(OUT_DIR)/callscheck
 CALLSCHECK_SRCS := dylib/tests/callscheck.c $(filter-out dylib/tests/anchorcheck.c,$(ANCHORCHECK_SRCS))
@@ -1012,15 +1032,20 @@ native-shim-tests:
 np-inventory-check:
 	@python3 scripts/tests/np-inventory.py
 
+# Offline tests for the Steam build canary's manifest, state and download handling.
+steamcanarycheck:
+	@if [ ! -f scripts/tests/steam-canary.py ]; then $(call SKIP,steamcanarycheck,scripts/tests/steam-canary.py); exit 0; fi; \
+	python3 -I scripts/tests/steam-canary.py
+
 # Every check .github/workflows/app.yml runs, after `make app`.
 # scripts/build-local.sh --checks runs this same target, so a local release build
 # and CI gate on one list. Each check runs even when an earlier one failed.
 # overlay-shim-tests is left out: it needs a Metal GPU and real frame timing.
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
-	activatecheck breakercheck clientgatecheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
+	activatecheck breakercheck clientgatecheck pauselistcheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck launchercheck \
-	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
+	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check steamcanarycheck np-native-tests native-shim-tests \
 	app-tests native-installercheck
 
 # app.yml runs the checks that need the built app in its build job and the rest in a

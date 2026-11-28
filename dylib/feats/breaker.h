@@ -5,8 +5,10 @@
 //   health.json      what this Steam start did (np_health_t), written by steam_osx
 //   health-web.json  the compat UI gates, written by Steam Helper
 //   paused           made and removed by the app: while it exists nothing installs
+//   pause-list.*     the signed pause list and its fetch state (pauselist.h)
 //
-// The app's "Try Again" deletes boot.json, which clears the strikes.
+// The app's "Try Again" deletes boot.json, which clears the strikes. It does not lift a pause
+// from the list, which ends when the list drops the entry, expires or Bridgeplay updates.
 #ifndef NOTPROTON_FEATS_BREAKER_H
 #define NOTPROTON_FEATS_BREAKER_H
 
@@ -15,9 +17,19 @@
 
 typedef enum {
     NP_MODE_ACTIVE = 0,
-    NP_MODE_PASSIVE,   // two bad starts on this key: no hooks, no insert
+    NP_MODE_PASSIVE,   // two bad starts on this key, or the pause list: no hooks, no insert
     NP_MODE_OFF,       // paused by the user
 } np_mode_t;
+
+// Pause, the strikes and the pause list all start Steam with no hooks. That Steam configures
+// every installed Windows game for macOS and removes its content (Update Required, then a
+// deletion on update), so all three stay off: the paused file and the list are ignored and a
+// start past the strikes stays active. The app hides Pause to match
+// (SteamHealthStore.offModesEnabled).
+// CEILING: off modes disabled outright — re-enable once a paused start keeps the compat layer in.
+#ifndef NP_BREAKER_OFF_MODES
+#define NP_BREAKER_OFF_MODES 0
+#endif
 
 #define NP_BOOT_STRIKES_MAX     2
 #define NP_BOOT_HEALTHY_SECONDS 120
@@ -32,6 +44,11 @@ typedef enum {
 #define NP_HEALTH_FILE     "health.json"
 #define NP_HEALTH_WEB_FILE "health-web.json"
 #define NP_PAUSED_FILE     "paused"
+
+// health.json "mode_reason"
+#define NP_REASON_PAUSED     "paused"
+#define NP_REASON_STRIKES    "strikes"
+#define NP_REASON_PAUSE_LIST "pause_list"
 
 typedef struct {
     char      key[64];     // "<steam build>:<BRIDGEPLAY_BUILD>"
@@ -48,12 +65,14 @@ typedef struct {
     long long   now;
     long long   own_start;     // this process's start time, 0 when unknown
     int         paused;
+    int         listed;        // the pause list names this Steam build
     int         prev_running;  // prev->pid is another steam_osx that is still running
 } np_boot_env_t;
 
 typedef enum {
     NP_BOOT_RECORD = 0,  // write `next`
     NP_BOOT_PAUSED,      // nothing counted
+    NP_BOOT_LISTED,      // passive from the pause list, nothing counted
     NP_BOOT_SECOND,      // another steam_osx owns the state
 } np_boot_verdict_t;
 
@@ -71,6 +90,13 @@ typedef struct {
     int                hooks_installed;
     int                hooks_total;
     int                layout_known;
+    char               reason[16];        // NP_REASON_*, empty while active
+    char               pause_list[16];    // np_pl_status_name
+    unsigned long long pause_serial;
+    long long          pause_expires;
+    char               pause_note[256];   // the entry that paused this start
+    char               pause_fixed_in[32];
+    char               pause_url[256];
 } np_health_t;
 
 // Pure parts, tested by breakercheck.

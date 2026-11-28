@@ -1,5 +1,6 @@
 // Crash-loop breaker, Pause and the health files. See breaker.h.
 #include "breaker.h"
+#include "pauselist.h"
 #include "../version.h"
 #include "../util/file.h"
 #include "../util/log.h"
@@ -52,6 +53,10 @@ np_boot_verdict_t np_boot_decide(const np_boot_t *prev, const np_boot_env_t *env
     if (env->paused) {
         *mode = NP_MODE_OFF;
         return NP_BOOT_PAUSED;
+    }
+    if (env->listed) {
+        *mode = NP_MODE_PASSIVE;
+        return NP_BOOT_LISTED;
     }
 
     int have = prev && prev->key[0];
@@ -334,6 +339,13 @@ char *np_health_format(const np_health_t *h) {
     cJSON_AddNumberToObject(root, "hooks_installed", h->hooks_installed);
     cJSON_AddNumberToObject(root, "hooks_total", h->hooks_total);
     cJSON_AddBoolToObject(root, "layout_known", h->layout_known != 0);
+    cJSON_AddStringToObject(root, "mode_reason", h->reason);
+    cJSON_AddStringToObject(root, "pause_list", h->pause_list);
+    cJSON_AddNumberToObject(root, "pause_list_serial", (double)h->pause_serial);
+    cJSON_AddNumberToObject(root, "pause_list_expires", (double)h->pause_expires);
+    cJSON_AddStringToObject(root, "pause_note", h->pause_note);
+    cJSON_AddStringToObject(root, "pause_fixed_in", h->pause_fixed_in);
+    cJSON_AddStringToObject(root, "pause_url", h->pause_url);
     char *text = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     return text;
@@ -350,13 +362,19 @@ static int         g_decided;    // steam_osx: g_mode holds this start's decisio
 static np_mode_t   g_mode = NP_MODE_ACTIVE;
 static int         g_exited;
 
-static int support_file(char *buf, size_t cap, const char *name) {
+static int support_dir(char *buf, size_t cap) {
     const char *home = np_home_dir();
     if (!home)
         return -1;
+    np_support_path(buf, cap, home, NULL);
+    mkdir(buf, 0755);
+    return buf[0] ? 0 : -1;
+}
+
+static int support_file(char *buf, size_t cap, const char *name) {
     char dir[PATH_MAX];
-    np_support_path(dir, sizeof dir, home, NULL);
-    mkdir(dir, 0755);
+    if (support_dir(dir, sizeof dir) != 0)
+        return -1;
     int n = snprintf(buf, cap, "%s/%s", dir, name);
     return n < 0 || (size_t)n >= cap ? -1 : 0;
 }
@@ -453,17 +471,12 @@ void np_breaker_drop_insert(void) {
 
 // Posted by the app, so it carries Bridgeplay's name. sh backgrounds open and exits at once,
 // so Steam's start never waits on LaunchServices.
-static void notify_trip(void) {
-    const char *quiet = getenv("BRIDGEPLAY_BREAKER_QUIET");
-    if (quiet && quiet[0] && strcmp(quiet, "0") != 0)
-        return;
+static void post_notification(const char *subtitle, const char *body) {
     char *const argv[] = {
         "/bin/sh", "-c",
         "/usr/bin/open -n -g -b com.bridgeplay.Bridgeplay --args --notify \"$1\" \"$2\" \"$3\""
         " </dev/null >/dev/null 2>&1 &",
-        "sh", "Bridgeplay", "Steam opened without Bridgeplay",
-        "Steam stopped twice soon after starting, so it opens without Bridgeplay until Steam "
-        "or Bridgeplay updates. Open Bridgeplay to try again.",
+        "sh", "Bridgeplay", (char *)subtitle, (char *)body,
         NULL,
     };
     pid_t pid;
@@ -472,6 +485,50 @@ static void notify_trip(void) {
         return;
     }
     while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {}
+}
+
+// Tests swap this out so nothing reaches the real app.
+static void (*g_notify)(const char *subtitle, const char *body) = post_notification;
+
+static void notify(const char *subtitle, const char *body) {
+    const char *quiet = getenv("BRIDGEPLAY_BREAKER_QUIET");
+    if (quiet && quiet[0] && strcmp(quiet, "0") != 0)
+        return;
+    g_notify(subtitle, body);
+}
+
+static void notify_trip(void) {
+    notify("Steam opened without Bridgeplay",
+           "Steam stopped twice soon after starting, so it opens without Bridgeplay until Steam "
+           "or Bridgeplay updates. Open Bridgeplay to try again.");
+}
+
+static void notify_listed(const np_pl_entry_t *e) {
+    char body[512];
+    const char *gap = e->note[0] ? " " : "";
+    if (e->fixed_in[0])
+        snprintf(body, sizeof body, "%s%sFixed in Bridgeplay %s. Open Bridgeplay to update, "
+                 "then restart Steam.", e->note, gap, e->fixed_in);
+    else
+        snprintf(body, sizeof body, "%s%sSteam opens without Bridgeplay until a fix ships, so "
+                 "Windows games won't run yet.", e->note, gap);
+    notify("Paused for this Steam build", body);
+}
+
+static int g_off_modes = NP_BREAKER_OFF_MODES;
+
+// With the off modes disabled a start the breaker would have made passive stays active, and is
+// recorded as a normal start, so a healthy one clears its strikes.
+static void keep_active(np_boot_verdict_t verdict, np_boot_t *next, np_mode_t *mode,
+                        int *first_trip) {
+    if (*mode == NP_MODE_ACTIVE)
+        return;
+    NP_WARN("breaker: %s start kept active, the off modes are disabled",
+            *mode == NP_MODE_OFF ? "a paused" : "a passive");
+    *mode = NP_MODE_ACTIVE;
+    *first_trip = 0;
+    if (verdict == NP_BOOT_RECORD && stage_is(next, NP_STAGE_PASSIVE))
+        set_str(next->stage, sizeof next->stage, NP_STAGE_BOOT);
 }
 
 np_mode_t np_breaker_start(void) {
@@ -484,10 +541,18 @@ np_mode_t np_breaker_start(void) {
         return g_mode;
     }
 
-    char pkg[PATH_MAX], build[24], key[64];
+    char pkg[PATH_MAX], build[24], key[64], channel[64], dir[PATH_MAX] = "";
     package_dir(pkg, sizeof pkg);
     np_steam_build(pkg, build, sizeof build);
+    np_steam_channel(pkg, channel, sizeof channel);
     snprintf(key, sizeof key, "%s:%d", build, BRIDGEPLAY_BUILD);
+
+    long long now = (long long)time(NULL);
+    int paused = g_off_modes && is_paused();
+    np_pl_result_t list = { .status = NP_PL_UNKEYED };
+    if (g_off_modes && support_dir(dir, sizeof dir) == 0)
+        np_pause_list_start(dir, strtoull(build, NULL, 10), channel, BRIDGEPLAY_BUILD, paused,
+                            now, &list);
 
     int lock = boot_lock();
     np_boot_t prev;
@@ -495,18 +560,21 @@ np_mode_t np_breaker_start(void) {
     np_boot_env_t env = {
         .key = key,
         .pid = getpid(),
-        .now = (long long)time(NULL),
+        .now = now,
         .own_start = proc_start(getpid(), NULL, 0),
-        .paused = is_paused(),
+        .paused = paused,
+        .listed = list.matched,
         .prev_running = have && steam_running(prev.pid, prev.t0),
     };
     if (env.own_start < 0)
         env.own_start = 0;
 
     np_boot_t next;
-    int notify = 0;
+    int first_trip = 0;
     np_mode_t mode;
-    np_boot_verdict_t verdict = np_boot_decide(have ? &prev : NULL, &env, &next, &mode, &notify);
+    np_boot_verdict_t verdict = np_boot_decide(have ? &prev : NULL, &env, &next, &mode, &first_trip);
+    if (!g_off_modes)
+        keep_active(verdict, &next, &mode, &first_trip);
     int strikes = have && strcmp(prev.key, key) == 0 ? prev.strikes : 0;
     if (verdict == NP_BOOT_RECORD) {
         strikes = next.strikes;
@@ -517,18 +585,35 @@ np_mode_t np_breaker_start(void) {
 
     pthread_mutex_lock(&g_lock);
     g_mode = mode;
-    g_owner = verdict == NP_BOOT_RECORD || (verdict == NP_BOOT_PAUSED && !health_owned_elsewhere());
+    g_owner = verdict == NP_BOOT_RECORD ||
+              ((verdict == NP_BOOT_PAUSED || verdict == NP_BOOT_LISTED) && !health_owned_elsewhere());
     memset(&g_health, 0, sizeof g_health);
     g_health.pid = getpid();
     g_health.patch_build = BRIDGEPLAY_BUILD;
     g_health.steam_build = strtoull(build, NULL, 10);
-    np_steam_channel(pkg, g_health.channel, sizeof g_health.channel);
+    set_str(g_health.channel, sizeof g_health.channel, channel);
     g_health.mode = mode;
     g_health.strikes = strikes;
+    set_str(g_health.reason, sizeof g_health.reason,
+            mode == NP_MODE_OFF ? NP_REASON_PAUSED
+            : verdict == NP_BOOT_LISTED ? NP_REASON_PAUSE_LIST
+            : mode == NP_MODE_PASSIVE ? NP_REASON_STRIKES : "");
+    set_str(g_health.pause_list, sizeof g_health.pause_list, np_pl_status_name(list.status));
+    g_health.pause_serial = list.serial;
+    g_health.pause_expires = list.expires;
+    if (verdict == NP_BOOT_LISTED) {
+        set_str(g_health.pause_note, sizeof g_health.pause_note, list.entry.note);
+        set_str(g_health.pause_fixed_in, sizeof g_health.pause_fixed_in, list.entry.fixed_in);
+        set_str(g_health.pause_url, sizeof g_health.pause_url, list.entry.url);
+    }
     health_write_locked();
     pthread_mutex_unlock(&g_lock);
 
-    switch (mode) {
+    if (verdict == NP_BOOT_LISTED)
+        NP_ERR("breaker: the pause list names Steam %s (%s) with Bridgeplay build %d, so "
+               "Steam starts without Bridgeplay%s%s", build, channel, BRIDGEPLAY_BUILD,
+               list.entry.fixed_in[0] ? "; fixed in " : "", list.entry.fixed_in);
+    else switch (mode) {
         case NP_MODE_PASSIVE:
             NP_ERR("breaker: %d bad starts on Steam %s with Bridgeplay build %d, so Steam "
                    "starts without Bridgeplay until either updates or Try Again in the app",
@@ -546,8 +631,12 @@ np_mode_t np_breaker_start(void) {
 
     if (mode != NP_MODE_ACTIVE) {
         np_breaker_drop_insert();
-        if (notify)
+        if (verdict == NP_BOOT_LISTED) {
+            if (np_pause_list_announce(dir, key, &list.entry))
+                notify_listed(&list.entry);
+        } else if (first_trip) {
             notify_trip();
+        }
     }
     return mode;
 }
@@ -557,6 +646,8 @@ static np_mode_t      g_peek_mode = NP_MODE_ACTIVE;
 
 // Steam Helper follows the start steam_osx recorded; anything unreadable means active.
 static void peek_mode(void) {
+    if (!g_off_modes)
+        return;
     if (is_paused()) {
         g_peek_mode = NP_MODE_OFF;
         return;
