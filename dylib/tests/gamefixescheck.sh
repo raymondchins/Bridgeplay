@@ -662,6 +662,178 @@ out=$(gamefix_args='' log=/dev/null append_args="$append_args" \
 	sh -ec 'eval "$append_args"; printf "[%s]" "$@"' sh /g/game.exe -novid)
 is "no ARGS leaves the command line alone" "[/g/game.exe][-novid]" "$out"
 
+echo "== EXE: skip a launcher that fails"
+skip_functions=""
+for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env load_gamefixes \
+	kernel_anticheat_name find_kernel_anticheat launcher_needed find_in_game launcher_skip; do
+	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
+	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
+	skip_functions="$skip_functions
+$body"
+done
+skip_hook=$(sed -n '/^launcher_skip "\$1" || true$/,/^fi$/p' "$SRC")
+[ -n "$skip_hook" ] || { echo "FAIL: the launcher_skip call not found"; exit 1; }
+is "the game starts in the skipped-to exe's folder" "1" \
+	"$(grep -c '^game_cwd=\${skip_cwd:-\$(pwd)}$' "$SRC")"
+
+# Runs the conf read and the EXE hook on VERB TARGET [ENV...]; prints the command line as
+# [arg] words, then cwd= and EXE=.
+skip_launch() {
+	verb=$1
+	target=$2
+	shift 2
+	env -i PATH="$PATH" HOME="$HOME" "$@" \
+		skip_functions="$skip_functions" skip_hook="$skip_hook" public_names="$public_names" \
+		app_id=4242 verb="$verb" log="$case_dir/log" np_support="$case_dir/support" \
+		STEAM_COMPAT_INSTALL_PATH="$case_dir/game" \
+		sh -ec '
+			eval "$public_names"
+			eval "$skip_functions"
+			gamefix_keys="" gamefix_args="" gamefix_exe="" gamefix_exe_from=""
+			load_gamefixes || true
+			eval "$skip_hook"
+			printf "[%s]" "$@"; echo
+			echo "cwd=$skip_cwd"
+			echo "EXE=${EXE-<unset>}"
+		' launch "$target" -steamarg > "$case_dir/out" 2>&1 || bad "the EXE sequence ran to the end" "exit 0" "exit $? $(tail -1 "$case_dir/out")"
+}
+cmdline() { sed -n 1p "$case_dir/out"; }
+skip_case() {
+	new_case
+	mkdir -p "$case_dir/game/Launcher"
+	printf 'MZ launcher\n' > "$case_dir/game/Launcher/dowser.exe"
+	printf 'MZ game\n' > "$case_dir/game/Cities2.exe"
+}
+
+cs2_conf="$(dirname "$SRC")/../../gamefixes/949230.conf"
+if [ -f "$cs2_conf" ]; then
+	skip_case
+	cp "$cs2_conf" "$case_dir/support/gamefixes-default/4242.conf"
+	skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+	is "gamefixes/949230.conf starts Cities2.exe instead of the Paradox launcher, arguments kept" \
+		"[$case_dir/game/Cities2.exe][-steamarg]" "$(cmdline)"
+	is "in the game's folder" "$case_dir/game" "$(got cwd)"
+	has "and the run log says what was skipped" \
+		"=== launcher skipped: starting Cities2.exe instead of dowser.exe (EXE from the default conf) ===" "$case_dir/log"
+	is "EXE is not exported to the game" "<unset>" "$(got EXE)"
+fi
+
+skip_case
+default_conf 'EXE_FROM=dowser.exe' 'EXE=Cities2.exe'
+printf 'MZ editor\n' > "$case_dir/game/Editor.exe"
+skip_launch waitforexitandrun "$case_dir/game/Editor.exe"
+is "another launch option of the game is left alone" "[$case_dir/game/Editor.exe][-steamarg]" "$(cmdline)"
+has "and logged" "EXE=Cities2.exe not applied: Steam starts Editor.exe, not dowser.exe" "$case_dir/log"
+is "and keeps Steam's folder" "" "$(got cwd)"
+
+skip_case
+default_conf 'EXE_FROM=DOWSER.EXE' 'EXE=Cities2.exe'
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+is "EXE_FROM matches in any case" "[$case_dir/game/Cities2.exe][-steamarg]" "$(cmdline)"
+
+skip_case
+rm "$case_dir/game/Cities2.exe"
+default_conf 'EXE=Cities2.exe'
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+is "a missing exe starts the launcher" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
+has "and says so" "EXE=Cities2.exe not applied: no such file in $case_dir/game, starting dowser.exe" "$case_dir/log"
+
+skip_case
+mkdir -p "$case_dir/game/Bin/X64"
+printf 'MZ game\n' > "$case_dir/game/Bin/X64/My Game (DX11).EXE"
+default_conf 'EXE=bin/x64/my game (dx11).exe'
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+# A case-insensitive volume finds the conf's spelling as it is; a case-sensitive one walks the folders.
+lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+is "the path matches in any case, spaces and parentheses included" \
+	"$(lc "[$case_dir/game/Bin/X64/My Game (DX11).EXE][-steamarg]")" "$(lc "$(cmdline)")"
+is "and the game starts in that exe's folder" "$(lc "$case_dir/game/Bin/X64")" "$(lc "$(got cwd)")"
+
+skip_case
+default_conf 'EXE=Cities2.exe'
+user_conf 'EXE=0'
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+is "a user conf EXE=0 keeps the launcher" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
+has "and logs it" "EXE=0 from the user conf, the launcher is not skipped" "$case_dir/log"
+
+skip_case
+default_conf 'EXE=Cities2.exe'
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe" BRIDGEPLAY_EXE=0
+is "BRIDGEPLAY_EXE=0 in the launch options keeps the launcher" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
+has "and logs it" "EXE=0 from the launch options, the launcher is not skipped" "$case_dir/log"
+
+skip_case
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe" BRIDGEPLAY_EXE=Cities2.exe BRIDGEPLAY_EXE_FROM=dowser.exe
+is "BRIDGEPLAY_EXE in the launch options skips without a conf" "[$case_dir/game/Cities2.exe][-steamarg]" "$(cmdline)"
+has "and names where it came from" "(EXE from the launch options)" "$case_dir/log"
+
+skip_case
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe" BRIDGEPLAY_EXE=../outside.exe
+is "an invalid BRIDGEPLAY_EXE is ignored" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
+has "and logged" "BRIDGEPLAY_EXE in the launch options ignored: not a path inside the game folder" "$case_dir/log"
+
+skip_case
+default_conf 'EXE=Cities2.exe'
+skip_launch run "$case_dir/game/Launcher/dowser.exe"
+is "helpers are left alone" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
+has "and the log says so" "EXE not applied, run is not the game launch" "$case_dir/log"
+
+skip_case
+default_conf 'EXE=Cities2.exe'
+skip_launch waitforexitandrun "$case_dir/game/Cities2.exe"
+is "a launch of the exe itself is unchanged" "[$case_dir/game/Cities2.exe][-steamarg]" "$(cmdline)"
+is "and keeps Steam's folder" "" "$(got cwd)"
+has "and logged" "EXE=Cities2.exe: Steam already starts it" "$case_dir/log"
+
+skip_case
+outside=$(mktemp -d "$work/outside.XXXXXX")
+printf 'MZ elsewhere\n' > "$outside/evil.exe"
+ln -s "$outside" "$case_dir/game/link"
+default_conf 'EXE=link/evil.exe'
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+is "a symlink out of the game folder is not followed" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
+has "and logged" "EXE=link/evil.exe not applied: it leads outside $case_dir/game" "$case_dir/log"
+
+for bad_exe in '/abs/game.exe' '../game.exe' 'a/../game.exe' './game.exe' 'a//game.exe' 'a\b.exe' \
+	'game.bat' 'game.exe/' 'g*.exe' 'g;x.exe' 'g$x.exe'; do
+	skip_case
+	user_conf "EXE=$bad_exe"
+	skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+	is "EXE=$bad_exe is rejected" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
+	has "and logged" "rejected EXE:" "$case_dir/log"
+done
+for bad_from in 'Launcher/dowser.exe' 'dowser' '.exe' 'd*.exe'; do
+	skip_case
+	user_conf "EXE_FROM=$bad_from"
+	skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+	has "EXE_FROM=$bad_from is rejected" "rejected EXE_FROM:" "$case_dir/log"
+done
+
+# Anti-cheat and DRM launchers are never skipped, by name or by what the game folder holds.
+for kept in start_protected_game.exe EasyAntiCheat_launcher.exe Game_BE.exe Link2EA.exe upc.exe PlayGTAV.exe; do
+	skip_case
+	printf 'MZ launcher\n' > "$case_dir/game/$kept"
+	default_conf 'EXE=Cities2.exe'
+	skip_launch waitforexitandrun "$case_dir/game/$kept"
+	is "$kept is never skipped" "[$case_dir/game/$kept][-steamarg]" "$(cmdline)"
+	has "and the run log says why" "=== launcher kept: $kept starts" "$case_dir/log"
+done
+for folder in EasyAntiCheat BattlEye; do
+	skip_case
+	mkdir -p "$case_dir/game/$folder"
+	default_conf 'EXE=Cities2.exe'
+	skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+	is "a game with a $folder folder keeps its launcher" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
+	has "and logged" "the game needs it for" "$case_dir/log"
+done
+skip_case
+mkdir -p "$case_dir/game/bin"
+: > "$case_dir/game/bin/randgrid.sys"
+default_conf 'EXE=Cities2.exe'
+skip_launch waitforexitandrun "$case_dir/game/Launcher/dowser.exe"
+is "a kernel anti-cheat in the game folder keeps the launcher" "[$case_dir/game/Launcher/dowser.exe][-steamarg]" "$(cmdline)"
+has "and names it" "the game needs it for Ricochet (randgrid.sys)" "$case_dir/log"
+
 echo "== RETINA"
 new_case
 full_engine

@@ -47,6 +47,8 @@ is rejected, and the rejection logged, when:
 | `BACKEND` | `dxmt`, `dxvk`, `wined3d`, `d3dmetal` | Graphics backend, see below |
 | `ROSETTA_ADVERTISE_AVX` | `0`, `1` | `1` makes Rosetta report AVX/AVX2 to the game (needed by AVX-only titles) |
 | `ARGS` | space-separated arguments of `A-Za-z0-9_+./:=,-` | Added to the game's command line after the launch options' own arguments. Ignored for installers and other helpers |
+| `EXE` | a path inside the game folder ending in `.exe`, `/` between folders; `0` | Starts that exe instead of the one Steam starts, for a publisher launcher that fails under Wine. See [Skipping a launcher](#skipping-a-launcher). `0` turns off an `EXE` from an earlier file |
+| `EXE_FROM` | a file name ending in `.exe` | `EXE` applies only when Steam starts an exe of this name (any case), so the game's other launch options are left alone |
 | `DLLOVERRIDES` | Wine syntax, e.g. `dinput8=n,b;xinput1_3=n` | Added to `WINEDLLOVERRIDES` after the backend's entries and before the launch options' |
 | `MSYNC` | `0`, `1` | `1` turns msync on when the engine supports it; `0` turns it off. Engines with msync (WineCX, and CrossOver runners whose binaries handle it) default to on |
 | `RETINA` | `0`, `1` | Same as `BRIDGEPLAY_RETINA` (High Resolution). DPI-unaware games on the OpenGL/wined3d path (D3D9, OpenGL) can draw into the top-left quarter with RETINA=1; set RETINA=0 in their gamefix, as gamefixes/49520.conf does. |
@@ -74,6 +76,43 @@ is rejected, and the rejection logged, when:
 
 Wine uses the last entry for a DLL in `WINEDLLOVERRIDES`. The order is: backend, then
 `DLLOVERRIDES`, then the launch options, then the Steam client DLLs, which always come last.
+
+## Skipping a launcher
+
+Some games start a publisher launcher, and the launcher then starts the game. When the launcher
+fails under Wine and the game itself runs, `EXE` starts the game's exe directly:
+
+```
+EXE_FROM=dowser.exe
+EXE=Cities2.exe
+```
+
+`gamefixes/949230.conf` does this for Cities: Skylines II, whose Paradox launcher fails. In a
+game's Steam launch options, `BRIDGEPLAY_EXE=Cities2.exe %command%` does the same for one game
+(quote a path with spaces: `BRIDGEPLAY_EXE="bin/My Game.exe" %command%`), and
+`BRIDGEPLAY_EXE=0 %command%` goes back through the launcher. `BRIDGEPLAY_EXE` and
+`BRIDGEPLAY_EXE_FROM` win over the confs, key by key.
+
+On the game launch only (not installers or other helpers), the run script:
+
+- leaves the launch alone when `EXE_FROM` is set and Steam starts an exe of another name
+- looks the path up under the game's install folder, in any case when the exact spelling is
+  missing (case-sensitive volumes), and leaves the launch alone when there is no such file or a
+  symlink leads out of the folder. A mod or script-extender loader can use this: the key only
+  takes effect once the file is there
+- never skips a launcher that anti-cheat or DRM needs: Easy Anti-Cheat
+  (`start_protected_game.exe`, `EasyAntiCheat*.exe`), BattlEye (`*_BE.exe`, `BEService*.exe`),
+  EA Javelin, the EA app (`Link2EA*.exe`, `EADesktop.exe`, `Origin.exe`), Ubisoft Connect
+  (`upc.exe`, `Uplay*.exe`, `UbisoftConnect*.exe`) and the Rockstar Games Launcher
+  (`PlayGTAV.exe`, `LauncherPatcher.exe`, `Rockstar*.exe`, `SocialClub*.exe`). Neither does it
+  for a game whose folder has an `EasyAntiCheat`, `EasyAntiCheat_EOS` or `BattlEye` folder, or a
+  kernel anti-cheat file, within three levels
+- otherwise starts the exe in its own folder, with the arguments Steam gave the launcher and
+  then `ARGS`. The backend is auto-detected from that exe
+
+The run log (`bridgeplay-run.log`) says `=== launcher skipped: starting <EXE> instead of
+<launcher> ===`, or `=== launcher kept: ... ===` with the anti-cheat or DRM it found, and a
+`gamefix:` line for every other case. Nothing in Steam's Bridgeplay tab shows `EXE`.
 
 ## Graphics backends
 

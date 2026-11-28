@@ -504,6 +504,8 @@ gamefix_nvapi=""
 gamefix_dlss_fg=""
 gamefix_args=""
 gamefix_rockstar_shim=""
+gamefix_exe=""
+gamefix_exe_from=""
 
 gamefix_log() {
   echo "gamefix: $*" >> "$log" 2>&1 || true
@@ -558,6 +560,22 @@ gamefix_reason() {
     ARGS)
       # Space-separated arguments, each of A-Za-z0-9_+./:=,- only, so none can glob or quote.
       case "$2" in *[!A-Za-z0-9_+./:=,\ -]*) echo "an argument with characters outside A-Za-z0-9_+./:=,-" ;; esac ;;
+    EXE)
+      # A path inside the game folder, / between folders; 0 starts what Steam starts.
+      case "$2" in
+        0) ;;
+        /*|*\\*|.|..|./*|../*|*/.|*/..|*/./*|*/../*|*//*|*/) echo "not a path inside the game folder" ;;
+        *[!A-Za-z0-9\ _+.,\(\)/-]*) echo "a character outside A-Za-z0-9 _+.,()/-" ;;
+        *.[eE][xX][eE]) ;;
+        *) echo "not an .exe" ;;
+      esac ;;
+    EXE_FROM)
+      case "$2" in
+        */*|*\\*|.*) echo "not a file name" ;;
+        *[!A-Za-z0-9\ _+.,\(\)-]*) echo "a character outside A-Za-z0-9 _+.,()-" ;;
+        *.[eE][xX][eE]) ;;
+        *) echo "not an .exe" ;;
+      esac ;;
     MTL_HUD_ENABLED|WINEDEBUG|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX) ;;
     ROSETTA_ADVERTISE_AVX)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
@@ -635,6 +653,9 @@ load_gamefixes() {
       NVAPI) gamefix_nvapi=$value; gamefix_log "NVAPI=$value from the $from conf" ;;
       DLSS_FG) gamefix_dlss_fg=$value; gamefix_log "DLSS_FG=$value from the $from conf" ;;
       ROCKSTAR_SHIM) gamefix_rockstar_shim=$value; gamefix_log "ROCKSTAR_SHIM=$value from the $from conf" ;;
+      # Read by launcher_skip, which the launch options can override.
+      EXE) gamefix_exe=$value; gamefix_log "EXE=$value from the $from conf" ;;
+      EXE_FROM) gamefix_exe_from=$value; gamefix_log "EXE_FROM=$value from the $from conf" ;;
       STDOUT_NULL) gamefix_apply_env NOTPROTON_STDOUT_NULL "$value" "$from" ;;
       VSYNC) gamefix_apply_env NOTPROTON_VSYNC "$value" "$from" ;;
       GAME_MODE) gamefix_apply_env NOTPROTON_GAME_MODE "$value" "$from" ;;
@@ -1777,6 +1798,125 @@ APPLESCRIPT
   } >> "$log" 2>&1 || true
   np_outcome=anticheat_blocked
   exit 0
+}
+
+# The anti-cheat or DRM a launcher is there for, from its file name or the game folder, so
+# EXE never skips it. Prints nothing when the launcher only starts the game.
+launcher_needed() {
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    start_protected_game.exe | easyanticheat*.exe) echo "Easy Anti-Cheat"; return 0 ;;
+    *_be.exe | beservice*.exe | battleye*.exe) echo "BattlEye"; return 0 ;;
+    eaanticheat*.exe) echo "EA Javelin"; return 0 ;;
+    link2ea*.exe | eadesktop.exe | eabackgroundservice.exe | origin.exe) echo "the EA app"; return 0 ;;
+    upc.exe | uplay*.exe | ubisoftconnect*.exe | ubisoftgamelauncher*.exe) echo "Ubisoft Connect"; return 0 ;;
+    playgtav.exe | launcherpatcher.exe | rockstar*.exe | socialclub*.exe) echo "the Rockstar Games Launcher"; return 0 ;;
+  esac
+  [ -d "$2" ] || return 0
+  ln_dir=$(find "$2" -maxdepth 3 -type d \( -iname easyanticheat -o -iname easyanticheat_eos \
+    -o -iname battleye \) 2>/dev/null | head -n 1)
+  case "$(printf '%s' "${ln_dir##*/}" | tr '[:upper:]' '[:lower:]')" in
+    easyanticheat*) echo "Easy Anti-Cheat (${ln_dir##*/} folder)"; return 0 ;;
+    battleye) echo "BattlEye (${ln_dir##*/} folder)"; return 0 ;;
+  esac
+  find_kernel_anticheat "$2"
+}
+
+# A relative path under a folder, each part matched in any case when the exact spelling is
+# missing (a case-sensitive volume). Prints the file's path.
+find_in_game() {
+  fg_path=$1
+  fg_rest=$2
+  while [ -n "$fg_rest" ]; do
+    fg_part=${fg_rest%%/*}
+    case "$fg_rest" in */*) fg_rest=${fg_rest#*/} ;; *) fg_rest="" ;; esac
+    if [ -e "$fg_path/$fg_part" ]; then fg_path="$fg_path/$fg_part"; continue; fi
+    fg_want=$(printf '%s' "$fg_part" | tr '[:upper:]' '[:lower:]')
+    fg_hit=""
+    for fg_entry in "$fg_path"/*; do
+      [ -e "$fg_entry" ] || continue
+      if [ "$(printf '%s' "${fg_entry##*/}" | tr '[:upper:]' '[:lower:]')" = "$fg_want" ]; then
+        fg_hit=$fg_entry
+        break
+      fi
+    done
+    [ -n "$fg_hit" ] || return 1
+    fg_path=$fg_hit
+  done
+  [ -f "$fg_path" ] || return 1
+  printf '%s' "$fg_path"
+}
+
+# EXE: start the game's own exe instead of a publisher launcher that fails under Wine. Sets
+# skip_exe and skip_cwd when the launch should change; every other case starts what Steam starts.
+launcher_skip() {
+  skip_exe=""
+  skip_cwd=""
+  sk_exe=$gamefix_exe
+  sk_from="the ${gamefix_from_EXE:-gamefix} conf"
+  sk_name=$gamefix_exe_from
+  if [ -n "${NOTPROTON_EXE+x}" ]; then
+    sk_why=$(gamefix_reason EXE "$NOTPROTON_EXE")
+    if [ -n "$sk_why" ]; then
+      gamefix_log "BRIDGEPLAY_EXE in the launch options ignored: $sk_why"
+    else
+      sk_exe=$NOTPROTON_EXE
+      sk_from="the launch options"
+    fi
+  fi
+  if [ -n "${NOTPROTON_EXE_FROM+x}" ]; then
+    sk_why=$(gamefix_reason EXE_FROM "$NOTPROTON_EXE_FROM")
+    if [ -n "$sk_why" ]; then
+      gamefix_log "BRIDGEPLAY_EXE_FROM in the launch options ignored: $sk_why"
+    else
+      sk_name=$NOTPROTON_EXE_FROM
+    fi
+  fi
+  [ -n "$sk_exe" ] || return 0
+  if [ "$sk_exe" = 0 ]; then
+    gamefix_log "EXE=0 from $sk_from, the launcher is not skipped"
+    return 0
+  fi
+  if [ "$verb" != waitforexitandrun ] || [ -z "$1" ]; then
+    gamefix_log "EXE not applied, $verb is not the game launch"
+    return 0
+  fi
+  sk_launched=${1##*/}
+  if [ -n "$sk_name" ] && [ "$(printf '%s' "$sk_launched" | tr '[:upper:]' '[:lower:]')" != \
+    "$(printf '%s' "$sk_name" | tr '[:upper:]' '[:lower:]')" ]; then
+    gamefix_log "EXE=$sk_exe not applied: Steam starts $sk_launched, not $sk_name"
+    return 0
+  fi
+  sk_root=$STEAM_COMPAT_INSTALL_PATH
+  if [ -z "$sk_root" ] || [ ! -d "$sk_root" ]; then
+    gamefix_log "EXE=$sk_exe not applied: no game folder"
+    return 0
+  fi
+  if ! sk_target=$(find_in_game "$sk_root" "$sk_exe"); then
+    gamefix_log "EXE=$sk_exe not applied: no such file in $sk_root, starting $sk_launched"
+    return 0
+  fi
+  # A symlink must not lead the launch out of the game folder.
+  sk_real_root=$(cd -P "$sk_root" 2>/dev/null && pwd -P) || sk_real_root=""
+  sk_real_dir=$(cd -P "${sk_target%/*}" 2>/dev/null && pwd -P) || sk_real_dir=""
+  case "$sk_real_dir/" in
+    "$sk_real_root"/*) ;;
+    *)
+      gamefix_log "EXE=$sk_exe not applied: it leads outside $sk_root"
+      return 0 ;;
+  esac
+  if [ "$sk_target" -ef "$1" ]; then
+    gamefix_log "EXE=$sk_exe: Steam already starts it"
+    return 0
+  fi
+  sk_needed=$(launcher_needed "$sk_launched" "$sk_root")
+  if [ -n "$sk_needed" ]; then
+    gamefix_log "EXE=$sk_exe not applied: $sk_launched is kept, the game needs it for $sk_needed"
+    echo "=== launcher kept: $sk_launched starts $sk_needed, which EXE never skips ===" >> "$log" 2>&1 || true
+    return 0
+  fi
+  skip_exe=$sk_target
+  skip_cwd=${sk_target%/*}
+  echo "=== launcher skipped: starting $sk_exe instead of $sk_launched (EXE from $sk_from) ===" >> "$log" 2>&1 || true
 }
 
 # The anti-cheat whose driver failed to load, from Wine's log.
@@ -3982,6 +4122,13 @@ fi
 low_power_notice
 launch_step prepare
 
+# EXE replaces the launcher Steam starts with the game's own exe, before anything reads it.
+launcher_skip "$1" || true
+if [ -n "$skip_exe" ]; then
+  shift
+  set -- "$skip_exe" "$@"
+fi
+
 mark "graphics backend"
 select_backend "$1"
 activate_backend || true
@@ -4625,7 +4772,8 @@ terminate() {
 }
 trap terminate TERM INT HUP
 
-game_cwd="$(pwd)"
+# EXE starts the game in its own folder, as its launcher would.
+game_cwd=${skip_cwd:-$(pwd)}
 if [ -n "$gamefix_args" ]; then
   # shellcheck disable=SC2086 # ARGS tokens hold no spaces or glob characters and have to split
   set -- "$@" $gamefix_args
