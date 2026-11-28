@@ -311,6 +311,34 @@ struct UninstallPlanTests {
         #expect(!FileManager.default.fileExists(atPath: fixture.support.path))
     }
 
+    @Test("Remove Everything unregisters Check Steam in the Background and keeps every prefix")
+    func removalUnregistersLoginItem() async throws {
+        let fixture = try fixture(modified: false)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let unregistered = Recorder()
+        let leftovers = Uninstall.Leftovers(
+            gamefixes: fixture.support.appending(path: "gamefixes"), keptGamefixes: fixture.root.appending(path: "kept"),
+            steamConfig: fixture.root.appending(path: "config.vdf"),
+            defaultToolBackup: fixture.support.appending(path: "backups/x.json"), files: [], steamRunning: { false },
+            unregisterLoginItem: { unregistered.add(URL(filePath: "/login-item")) })
+
+        let outcome = try await Uninstall.run(
+            app: fixture.root.appending(path: "Missing/Steam.app"), innerPlist: fixture.paths.innerPlist,
+            updateBlocks: fixture.paths.updateBlocks, legacyCompat: fixture.paths.legacyCompat,
+            compatTools: [], directories: [fixture.support], libraries: [fixture.library],
+            modifications: SteamModifications(file: fixture.root.appending(path: "bundles.json"),
+                                              legacyRecord: fixture.support.appending(path: "install-build.json")),
+            lockFolder: fixture.root, leftovers: leftovers,
+            stop: { _, _ in false },
+            trashPrefixes: [],
+            trash: { _ in Issue.record("nothing was picked for the Trash") })
+
+        #expect(unregistered.all.count == 1)
+        #expect(outcome.trashed.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: fixture.prefix("100").path))
+        #expect(FileManager.default.fileExists(atPath: fixture.prefix("200").path))
+    }
+
     @Test("--trash-prefixes takes all or app ids, and refuses an unknown id before anything runs")
     func trashFlag() throws {
         let found = [
