@@ -283,6 +283,21 @@ struct BackgroundItemTests {
         #expect(BackgroundAgent.delivered(resultFile: file))
     }
 
+    @Test("A notice helper quitting does not count as Bridgeplay quitting")
+    func helperQuitIsNotAQuit() {
+        let own = "com.bridgeplay.Bridgeplay"
+        func trigger(_ id: String?, posting: Bool = false, since: TimeInterval? = nil) -> Bool {
+            BackgroundAgent.quitTriggersLook(bundleID: id, ownBundleID: own, posting: posting, sinceNoticeEnded: since)
+        }
+        #expect(trigger(own))
+        #expect(trigger(own, since: 60))
+        #expect(!trigger(own, posting: true))
+        #expect(!trigger(own, since: 1))
+        #expect(trigger("com.valvesoftware.steam", posting: true))
+        #expect(!trigger("com.apple.Safari"))
+        #expect(!trigger(nil))
+    }
+
     @Test("An update replacing the bundle counts as the app's change, Steam's as Steam's")
     func touchedFolders() {
         let bundle = "/Applications/Bridgeplay.app/"

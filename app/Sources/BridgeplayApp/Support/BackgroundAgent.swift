@@ -30,6 +30,18 @@ enum BackgroundAgent {
         (try? String(contentsOf: resultFile, encoding: .utf8)) == NotifyCommand.deliveredMark
     }
 
+    // A quit that says look again. A notice helper is this app's bundle too, so its exit must
+    // not count as the user quitting Bridgeplay: not while a notice is out, nor just after it.
+    static let helperQuitGrace: TimeInterval = 10
+    static func quitTriggersLook(bundleID: String?, ownBundleID: String?, posting: Bool,
+                                 sinceNoticeEnded: TimeInterval?) -> Bool {
+        if bundleID == "com.valvesoftware.steam" { return true }
+        guard let bundleID, bundleID == ownBundleID else { return false }
+        if posting { return false }
+        if let sinceNoticeEnded, sinceNoticeEnded < helperQuitGrace { return false }
+        return true
+    }
+
     static func run() -> Never {
         MainActor.assumeIsolated { Loop.shared.start() }
         RunLoop.main.run()
@@ -55,6 +67,7 @@ enum BackgroundAgent {
         private var trying = false
         // A notice is out and its helper has not said yet whether it was delivered.
         private var posting = false
+        private var noticeEnded: Date?
         // Held while the install runs, so the installer doesn't replace Bridgeplay under it.
         private var inUse: AppInUseLock?
         private var lastSkip: BackgroundCheck.Skip?
@@ -70,8 +83,11 @@ enum BackgroundAgent {
                 let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
                 let id = app?.bundleIdentifier
                 MainActor.assumeIsolated {
-                    if id == "com.valvesoftware.steam" || id == Bundle.main.bundleIdentifier {
-                        Loop.shared.look(after: Loop.shared.afterEvent)
+                    let loop = Loop.shared
+                    if BackgroundAgent.quitTriggersLook(
+                        bundleID: id, ownBundleID: Bundle.main.bundleIdentifier, posting: loop.posting,
+                        sinceNoticeEnded: loop.noticeEnded.map { Date().timeIntervalSince($0) }) {
+                        loop.look(after: loop.afterEvent)
                     }
                 }
             }
@@ -139,6 +155,7 @@ enum BackgroundAgent {
                 posting = true
                 post(notice.title, notice.body) { delivered in
                     self.posting = false
+                    self.noticeEnded = Date()
                     if delivered {
                         self.defaults.set(notice.key, forKey: BackgroundCheck.toldKey)
                         self.postFailures = 0
