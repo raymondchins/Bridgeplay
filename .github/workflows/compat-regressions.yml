@@ -1,0 +1,46 @@
+# Daily regression watch over the compat export (branch compat-data, written by
+# compat-export.yml): one issue per game that ran well on older builds and does not run on a
+# newer one, kept current, closed when the game runs well again. scripts/compat-regressions.md.
+#
+# Off by default: a run only prints what it would do. Set the repository variable
+# BRIDGEPLAY_REGRESSION_ISSUES to `on` to let scheduled runs change issues, or dispatch the
+# workflow with `apply`. A manual run without `apply` stays a dry run either way.
+name: compat-regressions
+
+on:
+  schedule:
+    # After compat-export.yml's daily full refresh at 03:53.
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Open, edit and close the issues (otherwise a dry run)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency: compat-regressions
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Compare verdicts across builds
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # A manual run follows its own `apply` box; only scheduled runs read the variable.
+          APPLY: ${{ (github.event_name == 'workflow_dispatch' && inputs.apply) || (github.event_name == 'schedule' && vars.BRIDGEPLAY_REGRESSION_ISSUES == 'on') }}
+        run: |
+          set -euo pipefail
+          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git clone -q --depth 1 --branch compat-data "$remote" data
+          flag=""
+          [ "$APPLY" != "true" ] || flag=--apply
+          python3 scripts/compat-regressions.py data $flag | tee plan.txt
+          { echo '```'; cat plan.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

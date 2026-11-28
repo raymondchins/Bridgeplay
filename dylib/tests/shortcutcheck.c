@@ -365,6 +365,126 @@ static void stock_checks(void) {
     check(is(icon.s, "game art"), "replaced icon is not replaced again");
 }
 
+// Info.plist as Steam writes it, two NULs after </plist> included.
+static const char steam_plist[] =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    "\t<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+    "\t<plist version=\"1.0\">\n\t<dict>\n"
+    "\t\t<key>CFBundleExecutable</key>\n\t\t<string>run.sh</string>\n"
+    "\t\t<key>CFBundleIconFile</key>\n\t\t<string>shortcut.icns</string>\n"
+    "\t\t<key>CFBundlePackageType</key>\n\t\t<string>APPL</string>\n"
+    "\t</dict>\n\t</plist>\n";
+static const char games_lines[] =
+    "\t\t<key>LSApplicationCategoryType</key>\n\t\t<string>public.app-category.games</string>\n";
+
+static unsigned changed_count;
+static void count_changed(const char *path) {
+    changed_count++;
+    check(strstr(path, "/Applications/") && strstr(path, ".app") == path + strlen(path) - 4, "changed path names the bundle");
+}
+
+static path_t plist_of(const char *app) {
+    return P("%s/Contents/Info.plist", app);
+}
+
+static int plist_is(const char *path, const char *text, size_t length) {
+    blob_t data;
+    int ok = read_at(AT_FDCWD, path, PLIST_LIMIT, &data);
+    ok = ok && data.length == length && memcmp(data.bytes, text, length) == 0;
+    free(data.bytes);
+    return ok;
+}
+
+static void games_checks(void) {
+    size_t steam_length = sizeof(steam_plist) + 1;  // with the two NULs
+    char steam[sizeof(steam_plist) + 1];
+    memcpy(steam, steam_plist, sizeof(steam_plist));
+    steam[sizeof(steam_plist)] = 0;
+    char *close_dict = strstr(steam, "\t</dict>");
+    size_t head = (size_t)(close_dict - steam);
+    char want[sizeof(steam_plist) + sizeof(games_lines)];
+    memcpy(want, steam, head);
+    memcpy(want + head, games_lines, strlen(games_lines));
+    memcpy(want + head + strlen(games_lines), steam + head, steam_length - head);
+    size_t want_length = steam_length + strlen(games_lines);
+
+    path_t home = fixture("games");
+    path_t app = bundle(home.s, "Target", "440");
+    path_t desk = bundle_in(home.s, "Desktop", "Target", "440");
+    path_t other = bundle(home.s, "OtherGame", "570");
+    path_t custom = bundle(home.s, "Customized", "440");
+    put(P("%s/Contents/MacOS/run.sh", custom.s).s, P("%s440\n\necho customized\n", header).s);
+    path_t own = bundle(home.s, "OwnCategory", "440");
+    path_t nested = bundle(home.s, "Nested", "440");
+    path_t no_run = bundle(home.s, "NotRunSh", "440");
+    path_t linked = bundle(home.s, "Linked", "440");
+    const char *apps[] = {app.s, desk.s, other.s, custom.s};
+    for (size_t i = 0; i < sizeof(apps) / sizeof(*apps); i++) put_n(plist_of(apps[i]).s, steam, steam_length);
+    const char own_text[] = "<plist><dict>\n<key>CFBundleExecutable</key><string>run.sh</string>\n"
+                            "<key>LSApplicationCategoryType</key><string>public.app-category.puzzle-games</string>\n</dict></plist>\n";
+    put(plist_of(own.s).s, own_text);
+    const char nested_text[] = "<plist><dict>\n<key>CFBundleExecutable</key><string>run.sh</string>\n"
+                               "<key>X</key><dict></dict>\n</dict></plist>\n";
+    put(plist_of(nested.s).s, nested_text);
+    const char no_run_text[] = "<plist><dict>\n<key>CFBundleExecutable</key><string>launch</string>\n</dict></plist>\n";
+    put(plist_of(no_run.s).s, no_run_text);
+    path_t outside = P("%s/outside.plist", home.s);
+    put_n(outside.s, steam, steam_length);
+    check(symlink(outside.s, plist_of(linked.s).s) == 0, "link a shortcut's plist outside");
+    chmod(plist_of(app.s).s, 0755);
+    path_t held_path = plist_of(app.s);
+    int held = open(held_path.s, O_RDONLY | O_CLOEXEC);
+    check(held >= 0, "hold the old plist");
+
+    changed_count = 0;
+    np_shortcuts_games(home.s, "440", count_changed);
+    check(plist_is(plist_of(app.s).s, want, want_length), "Steam's shortcut gets the games category, other bytes kept");
+    check(changed_count == 1, "only the edited bundle is reported");
+    struct stat st;
+    check(stat(plist_of(app.s).s, &st) == 0 && (st.st_mode & 0777) == 0755, "plist keeps its mode");
+    char first[8];
+    check(read(held, first, sizeof(first)) == sizeof(first) && memcmp(first, "<?xml ve", 8) == 0, "open reader keeps the old plist");
+    close(held);
+    check(plist_is(plist_of(desk.s).s, steam, steam_length), "Desktop copy left alone");
+    check(plist_is(plist_of(other.s).s, steam, steam_length), "another game's shortcut left alone");
+    check(plist_is(plist_of(custom.s).s, steam, steam_length), "edited run.sh left alone");
+    check(is(plist_of(own.s).s, own_text), "a category already there is kept");
+    check(is(plist_of(nested.s).s, nested_text), "a plist Steam didn't write is left alone");
+    check(is(plist_of(no_run.s).s, no_run_text), "a plist not running run.sh is left alone");
+    check(plist_is(outside.s, steam, steam_length), "symlinked plist target untouched");
+    DIR *dir = opendir(P("%s/Contents", app.s).s);
+    int temps = 0;
+    for (struct dirent *e; dir && (e = readdir(dir));)
+        if (strncmp(e->d_name, ".bridgeplay-plist-", 18) == 0) temps++;
+    if (dir) closedir(dir);
+    check(temps == 0, "no temporary plist left behind");
+
+    struct stat before, after;
+    check(stat(plist_of(app.s).s, &before) == 0, "stat edited plist");
+    changed_count = 0;
+    np_shortcuts_games(home.s, "440", count_changed);
+    check(stat(plist_of(app.s).s, &after) == 0 && before.st_ino == after.st_ino && changed_count == 0,
+          "a second run changes nothing");
+    np_shortcuts_games(home.s, "440", NULL);
+    np_shortcuts_games(NULL, "440", NULL);
+    np_shortcuts_games("relative", "440", NULL);
+
+    path_t bare = fixture("games-no-apps");
+    remove_item(P("%s/Applications", bare.s).s);
+    np_shortcuts_games(bare.s, "440", count_changed);
+    check(!exists(P("%s/Applications", bare.s).s), "a missing Applications folder is not created");
+
+    path_t locked = fixture("games-locked");
+    path_t lapp = bundle(locked.s, "Target", "440");
+    put_n(plist_of(lapp.s).s, steam, steam_length);
+    path_t contents = P("%s/Contents", lapp.s);
+    check(chmod(contents.s, 0500) == 0, "lock Contents");
+    int writable = access(contents.s, W_OK) == 0;
+    np_shortcuts_games(locked.s, "440", NULL);
+    check(chmod(contents.s, 0755) == 0, "unlock Contents");
+    if (!writable) check(plist_is(plist_of(lapp.s).s, steam, steam_length), "read-only bundle left as it was");
+}
+
 int main(void) {
     signal(SIGALRM, SIG_DFL);
     alarm(60);
@@ -377,6 +497,7 @@ int main(void) {
     symlink_checks("Desktop");
     icon_checks();
     stock_checks();
+    games_checks();
     remove_item(sandbox);
     alarm(0);
     printf("shortcutcheck: %u checks passed\n", checks);

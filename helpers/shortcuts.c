@@ -1,6 +1,7 @@
 #include "shortcuts.h"
 
 #include <dirent.h>
+#include <limits.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -11,6 +12,7 @@
 #include <unistd.h>
 
 #define ICON_LIMIT (16 * 1024 * 1024)
+#define PLIST_LIMIT (64 * 1024)
 
 typedef struct {
     unsigned char *bytes;
@@ -138,4 +140,110 @@ void np_shortcuts_icons(const char *home, const char *app_id, const char *icon_p
     if (dir >= 0) close(dir);
     free(icon.bytes);
     free(stock.bytes);
+}
+
+static size_t count_of(const blob_t *b, const char *needle, size_t *last) {
+    size_t count = 0, n = strlen(needle);
+    for (const unsigned char *p = b->bytes, *end = b->bytes + b->length;
+         (p = memmem(p, (size_t)(end - p), needle, n)); p += n) {
+        *last = (size_t)(p - b->bytes);
+        count++;
+    }
+    return count;
+}
+
+// Steam's Info.plist with the games category added before its only </dict>, indented like the
+// line above, every other byte kept. NULL when it isn't the flat dict Steam writes, or already
+// has a category.
+static unsigned char *with_games_category(const blob_t *plist, size_t *length) {
+    size_t open_at = 0, close_at = 0, unused;
+    if (count_of(plist, "<dict>", &open_at) != 1 || count_of(plist, "</dict>", &close_at) != 1 ||
+        open_at > close_at || count_of(plist, "LSApplicationCategoryType", &unused) != 0 ||
+        count_of(plist, "<string>run.sh</string>", &unused) != 1)
+        return NULL;
+    size_t line = close_at;
+    while (line > 0 && (plist->bytes[line - 1] == '\t' || plist->bytes[line - 1] == ' ')) line--;
+    size_t indent = close_at - line;
+    if ((line > 0 && plist->bytes[line - 1] != '\n') || indent > 16) return NULL;
+    char added[160];
+    int n = snprintf(added, sizeof(added),
+                     "%.*s\t<key>LSApplicationCategoryType</key>\n%.*s\t<string>public.app-category.games</string>\n",
+                     (int)indent, (const char *)plist->bytes + line, (int)indent, (const char *)plist->bytes + line);
+    if (n <= 0 || n >= (int)sizeof(added)) return NULL;
+    unsigned char *out = malloc(plist->length + (size_t)n);
+    if (!out) return NULL;
+    memcpy(out, plist->bytes, line);
+    memcpy(out + line, added, (size_t)n);
+    memcpy(out + line + n, plist->bytes + line, plist->length - line);
+    *length = plist->length + (size_t)n;
+    return out;
+}
+
+static int add_games_category(int parent, const char *name, int app) {
+    int contents = directory_at(app, "Contents");
+    if (contents < 0) return 0;
+    struct stat st;
+    blob_t plist, again;
+    size_t length = 0;
+    unsigned char *edited = NULL;
+    int done = 0;
+    if (fstatat(contents, "Info.plist", &st, AT_SYMLINK_NOFOLLOW) == 0 &&
+        read_at(contents, "Info.plist", PLIST_LIMIT, &plist)) {
+        edited = with_games_category(&plist, &length);
+        char temp[64];
+        snprintf(temp, sizeof(temp), ".bridgeplay-plist-%d-%08x", (int)getpid(), arc4random());
+        int fd = edited ? openat(contents, temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600) : -1;
+        if (fd >= 0) {
+            size_t written = 0;
+            while (written < length) {
+                ssize_t n = write(fd, edited + written, length - written);
+                if (n < 0 && errno == EINTR) continue;
+                if (n <= 0) break;
+                written += (size_t)n;
+            }
+            int ok = written == length && fchmod(fd, st.st_mode & 0777) == 0;
+            ok = close(fd) == 0 && ok;
+            // Steam rewrites the shortcut when it is made again: only a file still unchanged is replaced.
+            ok = ok && read_at(contents, "Info.plist", PLIST_LIMIT, &again);
+            if (ok) {
+                ok = same_blob(&plist, &again);
+                free(again.bytes);
+            }
+            if (ok && same_entry(parent, name, app) && renameat(contents, temp, contents, "Info.plist") == 0) {
+                futimens(app, NULL);
+                done = 1;
+            }
+            unlinkat(contents, temp, 0);
+        }
+        free(plist.bytes);
+    }
+    free(edited);
+    close(contents);
+    return done;
+}
+
+void np_shortcuts_games(const char *home, const char *app_id, void (*changed)(const char *path)) {
+    if (!home || home[0] != '/' || !app_id) return;
+    int dir = open(home, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    int parent = dir >= 0 ? directory_at(dir, "Applications") : -1;
+    if (dir >= 0) close(dir);
+    DIR *apps = parent >= 0 ? fdopendir(parent) : NULL;
+    if (!apps) {
+        if (parent >= 0) close(parent);
+        return;
+    }
+    struct dirent *entry;
+    while ((entry = readdir(apps))) {
+        size_t len = strlen(entry->d_name);
+        if (len <= 4 || strcmp(entry->d_name + len - 4, ".app") != 0) continue;
+        int app = directory_at(parent, entry->d_name);
+        if (app < 0) continue;
+        if (is_shortcut(app, app_id) && add_games_category(parent, entry->d_name, app) && changed) {
+            char path[PATH_MAX];
+            int n = snprintf(path, sizeof(path), "%s/Applications/%s", home, entry->d_name);
+            if (n > 0 && n < (int)sizeof(path)) changed(path);
+        }
+        close(app);
+    }
+    closedir(apps);
 }

@@ -161,6 +161,7 @@ case "$verb" in
     target=""
     read_app_meta
     resolve_icon && "$iconmaker" --shortcuts "$app_id" "$icon_cache" "$2/steam.icns" >> "$log" 2>&1 || true
+    [ ! -x "$iconmaker" ] || "$iconmaker" --games-category "$app_id" >> "$log" 2>&1 || true
     exit 0
     ;;
 esac
@@ -328,6 +329,36 @@ mark() {
   echo "time: $1 at ${np_sec}s" >> "$log" 2>&1 || true
 }
 
+# The Steam client's build and branch at this launch, for play reports, read as the dylib's
+# np_steam_build and np_steam_channel read them: the newest .installed package whose manifest
+# names a version, and package/beta. Both empty when Steam's package folder is not there.
+steam_facts() {
+  steam_build="" steam_channel=""
+  sf_pkg="$HOME/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/package"
+  [ -d "$sf_pkg" ] || return 0
+  # shellcheck disable=SC2012 # ls -t is sh's only order by time; Steam's package names are plain
+  steam_build=$(ls -t "$sf_pkg" 2>/dev/null | while IFS= read -r sf_name; do
+    case "$sf_name" in (*.installed) ;; (*) continue ;; esac
+    [ -f "$sf_pkg/$sf_name" ] || continue
+    sf_build=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*"\([0-9]*\)".*/\1/p' \
+      "$sf_pkg/${sf_name%.installed}.manifest" 2>/dev/null | head -n 1)
+    case "$sf_build" in (''|*[!0-9]*) continue ;; esac
+    [ "${#sf_build}" -ge 6 ] && [ "${#sf_build}" -le 12 ] || continue
+    printf '%s\n' "$sf_build"
+    break
+  done)
+  steam_channel=stable
+  if [ -f "$sf_pkg/beta" ]; then
+    sf_beta=$(head -c 256 "$sf_pkg/beta" 2>/dev/null | tr -d ' \t\r\n') || sf_beta=""
+    case "$sf_beta" in
+      '') ;;
+      *[!A-Za-z0-9_.-]*) steam_channel=unknown ;;
+      *) if [ "${#sf_beta}" -le 63 ]; then steam_channel=$sf_beta; else steam_channel=unknown; fi ;;
+    esac
+  fi
+}
+steam_facts
+
 # How the last game launch ended, for Bridgeplay's Status page: KEY=VALUE lines, written aside
 # and renamed over. code is one word from the list in docs/DEVELOPING.md, never a sentence.
 # Arguments: code, game exit status (empty when it never ran), seconds it ran, who stopped it
@@ -340,8 +371,14 @@ write_last_launch() {
   ll_window="window=$5
 "
   [ "$5" != - ] || ll_window=""
-  if ! { printf 'version=1\ncode=%s\nexit=%s\nseconds=%s\nstopped=%s\nbackend=%s\nengine=%s\n%sended=%s\n' \
-      "$1" "$2" "$3" "$4" "${backend:-}" "${np_build:-}" "$ll_window" "$(date +%s)" > "$ll_file.new" \
+  # The Steam this launch ran under; a report sent days later must not name a newer one.
+  ll_steam=""
+  [ -z "${steam_build:-}" ] || ll_steam="steam_build=$steam_build
+"
+  [ -z "${steam_channel:-}" ] || ll_steam="${ll_steam}steam_channel=$steam_channel
+"
+  if ! { printf 'version=1\ncode=%s\nexit=%s\nseconds=%s\nstopped=%s\nbackend=%s\nengine=%s\n%s%sended=%s\n' \
+      "$1" "$2" "$3" "$4" "${backend:-}" "${np_build:-}" "$ll_steam" "$ll_window" "$(date +%s)" > "$ll_file.new" \
     && mv -f "$ll_file.new" "$ll_file"; } 2>/dev/null; then
     rm -f "$ll_file.new" 2>/dev/null || true
     echo "=== could not record the outcome in $ll_file ===" >> "$log" 2>&1 || true
@@ -4433,8 +4470,14 @@ else
   echo "loader staging failed, game mode unavailable" >> "$log" 2>&1 || true
 fi
 
+# Spotlight and the Games app start the bundle with no arguments: Steam launches the game then.
+bare_game_id=$app_id
+! shortcut_game_id "$SteamGameId" || bare_game_id=$SteamGameId
+bare_start="exit 1"
+case "$bare_game_id" in ''|0|*[!0-9]*) ;; *) bare_start="exec /usr/bin/open steam://rungameid/$bare_game_id" ;; esac
 cat > "$loader_macos/launcher" <<LAUNCHER
 #!/bin/sh
+[ "\$#" -gt 0 ] || ${bare_start:-exit 1}
 export WINELOADER="$WINELOADER"
 wine_log="$loader_root/bridgeplay-wine.log"
 exec > "\$wine_log" 2>&1
@@ -4641,6 +4684,13 @@ if [ "$bundle_fast" = 1 ] && [ "$bundle_registered" = 1 ]; then
 elif [ -x "$lsregister" ] && "$lsregister" -f "$loader_app" >> "$log" 2>&1; then
   [ "${np_stamps_ready:-0}" != 1 ] || bundle_record 1
 fi
+# Shortcuts made before Bridgeplay filed them with games get the category on the next launch.
+for shortcut in "$HOME"/Applications/*.app; do
+  grep -qx "open steam://run/$app_id" "$shortcut/Contents/MacOS/run.sh" 2>/dev/null || continue
+  grep -q LSApplicationCategoryType "$shortcut/Contents/Info.plist" 2>/dev/null && continue
+  [ ! -x "$iconmaker" ] || "$iconmaker" --games-category "$app_id" >> "$log" 2>&1 || true
+  break
+done
 trap - EXIT
 mark "game start"
 np_started=$np_ms

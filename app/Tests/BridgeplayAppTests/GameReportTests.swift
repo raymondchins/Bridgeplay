@@ -14,10 +14,19 @@ struct GameReportTests {
         graphics: backend=d3dmetal (carried over from the last launch)
         """
 
-    @Test("Chip and memory map onto the form's options")
+    @Test("Chip is named by pattern, memory maps onto the form's options")
     func machineFields() {
         #expect(GameReport.chip("Apple M5 Max") == "M5 Max")
-        #expect(GameReport.chip("Apple M9") == "Other")
+        #expect(GameReport.chip("Apple M9") == "M9")
+        #expect(GameReport.chip("Apple M6 Pro") == "M6 Pro")
+        #expect(GameReport.chip("Apple M4 Ultra") == "M4 Ultra")
+        #expect(GameReport.chip("Apple A18 Pro") == "A18 Pro")
+        #expect(GameReport.chip("  Apple  M5   Max ") == "M5 Max")
+        #expect(GameReport.chip("M3") == "M3")
+        for unknown in ["", "Apple", "Apple M5 Max (Virtual)", "Apple M7 Extreme", "Apple M0", "Apple m5",
+                        "Apple Mac17,5", "Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz", "Apple M5 Max Pro"] {
+            #expect(GameReport.chip(unknown) == "Other")
+        }
         #expect(GameReport.memory(64 * 1_073_741_824) == "64 GB")
         #expect(GameReport.memory(20 * 1_073_741_824) == "Other")
     }

@@ -96,7 +96,7 @@ DEPS := $(OBJS:.o=.d)
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
         compatsvc-check prefixstate-check breakercheck clientgatecheck pauselistcheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck \
-        gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check steamcanarycheck FORCE
+        gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check compat-export-check steamcanarycheck FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
 
@@ -110,7 +110,7 @@ $(APP_PAYLOAD):
 	@mkdir -p $(APP_PAYLOAD)
 
 TEST_PATHS := dylib/tests overlay-shim/tests app/Tests scripts/tests ntdll-patch/tests \
-              native-launch/tests native-shim/tests installer/tests
+              native-launch/tests native-shim/tests installer/tests compat/tests
 
 tests-list:
 	@for p in $(TEST_PATHS); do echo $$p; done
@@ -253,6 +253,17 @@ compat-reported-check:
 .PHONY: compat-reported-import-check
 compat-reported-import-check:
 	@python3 scripts/tests/compat-reported.py
+
+# The compat-data export (scripts/compat-export.py): verdicts, signatures, privacy, on fixtures.
+compat-export-check:
+	@if [ ! -f compat/tests/compat-export.py ]; then $(call SKIP,compat-export-check,compat/tests/compat-export.py); exit 0; fi; \
+	python3 compat/tests/compat-export.py
+
+# Offline test of the regression watch on the compat-export fixture.
+.PHONY: compat-regressions-check
+compat-regressions-check:
+	@if [ ! -f compat/tests/compat-regressions.py ]; then $(call SKIP,compat-regressions-check,compat/tests/compat-regressions.py); exit 0; fi; \
+	python3 compat/tests/compat-regressions.py
 
 .PHONY: mincheck
 mincheck:
@@ -1061,7 +1072,7 @@ steamcanarycheck:
 # overlay-shim-tests is left out: it needs a Metal GPU and real frame timing.
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
-	activatecheck breakercheck clientgatecheck pauselistcheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
+	activatecheck breakercheck clientgatecheck pauselistcheck compat-reported-import-check compat-export-check compat-regressions-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck launchercheck \
 	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check benchcheck benchabcheck steamcanarycheck np-native-tests native-shim-tests \
 	app-tests native-installercheck

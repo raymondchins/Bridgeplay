@@ -115,6 +115,8 @@ over:
 | `stopped` | `steam` (Steam's Stop or Steam quitting), `game` or `unknown` |
 | `backend` | the backend id of `notproton-backend` (`d3dmetal`, `dxmt`, `dxvk`, `wined3d`, `dxmt-builtin`); empty before the backend step |
 | `engine` | the tool's build (`notproton-build`), such as `winecx-11.17` |
+| `steam_build` | the Steam client's build at this launch (`1795567705`), from the newest package manifest; left out when unknown |
+| `steam_channel` | Steam's branch at this launch (`stable`, `publicbeta`, or `unknown` for an odd `package/beta`); left out without Steam's package folder |
 | `window` | whole seconds from the game's start to its first window; empty when the launch panel watched until the game exited and saw none; left out when nothing watched (no app, the panel's 15-minute limit, or a stop before the game started) |
 | `ended` | Unix seconds when the record was written |
 

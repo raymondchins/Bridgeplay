@@ -620,6 +620,9 @@ struct VerifiedGamesTests {
         #expect(VerifiedGames.chipFamilies(in: "M5 Max · macOS 27") == ["M5 Max"])
         #expect(VerifiedGames.chipFamilies(in: "M2 · 16 GB") == ["M2"])
         #expect(VerifiedGames.chipFamilies(in: "MacBook Pro M3 Ultra") == ["M3 Ultra"])
+        #expect(VerifiedGames.chipFamilies(in: "MacBook A18 Pro") == ["A18 Pro"])
+        #expect(VerifiedGames.chipFamilies(in: "M6 Pro, macOS 28") == ["M6 Pro"])
+        #expect(VerifiedGames.chipFamilies(in: "Mac17,5 · M0").isEmpty)
     }
 
     @Test("A verified status on the same chip family counts; untested and other chips don't")

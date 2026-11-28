@@ -917,9 +917,9 @@ chmod +x "$work/launcher/Contents/MacOS/launcher"
 for spec in '-:none' '0:none' 'off:none' '1:shim' '2:shim' '3:shim' 'adaptive:shim'; do
 	fg=${spec%%:*} want=${spec#*:}
 	if [ "$fg" = - ]; then
-		env -i PATH="$PATH" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+		env -i PATH="$PATH" "$work/launcher/Contents/MacOS/launcher" game.exe >/dev/null 2>&1 || true
 	else
-		env -i PATH="$PATH" NOTPROTON_FRAMEGEN="$fg" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+		env -i PATH="$PATH" NOTPROTON_FRAMEGEN="$fg" "$work/launcher/Contents/MacOS/launcher" game.exe >/dev/null 2>&1 || true
 	fi
 	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
 	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
@@ -927,28 +927,28 @@ for spec in '-:none' '0:none' 'off:none' '1:shim' '2:shim' '3:shim' 'adaptive:sh
 done
 for spec in '0:none' 'off:none' 'OFF:none' 'false:none' 'No:none' 'fps:shim' 'summary:shim' 'detailed:shim'; do
 	po=${spec%%:*} want=${spec#*:}
-	env -i PATH="$PATH" NOTPROTON_PERF_OVERLAY="$po" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	env -i PATH="$PATH" NOTPROTON_PERF_OVERLAY="$po" "$work/launcher/Contents/MacOS/launcher" game.exe >/dev/null 2>&1 || true
 	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
 	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
 	is "NOTPROTON_PERF_OVERLAY=$po without the Steam overlay: $want" "$want" "$got_dyld"
 done
 for spec in '0:none' 'off:none' 'display:shim' 'half:shim' '30:shim'; do
 	fl=${spec%%:*} want=${spec#*:}
-	env -i PATH="$PATH" NOTPROTON_FPS_LIMIT="$fl" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	env -i PATH="$PATH" NOTPROTON_FPS_LIMIT="$fl" "$work/launcher/Contents/MacOS/launcher" game.exe >/dev/null 2>&1 || true
 	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
 	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
 	is "NOTPROTON_FPS_LIMIT=$fl without the Steam overlay: $want" "$want" "$got_dyld"
 done
 for spec in '1:none' '0:shim'; do
 	off=${spec%%:*} want=${spec#*:}
-	env -i PATH="$PATH" NOTPROTON_FPS_LIMIT=45 NOTPROTON_FPS_LIMIT_OFF="$off" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	env -i PATH="$PATH" NOTPROTON_FPS_LIMIT=45 NOTPROTON_FPS_LIMIT_OFF="$off" "$work/launcher/Contents/MacOS/launcher" game.exe >/dev/null 2>&1 || true
 	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
 	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
 	is "a limit of 45 with NOTPROTON_FPS_LIMIT_OFF=$off without the Steam overlay: $want" "$want" "$got_dyld"
 done
 for spec in '0:none' 'off:none' 'linear:shim' 'nearest:shim' 'integer:shim'; do
 	sfv=${spec%%:*} want=${spec#*:}
-	env -i PATH="$PATH" NOTPROTON_SCALING_FILTER="$sfv" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	env -i PATH="$PATH" NOTPROTON_SCALING_FILTER="$sfv" "$work/launcher/Contents/MacOS/launcher" game.exe >/dev/null 2>&1 || true
 	got_dyld=$(cat "$work/launcher/bridgeplay-wine.log")
 	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
 	is "NOTPROTON_SCALING_FILTER=$sfv without the Steam overlay: $want" "$want" "$got_dyld"

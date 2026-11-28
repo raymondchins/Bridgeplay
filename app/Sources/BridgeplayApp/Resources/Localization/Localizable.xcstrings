@@ -7718,28 +7718,6 @@
         }
       }
     },
-    "For example: no sound, crashes when a level loads" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Per esempio: niente audio, si chiude quando carica un livello"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Например: нет звука, вылет при загрузке уровня"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "例如：没有声音，加载关卡时崩溃"
-          }
-        }
-      }
-    },
     "Force VSync" : {
       "localizations" : {
         "it" : {
@@ -11106,6 +11084,28 @@
         }
       }
     },
+    "No sound" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niente audio"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет звука"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有声音"
+          }
+        }
+      }
+    },
     "No stable release includes your beta yet. Bridgeplay stays on build %@ and checks again later." : {
       "localizations" : {
         "it" : {
@@ -13924,24 +13924,24 @@
         }
       }
     },
-    "Reports are posted publicly in Bridgeplay's GitHub Discussions and counted on the compatibility list. Each one has the game, how it ran, anything you write about it, your Mac's model, chip, GPU cores, memory and displays, whether it was on battery, in Low Power Mode or running hot, the macOS and Bridgeplay versions, the engine, backend and High Resolution setting, and the game's logs. Your home folder, user and computer names, Steam account name, Steam ID and email addresses are removed from the logs first. You don't need a GitHub account. It also sends a random install ID, used only for rate limits. The server sees your IP, like any website." : {
+    "Reports are posted publicly in Bridgeplay's GitHub Discussions and counted on the compatibility list. Each one has the game, how it ran, anything you write about it, your Mac's model, chip, GPU cores, memory and displays, whether it was on battery, in Low Power Mode or running hot, the macOS, Bridgeplay and Steam versions, the engine, backend and High Resolution setting, how the launch ended, and the game's logs. Your home folder, user and computer names, Steam account name, Steam ID and email addresses are removed from the logs first. You don't need a GitHub account. It also sends a random install ID. The server uses it for rate limits and publishes a code made from it that is different for every game, so your reports of one game count once and your games can't be linked to each other. The ID itself is never published. The server sees your IP, like any website." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I report vengono pubblicati nelle GitHub Discussions di Bridgeplay e contati nell'elenco di compatibilità. Ognuno contiene il gioco, come è andato, quello che scrivi al riguardo, modello, chip, core GPU, memoria e schermi del Mac, se era a batteria, in modalità Risparmio energia o surriscaldato, le versioni di macOS e Bridgeplay, motore, backend e impostazione Alta risoluzione, e i log del gioco. Prima dell'invio vengono rimossi dai log la cartella Inizio, i nomi utente e computer, il nome dell'account Steam, lo Steam ID e gli indirizzi email. Non serve un account GitHub. Invia anche un ID di installazione casuale, usato solo per i limiti di frequenza. Il server vede il tuo IP, come qualsiasi sito web."
+            "value" : "I report vengono pubblicati nelle GitHub Discussions di Bridgeplay e contati nell'elenco di compatibilità. Ognuno contiene il gioco, come è andato, quello che scrivi al riguardo, modello, chip, core GPU, memoria e schermi del Mac, se era a batteria, in modalità Risparmio energia o surriscaldato, le versioni di macOS, Bridgeplay e Steam, motore, backend e impostazione Alta risoluzione, come è finito l'avvio, e i log del gioco. Prima dell'invio vengono rimossi dai log la cartella Inizio, i nomi utente e computer, il nome dell'account Steam, lo Steam ID e gli indirizzi email. Non serve un account GitHub. Invia anche un ID di installazione casuale. Il server lo usa per i limiti di frequenza e pubblica un codice ricavato da esso, diverso per ogni gioco, così i tuoi report di un gioco contano una volta sola e i tuoi giochi non possono essere collegati tra loro. L'ID stesso non viene mai pubblicato. Il server vede il tuo IP, come qualsiasi sito web."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Отчёты публикуются открыто в GitHub Discussions проекта Bridgeplay и учитываются в списке совместимости. В каждом отчёте указаны игра, как она запустилась, всё, что вы о ней напишете, модель вашего Mac, чип, число ядер GPU, память и дисплеи, работал ли он от батареи, в режиме энергосбережения или перегревался, версии macOS и Bridgeplay, движок, бэкенд и настройка «Высокое разрешение», а также журналы игры. Из журналов предварительно удаляются ваша домашняя папка, имена пользователя и компьютера, имя учётной записи Steam, Steam ID и адреса электронной почты. Учётная запись GitHub не нужна. Также отправляется случайный идентификатор установки, который используется только для ограничения частоты запросов. Сервер видит ваш IP-адрес, как любой сайт."
+            "value" : "Отчёты публикуются открыто в GitHub Discussions проекта Bridgeplay и учитываются в списке совместимости. В каждом отчёте указаны игра, как она запустилась, всё, что вы о ней напишете, модель вашего Mac, чип, число ядер GPU, память и дисплеи, работал ли он от батареи, в режиме энергосбережения или перегревался, версии macOS, Bridgeplay и Steam, движок, бэкенд и настройка «Высокое разрешение», чем закончился запуск, а также журналы игры. Из журналов предварительно удаляются ваша домашняя папка, имена пользователя и компьютера, имя учётной записи Steam, Steam ID и адреса электронной почты. Учётная запись GitHub не нужна. Также отправляется случайный идентификатор установки. Сервер использует его для ограничения частоты запросов и публикует полученный из него код, свой для каждой игры: так ваши отчёты об одной игре учитываются один раз, а ваши игры нельзя связать друг с другом. Сам идентификатор никогда не публикуется. Сервер видит ваш IP-адрес, как любой сайт."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "报告会公开发布到 Bridgeplay 的 GitHub Discussions，并计入兼容性列表。每份报告包含游戏、运行情况、你对此写下的说明、Mac 的型号、芯片、GPU 核心数、内存和显示器，是否使用电池供电、处于低电量模式或过热，macOS 和 Bridgeplay 版本，引擎、后端和高分辨率设置，以及游戏日志。发送前会从日志中移除你的个人文件夹、用户名和电脑名称、Steam 账户名称、Steam ID 和电子邮件地址。不需要 GitHub 账户。它还会发送一个随机的安装 ID，仅用于频率限制。服务器会像任何网站一样看到你的 IP。"
+            "value" : "报告会公开发布到 Bridgeplay 的 GitHub Discussions，并计入兼容性列表。每份报告包含游戏、运行情况、你对此写下的说明、Mac 的型号、芯片、GPU 核心数、内存和显示器，是否使用电池供电、处于低电量模式或过热，macOS、Bridgeplay 和 Steam 版本，引擎、后端和高分辨率设置，启动如何结束，以及游戏日志。发送前会从日志中移除你的个人文件夹、用户名和电脑名称、Steam 账户名称、Steam ID 和电子邮件地址。不需要 GitHub 账户。它还会发送一个随机的安装 ID。服务器用它做频率限制，并公开一个由它生成、每个游戏都不同的代码，这样你对同一游戏的报告只计一次，而你的各个游戏之间无法被关联。ID 本身永远不会公开。服务器会像任何网站一样看到你的 IP。"
           }
         }
       }
@@ -17469,6 +17469,28 @@
         }
       }
     },
+    "Switched to DXVK" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passato a DXVK"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переключился на DXVK"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换到了 DXVK"
+          }
+        }
+      }
+    },
     "Takes what did not move, like a HUD or a menu, straight from the real frame instead of warping it." : {
       "localizations" : {
         "it" : {
@@ -19141,6 +19163,28 @@
         }
       }
     },
+    "Tweaked" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con ritocchi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "С настройкой"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调整后可用"
+          }
+        }
+      }
+    },
     "Undo with Put Back in the Trash." : {
       "localizations" : {
         "it" : {
@@ -19889,24 +19933,46 @@
         }
       }
     },
-    "What went wrong? Optional, and public with the report." : {
+    "What helped? Optional, public." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cosa non ha funzionato? Facoltativo, e pubblico insieme al report."
+            "value" : "Cosa ha aiutato? Facoltativo, pubblico."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Что пошло не так? Необязательно; текст будет виден всем вместе с отчётом."
+            "value" : "Что помогло? Необязательно, публично."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "哪里出了问题？可不填，会随报告公开。"
+            "value" : "什么起了作用？可选，公开。"
+          }
+        }
+      }
+    },
+    "What went wrong? Optional, public." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cosa non ha funzionato? Facoltativo, pubblico."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Что пошло не так? Необязательно, публично."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出了什么问题？可选，公开。"
           }
         }
       }

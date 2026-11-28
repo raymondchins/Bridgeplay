@@ -6,11 +6,9 @@ import SystemConfiguration
 // redaction its public log copy goes through. Sent by PlayReports.
 enum GameReport {
 
-    // The options of the Mac chip and memory dropdowns in .github/ISSUE_TEMPLATE/game-report.yml,
-    // so reports from the app and from the form read the same.
-    static let chips = ["M1", "M1 Pro", "M1 Max", "M1 Ultra", "M2", "M2 Pro", "M2 Max", "M2 Ultra",
-                        "M3", "M3 Pro", "M3 Max", "M3 Ultra", "M4", "M4 Pro", "M4 Max",
-                        "M5", "M5 Pro", "M5 Max"]
+    // The memory options of the dropdown in .github/ISSUE_TEMPLATE/game-report.yml, so reports
+    // from the app and from the form read the same. Chips are named by pattern, not a list,
+    // so a Mac newer than the form still reports its chip.
     static let memorySizes = [8, 16, 18, 24, 32, 36, 48, 64, 96, 128, 192, 256, 512]
     static let backends = ["dxmt", "dxvk", "wined3d", "d3dmetal"]
 
@@ -36,6 +34,11 @@ enum GameReport {
                        model: sysctl("hw.model"),
                        newerRelease: LatestRelease.newer(than: ProductVersion.build, state: state),
                        updateState: state.rawValue, buildChannel: ProductVersion.channel.rawValue)
+    }
+
+    // A Steam build as the launch record carries it: the manifest's version, digits only.
+    static func steamBuild(_ version: String) -> String? {
+        version.wholeMatch(of: /\d{6,12}/) != nil ? version : nil
     }
 
     private static func sysctl(_ name: String) -> String? {
@@ -91,10 +94,12 @@ enum GameReport {
         return "off"
     }
 
-    // "Apple M5 Max" → "M5 Max"; a chip the form doesn't list is "Other".
+    // "Apple M5 Max" → "M5 Max", "Apple A18 Pro" → "A18 Pro"; anything else (a virtual Mac,
+    // an Intel brand string, a tier with a new name) is "Other".
     static func chip(_ brand: String) -> String {
-        let name = brand.replacingOccurrences(of: "Apple ", with: "").trimmingCharacters(in: .whitespaces)
-        return chips.contains(name) ? name : "Other"
+        var name = brand.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        if name.hasPrefix("Apple ") { name.removeFirst("Apple ".count) }
+        return name.wholeMatch(of: /[AM][1-9]\d{0,2}(?: (?:Pro|Max|Ultra))?/) != nil ? name : "Other"
     }
 
     static func memory(_ bytes: UInt64) -> String {
@@ -102,24 +107,24 @@ enum GameReport {
         return memorySizes.contains(gb) ? "\(gb) GB" : "Other"
     }
 
-    // The engine and backend of the most recent launch in bridgeplay-run.log:
+    // The engine, backend and engine id of the most recent launch in bridgeplay-run.log:
     //   runner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at /…
     //   graphics: backend=d3dmetal (carried over from the last launch)
     // A run aborted before launch (another tool picked to try a fix, refused by the prefix
     // check) never ran the game, so it does not replace the run before it. A log of nothing
     // but aborted runs still names what was tried.
-    static func lastLaunch(in log: String) -> (engine: String?, backend: String?) {
-        var engine: String?, backend: String?
-        var run: (engine: String?, backend: String?) = (nil, nil)
+    static func lastLaunch(in log: String) -> (engine: String?, backend: String?, id: String?) {
+        typealias Launch = (engine: String?, backend: String?, id: String?)
+        var found: Launch = (nil, nil, nil)
+        var run: Launch = (nil, nil, nil)
         var aborted = false
-        var tried: (engine: String?, backend: String?) = (nil, nil)
+        var tried: Launch = (nil, nil, nil)
         func finishRun() {
-            tried = (run.engine ?? tried.engine, run.backend ?? tried.backend)
+            tried = (run.engine ?? tried.engine, run.backend ?? tried.backend, run.id ?? tried.id)
             if !aborted {
-                engine = run.engine ?? engine
-                backend = run.backend ?? backend
+                found = (run.engine ?? found.engine, run.backend ?? found.backend, run.id ?? found.id)
             }
-            run = (nil, nil)
+            run = (nil, nil, nil)
             aborted = false
         }
         for line in log.split(separator: "\n") {
@@ -128,6 +133,8 @@ enum GameReport {
             } else if line.hasPrefix("runner: build "), let open = line.firstIndex(of: "("),
                let close = line.range(of: ") at ", options: .backwards) {
                 run.engine = String(line[line.index(after: open)..<close.lowerBound])
+                let id = line.dropFirst("runner: build ".count).prefix { !$0.isWhitespace }
+                if id.wholeMatch(of: /[A-Za-z0-9.-]{1,60}/) != nil { run.id = String(id) }
             } else if line.hasPrefix("graphics: backend=") {
                 let value = line.dropFirst("graphics: backend=".count).prefix { !$0.isWhitespace }
                 if backends.contains(String(value)) { run.backend = String(value) }
@@ -136,7 +143,7 @@ enum GameReport {
             }
         }
         finishRun()
-        return (engine ?? tried.engine, backend ?? tried.backend)
+        return (found.engine ?? tried.engine, found.backend ?? tried.backend, found.id ?? tried.id)
     }
 
     // Reports are public. Besides the home folder, run logs carry the Steam account name

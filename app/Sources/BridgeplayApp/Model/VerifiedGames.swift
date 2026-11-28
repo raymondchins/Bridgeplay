@@ -8,9 +8,10 @@ enum VerifiedGames {
     static let source = URL(string: "https://raw.githubusercontent.com/raymondchins/Bridgeplay/main/compat/games.json")!
     static var cache: URL { SupportPaths.caches.appending(path: "compat-games.json") }
 
-    // "M5 Max", "M2", "M3 Ultra" out of free text such as "M5 Max · macOS 27".
+    // "M5 Max", "M2", "A18 Pro" out of free text such as "M5 Max · macOS 27"; the same names
+    // GameReport.chip gives.
     static func chipFamilies(in text: String) -> Set<String> {
-        let pattern = /\bM\d+(?: (?:Pro|Max|Ultra))?\b/
+        let pattern = /\b[AM][1-9]\d{0,2}(?: (?:Pro|Max|Ultra))?\b/
         return Set(text.matches(of: pattern).map { String($0.output) })
     }
 

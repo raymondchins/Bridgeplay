@@ -19,6 +19,10 @@ struct LaunchRecord: Equatable, Sendable {
     // Seconds to the first window. nil: not recorded; .some(nil): recorded, no window ever.
     var window: Int??
     var ended: Date?
+    // The Steam client's build and branch this launch ran under. nil when the run script
+    // could not tell, or wrote the record before it read them.
+    var steamBuild: String?
+    var steamChannel: String?
 
     // KEY=VALUE lines. Unknown keys are ignored, so later versions stay readable.
     static func parse(_ text: String) -> LaunchRecord? {
@@ -38,6 +42,10 @@ struct LaunchRecord: Equatable, Sendable {
         record.engine = values["engine"].flatMap { $0.isEmpty ? nil : $0 }
         if let window = values["window"] { record.window = .some(Int(window)) }
         record.ended = values["ended"].flatMap { TimeInterval($0) }.map { Date(timeIntervalSince1970: $0) }
+        record.steamBuild = values["steam_build"].flatMap(GameReport.steamBuild)
+        record.steamChannel = values["steam_channel"].flatMap {
+            $0.wholeMatch(of: /[A-Za-z0-9_.-]{1,63}/) != nil ? $0 : nil
+        }
         return record
     }
 

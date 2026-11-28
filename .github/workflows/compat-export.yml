@@ -1,0 +1,85 @@
+# Hourly static export of the compatibility reports (Discussions in the compatibility-reports
+# category) to the orphan branch `compat-data`, read by bridgeplay.dev and the app:
+#   reports/YYYY-MM.ndjson  compat.json  compat-index.json  board.md  README.md  LICENSE
+# scripts/compat-export.md has the verdict rule; compat/data/README.md the fields.
+# The branch holds one commit, replaced on each run, so hourly runs don't grow the repository.
+# The Discussions stay the source: a run with "full" rebuilds the branch from them.
+name: compat-export
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+    # Once a day: also drop reports whose discussion was deleted, and refresh the verdicts'
+    # 120-day window even when no report came in.
+    - cron: "53 3 * * *"
+  workflow_dispatch:
+    inputs:
+      full:
+        description: Re-read every report instead of only the new ones
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  discussions: read
+
+concurrency: compat-export
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Export the reports
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCHEDULE: ${{ github.event.schedule }}
+          FULL: ${{ inputs.full }}
+          # The report bot and the owner's login of the reports sent before the GitHub App
+          # (bridgeplay-web api/_lib/github.mjs).
+          BRIDGEPLAY_REPORT_AUTHORS: bridgeplay-reports[bot],raymondchins
+        run: |
+          set -euo pipefail
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          # 2 means no such branch; any other failure must not start an empty one.
+          rc=0
+          git ls-remote --exit-code --heads "$remote" compat-data >/dev/null || rc=$?
+          old=""
+          case $rc in
+            0)
+              git clone -q --depth 1 --branch compat-data "$remote" out
+              old=$(git -C out rev-parse HEAD) ;;
+            2)
+              git init -q -b compat-data out
+              git -C out remote add origin "$remote" ;;
+            *) echo "git ls-remote failed ($rc)"; exit "$rc" ;;
+          esac
+
+          daily=0
+          mode=""
+          [ "$SCHEDULE" != "53 3 * * *" ] || { daily=1; mode=--prune; }
+          # On Sundays the daily run re-reads every report, so edited reports catch up too.
+          [ "$mode" != --prune ] || [ "$(date -u +%u)" != 7 ] || mode=--full
+          [ "$FULL" != "true" ] || { daily=1; mode=--full; }
+          [ -n "$old" ] || { daily=1; mode=--full; }
+          python3 scripts/compat-export.py fetch out $mode
+          python3 scripts/compat-export.py build out
+
+          cd out
+          # Hourly runs publish only when a report came in or went away.
+          if [ "$daily" = 0 ] && git diff --quiet HEAD -- reports \
+            && [ -z "$(git ls-files --others --exclude-standard -- reports)" ]; then
+            echo "no new reports"; exit 0
+          fi
+          git checkout -q --orphan next
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "compat-data: $(date -u +%FT%TZ)"
+          if [ -n "$old" ]; then
+            git push -q --force-with-lease="compat-data:$old" origin HEAD:compat-data
+          else
+            git push -q origin HEAD:compat-data
+          fi

@@ -32,6 +32,44 @@ struct ReportPayload: Codable, Equatable, Sendable {
     var updateState: String? = nil
     var buildChannel: String? = nil
 
+    // Schema 2: the facts the verdict and the regression watch compare. Every field is
+    // optional, and a schema 1 endpoint ignores them.
+    var schema: Int? = ReportPayload.currentSchema
+    // The consent wording the player agreed to. From 2 on, the endpoint may publish a code
+    // made from the install ID and the AppID, different for every game (PlayReports.consentVersion).
+    var consent: Int? = nil
+    var steamBuild: String? = nil
+    var steamChannel: String? = nil
+    var engineID: String? = nil
+    var launch: Launch? = nil
+    // Sent from Report Your Games…, one answer for many games.
+    var bulk: Bool? = nil
+
+    static let currentSchema = 2
+
+    // How the launch ended, from compatdata/<appid>/bridgeplay-last-launch (LaunchRecord).
+    struct Launch: Codable, Equatable, Sendable {
+        var code: String
+        var seconds: Int?
+        // Seconds to the first window; noWindow when the launch panel watched and saw none.
+        var window: Int?
+        var noWindow: Bool?
+
+        // The record of this session only: one written more than 10 minutes from the end of
+        // the session the report is about belongs to another launch.
+        init?(_ record: LaunchRecord?, session: GameSession) {
+            guard let record, let ended = record.ended, abs(ended.timeIntervalSince(session.ended)) <= 600,
+                  record.code.wholeMatch(of: /[a-z0-9_]{1,32}/) != nil else { return nil }
+            code = record.code
+            seconds = record.seconds.flatMap { $0 >= 0 ? $0 : nil }
+            switch record.window {
+            case .some(.some(let value)) where value >= 0: window = value
+            case .some(.none): noWindow = true
+            default: break
+            }
+        }
+    }
+
     // Newest lines kept. These count characters, not bytes, so encoded() is what keeps the
     // JSON under the endpoint's 1 MB cap.
     static let logLimit = 550_000
@@ -70,11 +108,15 @@ struct ReportPayload: Codable, Equatable, Sendable {
 
     static func make(name: String, appID: String, status: ReportStatus, source: Source, session: GameSession,
                      log: String?, wineLog: String?, machine: GameReport.Machine, install: String,
-                     note: String? = nil, issue: ReportIssue? = nil) -> ReportPayload {
-        let launch: (engine: String?, backend: String?) = log.map(GameReport.lastLaunch) ?? (nil, nil)
+                     note: String? = nil, issue: ReportIssue? = nil, record: LaunchRecord? = nil,
+                     consent: Int? = nil, bulk: Bool = false) -> ReportPayload {
+        let launch: (engine: String?, backend: String?, id: String?) = log.map(GameReport.lastLaunch) ?? (nil, nil, nil)
         var summary = session.summary(log: log, wineLog: wineLog)
         if let newer = machine.newerRelease { summary += ". A newer Bridgeplay was out: \(newer)" }
         if source == .auto { summary += ". Status inferred from the log" }
+        // The Steam facts come from this session's own record: Steam can update between the
+        // launch and a report sent days later, and the regression watch compares builds.
+        let thisLaunch = Launch(record, session: session)
         return ReportPayload(
             appid: appID, status: status, install: install, source: source, name: name,
             chip: GameReport.chip(machine.chip), memory: GameReport.memory(machine.memoryBytes),
@@ -86,7 +128,11 @@ struct ReportPayload: Codable, Equatable, Sendable {
             setup: machine.setup.isEmpty ? nil : machine.setup,
             log: log.map { String(GameReport.redacted($0).suffix(logLimit)) },
             wineLog: wineLog.map { GameReport.wineTail(GameReport.redacted($0), limit: wineLogLimit) },
-            updateState: machine.updateState, buildChannel: machine.buildChannel)
+            updateState: machine.updateState, buildChannel: machine.buildChannel,
+            consent: consent, steamBuild: thisLaunch == nil ? nil : record?.steamBuild,
+            steamChannel: thisLaunch == nil ? nil : record?.steamChannel,
+            engineID: launch.id ?? record?.engine.flatMap { $0.wholeMatch(of: /[A-Za-z0-9.-]{1,60}/) != nil ? $0 : nil },
+            launch: thisLaunch, bulk: bulk ? true : nil)
     }
 }
 
@@ -221,6 +267,9 @@ final class PlayReports {
     var isAsking: Bool { nudge != nil || thanking || consentRequest != nil || bulk != nil }
 
     private static let consentKey = "PlayReportsConsent"
+    // The consent wording agreed to; missing is 1, the text before schema 2.
+    private static let consentVersionKey = "PlayReportsConsentVersion"
+    static let consentVersion = 2
     private static let autoShareKey = "PlayReportsAutoShare"
     private static let handledKey = "PlayReportsHandled"
     private static let installKey = "PlayReportsInstallID"
@@ -240,7 +289,15 @@ final class PlayReports {
 
     var hasConsent: Bool { defaults.bool(forKey: Self.consentKey) }
 
-    // Random and only used by the endpoint for rate limiting; it is not in the report.
+    // The wording the player agreed to. A player who agreed to the first text keeps sharing
+    // under it, so the endpoint publishes no per-game code for them.
+    var agreedConsent: Int? {
+        guard hasConsent else { return nil }
+        return max(1, defaults.integer(forKey: Self.consentVersionKey))
+    }
+
+    // Random. The endpoint uses it for rate limits; with consent 2 it also publishes a code
+    // made from it and the AppID, which differs for every game. The ID itself is never published.
     var installID: String {
         if let id = defaults.string(forKey: Self.installKey) { return id }
         let id = UUID().uuidString
@@ -318,6 +375,7 @@ final class PlayReports {
 
     func consent(alsoAutoShare: Bool) {
         defaults.set(true, forKey: Self.consentKey)
+        defaults.set(Self.consentVersion, forKey: Self.consentVersionKey)
         let request = consentRequest
         consentRequest = nil
         if alsoAutoShare || request == .autoShare { setAutoShare(true) }
@@ -370,7 +428,7 @@ final class PlayReports {
             markHandled(Self.key(item.prefix, item.session))
             nudges.removeAll { $0.prefix.appID == item.prefix.appID }
         }
-        submitAll(items.map { ($0, status) }, source: .tap)
+        submitAll(items.map { ($0, status) }, source: .tap, bulk: true)
     }
 
     // Report This Game…: ask about the game now, from its last session if the log has one.
@@ -485,20 +543,22 @@ final class PlayReports {
     // Redacting a large log takes a moment, so payloads are built off the main thread, and
     // sent one after another so a batch stays within the endpoint's rate limits.
     private func submitAll(_ items: [(Found, ReportStatus)], source: ReportPayload.Source, note: String? = nil,
-                           issue: ReportIssue? = nil) {
+                           issue: ReportIssue? = nil, bulk: Bool = false) {
         var machine = GameReport.thisMac
         machine.setup = GameReport.setup()
-        let sender = sender(), install = installID
+        let sender = sender(), install = installID, consent = agreedConsent
         Task.detached {
             for (item, status) in items {
                 var machine = machine
                 if let reg = try? String(contentsOf: item.prefix.pfx.appending(path: "user.reg"), encoding: .utf8) {
                     machine.setup["retina"] = GameReport.retina(reg)
                 }
+                let record = (try? String(contentsOf: item.prefix.root.appending(path: LaunchRecord.fileName), encoding: .utf8))
+                    .flatMap(LaunchRecord.parse)
                 let payload = ReportPayload.make(
                     name: item.prefix.title, appID: item.prefix.appID, status: status, source: source, session: item.session,
                     log: item.log.isEmpty ? nil : item.log, wineLog: item.wineLog, machine: machine, install: install,
-                    note: note, issue: issue)
+                    note: note, issue: issue, record: record, consent: consent, bulk: bulk)
                 let outcome = await sender.submit(payload)
                 AppLog.note("play report: \(payload.appid) \(payload.status.rawValue) (\(payload.source.rawValue)): \(outcome)")
             }
