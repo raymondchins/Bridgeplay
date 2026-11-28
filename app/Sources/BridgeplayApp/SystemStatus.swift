@@ -162,7 +162,7 @@ final class SystemStatus {
     // happened from one refused because another was in flight.
     @ObservationIgnored private(set) var runsStarted = 0
 
-    var isBusy: Bool { activity != nil || runInFlight || checkingLicense || setupDownloading }
+    var isBusy: Bool { activity != nil || runInFlight || checkingLicense || setupDownloading || trashingLeftovers }
     var isIdle: Bool { !isBusy && !isRefreshing }
     // A pending 3.0 folder move blocks every install: anything written now would land in
     // the new folders before the old ones are moved in.
@@ -1155,14 +1155,36 @@ final class SystemStatus {
     }
 
     func refreshLeftoverPrefixes() async {
-        leftoverPrefixes = await Task.detached(priority: .utility) { LeftoverPrefixes.load() }.value
+        let found = await Task.detached(priority: .utility) { LeftoverPrefixes.load() }.value
+        // A Keep made while this scan ran still holds
+        let kept = LeftoverPrefixes.kept()
+        leftoverPrefixes = found.filter { !kept.contains($0.id) }
+    }
+
+    // What the dialog names, so a scan that ends while it's open can't add to it
+    @ObservationIgnored private var leftoversToTrash: [LeftoverPrefix] = []
+    private(set) var trashingLeftovers = false
+
+    func askToTrashLeftoverPrefixes() {
+        leftoversToTrash = leftoverPrefixes
+        pendingConfirmation = .trashLeftoverPrefixes
     }
 
     // Only to the Trash: a prefix can hold a game's only saves.
     func trashLeftoverPrefixes() async {
-        let items = leftoverPrefixes
+        guard !trashingLeftovers else { return }
+        let items = leftoversToTrash
+        leftoversToTrash = []
+        trashingLeftovers = true
+        defer { trashingLeftovers = false }
         let errors = await Task.detached(priority: .userInitiated) {
-            items.compactMap { item -> Error? in
+            // A game reinstalled since the scan keeps its prefix
+            let still = LeftoverPrefixes.currentIDs()
+            return items.compactMap { item -> Error? in
+                guard still.contains(item.id) else {
+                    AppLog.note("leftover prefix: \(item.prefix.appID) is installed again, kept")
+                    return nil
+                }
                 do {
                     try PrefixTools.delete(item.prefix)
                     AppLog.note("leftover prefix: moved \(item.prefix.root.path(percentEncoded: false)) to the Trash")

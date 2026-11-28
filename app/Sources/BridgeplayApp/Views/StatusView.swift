@@ -465,7 +465,7 @@ struct StatusView: View {
                 status.keepLeftoverPrefixes()
             },
             action: StatusAction(label: String(localized: "Move to Trash…"), isEnabled: status.isIdle) {
-                status.pendingConfirmation = .trashLeftoverPrefixes
+                status.askToTrashLeftoverPrefixes()
             }
         )
     }

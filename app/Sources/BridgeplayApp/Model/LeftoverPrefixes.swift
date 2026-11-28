@@ -93,7 +93,7 @@ enum LeftoverPrefixes {
         let found = scan(
             libraries: PrefixStore.libraries(vdf: vdf),
             listedApps: listedApps(in: text),
-            kept: Set(defaults.stringArray(forKey: keptKey) ?? []),
+            kept: kept(defaults: defaults),
             names: names
         )
         if !found.names.isEmpty, found.names.contains(where: { names[$0.key] != $0.value }) {
@@ -101,6 +101,18 @@ enum LeftoverPrefixes {
             defaults.set(names, forKey: namesKey)
         }
         return found.leftovers.map { LeftoverPrefix(prefix: $0, bytes: PrefixStore.directoryBytes($0.root)) }
+    }
+
+    static func kept(defaults: UserDefaults = .standard) -> Set<String> {
+        Set(defaults.stringArray(forKey: keptKey) ?? [])
+    }
+
+    // Leftovers right now, kept ones included: checked again just before the Trash
+    static func currentIDs() -> Set<String> {
+        let vdf = SupportPaths.Steam.libraryFoldersVDF
+        guard let text = try? String(contentsOf: vdf, encoding: .utf8) else { return [] }
+        let found = scan(libraries: PrefixStore.libraries(vdf: vdf), listedApps: listedApps(in: text), kept: [], names: [:])
+        return Set(found.leftovers.map(\.id))
     }
 
     static func keep(_ ids: [String], defaults: UserDefaults = .standard) {
