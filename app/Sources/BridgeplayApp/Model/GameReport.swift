@@ -6,11 +6,9 @@ import SystemConfiguration
 // redaction its public log copy goes through. Sent by PlayReports.
 enum GameReport {
 
-    // The options of the Mac chip and memory dropdowns in .github/ISSUE_TEMPLATE/game-report.yml,
-    // so reports from the app and from the form read the same.
-    static let chips = ["M1", "M1 Pro", "M1 Max", "M1 Ultra", "M2", "M2 Pro", "M2 Max", "M2 Ultra",
-                        "M3", "M3 Pro", "M3 Max", "M3 Ultra", "M4", "M4 Pro", "M4 Max",
-                        "M5", "M5 Pro", "M5 Max"]
+    // The memory options of the dropdown in .github/ISSUE_TEMPLATE/game-report.yml, so reports
+    // from the app and from the form read the same. Chips are named by pattern, not a list,
+    // so a Mac newer than the form still reports its chip.
     static let memorySizes = [8, 16, 18, 24, 32, 36, 48, 64, 96, 128, 192, 256, 512]
     static let backends = ["dxmt", "dxvk", "wined3d", "d3dmetal"]
 
@@ -115,10 +113,12 @@ enum GameReport {
         return "off"
     }
 
-    // "Apple M5 Max" → "M5 Max"; a chip the form doesn't list is "Other".
+    // "Apple M5 Max" → "M5 Max", "Apple A18 Pro" → "A18 Pro"; anything else (a virtual Mac,
+    // an Intel brand string, a tier with a new name) is "Other".
     static func chip(_ brand: String) -> String {
-        let name = brand.replacingOccurrences(of: "Apple ", with: "").trimmingCharacters(in: .whitespaces)
-        return chips.contains(name) ? name : "Other"
+        var name = brand.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        if name.hasPrefix("Apple ") { name.removeFirst("Apple ".count) }
+        return name.wholeMatch(of: /[AM][1-9]\d{0,2}(?: (?:Pro|Max|Ultra))?/) != nil ? name : "Other"
     }
 
     static func memory(_ bytes: UInt64) -> String {

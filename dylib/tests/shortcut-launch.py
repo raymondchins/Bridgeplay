@@ -22,7 +22,10 @@ with tempfile.TemporaryDirectory(prefix="np-shortcut-icons-") as temporary:
     support.mkdir(parents=True)
     (support / "appinfo").write_text("#!/bin/sh\nprintf 'name=Game\\nicon=abc123\\n'\n")
     (support / "iconmaker").write_text(
-        '#!/bin/sh\nif [ "$1" = --shortcuts ]; then exec "$REAL_ICONMAKER" "$@"; fi\ncp "$1" "$2"\n')
+        '#!/bin/sh\nif [ "$1" = --shortcuts ]; then exec "$REAL_ICONMAKER" "$@"; fi\n'
+        # The real one would register the fixture bundle with this Mac's Launch Services.
+        'if [ "$1" = --games-category ]; then printf "%s\\n" "$2" >> "$HOME/games-category.calls"; exit 0; fi\n'
+        'cp "$1" "$2"\n')
     for helper in ("appinfo", "iconmaker"):
         (support / helper).chmod(0o755)
     steam = root / "Steam"
@@ -47,5 +50,6 @@ with tempfile.TemporaryDirectory(prefix="np-shortcut-icons-") as temporary:
     assert desktop_icon.read_bytes() == b"user icon"
     assert (support / "shortcut-icons/100/game.icns").read_bytes() == b"game art"
     assert not (support / "launchers").exists()
+    assert (root / "games-category.calls").read_text() == "100\n"
 
-print("shortcut-launch: Steam-made shortcuts get artwork, custom icons and bad arguments are left alone")
+print("shortcut-launch: Steam-made shortcuts get artwork and the games category, custom icons and bad arguments are left alone")

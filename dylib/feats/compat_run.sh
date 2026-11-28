@@ -161,6 +161,7 @@ case "$verb" in
     target=""
     read_app_meta
     resolve_icon && "$iconmaker" --shortcuts "$app_id" "$icon_cache" "$2/steam.icns" >> "$log" 2>&1 || true
+    [ ! -x "$iconmaker" ] || "$iconmaker" --games-category "$app_id" >> "$log" 2>&1 || true
     exit 0
     ;;
 esac
@@ -4433,8 +4434,14 @@ else
   echo "loader staging failed, game mode unavailable" >> "$log" 2>&1 || true
 fi
 
+# Spotlight and the Games app start the bundle with no arguments: Steam launches the game then.
+bare_game_id=$app_id
+! shortcut_game_id "$SteamGameId" || bare_game_id=$SteamGameId
+bare_start="exit 1"
+case "$bare_game_id" in ''|0|*[!0-9]*) ;; *) bare_start="exec /usr/bin/open steam://rungameid/$bare_game_id" ;; esac
 cat > "$loader_macos/launcher" <<LAUNCHER
 #!/bin/sh
+[ "\$#" -gt 0 ] || ${bare_start:-exit 1}
 export WINELOADER="$WINELOADER"
 wine_log="$loader_root/bridgeplay-wine.log"
 exec > "\$wine_log" 2>&1
@@ -4641,6 +4648,13 @@ if [ "$bundle_fast" = 1 ] && [ "$bundle_registered" = 1 ]; then
 elif [ -x "$lsregister" ] && "$lsregister" -f "$loader_app" >> "$log" 2>&1; then
   [ "${np_stamps_ready:-0}" != 1 ] || bundle_record 1
 fi
+# Shortcuts made before Bridgeplay filed them with games get the category on the next launch.
+for shortcut in "$HOME"/Applications/*.app; do
+  grep -qx "open steam://run/$app_id" "$shortcut/Contents/MacOS/run.sh" 2>/dev/null || continue
+  grep -q LSApplicationCategoryType "$shortcut/Contents/Info.plist" 2>/dev/null && continue
+  [ ! -x "$iconmaker" ] || "$iconmaker" --games-category "$app_id" >> "$log" 2>&1 || true
+  break
+done
 trap - EXIT
 mark "game start"
 np_started=$np_ms
