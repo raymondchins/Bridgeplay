@@ -3,6 +3,7 @@ import BridgeplayUI
 
 enum Pane: String, CaseIterable, Identifiable, Hashable {
     case status
+    case games
     case gameDefaults
     case prefixes
     case backups
@@ -13,6 +14,7 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
     var label: String {
         switch self {
         case .status: String(localized: "Status")
+        case .games: String(localized: "Games")
         case .gameDefaults: String(localized: "Game Defaults")
         case .prefixes: String(localized: "Prefixes")
         case .backups: String(localized: "Prefix Backups")
@@ -23,6 +25,7 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
     var symbol: String {
         switch self {
         case .status: "checklist"
+        case .games: "gamecontroller"
         case .gameDefaults: "slider.horizontal.3"
         case .prefixes: "externaldrive"
         case .backups: "externaldrive.badge.timemachine"
@@ -113,6 +116,7 @@ struct RootView: View {
                 Group {
                     switch pane {
                     case .status: StatusView()
+                    case .games: GamesView()
                     case .gameDefaults: GameDefaultsView()
                     case .prefixes: PrefixesView()
                     case .backups: BackupsView()

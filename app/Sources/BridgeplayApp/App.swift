@@ -6,6 +6,7 @@ struct BridgeplayApp: App {
 
     @State private var status = SystemStatus()
     @State private var prefixes = PrefixesModel()
+    @State private var games = GamesModel()
     @State private var pane: Pane = .status
     @State private var showsSetup = false
     @Environment(\.openWindow) private var openWindow
@@ -16,6 +17,7 @@ struct BridgeplayApp: App {
             RootView(pane: $pane, showsSetup: showsSetup)
                 .environment(status)
                 .environment(prefixes)
+                .environment(games)
                 .frame(minWidth: 800, minHeight: 600)
                 .onChange(of: pane) { prefixes.forgetOutcome() }
                 .onChange(of: status.snapshot?.installedRunners.map(\.id)) {
@@ -85,6 +87,8 @@ struct BridgeplayApp: App {
                 .keyboardShortcut("4", modifiers: .command)
             Button("Game Defaults") { pane = .gameDefaults }
                 .keyboardShortcut("5", modifiers: .command)
+            Button("Games") { pane = .games }
+                .keyboardShortcut("6", modifiers: .command)
 
             Divider()
 
@@ -93,11 +97,14 @@ struct BridgeplayApp: App {
                     switch pane {
                     case .status, .guide, .gameDefaults: await status.refresh()
                     case .prefixes, .backups: await prefixes.load()
+                    case .games:
+                        await games.load()
+                        await prefixes.load()
                     }
                 }
             }
             .keyboardShortcut("r", modifiers: .command)
-            .disabled(pane == .status || pane == .guide || pane == .gameDefaults ? !status.isIdle : prefixes.isLoading)
+            .disabled(pane == .status || pane == .guide || pane == .gameDefaults ? !status.isIdle : prefixes.isLoading || games.isLoading)
 
             Divider()
         }

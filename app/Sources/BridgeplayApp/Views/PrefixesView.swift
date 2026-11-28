@@ -60,69 +60,6 @@ struct PrefixesView: View {
             }
         }
         .task { await model.load() }
-        .confirmationDialog(
-            PrefixPrompt.deleteTitle(deleting),
-            isPresented: asking(.delete),
-            titleVisibility: .visible
-        ) {
-            Button(PrefixPrompt.deleteButton(deleting), role: .destructive) {
-                let targets = deleting
-                model.pendingConfirmation = nil
-                Task { await model.delete(targets) }
-            }
-            Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
-                .keyboardShortcut(.defaultAction)
-        } message: {
-            Text(PrefixPrompt.deleteMessage(
-                deleting,
-                backups: model.backups.filter { backup in deleting.contains { $0.id == backup.prefix.id } }.count))
-        }
-        .confirmationDialog(
-            PrefixPrompt.rebuildTitle(rebuilding, for: rebuildTool),
-            isPresented: asking(.rebuild),
-            titleVisibility: .visible
-        ) {
-            Button(PrefixPrompt.rebuildWithBackupButton(rebuilding)) {
-                model.confirmRebuild()
-            }
-            .keyboardShortcut(.defaultAction)
-            Button(PrefixPrompt.rebuildWithoutBackupButton(rebuilding)) {
-                model.confirmRebuild(keepBackup: false)
-            }
-            Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
-        } message: {
-            Text(PrefixPrompt.rebuildMessage())
-        }
-        .confirmationDialog(
-            PrefixPrompt.backUpTitle(backingUp),
-            isPresented: asking(.backUp),
-            titleVisibility: .visible
-        ) {
-            Button(PrefixPrompt.backUpButton(backingUp)) {
-                let targets = backingUp
-                model.pendingConfirmation = nil
-                Task { await model.backUp(targets) }
-            }
-            .keyboardShortcut(.defaultAction)
-            Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
-        } message: {
-            Text(PrefixPrompt.backUpMessage(backingUp, bytes: backUpBytes))
-        }
-        .confirmationDialog(
-            PrefixPrompt.clearShaderCacheTitle(clearingCache),
-            isPresented: asking(.clearShaderCache),
-            titleVisibility: .visible
-        ) {
-            Button(PrefixPrompt.clearShaderCacheButton(clearingCache), role: .destructive) {
-                let targets = clearingCache
-                model.pendingConfirmation = nil
-                Task { await model.clearShaderCaches(targets) }
-            }
-            Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
-                .keyboardShortcut(.defaultAction)
-        } message: {
-            Text(PrefixPrompt.clearShaderCacheMessage(bytes: model.shaderCacheBytes(clearingCache)))
-        }
         .prefixDialogs()
         .alert(
             "Winetricks",
@@ -143,63 +80,6 @@ struct PrefixesView: View {
         } message: { prefix in
             Text("Enter the Winetricks verbs to install in \(prefix.title), separated by spaces.")
         }
-    }
-
-    private enum Question {
-        case delete, rebuild, backUp, clearShaderCache
-    }
-
-    private var deleting: [WinePrefix] {
-        if case .delete(let targets) = model.pendingConfirmation { return targets }
-        return []
-    }
-
-    private var rebuilding: [WinePrefix] {
-        if case .rebuild(let targets, _) = model.pendingConfirmation { return targets }
-        return []
-    }
-
-    private var rebuildTool: InstalledTool? {
-        if case .rebuild(_, let tool) = model.pendingConfirmation { return tool }
-        return nil
-    }
-
-    private var backingUp: [WinePrefix] {
-        if case .backUp(let targets) = model.pendingConfirmation { return targets }
-        return []
-    }
-
-    private var backUpBytes: Int64? {
-        var total: Int64 = 0
-        for prefix in backingUp {
-            guard let bytes = model.usage[prefix.id]?.bytes else { return nil }
-            total += bytes
-        }
-        return total
-    }
-
-    private var clearingCache: [WinePrefix] {
-        if case .clearShaderCache(let targets) = model.pendingConfirmation { return targets }
-        return []
-    }
-
-    private func isAsking(_ question: Question) -> Bool {
-        switch (question, model.pendingConfirmation) {
-        case (.delete, .delete): true
-        case (.rebuild, .rebuild(_, _)): true
-        case (.backUp, .backUp): true
-        case (.clearShaderCache, .clearShaderCache): true
-        default: false
-        }
-    }
-
-    private func asking(_ question: Question) -> Binding<Bool> {
-        Binding(
-            get: { isAsking(question) },
-            set: { shown in
-                if !shown, isAsking(question) { model.pendingConfirmation = nil }
-            }
-        )
     }
 
     @ViewBuilder
@@ -476,9 +356,9 @@ struct PrefixesView: View {
     }
 }
 
-// A table cell's quiet text in the BP greys. On a selected row it takes the system's, which
-// turn light on the selection, where a fixed grey would be hard to read.
-private struct CellGrey: ViewModifier {
+// A table cell's quiet text in the BP greys (Prefixes and Games). On a selected row it takes
+// the system's, which turn light on the selection, where a fixed grey would be hard to read.
+struct CellGrey: ViewModifier {
     var faint = false
     @Environment(\.backgroundProminence) private var prominence
     @Environment(\.colorSchemeContrast) private var contrast
