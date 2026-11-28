@@ -156,7 +156,6 @@ final class SystemStatus {
         case installUnlicensed
         case toolUnlicensed
         case removeBuild
-        case removeEverything
         case stopLeftovers
 
         var id: Self { self }
@@ -1037,11 +1036,43 @@ final class SystemStatus {
         }
     }
 
-    func removeEverything() async {
+    // Remove Everything: the plan sheet first, then the checklist sheet.
+    var uninstallPlan: UninstallPlan?
+    var uninstallChecklist: UninstallChecklist?
+    var isPlanningUninstall = false
+
+    func planUninstall() async {
+        guard !isPlanningUninstall else { return }
+        isPlanningUninstall = true
+        defer { isPlanningUninstall = false }
+        uninstallChecklist = nil
+        uninstallPlan = await Task.detached(priority: .userInitiated) {
+            UninstallPlan.make(paths: .live)
+        }.value
+    }
+
+    func verifyUninstall() async {
+        guard uninstallChecklist != nil else { return }
+        let verification = await Task.detached(priority: .userInitiated) {
+            UninstallVerification.run(paths: .live)
+        }.value
+        uninstallChecklist?.verification = verification
+    }
+
+    func removeEverything(plan: UninstallPlan, trashing: Set<String>) async {
+        uninstallPlan = nil
+        let picked = plan.prefixes.map(\.prefix).filter { trashing.contains($0.id) }
         await perform(from: UninstallPhase.stoppingClient.label,
-                      retryAfterStoppingLeftovers: { await self.removeEverything() }) { progress in
+                      retryAfterStoppingLeftovers: { await self.removeEverything(plan: plan, trashing: trashing) }) { progress in
             defaultToolRetryPending = false
-            let result = try await Uninstall.run(leftovers: .live) { progress($0.label) }
+            let result = try await Uninstall.run(leftovers: .live, report: { progress($0.label) }, trashPrefixes: picked)
+            let paths = UninstallPaths.live
+            let checklist = await Task.detached(priority: .userInitiated) {
+                UninstallChecklist.make(plan: plan, outcome: result, paths: paths,
+                                        verification: .run(paths: paths))
+            }.value
+            AppLog.note("uninstall: verify \(checklist.verification.passed ? "passed" : "failed")")
+            uninstallChecklist = checklist
 
             let summary = result.partialRemoval ?? (result.steamNeedsRedownload
                 ? String(localized: "Bridgeplay has been removed. Steam could not be restored. Reinstall Steam from steampowered.com before using it again.")

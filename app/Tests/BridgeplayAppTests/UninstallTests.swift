@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import BridgeplayApp
@@ -675,6 +676,21 @@ struct UninstallTests {
         #expect(try layout.modifications.paths().isEmpty)
         #expect(try SteamModifications.inspect(first) == .clean)
         #expect(try SteamModifications.inspect(second) == .clean)
+    }
+
+    @Test("A prefix that could not be trashed fails the command but still prints the checklist")
+    func untrashedPrefixFailsTheCommand() async {
+        let printed = Mutex(false)
+        let exitCode = await RemoveEverythingCommand.perform(
+            remove: { _ in
+                var outcome = UninstallOutcome(steamInstalled: false, restoredValveSignature: false, removed: [])
+                outcome.notTrashed = [UninstallItem(url: URL(filePath: "/tmp/compatdata/1574480"), note: "No Trash")]
+                return outcome
+            },
+            finish: { _ in printed.withLock { $0 = true }; return "Remains:" })
+
+        #expect(exitCode == 1)
+        #expect(printed.withLock { $0 })
     }
 
     @Test("A conservatively recorded clean bundle is retired without repair")

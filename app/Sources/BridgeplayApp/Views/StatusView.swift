@@ -233,17 +233,19 @@ struct StatusView: View {
         } message: {
             Text("CrossOver itself is not removed.")
         }
-        .confirmationDialog(
-            String(localized: "Remove everything Bridgeplay has created?"),
-            isPresented: asking(.removeEverything),
-            titleVisibility: .visible
-        ) {
-            Button("Remove Everything", role: .destructive) {
-                Task { await status.removeEverything() }
+        .sheet(isPresented: Binding(get: { status.uninstallPlan != nil },
+                                    set: { if !$0 { status.uninstallPlan = nil } })) {
+            if let plan = status.uninstallPlan {
+                UninstallPlanSheet(plan: plan) { trashing in
+                    Task { await status.removeEverything(plan: plan, trashing: trashing) }
+                }
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(Uninstall.confirmation())
+        }
+        .sheet(isPresented: Binding(get: { status.uninstallChecklist != nil },
+                                    set: { if !$0 { status.uninstallChecklist = nil } })) {
+            if let checklist = status.uninstallChecklist {
+                UninstallChecklistSheet(checklist: checklist) { await status.verifyUninstall() }
+            }
         }
         .confirmationDialog(
             String(localized: "Stop the leftover Wine processes?"),
@@ -479,8 +481,8 @@ struct StatusView: View {
                 action: StatusAction(
                     label: String(localized: "Remove"),
                     role: .destructive,
-                    isEnabled: status.isIdle
-                ) { status.pendingConfirmation = .removeEverything }
+                    isEnabled: status.isIdle && !status.isPlanningUninstall
+                ) { Task { await status.planUninstall() } }
             )
         }
     }

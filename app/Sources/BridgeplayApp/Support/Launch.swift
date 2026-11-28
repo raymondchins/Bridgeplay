@@ -12,6 +12,8 @@ enum Launch {
         // Out of the launching process group, so stopping the game in Steam cannot take
         // the rebuild with it.
         if rebuilding { _ = setsid() }
+        // Read only: before the 3.0.0 move and the log, which would write the support folder.
+        if let flag = UninstallCheckCommand.requested { UninstallCheckCommand.run(flag) }
         // Before anything opens the support folder: the 3.0.0 move needs the old one intact.
         MainActor.assumeIsolated { MigrationLaunch.shared.runAtLaunch() }
         #if DEBUG

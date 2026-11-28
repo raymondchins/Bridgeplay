@@ -129,7 +129,22 @@ Also changed:
 - For Apple's MetalFX DLSS only, patched `crypt32` and `wintrust` pass NVIDIA's signature check on Apple's `nvngx.dll` (`ngx-signer-patch/`).
 - Some gamefixes turn off a game's Wine check to unlock DLSS, for example in Resident Evil Requiem and The Witcher 3.
 
-Valve doesn't support or endorse Bridgeplay, and modifying Steam may go against the [Steam Subscriber Agreement](https://store.steampowered.com/subscriber_agreement/). Use it at your own risk. **Repair Steam** or **Remove Everything** on the Status page restores Steam's `Info.plist`; if Valve's signature isn't back, reinstall Steam from Valve.
+Valve doesn't support or endorse Bridgeplay, and modifying Steam may go against the [Steam Subscriber Agreement](https://store.steampowered.com/subscriber_agreement/). Use it at your own risk.
+
+## Removing Bridgeplay
+
+**Remove Everything** on the Status page first lists what it will remove, with paths and sizes. It quits Steam, puts back Valve's signed Steam (from the copy kept on your Mac, or downloaded from Valve when there is none), and removes this account's Bridgeplay files under both the `bridgeplay` and the old `notproton` names. Game prefixes, which hold saves that aren't in Steam Cloud, stay unless you tick them; ticked ones go to the Trash. It ends with a checklist of what was removed and what stays, and checks that Steam is signed by Valve with no Bridgeplay file left in it.
+
+From Terminal:
+
+```sh
+/Applications/Bridgeplay.app/Contents/MacOS/BridgeplayApp --uninstall-plan       # what would go, changes nothing
+/Applications/Bridgeplay.app/Contents/MacOS/BridgeplayApp --remove-everything    # add --trash-prefixes <appid,...|all> for prefixes
+/Applications/Bridgeplay.app/Contents/MacOS/BridgeplayApp --verify-uninstall     # exit 0: Steam is Valve's and holds nothing of Bridgeplay's
+codesign --verify -R '=anchor apple generic and certificate leaf[subject.OU] = "MXGJJ98X76"' /Applications/Steam.app
+```
+
+The last line is the same signature check without Bridgeplay. Every macOS account on a shared `/Applications/Steam.app` stops getting Bridgeplay, but other accounts keep their own Bridgeplay files until they remove them from their account. Then drag Bridgeplay.app to the Trash. Details: [docs/UNINSTALL.md](docs/UNINSTALL.md).
 
 ## Online games and anti-cheat
 
