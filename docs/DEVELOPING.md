@@ -94,6 +94,53 @@ it notifies once per Steam update that removed Bridgeplay, or, in its second mod
 verdict for this build, Repair Steam and an open Bridgeplay app all stop it. Its lines in the
 app log start with `background check:`.
 
+`bridgeplay-run.log` gives each launch step a `time: <step> at <seconds>s` line, counted from
+the run script's start, with milliseconds where `/bin/date` has `%N` (macOS 27 does; older
+systems use perl, then whole seconds). When the game exits it adds `time: game exited at`, the
+first window as the launch panel saw it, and the first Metal frame when the overlay shim is
+loaded, both in seconds after the game started.
+
+### The outcome record
+
+After the exit summary, the run script writes `compatdata/<appid>/bridgeplay-last-launch` for
+the game launch (verb `waitforexitandrun`, never Steam's helpers), written aside and renamed
+over:
+
+| Key | Value |
+|---|---|
+| `version` | `1` |
+| `code` | one word from the table below |
+| `exit` | the game's exit status; empty when the game never started |
+| `seconds` | how long the game ran, whole seconds; `0` when it never started |
+| `stopped` | `steam` (Steam's Stop or Steam quitting), `game` or `unknown` |
+| `backend` | the backend id of `notproton-backend` (`d3dmetal`, `dxmt`, `dxvk`, `wined3d`, `dxmt-builtin`); empty before the backend step |
+| `engine` | the tool's build (`notproton-build`), such as `winecx-11.17` |
+| `window` | whole seconds from the game's start to its first window; empty when the launch panel watched until the game exited and saw none; left out when nothing watched (no app, the panel's 15-minute limit, or a stop before the game started) |
+| `ended` | Unix seconds when the record was written |
+
+| Code | When | `stopped` |
+|---|---|---|
+| `ok` | exit 0 after a minute or more | `game` |
+| `quit_early` | exit 0 within a minute, no Wine crash line | `game` |
+| `crashed` | a Wine crash line, with exit 0 within a minute, exit 1 or a code not listed here | `game` |
+| `generic_failure`, `game_error`, `exit_code` | exit 1, exit 255 (-1), any other code, without a crash line | `game` |
+| `abort` (3), `access_violation` (5), `fail_fast` (9), `invalid_parameter` (23), `illegal_instruction` (29), `dll_not_found` (53), `dll_init_failed` (66), `cpp_exception` (99), `heap_corruption` (116), `stack_overflow` (253) | the low byte of a Windows exception code | `game` |
+| `sigill` (132), `sigtrap` (133), `sigabrt` (134), `sigfpe` (136), `sigbus` (138), `sigsegv` (139) | Wine died of a crash in Mac-side code | `game` |
+| `sighup` (129), `sigint` (130), `sigkill` (137), `sigterm` (143) | Wine was killed from outside Steam | `unknown` |
+| `anticheat_driver` | a kernel anti-cheat could not load its Windows driver | `game` |
+| `stopped_from_steam` | Steam's Stop, or Steam quitting | `steam` |
+| `launch_services` | `BRIDGEPLAY_LAUNCH_SERVICES=1`, so the status is `open`'s | `unknown` |
+| `anticheat_blocked` | the kernel anti-cheat prompt got no Launch Anyway | `unknown` |
+| `rosetta_missing` | Rosetta 2 is missing and the engine's loader cannot start | `unknown` |
+| `engine_missing` | the tool's engine is not set up | `unknown` |
+| `engine_unsupported` | Wine through FEX on macOS before 26.5 | `unknown` |
+| `aborted` | any other stop before the game started | `steam` when Steam's Stop did it, else `unknown` |
+
+The codes before the game started (the last five) leave `exit` empty and `seconds` at `0`.
+`=== session health:` in the run log is separate: `healthy` only after a minute or more
+without a crash, `failed` for a crash within the first minute that Steam did not stop, and
+`unknown` with its reason otherwise.
+
 ## Checks
 
 | Command | Runs |

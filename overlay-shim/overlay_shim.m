@@ -23,6 +23,7 @@
 #import <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #import <unistd.h>
 
 __attribute__((format(printf, 1, 2)))
@@ -1060,8 +1061,12 @@ static id hook_next_drawable(id layer, SEL selector)
 
 	if (!next_drawable_logged) {
 		next_drawable_logged = 1;
-		shim_log("overlay_shim hook_next_drawable: layer=%s drawable=%s\n",
-		        class_getName(object_getClass(layer)), drawable != nil ? "yes" : "no");
+		// t is milliseconds since 1970: the run script logs the first frame from it.
+		struct timespec now = {0};
+		clock_gettime(CLOCK_REALTIME, &now);
+		shim_log("overlay_shim hook_next_drawable: layer=%s drawable=%s t=%lld\n",
+		        class_getName(object_getClass(layer)), drawable != nil ? "yes" : "no",
+		        (long long)now.tv_sec * 1000 + now.tv_nsec / 1000000);
 	}
 
 	if (framegen_enabled) {

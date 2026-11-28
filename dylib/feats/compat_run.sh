@@ -221,6 +221,33 @@ without_lock_fds() {
 export WINEDLLPATH="$CX_ROOT/lib/wine/x86_64-windows:$wine_unix${WINEDLLPATH:+:$WINEDLLPATH}"
 export PATH="$CX_ROOT/bin:$PATH"
 
+# Milliseconds since 1970 in np_ms, for the step times. /bin/date has %N on macOS 27; without
+# it perl, then whole seconds.
+np_clock=seconds
+np_ms=$(/bin/date +%s%N 2>/dev/null) || np_ms=""
+case "$np_ms" in
+  *[!0-9]*|'') [ ! -x /usr/bin/perl ] || ! /usr/bin/perl -MTime::HiRes -e 1 2>/dev/null || np_clock=perl-hires ;;
+  *) [ "${#np_ms}" -lt 19 ] || np_clock=date-ns ;;
+esac
+np_now_ms() {
+  case "$np_clock" in
+    date-ns) np_ms=$(/bin/date +%s%N 2>/dev/null) || np_ms=""; np_ms=${np_ms%??????} ;;
+    perl-hires) np_ms=$(/usr/bin/perl -MTime::HiRes=time -e 'printf "%d", time * 1000' 2>/dev/null) || np_ms="" ;;
+    *) np_ms=$(date +%s 2>/dev/null)000 ;;
+  esac
+  # Never anything set -e or the arithmetic could stop the launch on.
+  case "$np_ms" in ''|*[!0-9]*) np_ms=${np_t0:-0} ;; esac
+}
+# Milliseconds as seconds with three decimals, in np_sec.
+np_seconds() {
+  [ "$1" -ge 0 ] || set -- 0
+  np_sec=$(($1 % 1000))
+  case "$np_sec" in [0-9]) np_sec=00$np_sec ;; [0-9][0-9]) np_sec=0$np_sec ;; esac
+  np_sec="$(($1 / 1000)).$np_sec"
+}
+np_now_ms
+np_t0=$np_ms
+
 if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   log="$STEAM_COMPAT_DATA_PATH/bridgeplay-run.log"
 else
@@ -230,6 +257,7 @@ fi
   && : > "$log" || true
 {
   echo "=== bridgeplay run $(date) ==="
+  echo "time: steps are seconds since this run started (clock: $np_clock)"
   echo "verb=$verb"
   echo "args:"; for a in "$@"; do printf '  [%s]\n' "$a"; done
   echo "cwd=$(pwd)"
@@ -277,13 +305,52 @@ heal_wine_tmp() {
 }
 heal_wine_tmp /tmp
 
-stage_step="startup"
+# The step the launch is on, for the abort line, logged with its time.
+mark() {
+  stage_step=$1
+  np_now_ms
+  np_seconds $((np_ms - np_t0))
+  echo "time: $1 at ${np_sec}s" >> "$log" 2>&1 || true
+}
+
+# How the last game launch ended, for Bridgeplay's Status page: KEY=VALUE lines, written aside
+# and renamed over. code is one word from the list in docs/DEVELOPING.md, never a sentence.
+# Arguments: code, game exit status (empty when it never ran), seconds it ran, who stopped it
+# (steam, game or unknown), seconds to its first window (empty when the launch panel watched
+# and saw none, - when nothing watched, which leaves the key out).
+write_last_launch() {
+  [ "$verb" = waitforexitandrun ] && [ -n "$STEAM_COMPAT_DATA_PATH" ] || return 0
+  ll_file="$STEAM_COMPAT_DATA_PATH/bridgeplay-last-launch"
+  rm -f "$ll_file.new" 2>/dev/null || true
+  ll_window="window=$5
+"
+  [ "$5" != - ] || ll_window=""
+  if ! { printf 'version=1\ncode=%s\nexit=%s\nseconds=%s\nstopped=%s\nbackend=%s\nengine=%s\n%sended=%s\n' \
+      "$1" "$2" "$3" "$4" "${backend:-}" "${np_build:-}" "$ll_window" "$(date +%s)" > "$ll_file.new" \
+    && mv -f "$ll_file.new" "$ll_file"; } 2>/dev/null; then
+    rm -f "$ll_file.new" 2>/dev/null || true
+    echo "=== could not record the outcome in $ll_file ===" >> "$log" 2>&1 || true
+  fi
+}
+
+# Set before an exit that has its own outcome code.
+np_outcome=""
+mark startup
 # shellcheck disable=SC2329 # the trap below invokes this
 report_early_exit() {
   status=$?
-  [ "$status" = 0 ] && return 0
-  echo "=== aborted during $stage_step (exit $status) before launch ===" \
-    >> "$log" 2>&1 || true
+  # A signal (Steam's Stop) reaches this with status 0, as does only the anti-cheat
+  # prompt's exit, which sets its outcome.
+  if [ "$status" != 0 ]; then
+    echo "=== aborted during $stage_step (exit $status) before launch ===" \
+      >> "$log" 2>&1 || true
+    write_last_launch "${np_outcome:-aborted}" "" 0 unknown -
+  elif [ -z "$np_outcome" ]; then
+    echo "=== stopped during $stage_step before launch ===" >> "$log" 2>&1 || true
+    write_last_launch aborted "" 0 steam -
+  else
+    write_last_launch "$np_outcome" "" 0 unknown -
+  fi
 }
 trap report_early_exit EXIT
 
@@ -770,6 +837,12 @@ select_backend() {
     backend_from=default
   fi
   backend=$wanted
+  # A conf Bridgeplay ships names a backend for the engines that have it (BACKEND=wined3d for
+  # the ones without D3DMetal), so on another engine the next one is the plan, not a fallback.
+  shipped_choice=""
+  case "$backend_from" in "BACKEND in the default conf"|"BACKEND in the shipped-global conf")
+    shipped_choice=${gamefix_from_BACKEND} ;;
+  esac
   while ! backend_available "$backend"; do
     case "$backend" in
       d3dmetal) why="no d3dmetal.enabled marker"; next=dxmt ;;
@@ -779,8 +852,14 @@ select_backend() {
         why="no x86_64 DLLs in notproton-backends/$backend"
         if d3dmetal_engine; then next=d3dmetal; else next=wined3d; fi ;;
     esac
-    graphics_log "$backend is not available ($why), falling back to $next"
-    backend_from="$backend_from, fell back from $backend"
+    if [ -n "$shipped_choice" ]; then
+      graphics_log "the $shipped_choice conf's BACKEND=$backend is for engines that have it, this one does not ($why), so the game runs on $next"
+      backend_from="the $shipped_choice conf's BACKEND=$backend is for other engines"
+      shipped_choice=""
+    else
+      graphics_log "$backend is not available ($why), falling back to $next"
+      backend_from="$backend_from, fell back from $backend"
+    fi
     backend=$next
   done
   # A game whose exe imports d3d12.dll is a D3D12 game.
@@ -789,6 +868,27 @@ select_backend() {
     backend_from="$backend_from, moved to d3dmetal because the game imports d3d12.dll"
     backend=d3dmetal
   fi
+}
+
+# Wine through FEX has no D3DMetal and no Direct3D 12 (its DXMT is Direct3D 10 and 11). A game
+# that needs either is told so once per prefix and build, in a notification beside the launch,
+# and the log says it every launch. The Rosetta tool of the same CrossOver has both.
+fex_graphics_notice() {
+  [ "${wine_unix##*/}" = aarch64-unix ] && [ "$verb" = waitforexitandrun ] || return 0
+  if imports_d3d12 "$1"; then
+    graphics_log "the game imports d3d12.dll, and Wine through FEX has no Direct3D 12 yet, so it may quit or stay black"
+    fex_title="This game needs Direct3D 12"
+    fex_body="Wine through FEX can't run Direct3D 12 yet, so the game may quit or stay black. For Direct3D 12, pick this CrossOver's Rosetta tool in the game's Compatibility settings in Steam."
+  else
+    case " $np_dropped " in *" CX_GRAPHICS_BACKEND=d3dmetal "*) ;; *) return 0 ;; esac
+    graphics_log "D3DMetal was asked for, and Wine through FEX has none, so the engine picks the graphics"
+    fex_title="D3DMetal is off on FEX"
+    fex_body="Wine through FEX has no D3DMetal, so the game runs without it. For D3DMetal, pick this CrossOver's Rosetta tool in the game's Compatibility settings in Steam."
+  fi
+  fex_mark="$STEAM_COMPAT_DATA_PATH/bridgeplay-fex-noticed"
+  [ -n "$STEAM_COMPAT_DATA_PATH" ] && [ "$(sed -n 1p "$fex_mark" 2>/dev/null)" != "$np_build" ] || return 0
+  printf '%s\n' "$np_build" > "$fex_mark" 2>/dev/null || true
+  notify_user "$fex_title" "$fex_body"
 }
 
 # Returns 0 when the destination already matches or was replaced.
@@ -1401,6 +1501,8 @@ APPLESCRIPT
 launch_progress() {
   [ "$verb" = waitforexitandrun ] && [ "$app_id" != 0 ] || return 0
   launch_step_file="$STEAM_COMPAT_DATA_PATH/bridgeplay-launch-step"
+  # The panel writes the time it saw the game's first window here, read when the game exits.
+  rm -f "$STEAM_COMPAT_DATA_PATH/bridgeplay-first-window" 2>/dev/null || true
   launch_step "$1"
   progress_app=$(cat "$np_support/app-executable" 2>/dev/null) || progress_app=""
   # An app from before the panel would open its main window for a flag it does not know.
@@ -1410,6 +1512,7 @@ launch_progress() {
       "$progress_app" --launch-progress "$STEAM_COMPAT_DATA_PATH" "$prefix_was_new" \
       "$np_support/launchers/$app_id/bridgeplay-wine.log" "$$" \
       < /dev/null > /dev/null 2>&1 7>&- 8>&- 9>&- &
+    np_panel_pid=$!
     echo "launch: progress panel started (new prefix: $prefix_was_new)" >> "$log" 2>&1 || true
   elif [ "$prefix_was_new" = 1 ]; then
     notify_user "Getting this game ready" "The first launch sets the game up and prepares its graphics. It can take a few minutes, and the screen may stay black until it is ready."
@@ -1541,6 +1644,7 @@ APPLESCRIPT
     echo "=== exit summary: not launched, stopped before Wine started ==="
     echo "=== exit cause: blocked: kernel anti-cheat $ka_found not confirmed, $ka_why ==="
   } >> "$log" 2>&1 || true
+  np_outcome=anticheat_blocked
   exit 0
 }
 
@@ -1735,17 +1839,42 @@ note_other_build() {
   fi
 }
 
-# Healthy is a session Steam did not cut short or that lasted, with no Wine crash. Failed is a
-# crash within the first minute. Anything else says nothing about the build.
+# The lines Wine prints when a process dies or cannot start: what the exit summary quotes and
+# what makes a session crashed.
+wine_crash_pattern() {
+  printf '%s' 'Unhandled (page fault|exception|illegal instruction|stack overflow)|^wine: (Call from|could not|cannot|failed)|err:module:(import_dll|LdrInitializeThunk)|wine client error'
+}
+
+# Exit statuses that are crashes, from exit_meaning and exit_signal: Windows exception codes
+# and the signals of a Mac-side crash.
+crash_status() {
+  case "$1" in
+    3|5|9|23|29|53|66|99|116|253|132|133|134|136|138|139) return 0 ;;
+  esac
+  return 1
+}
+
+# Healthy is a session that ran a minute or more without a crash. Failed is a crash within the
+# first minute that Steam did not stop. Anything else, a quick quit without a crash too, says
+# nothing about the build. Prints the word, then the reason after a comma when it is not
+# healthy. Arguments: the Wine log, seconds, 1 if Steam stopped it, the exit status.
 session_health() {
   crashed=0
-  grep -q -E 'Unhandled (page fault|exception)|err:module:import_dll' "$1" 2>/dev/null && crashed=1
-  if [ "$crashed" = 1 ] && [ "$2" -lt 60 ] && [ "$3" != 1 ]; then
-    echo failed
-  elif [ "$crashed" = 0 ] && { [ "$3" != 1 ] || [ "$2" -ge 60 ]; }; then
+  grep -a -q -E "$(wine_crash_pattern)" "$1" 2>/dev/null && crashed=1
+  # Through Launch Services the status is open's, not the game's.
+  if [ "${NOTPROTON_LAUNCH_SERVICES:-0}" != 1 ] && crash_status "${4:-0}"; then crashed=1; fi
+  if [ "$crashed" = 0 ] && [ "$2" -ge 60 ]; then
     echo healthy
+  elif [ "$3" = 1 ] && [ "$crashed" = 1 ]; then
+    echo "unknown, stopped from Steam after a crash"
+  elif [ "$3" = 1 ]; then
+    echo "unknown, stopped from Steam within a minute"
+  elif [ "$crashed" = 1 ] && [ "$2" -lt 60 ]; then
+    echo "failed, a crash within the first minute"
+  elif [ "$crashed" = 1 ]; then
+    echo "unknown, a crash after the first minute"
   else
-    echo unknown
+    echo "unknown, quit within a minute"
   fi
 }
 
@@ -1760,8 +1889,10 @@ set_switch_state() {
 # Two healthy sessions clear it.
 record_session() {
   switch="$STEAM_COMPAT_DATA_PATH/notproton-switch"
-  health=$(session_health "$1" "$2" "$3")
-  echo "=== session health: $health after $2s ===" >> "$log" 2>&1 || true
+  health=$(session_health "$1" "$2" "$3" "$4")
+  health_why=""
+  case "$health" in *", "*) health_why=", ${health#*, }"; health=${health%%, *} ;; esac
+  echo "=== session health: $health after $2s$health_why ===" >> "$log" 2>&1 || true
   case "$health" in
     healthy)
       printf '%s\n' "$np_build" > "$STEAM_COMPAT_DATA_PATH/notproton-healthy" 2>/dev/null || true
@@ -1816,13 +1947,53 @@ exit_signal() {
   esac
 }
 
-# The lines Wine prints when a process dies or cannot start. iconv drops invalid bytes, so
-# the run log stays UTF-8 for the app, and keeps a home folder with an accented name whole for
-# the report's redaction to match.
+# Wine's crash lines, the first three. iconv drops invalid bytes, so the run log stays UTF-8
+# for the app, and keeps a home folder with an accented name whole for the report's redaction
+# to match.
 exit_crash_lines() {
   [ -f "$1" ] || return 0
-  grep -a -E -m 3 'Unhandled (page fault|exception|illegal instruction|stack overflow)|^wine: (Call from|could not|cannot|failed)|err:module:(import_dll|LdrInitializeThunk)|wine client error' \
+  grep -a -E -m 3 "$(wine_crash_pattern)" \
     "$1" 2>/dev/null | LC_ALL=C tr -d '\0-\10\13-\37\177' | LC_ALL=C cut -b 1-300 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null || true
+}
+
+# The outcome record's code, then who stopped the game (steam, game or unknown): the exit
+# summary's account as fixed words (docs/DEVELOPING.md). Same arguments as exit_summary.
+exit_outcome() {
+  if [ "$3" = 1 ]; then echo "stopped_from_steam steam"; return 0; fi
+  if [ "${NOTPROTON_LAUNCH_SERVICES:-0}" = 1 ]; then echo "launch_services unknown"; return 0; fi
+  if [ -n "$(exit_anticheat "$4")" ]; then echo "anticheat_driver game"; return 0; fi
+  case "$1" in
+    129) echo "sighup unknown" ;;
+    130) echo "sigint unknown" ;;
+    132) echo "sigill game" ;;
+    133) echo "sigtrap game" ;;
+    134) echo "sigabrt game" ;;
+    136) echo "sigfpe game" ;;
+    137) echo "sigkill unknown" ;;
+    138) echo "sigbus game" ;;
+    139) echo "sigsegv game" ;;
+    143) echo "sigterm unknown" ;;
+    3) echo "abort game" ;;
+    5) echo "access_violation game" ;;
+    9) echo "fail_fast game" ;;
+    23) echo "invalid_parameter game" ;;
+    29) echo "illegal_instruction game" ;;
+    53) echo "dll_not_found game" ;;
+    66) echo "dll_init_failed game" ;;
+    99) echo "cpp_exception game" ;;
+    116) echo "heap_corruption game" ;;
+    253) echo "stack_overflow game" ;;
+    *)
+      eo_crashed=0
+      grep -a -q -E "$(wine_crash_pattern)" "$4" 2>/dev/null && eo_crashed=1
+      if [ "$1" = 0 ] && [ "$2" -ge 60 ]; then echo "ok game"
+      elif [ "$eo_crashed" = 1 ]; then echo "crashed game"
+      elif [ "$1" = 0 ]; then echo "quit_early game"
+      elif [ "$1" = 1 ]; then echo "generic_failure game"
+      elif [ "$1" = 255 ]; then echo "game_error game"
+      else echo "exit_code game"
+      fi ;;
+  esac
 }
 
 # How the game ended, in one line, plus Wine's crash lines. GameSession.swift reads these
@@ -1855,6 +2026,53 @@ exit_summary() {
   # winedbg's "has encountered a serious problem" dialog holds the game open until closed.
   if grep -a -q -E 'starting debugger|exe=winedbg' "$4" 2>/dev/null; then
     echo "=== exit note: Wine started its crash handler, whose error dialog can sit behind the game ==="
+  fi
+}
+
+# Milliseconds since 1970 at which the launch panel saw the game's first window, from the file
+# it writes in compatdata $1 (LaunchProgress.swift).
+first_window_ms() {
+  fw_ms=$(sed -n 1p "$1/bridgeplay-first-window" 2>/dev/null) || return 1
+  case "$fw_ms" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s' "$fw_ms"
+}
+
+# The same for the first Metal drawable, from the overlay shim's line in the Wine log $1.
+first_frame_ms() {
+  ff_ms=$(grep -a -m 1 -o 'overlay_shim hook_next_drawable: .* t=[0-9]*' "$1" 2>/dev/null | sed 's/.* t=//')
+  case "$ff_ms" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s' "$ff_ms"
+}
+
+# Succeeds while process $1 runs; a zombie has ended.
+process_running() {
+  pr_stat=$(ps -o stat= -p "$1" 2>/dev/null) || return 1
+  case "$pr_stat" in ''|Z*) return 1 ;; esac
+}
+
+# The game's times since its start, which was $1 in milliseconds since 1970; it exited at $2.
+# Sets np_window to the whole seconds to its first window: empty when the launch panel was
+# still watching when the game exited ($4 is 1) and saw none, - when nothing watched (no app,
+# or the panel's time limit). $3 is the Wine log.
+launch_times() {
+  np_seconds $(($2 - np_t0))
+  echo "time: game exited at ${np_sec}s"
+  np_window=-
+  if lt_ms=$(first_window_ms "$STEAM_COMPAT_DATA_PATH"); then
+    [ "$lt_ms" -ge "$1" ] || lt_ms=$1
+    np_window=$(((lt_ms - $1) / 1000))
+    np_seconds $((lt_ms - $1))
+    echo "time: first window ${np_sec}s after the game started"
+  elif [ "${4:-0}" = 1 ]; then
+    np_window=""
+    echo "time: no first window noted"
+  else
+    echo "time: first window not measured, the launch panel was not watching"
+  fi
+  if lt_ms=$(first_frame_ms "$3"); then
+    [ "$lt_ms" -ge "$1" ] || lt_ms=$1
+    np_seconds $((lt_ms - $1))
+    echo "time: first frame ${np_sec}s after the game started"
   fi
 }
 
@@ -2566,24 +2784,52 @@ import_prefix_settings() {
     || echo "=== prefix settings import exited status=$import_status ===" >> "$log" 2>&1 || true
 }
 
-stage_step="runner check"
+mark "runner check"
 if [ -z "$np_build" ] || [ ! -d "$CX_ROOT/lib/wine" ]; then
   echo "=== build ${np_build:-(none recorded)} behind this compatibility tool is not set up, set it up in Bridgeplay ===" >> "$log" 2>&1 || true
   show_alert "CrossOver is not set up" "The CrossOver build behind $(alert_safe "$np_display") is not set up. Set it up in Bridgeplay, or pick another compatibility tool for this game."
+  np_outcome=engine_missing
   exit 1
 fi
 echo "runner: build $np_build ($np_display) at $CX_ROOT" >> "$log" 2>&1 || true
 
+# Whether the engine's loader starts at all: wine --version stops before any prefix or server.
+engine_loader_runs() {
+  without_lock_fds "$WINELOADER" --version >> "$log" 2>&1 < /dev/null
+}
+
+# Succeeds when macOS is older than $1.$2.
+macos_before() {
+  /usr/bin/sw_vers -productVersion 2>/dev/null \
+    | awk -F . -v major="$1" -v minor="$2" '{ found = 1; old = ($1 + 0 < major || ($1 + 0 == major && $2 + 0 < minor)) }
+      END { exit !(found && old) }'
+}
+
 # Intel Wine needs Rosetta 2; without it every Wine call fails with "Bad CPU type" and the
 # prefix check misreports it as a broken prefix. macOS updates can drop Rosetta.
-stage_step="rosetta check"
+mark "rosetta check"
 case "$(/usr/bin/file -b "$WINESERVER" 2>/dev/null)" in
-  *arm64*) ;;
-  *)
-    if ! /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
-      echo "=== Rosetta 2 is not installed, Wine cannot run: softwareupdate --install-rosetta --agree-to-license ===" >> "$log" 2>&1 || true
-      show_alert "Rosetta 2 is not installed" "Windows games need Rosetta 2, and this Mac does not have it (a macOS update can remove it). Install it in Terminal with: softwareupdate --install-rosetta --agree-to-license, then launch the game again."
+  *arm64*)
+    # ARM64 Wine needs what macOS 26.5 added (CrossOver falls back to Rosetta before it).
+    if [ "${wine_unix##*/}" = aarch64-unix ] && macos_before 26 5 && ! engine_loader_runs; then
+      echo "=== Wine through FEX did not start: it needs macOS 26.5 or later ===" >> "$log" 2>&1 || true
+      show_alert "This tool needs macOS 26.5" "$(alert_safe "$(preview_name "${np_display% - FEX}")") runs Windows games through FEX, which needs macOS 26.5 or later. Update macOS, or pick this CrossOver's Rosetta tool in the game's Compatibility settings in Steam."
+      np_outcome=engine_unsupported
       exit 1
+    fi
+    ;;
+  *)
+    # Probing a Mac tool can fail where the engine still runs (macOS 28's game test mode keeps
+    # Rosetta for games only), so the engine's own loader decides.
+    if ! /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
+      if engine_loader_runs; then
+        echo "=== arch -x86_64 failed, but the engine's loader runs, so Rosetta is there for it ===" >> "$log" 2>&1 || true
+      else
+        echo "=== Rosetta 2 is not installed, Wine cannot run: softwareupdate --install-rosetta --agree-to-license ===" >> "$log" 2>&1 || true
+        show_alert "Rosetta 2 is not installed" "Windows games need Rosetta 2, and this Mac does not have it (a macOS update can remove it). Install it in Terminal with: softwareupdate --install-rosetta --agree-to-license, then launch the game again."
+        np_outcome=rosetta_missing
+        exit 1
+      fi
     fi
     ;;
 esac
@@ -3163,20 +3409,20 @@ link_fonts() {
 
 # Lays out the profile, drives, settings and fonts of the prefix the launch will use.
 set_up_prefix_contents() {
-  stage_step="profile layout"
+  mark "profile layout"
   if ! lay_out_proton_profile; then
     show_alert "Saved-game folders need attention" "Bridgeplay left the conflicting files in place. Open this prefix's bridgeplay-run.log for details before trying again."
     exit 1
   fi
   [ "$verb" != waitforexitandrun ] || echo "video: RetinaMode=${NOTPROTON_RETINA:-0}" >> "$log" 2>&1 || true
-  stage_step="game drive"
+  mark "game drive"
   map_game_drive
-  stage_step="prefix settings"
+  mark "prefix settings"
   import_prefix_settings
-  stage_step="fonts"
+  mark "fonts"
   link_fonts
   # A prefix that Wine built just now only has dosdevices from this point on.
-  stage_step="game drive"
+  mark "game drive"
   map_game_drive
 }
 
@@ -3193,18 +3439,18 @@ native_vc_runtime() {
 }
 
 if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
-  stage_step="anti-cheat check"
+  mark "anti-cheat check"
   kernel_anticheat_notice
   export WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
-  stage_step="prefix lock"
+  mark "prefix lock"
   prepare_prefix_directory
   resolve_msync
   export WINEMSYNC="${WINEMSYNC:-0}"
   printf '%s' "$WINEMSYNC" \
     > "$STEAM_COMPAT_DATA_PATH/notproton-msync" 2>/dev/null || true
-  stage_step="prefix build check"
+  mark "prefix build check"
   note_other_build
-  stage_step="prefix arch check"
+  mark "prefix arch check"
   refuse_foreign_prefix
   prefix_was_new=0
   [ -f "$WINEPREFIX/system.reg" ] || prefix_was_new=1
@@ -3212,7 +3458,7 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   find_client_root "$STEAM_COMPAT_CLIENT_INSTALL_PATH"
   note_prefix_volume
   note_other_prefixes
-  stage_step="prefix switch check"
+  mark "prefix switch check"
   offer_switch_rebuild
   echo "sync: WINEMSYNC=$WINEMSYNC from $msync_from" >> "$log" 2>&1 || true
   if [ "${wine_unix##*/}" = aarch64-unix ]; then
@@ -3222,26 +3468,27 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   fi
   without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
   if [ "$prefix_was_new" = 1 ]; then launch_progress setup; else launch_progress prepare; fi
-  stage_step="prefix seed"
+  mark "prefix seed"
   seed_prefix_from_template
   set_up_prefix_contents
-  stage_step="prefix check"
+  mark "prefix check"
   refuse_broken_prefix
   if [ "${broken_rebuilt:-0}" = 1 ]; then
     launch_step prepare
     set_up_prefix_contents
-    stage_step="prefix check"
+    mark "prefix check"
     refuse_broken_prefix
   fi
 fi
 low_power_notice
 launch_step prepare
 
-stage_step="graphics backend"
+mark "graphics backend"
 select_backend "$1"
 activate_backend || true
 record_backend || true
 stage_rockstar_shim || true
+fex_graphics_notice "$1" || true
 # An engine without lib/notproton-backends (CrossOver) picks its graphics itself, from
 # CX_GRAPHICS_BACKEND, so the log names that choice, not the dxmt-builtin placeholder.
 if [ "$backend" = dxmt-builtin ]; then
@@ -3388,7 +3635,7 @@ place_bridge_file() {
   cp -c -fp "$origin" "$2" 2>/dev/null || cp -fp "$bridge_src/$1" "$2" 2>> "$log"
 }
 if [ -d "$bridge_src" ] && [ -n "$WINEPREFIX" ]; then
-  stage_step="bridge staging"
+  mark "bridge staging"
   mkdir -p "$prefix_steam"
   bridge_cache=""
   if [ -n "$STEAM_COMPAT_DATA_PATH" ] && ! same_volume "$bridge_src" "$STEAM_COMPAT_DATA_PATH" \
@@ -3464,7 +3711,10 @@ fi
 
 export WINEDEBUG="${WINEDEBUG:-err+all,fixme-all}"
 exec 8>&-
-trap - EXIT
+# Helpers report their own status. A game launch can still stop while its launcher bundle is
+# built, so it keeps the abort report until the game starts.
+[ "$verb" = waitforexitandrun ] || trap - EXIT
+mark "launcher bundle"
 printf 'launch_args=%s\n' "$launch_args" >> "$log" 2>&1 || true
 printf '=== launching (%s): %s %s ===\n' "$verb" "$WINELOADER" "$*" >> "$log" 2>&1 || true
 
@@ -3822,7 +4072,9 @@ set -- \
 lsregister="/System/Library/Frameworks/CoreServices.framework/Versions/A"
 lsregister="$lsregister/Frameworks/LaunchServices.framework/Support/lsregister"
 [ -x "$lsregister" ] && "$lsregister" -f "$loader_app" >> "$log" 2>&1 || true
-np_started=$(date +%s)
+trap - EXIT
+mark "game start"
+np_started=$np_ms
 np_terminated=0
 launch_step start
 if [ "${NOTPROTON_LAUNCH_SERVICES:-0}" = "1" ]; then
@@ -3861,13 +4113,23 @@ open_pid=$!
 /usr/bin/caffeinate -d -i -w "$open_pid" >> "$log" 2>&1 5>&- &
 status=0
 wait "$open_pid" || status=$?
+# Before the step file tells it to quit: a panel still up saw no window.
+np_watched=0
+[ -z "${np_panel_pid:-}" ] || ! process_running "$np_panel_pid" || np_watched=1
 launch_step ended
-np_ran=$(($(date +%s) - np_started))
+np_now_ms
+np_ended=$np_ms
+np_ran=$(((np_ended - np_started) / 1000))
 echo "=== game exited status=$status, killing wine prefix ===" >> "$log" 2>&1 || true
 kill_wine_prefix
+wine_log="$loader_root/bridgeplay-wine.log"
 [ -z "$STEAM_COMPAT_DATA_PATH" ] \
-  || record_session "$loader_root/bridgeplay-wine.log" "$(($(date +%s) - np_started))" "$np_terminated"
+  || record_session "$wine_log" "$np_ran" "$np_terminated" "$status"
 # After the teardown, so reading a long Wine log never holds the prefix up.
-exit_summary "$status" "$np_ran" "$np_terminated" "$loader_root/bridgeplay-wine.log" >> "$log" 2>&1 || true
+exit_summary "$status" "$np_ran" "$np_terminated" "$wine_log" >> "$log" 2>&1 || true
+np_window=-
+launch_times "$np_started" "$np_ended" "$wine_log" "$np_watched" >> "$log" 2>&1 || true
+outcome=$(exit_outcome "$status" "$np_ran" "$np_terminated" "$wine_log") || outcome="exit_code unknown"
+write_last_launch "${outcome%% *}" "$status" "$np_ran" "${outcome#* }" "$np_window"
 echo "=== wine prefix killed, session ending ===" >> "$log" 2>&1 || true
 exit $status

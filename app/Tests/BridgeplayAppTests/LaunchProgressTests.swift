@@ -134,4 +134,18 @@ struct LaunchProgressTests {
         #expect(LaunchProgressWatcher.windowOwner(window(layer: -1)) == nil)
     }
 
+    @Test("The first window's time is milliseconds since 1970, in the file the run script reads")
+    func notesTheFirstWindow() throws {
+        let dir = try scratchDirectory("first-window")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let compatdata = dir.path(percentEncoded: false)
+        LaunchProgressCommand.noteFirstWindow(compatdata: compatdata, at: Date(timeIntervalSince1970: 1_795_765_878.625))
+        let text = try String(contentsOfFile: compatdata + "/" + LaunchProgressCommand.firstWindowName, encoding: .utf8)
+        #expect(text == "1795765878625\n")
+        let script = try String(
+            contentsOf: URL(filePath: #filePath).deletingLastPathComponent()
+                .appending(path: "../../../dylib/feats/compat_run.sh").standardizedFileURL, encoding: .utf8)
+        #expect(script.contains("/\(LaunchProgressCommand.firstWindowName)\""))
+    }
+
 }
