@@ -259,6 +259,30 @@ struct BackgroundItemTests {
         #expect(BackgroundItem.state(for: .requiresApproval, plistShipped: true) == .needsApproval)
     }
 
+    @Test("The Steam build is read from the inner bundle Steam's client updates")
+    func readsTheInnerSteamBuild() {
+        #expect(BackgroundAgent.steamPackage
+            == SupportPaths.Steam.innerApp.appending(path: "Contents/MacOS/package"))
+    }
+
+    @Test("The agent's notice asks the helper to report back, and only a delivery counts as told")
+    func noticeIsToldOnlyWhenDelivered() throws {
+        let dir = try scratchDirectory("notify-result")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appending(path: "result")
+        let arguments = ["Bridgeplay"] + NotifyCommand.arguments(["Title", "Body --notify-result x"], result: file)
+        #expect(NotifyCommand.requested(arguments) == ["Title", "Body --notify-result x"])
+        #expect(NotifyCommand.resultFile(arguments) == file)
+        // The run script's form has no result file.
+        #expect(NotifyCommand.resultFile(["Bridgeplay", "--notify", "T", "--notify-result", "x"]) == nil)
+
+        #expect(!BackgroundAgent.delivered(resultFile: file))
+        try Data("failed".utf8).write(to: file)
+        #expect(!BackgroundAgent.delivered(resultFile: file))
+        try Data(NotifyCommand.deliveredMark.utf8).write(to: file)
+        #expect(BackgroundAgent.delivered(resultFile: file))
+    }
+
     @Test("An update replacing the bundle counts as the app's change, Steam's as Steam's")
     func touchedFolders() {
         let bundle = "/Applications/Bridgeplay.app/"

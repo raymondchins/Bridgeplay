@@ -22,6 +22,14 @@ enum BackgroundAgent {
         return (paths.contains(where: inBundle), paths.contains { !inBundle($0) })
     }
 
+    // Steam's client keeps its package files in the inner bundle, not in Steam.app.
+    static var steamPackage: URL { SupportPaths.Steam.innerApp.appending(path: "Contents/MacOS/package") }
+
+    // What the notification helper wrote back: only "delivered" counts as told.
+    static func delivered(resultFile: URL) -> Bool {
+        (try? String(contentsOf: resultFile, encoding: .utf8)) == NotifyCommand.deliveredMark
+    }
+
     static func run() -> Never {
         MainActor.assumeIsolated { Loop.shared.start() }
         RunLoop.main.run()
@@ -45,6 +53,8 @@ enum BackgroundAgent {
         private var late: DispatchWorkItem?
         private var exits: [pid_t: any DispatchSourceProcess] = [:]
         private var trying = false
+        // A notice is out and its helper has not said yet whether it was delivered.
+        private var posting = false
         // Held while the install runs, so the installer doesn't replace Bridgeplay under it.
         private var inUse: AppInUseLock?
         private var lastSkip: BackgroundCheck.Skip?
@@ -76,7 +86,7 @@ enum BackgroundAgent {
         }
 
         private func evaluate() {
-            guard !trying else { return }
+            guard !trying, !posting else { return }
             let mode = BackgroundCheck.mode(defaults)
             if mode == .off {
                 AppLog.note("background check: turned off, leaving")
@@ -93,8 +103,7 @@ enum BackgroundAgent {
 
             let version = AppVersion.bundled
             let seen = SteamPatchKeeper.capture(bundledVersion: version)
-            let steamBuild = SteamHealthStore.installedSteamBuild(
-                package: app.appending(path: "Contents/MacOS/package"))
+            let steamBuild = SteamHealthStore.installedSteamBuild(package: BackgroundAgent.steamPackage)
             let deployed = SteamBundle.deployedVersion(at: SupportPaths.deployedVersion)
             var failed = defaults.bool(forKey: BackgroundCheck.lastTryFailedKey)
             if failed, !SteamPatchKeeper.failureStands(seen.deployment, lastAttemptFailed: true,
@@ -115,6 +124,7 @@ enum BackgroundAgent {
                 lastTry: defaults.object(forKey: BackgroundCheck.lastTryKey) as? Date,
                 lastTryFailed: failed)
             let action = BackgroundCheck.decide(inputs)
+            let waits = BackgroundCheck.waitsForQuit(action, inputs: inputs)
 
             switch action {
             case .skip(.nothingToDo):
@@ -126,19 +136,29 @@ enum BackgroundAgent {
             case .notify(let notice):
                 AppLog.note("background check: telling the user, \(notice.repair ? "repair" : "\(notice.kind)"), \(notice.blocker.map { "\($0)" } ?? "notify only")")
                 lastSkip = nil
-                if post(notice.title, notice.body) {
-                    defaults.set(notice.key, forKey: BackgroundCheck.toldKey)
-                    postFailures = 0
-                } else if postFailures < 3 {
-                    // Not told yet: try again shortly, a few times, then on the next event.
-                    postFailures += 1
-                    look(after: afterEvent)
-                    return
+                posting = true
+                post(notice.title, notice.body) { delivered in
+                    self.posting = false
+                    if delivered {
+                        self.defaults.set(notice.key, forKey: BackgroundCheck.toldKey)
+                        self.postFailures = 0
+                    } else if self.postFailures < 3 {
+                        // Not told yet: try again shortly, a few times, then on the next event.
+                        self.postFailures += 1
+                        self.look(after: self.afterEvent)
+                        return
+                    }
+                    self.afterLook(waits: waits)
                 }
+                return
             case .reapply(let kind):
                 reapply(kind)
             }
-            if BackgroundCheck.waitsForQuit(action, inputs: inputs) { waitForQuit() } else { late?.cancel() }
+            afterLook(waits: waits)
+        }
+
+        private func afterLook(waits: Bool) {
+            if waits { waitForQuit() } else { late?.cancel() }
         }
 
         private func note(_ skip: BackgroundCheck.Skip, _ detail: String? = nil) {
@@ -281,20 +301,45 @@ enum BackgroundAgent {
         }
 
         // The same path the run script and the breaker use, so it carries Bridgeplay's name.
-        @discardableResult
-        private func post(_ title: String, _ body: String) -> Bool {
+        // `done` hears true only once the helper wrote that the notification was added; a
+        // refused permission, a failed post or a helper that never answers is not told.
+        private let postWait: TimeInterval = 120
+
+        @MainActor private final class Once { var done = false }
+
+        private func post(_ title: String, _ body: String, done: (@MainActor (Bool) -> Void)? = nil) {
+            let result = FileManager.default.temporaryDirectory
+                .appending(path: "bridgeplay-notify-\(UUID().uuidString)")
+            let once = Once()
+            let answer: @MainActor (Bool) -> Void = { delivered in
+                guard !once.done else { return }
+                once.done = true
+                if !delivered { AppLog.note("background check: the notification was not delivered") }
+                done?(delivered)
+            }
             let open = Process()
             open.executableURL = URL(filePath: "/usr/bin/open")
-            open.arguments = ["-n", "-g", "-a", Bundle.main.bundleURL.path(percentEncoded: false),
-                              "--args", NotifyCommand.flag, title, body]
+            open.arguments = ["-W", "-n", "-g", "-a", Bundle.main.bundleURL.path(percentEncoded: false),
+                              "--args"] + NotifyCommand.arguments([title, body], result: result)
             open.standardOutput = FileHandle.nullDevice
             open.standardError = FileHandle.nullDevice
+            open.terminationHandler = { _ in
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        let delivered = BackgroundAgent.delivered(resultFile: result)
+                        try? FileManager.default.removeItem(at: result)
+                        answer(delivered)
+                    }
+                }
+            }
             do {
                 try open.run()
-                return true
             } catch {
                 AppLog.note("background check: could not post: \(error.localizedDescription)")
-                return false
+                return answer(false)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + postWait) {
+                MainActor.assumeIsolated { answer(false) }
             }
         }
     }
