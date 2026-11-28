@@ -9,15 +9,17 @@ UPDATE="${2:-$(dirname "$0")/../../scripts/update-gamecontrollerdb.sh}"
 
 block=$(sed -n '/^np_pad_mappings() {$/,/^}$/p' "$SRC")
 forward=$(sed -n '/^for name in $(env /,/^done$/p' "$SRC")
+report=$(sed -n '/^np_pad_report() {$/,/^}$/p' "$SRC")
 [ -n "$block" ] || { echo "FAIL: np_pad_mappings not found in $SRC"; exit 1; }
 [ -n "$forward" ] || { echo "FAIL: the launcher environment loop not found in $SRC"; exit 1; }
+[ -n "$report" ] || { echo "FAIL: np_pad_report not found in $SRC"; exit 1; }
 
 fails=0
 ok() { printf '  ok    %s\n' "$1"; }
 bad() { printf '  FAIL  %s\n         want [%s]\n         got  [%s]\n' "$1" "$2" "$3"; fails=$((fails + 1)); }
 is() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1" "$2" "$3"; fi; }
 
-work=$(mktemp -d)
+work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT
 
 g1=03000000373500002210000000010000
@@ -134,6 +136,135 @@ echo "== run script: the launcher forwards the file hint =="
 	done
 ) > "$work/forwarded"
 is "SDL_GAMECONTROLLERCONFIG_FILE passed as one argument" "/a b/gamecontrollerdb.merged.txt" "$(cat "$work/forwarded")"
+
+echo "== run script: the pads attached at launch =="
+# ioreg output in its text form; the stub prints the HID or the USB tree by -c.
+mkdir -p "$work/ioreg"
+cat > "$work/ioreg/hid" <<'IOREG'
++-o AppleUserHIDDevice  <class AppleUserHIDDevice, id 0x1, registered, matched, active, busy 0 (1 ms), retain 9>
+    {
+      "Product" = "Apple Internal Keyboard / Trackpad"
+      "PrimaryUsagePage" = 1
+      "PrimaryUsage" = 6
+      "VendorID" = 1452
+      "ProductID" = 834
+    }
++-o AppleBluetoothHIDDevice  <class AppleBluetoothHIDDevice, id 0x2, registered, matched, active, busy 0 (1 ms), retain 9>
+    {
+      "Transport" = "Bluetooth"
+      "Product" = "DualSense Wireless Controller"
+      "PrimaryUsagePage" = 1
+      "PrimaryUsage" = 5
+      "VendorID" = 1356
+      "ProductID" = 3302
+      "SerialNumber" = "aa-bb-cc"
+    }
++-o IOHIDInterface  <class IOHIDInterface, id 0x3, registered, matched, active, busy 0 (1 ms), retain 9>
+    {
+      "Transport" = "USB"
+      "PrimaryUsagePage" = 1
+      "PrimaryUsage" = 5
+      "VendorID" = 1118
+      "ProductID" = 654
+    }
++-o IOHIDInterface  <class IOHIDInterface, id 0x4, registered, matched, active, busy 0 (1 ms), retain 9>
+    {
+      "Transport" = "USB"
+      "PrimaryUsagePage" = 1
+      "PrimaryUsage" = 4
+      "VendorID" = 13623
+      "ProductID" = 4130
+    }
+IOREG
+cat > "$work/ioreg/usb" <<'IOREG'
++-o 8BitDo Receiver@01100000  <class IOUSBHostDevice, id 0x10, registered, matched, active, busy 0 (2 ms), retain 30>
+  | {
+  |   "idVendor" = 11720
+  |   "idProduct" = 12554
+  |   "UsbExclusiveOwner" = "pid 4242, steam_osx"
+  |   "USB Product Name" = "8BitDo Receiver"
+  | }
+  |
+  +-o IOUSBHostInterface@0  <class IOUSBHostInterface, id 0x11, registered, matched, active, busy 0 (1 ms), retain 7>
+      {
+        "bInterfaceClass" = 255
+        "bInterfaceSubClass" = 93
+        "bInterfaceProtocol" = 1
+      }
++-o Xbox Wireless Controller@02100000  <class IOUSBHostDevice, id 0x20, registered, matched, active, busy 0 (2 ms), retain 30>
+  | {
+  |   "idVendor" = 1118
+  |   "idProduct" = 2834
+  | }
+  |
+  +-o IOUSBHostInterface@0  <class IOUSBHostInterface, id 0x21, registered, matched, active, busy 0 (1 ms), retain 7>
+      {
+        "bInterfaceClass" = 255
+        "bInterfaceSubClass" = 71
+        "bInterfaceProtocol" = 208
+      }
++-o USB Keyboard@03100000  <class IOUSBHostDevice, id 0x30, registered, matched, active, busy 0 (2 ms), retain 30>
+  | {
+  |   "idVendor" = 1452
+  |   "idProduct" = 1
+  | }
+  |
+  +-o IOUSBHostInterface@0  <class IOUSBHostInterface, id 0x31, registered, matched, active, busy 0 (1 ms), retain 7>
+      {
+        "bInterfaceClass" = 3
+        "bInterfaceSubClass" = 1
+        "bInterfaceProtocol" = 1
+      }
+IOREG
+cat > "$work/ioreg/stub" <<'STUB'
+#!/bin/sh
+dir=$(dirname "$0")
+case "$*" in
+  *IOHIDDevice*) [ -f "$dir/hid.on" ] && cat "$dir/hid" ;;
+  *IOUSBHostDevice*) [ -f "$dir/usb.on" ] && cat "$dir/usb" ;;
+esac
+exit 0
+STUB
+chmod +x "$work/ioreg/stub"
+run_report() {
+	(
+		np_support="$case_dir/support"
+		np_ioreg="$work/ioreg/stub"
+		eval "$report"
+		np_pad_report
+	)
+}
+
+new_case report-none
+rm -f "$work/ioreg/hid.on" "$work/ioreg/usb.on"
+is "no pads" "controllers: no gamepad attached at launch" "$(run_report)"
+
+new_case report-pads
+: > "$work/ioreg/hid.on"; : > "$work/ioreg/usb.on"
+echo "$full_g3" > "$case_dir/support/gamecontrollerdb.merged.txt"
+printf '# mine\r\n%s\r\n' "$own1" > "$case_dir/support/gamecontrollerdb.txt"
+out=$(run_report)
+is "gamepads and joysticks, then XInput; keyboards left out" \
+"controllers: pad 054c:0ce6 over Bluetooth, mapping: none in Bridgeplay's files
+controllers: pad 045e:028e over USB, mapping: gamecontrollerdb.merged.txt
+controllers: pad 3537:1022 over USB, mapping: gamecontrollerdb.txt
+controllers: pad 2dc8:310a is USB XInput, which has no HID interface on macOS; held exclusively by pid 4242, steam_osx
+controllers: pad 045e:0b12 is USB XInput, which has no HID interface on macOS" "$out"
+case "$out" in *aa-bb-cc*|*DualSense*|*8BitDo*) bad "no serials or names in the log" "" "$out" ;; *) ok "no serials or names in the log" ;; esac
+
+echo "$own1" > "$case_dir/support/gamecontrollerdb.txt"
+echo "${full_g3%%,*}" | tr 'a-f' 'A-F' > "$case_dir/support/gamecontrollerdb.merged.txt"
+is "upper-case GUIDs match" "controllers: pad 045e:028e over USB, mapping: gamecontrollerdb.merged.txt" "$(run_report | grep 045e:028e)"
+
+new_case report-usb-only
+rm -f "$work/ioreg/hid.on"
+is "only the XInput pads" "2" "$(run_report | grep -c 'USB XInput')"
+
+if sed -n '/^np_pad_report() {$/,/^fi$/p' "$SRC" | grep -q '^if \[ "$verb" = waitforexitandrun \]; then$'; then
+	ok "the report runs for the game launch only"
+else
+	bad "the report runs for the game launch only" "guarded by verb=waitforexitandrun" "missing"
+fi
 
 if [ -f "$UPDATE" ]; then
 	echo "== update-gamecontrollerdb.sh =="

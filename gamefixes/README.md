@@ -10,3 +10,9 @@ Add a file only with evidence, and cite it in a comment: a PCGamingWiki page, a 
 umu-protonfixes go in `ARGS`. File creation and winetricks have no equivalent key here and
 are not seeded. Checked 2026-10-09 against all appids in `compat/games.json`: only 782330,
 1245620, 377160, 22380, 489830 have a protonfix.
+
+`EXE` and `EXE_FROM` start a game's own exe when its publisher launcher fails under Wine
+(`949230.conf`, Cities: Skylines II). Seed one only when reports show the launcher failing and
+the game running started directly, always with `EXE_FROM` naming the launcher, and never for a
+launcher that anti-cheat or DRM needs (the run script refuses those anyway). See
+[Skipping a launcher](../docs/GAMEFIXES.md#skipping-a-launcher).

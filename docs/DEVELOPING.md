@@ -100,6 +100,14 @@ systems use perl, then whole seconds). When the game exits it adds `time: game e
 first window as the launch panel saw it, and the first Metal frame when the overlay shim is
 loaded, both in seconds after the game started.
 
+For a game launch it also lists the controllers attached at that moment, from `ioreg`, in the
+background: `controllers: pad <vendor>:<product> over <transport>, mapping: <file>` names the
+`gamecontrollerdb` file that maps the pad, or `none in Bridgeplay's files` when only SDL's
+built-in list could. A USB XInput pad has no HID interface on macOS and gets its own line,
+with the process that holds it exclusively (#4934). `controllers: no gamepad attached at
+launch` means macOS saw none. No names or serial numbers are logged. To try a pad inside a
+prefix, the Prefixes page's **Game Controllers** opens Wine's `joy.cpl`.
+
 ### The outcome record
 
 After the exit summary, the run script writes `compatdata/<appid>/bridgeplay-last-launch` for

@@ -96,7 +96,7 @@ DEPS := $(OBJS:.o=.d)
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
         compatsvc-check prefixstate-check breakercheck clientgatecheck pauselistcheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck \
-        gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check compat-export-check steamcanarycheck FORCE
+        gamefixescheck modloadercheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check compat-export-check steamcanarycheck FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
 
@@ -227,6 +227,10 @@ fontlinkcheck:
 gamefixescheck:
 	@if [ ! -f dylib/tests/gamefixescheck.sh ]; then $(call SKIP,gamefixescheck,dylib/tests/gamefixescheck.sh); exit 0; fi; \
 	sh dylib/tests/gamefixescheck.sh dylib/feats/compat_run.sh
+
+modloadercheck:
+	@if [ ! -f dylib/tests/modloadercheck.sh ]; then $(call SKIP,modloadercheck,dylib/tests/modloadercheck.sh); exit 0; fi; \
+	sh dylib/tests/modloadercheck.sh dylib/feats/compat_run.sh
 
 # The beta stamp, the version bump and the upstream sync, on throwaway copies of the repo.
 versioncheck:
@@ -1074,7 +1078,7 @@ CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck breakercheck clientgatecheck pauselistcheck compat-reported-import-check compat-export-check compat-regressions-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck launchercheck \
-	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check benchcheck benchabcheck steamcanarycheck np-native-tests native-shim-tests \
+	seedcheck gamefixescheck modloadercheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check benchcheck benchabcheck steamcanarycheck np-native-tests native-shim-tests \
 	app-tests native-installercheck
 
 # app.yml runs the checks that need the built app in its build job and the rest in a

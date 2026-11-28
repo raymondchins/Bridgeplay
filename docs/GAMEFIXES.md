@@ -47,6 +47,8 @@ is rejected, and the rejection logged, when:
 | `BACKEND` | `dxmt`, `dxvk`, `wined3d`, `d3dmetal` | Graphics backend, see below |
 | `ROSETTA_ADVERTISE_AVX` | `0`, `1` | `1` makes Rosetta report AVX/AVX2 to the game (needed by AVX-only titles) |
 | `ARGS` | space-separated arguments of `A-Za-z0-9_+./:=,-` | Added to the game's command line after the launch options' own arguments. Ignored for installers and other helpers |
+| `EXE` | a path inside the game folder ending in `.exe`, `/` between folders; `0` | Starts that exe instead of the one Steam starts, for a publisher launcher that fails under Wine. See [Skipping a launcher](#skipping-a-launcher). `0` turns off an `EXE` from an earlier file |
+| `EXE_FROM` | a file name ending in `.exe` | `EXE` applies only when Steam starts an exe of this name (any case), so the game's other launch options are left alone |
 | `DLLOVERRIDES` | Wine syntax, e.g. `dinput8=n,b;xinput1_3=n` | Added to `WINEDLLOVERRIDES` after the backend's entries and before the launch options' |
 | `MSYNC` | `0`, `1` | `1` turns msync on when the engine supports it; `0` turns it off. Engines with msync (WineCX, and CrossOver runners whose binaries handle it) default to on |
 | `RETINA` | `0`, `1` | Same as `BRIDGEPLAY_RETINA` (High Resolution). DPI-unaware games on the OpenGL/wined3d path (D3D9, OpenGL) can draw into the top-left quarter with RETINA=1; set RETINA=0 in their gamefix, as gamefixes/49520.conf does. |
@@ -66,6 +68,7 @@ is rejected, and the rejection logged, when:
 | `VSYNC` | `0`, `1` | `1` makes the game's Metal layer wait for the display even when the game turns vsync off, like forcing vsync in the NVIDIA control panel. For games that lock vsync off with frame generation on (Resident Evil Requiem) and tear above the refresh rate |
 | `GAME_MODE` | `0`, `1` | Same as `BRIDGEPLAY_GAME_MODE`. macOS turns Game Mode on for the game's launcher in full screen (higher CPU and GPU priority, lower Bluetooth latency), the default (`1`). The game's processes run from the launcher bundle's own copy of the Wine loader, so macOS sees the bundle on every launch. `0` adds `LSSupportsGameMode=false` to the launcher's `Info.plist` so macOS leaves it off, for a game that runs worse with it or when background apps (streaming, recording, voice chat) must keep their share |
 | `HIDE_WINE_EXPORTS` | `0`, `1` | `1` makes `GetProcAddress` fail for ntdll's `wine_*` exports on the WineCX 11.17 engine (`hide-wine-exports-patch/`), like Wine Staging's `HideWineExports`. For games that turn features off under Wine: The Witcher 3 5.0 skips NVIDIA Streamline, so no DLSS |
+| `MOD_LOADERS` | `0`, `1` | Same as `BRIDGEPLAY_MOD_LOADERS` in the launch options (the conf key has no `BRIDGEPLAY_` spelling). `0` turns off [mod loader detection](#mod-loaders) for the game. On when unset |
 | `STEAMDECK` | `0`, `1` | Exported as `SteamDeck` (mixed case, which a conf key can't spell). Mortal Kombat 1 reads controllers only with `1` (`gamefixes/1971870.conf`) |
 | `ROCKSTAR_SHIM` | `0`, `1` | `1` stages `rockstar-shim/`'s `version.dll` next to `SocialClubHelper.exe` (`C:\Program Files\Rockstar Games\Social Club`) and in the game folder (next to GTA5.exe) at the game launch, and adds `version=n,b`. It makes the Rockstar Games Launcher's CEF windows draw on winemac and, on `dxvk`, gives GTA5.exe DXVK's dxgi instead of D3DMetal's (`NOTPROTON_ROCKSTAR_DXGI`) and stages that dxgi as `dxgi.dll` in `Gameface/Binaries/Win64` with `dxgi=n,b` (SanAndreas.exe imports it statically). A `version.dll` or `dxgi.dll` already where one is staged is moved to `<name>.bridgeplay-orig` first; a `version.dll` in `Gameface/Binaries/Win64` (a mod loader) is never staged over and keeps loading. Without the key, or on an engine without the shim, staged copies are removed and that file is put back, except in a game folder another launch (another macOS user's too) is still using. WineCX 11.17 only; `gamefixes/271590.conf` (GTA V Legacy) and `gamefixes/1547000.conf` (GTA San Andreas DE) set it. Details in `rockstar-shim/README.md` |
 | `DXMT_*`, `DXVK_*`, `MVK_*`, `VKD3D_*`, `D3DM_*`, `STAGING_*` | any | Exported as is |
@@ -74,6 +77,43 @@ is rejected, and the rejection logged, when:
 
 Wine uses the last entry for a DLL in `WINEDLLOVERRIDES`. The order is: backend, then
 `DLLOVERRIDES`, then the launch options, then the Steam client DLLs, which always come last.
+
+## Skipping a launcher
+
+Some games start a publisher launcher, and the launcher then starts the game. When the launcher
+fails under Wine and the game itself runs, `EXE` starts the game's exe directly:
+
+```
+EXE_FROM=dowser.exe
+EXE=Cities2.exe
+```
+
+`gamefixes/949230.conf` does this for Cities: Skylines II, whose Paradox launcher fails. In a
+game's Steam launch options, `BRIDGEPLAY_EXE=Cities2.exe %command%` does the same for one game
+(quote a path with spaces: `BRIDGEPLAY_EXE="bin/My Game.exe" %command%`), and
+`BRIDGEPLAY_EXE=0 %command%` goes back through the launcher. `BRIDGEPLAY_EXE` and
+`BRIDGEPLAY_EXE_FROM` win over the confs, key by key.
+
+On the game launch only (not installers or other helpers), the run script:
+
+- leaves the launch alone when `EXE_FROM` is set and Steam starts an exe of another name
+- looks the path up under the game's install folder, in any case when the exact spelling is
+  missing (case-sensitive volumes), and leaves the launch alone when there is no such file or a
+  symlink leads out of the folder. A mod or script-extender loader can use this: the key only
+  takes effect once the file is there
+- never skips a launcher that anti-cheat or DRM needs: Easy Anti-Cheat
+  (`start_protected_game.exe`, `EasyAntiCheat*.exe`), BattlEye (`*_BE.exe`, `BEService*.exe`),
+  EA Javelin, the EA app (`Link2EA*.exe`, `EADesktop.exe`, `Origin.exe`), Ubisoft Connect
+  (`upc.exe`, `Uplay*.exe`, `UbisoftConnect*.exe`) and the Rockstar Games Launcher
+  (`PlayGTAV.exe`, `LauncherPatcher.exe`, `Rockstar*.exe`, `SocialClub*.exe`). Neither does it
+  for a game whose folder has an `EasyAntiCheat`, `EasyAntiCheat_EOS` or `BattlEye` folder, or a
+  kernel anti-cheat file, within three levels
+- otherwise starts the exe in its own folder, with the arguments Steam gave the launcher and
+  then `ARGS`. The backend is auto-detected from that exe
+
+The run log (`bridgeplay-run.log`) says `=== launcher skipped: starting <EXE> instead of
+<launcher> ===`, or `=== launcher kept: ... ===` with the anti-cheat or DRM it found, and a
+`gamefix:` line for every other case. Nothing in Steam's Bridgeplay tab shows `EXE`.
 
 ## Graphics backends
 
@@ -179,6 +219,32 @@ DXMT_METALFX_SPATIAL_SWAPCHAIN=1
 MSYNC=0
 RETINA=1
 ```
+
+## Mod loaders
+
+At each game launch the run script looks for a mod loader's proxy DLL in the folder of the
+game's `.exe` and in the install folder. Wine would load its own copy of these DLLs instead
+of the loader, so the script adds `<dll>=n,b` for a proxy it recognises and logs it
+(`gamefix: mod loader: ...` in `bridgeplay-run.log`). A proxy counts only when its loader's
+own files sit beside it:
+
+| Loader | Proxy DLL | Files that must be next to it |
+| --- | --- | --- |
+| BepInEx, Unity Doorstop | `winhttp.dll`, `version.dll` | a `BepInEx` folder or `doorstop_config.ini` |
+| MelonLoader | `winhttp.dll`, `version.dll` | a `MelonLoader` folder |
+| Script Hook V, Script Hook RDR2 | `dinput8.dll` | `ScriptHookV.dll` or `ScriptHookRDR2.dll` |
+| Ultimate ASI Loader and other ASI loaders | `winhttp.dll`, `version.dll`, `dinput8.dll` | an `.asi` file in that folder, `scripts/` or `plugins/` |
+
+A DLL with none of these beside it is treated as the game's own and keeps Wine's default
+load order, and the log says so. `dxgi.dll` and `d3d11.dll` are never overridden, even beside a loader,
+because the graphics backend provides them. The check is a few file lookups, plus one
+listing of each folder for `.asi` files when a proxy DLL is there. Script extenders that
+replace the game's `.exe` (SKSE, F4SE) are not covered.
+
+The entries go before the conf's `DLLOVERRIDES`, so a conf entry or the launch options'
+`WINEDLLOVERRIDES` for the same DLL wins. `BRIDGEPLAY_MOD_LOADERS=0 %command%` in the launch
+options, or `MOD_LOADERS=0` in the game's conf, turns detection off for that game. It runs
+for the game launch only, not for installers and other helpers.
 
 ## In-game quick settings
 

@@ -491,6 +491,62 @@ $pad_maps"
 }
 np_pad_mappings
 
+# The pads attached at launch, for "controller not detected" reports: vendor:product,
+# transport and whether a gamecontrollerdb file maps it (SDL's built-in list may know pads
+# these files don't). A USB XInput pad has no HID interface on macOS, and Steam's SDL can
+# hold it exclusively (#4934). Read-only, in the background; no names or serials.
+np_pad_report() {
+  pad_ioreg=${np_ioreg:-/usr/sbin/ioreg}
+  pads=$({ "$pad_ioreg" -r -c IOHIDDevice -d 1 -w 0; echo '#usb'; "$pad_ioreg" -r -c IOUSBHostDevice -d 2 -w 0; } 2>/dev/null \
+    | awk '
+      function flush() {
+        u = p["PrimaryUsage"]
+        if (!usb && p["PrimaryUsagePage"] == 1 && (u == 4 || u == 5 || u == 8))
+          printf "hid %04x:%04x %s\n", p["VendorID"], p["ProductID"], (p["Transport"] == "" ? "?" : p["Transport"])
+        if (usb && cls == "IOUSBHostInterface" && p["bInterfaceClass"] == 255 \
+            && ((p["bInterfaceSubClass"] == 93 && p["bInterfaceProtocol"] == 1) \
+              || (p["bInterfaceSubClass"] == 71 && p["bInterfaceProtocol"] == 208))) {
+          v = ("idVendor" in p) ? p["idVendor"] : dv
+          d = ("idProduct" in p) ? p["idProduct"] : dp
+          printf "xinput %04x:%04x %s\n", v, d, (p["UsbExclusiveOwner"] != "" ? p["UsbExclusiveOwner"] : downer)
+        }
+        split("", p)
+      }
+      /^#usb$/ { flush(); usb = 1; cls = ""; next }
+      /\+-o / {
+        flush(); cls = $0; sub(/.*<class /, "", cls); sub(/,.*/, "", cls)
+        if (cls == "IOUSBHostDevice") { dv = ""; dp = ""; downer = "" }
+        next
+      }
+      /^[ |]*"[A-Za-z]+" = / {
+        key = $0; sub(/^[ |]*"/, "", key); sub(/".*/, "", key)
+        val = $0; sub(/^[^=]*= /, "", val); gsub(/"/, "", val)
+        p[key] = val
+        if (cls == "IOUSBHostDevice") {
+          if (key == "idVendor") dv = val
+          else if (key == "idProduct") dp = val
+          else if (key == "UsbExclusiveOwner") downer = val
+        }
+      }
+      END { flush() }' | awk '!seen[$1 " " $2]++')
+  [ -n "$pads" ] || { echo "controllers: no gamepad attached at launch"; return 0; }
+  printf '%s\n' "$pads" | while read -r kind id rest; do
+    v=${id%:*}; d=${id#*:}
+    le=$(printf '%s' "$v$d" | sed 's/^\(..\)\(..\)\(..\)\(..\)$/\2\10000\4\3/')
+    map="none in Bridgeplay's files"
+    for f in "$np_support/gamecontrollerdb.txt" "$np_support/gamecontrollerdb.merged.txt"; do
+      [ -f "$f" ] && LC_ALL=C cut -c9-20 "$f" | tr 'A-F' 'a-f' | grep -qx "$le" && { map=${f##*/}; break; }
+    done
+    case "$kind" in
+      hid) echo "controllers: pad $id over $rest, mapping: $map" ;;
+      xinput) echo "controllers: pad $id is USB XInput, which has no HID interface on macOS${rest:+; held exclusively by $rest}" ;;
+    esac
+  done
+}
+if [ "$verb" = waitforexitandrun ]; then
+  np_pad_report < /dev/null >> "$log" 2>&1 7>&- 8>&- 9>&- &
+fi
+
 # Settings for every game, then per-game fixes, the later file winning per key: the shipped
 # gamefixes-default/default.conf, the user's gamefixes/default.conf (Game Defaults in the
 # app), the shipped gamefixes-default/<appid>.conf, then the user's gamefixes/<appid>.conf.
@@ -504,6 +560,8 @@ gamefix_nvapi=""
 gamefix_dlss_fg=""
 gamefix_args=""
 gamefix_rockstar_shim=""
+gamefix_exe=""
+gamefix_exe_from=""
 
 gamefix_log() {
   echo "gamefix: $*" >> "$log" 2>&1 || true
@@ -558,8 +616,26 @@ gamefix_reason() {
     ARGS)
       # Space-separated arguments, each of A-Za-z0-9_+./:=,- only, so none can glob or quote.
       case "$2" in *[!A-Za-z0-9_+./:=,\ -]*) echo "an argument with characters outside A-Za-z0-9_+./:=,-" ;; esac ;;
+    EXE)
+      # A path inside the game folder, / between folders; 0 starts what Steam starts.
+      case "$2" in
+        0) ;;
+        /*|*\\*|.|..|./*|../*|*/.|*/..|*/./*|*/../*|*//*|*/) echo "not a path inside the game folder" ;;
+        *[!A-Za-z0-9\ _+.,\(\)/-]*) echo "a character outside A-Za-z0-9 _+.,()/-" ;;
+        *.[eE][xX][eE]) ;;
+        *) echo "not an .exe" ;;
+      esac ;;
+    EXE_FROM)
+      case "$2" in
+        */*|*\\*|.*) echo "not a file name" ;;
+        *[!A-Za-z0-9\ _+.,\(\)-]*) echo "a character outside A-Za-z0-9 _+.,()-" ;;
+        *.[eE][xX][eE]) ;;
+        *) echo "not an .exe" ;;
+      esac ;;
     MTL_HUD_ENABLED|WINEDEBUG|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX) ;;
     ROSETTA_ADVERTISE_AVX)
+      case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
+    MOD_LOADERS)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     DXMT_?*|DXVK_?*|MVK_?*|VKD3D_?*|D3DM_?*|STAGING_?*) ;;
     *) echo "not on the allow-list" ;;
@@ -635,6 +711,9 @@ load_gamefixes() {
       NVAPI) gamefix_nvapi=$value; gamefix_log "NVAPI=$value from the $from conf" ;;
       DLSS_FG) gamefix_dlss_fg=$value; gamefix_log "DLSS_FG=$value from the $from conf" ;;
       ROCKSTAR_SHIM) gamefix_rockstar_shim=$value; gamefix_log "ROCKSTAR_SHIM=$value from the $from conf" ;;
+      # Read by launcher_skip, which the launch options can override.
+      EXE) gamefix_exe=$value; gamefix_log "EXE=$value from the $from conf" ;;
+      EXE_FROM) gamefix_exe_from=$value; gamefix_log "EXE_FROM=$value from the $from conf" ;;
       STDOUT_NULL) gamefix_apply_env NOTPROTON_STDOUT_NULL "$value" "$from" ;;
       VSYNC) gamefix_apply_env NOTPROTON_VSYNC "$value" "$from" ;;
       GAME_MODE) gamefix_apply_env NOTPROTON_GAME_MODE "$value" "$from" ;;
@@ -649,6 +728,7 @@ load_gamefixes() {
       RETINA) gamefix_apply_env NOTPROTON_RETINA "$value" "$from" ;;
       # Steam reads SteamDeck in mixed case, which a conf key cannot spell.
       STEAMDECK) gamefix_apply_env SteamDeck "$value" "$from" ;;
+      MOD_LOADERS) gamefix_apply_env NOTPROTON_MOD_LOADERS "$value" "$from" ;;
       FRAMEGEN|FRAMEGEN_QUALITY|FRAMEGEN_UI|FRAMEGEN_FALLBACK|FRAMEGEN_ENGINE|PERF_OVERLAY|FPS_LIMIT|FPS_LIMIT_OFF|SCALING_FILTER|SUSTAINED)
         gamefix_apply_env "NOTPROTON_$key" "$value" "$from" ;;
       *) gamefix_apply_env "$key" "$value" "$from" ;;
@@ -1455,6 +1535,95 @@ record_backend() {
   fi
 }
 
+# The files (f) and folders (d) in folder $1, lowercased, one "f name" or "d name" per line.
+ml_list() {
+  for ml_entry in "$1"/*; do
+    if [ -f "$ml_entry" ]; then printf 'f %s\n' "${ml_entry##*/}"
+    elif [ -d "$ml_entry" ]; then printf 'd %s\n' "${ml_entry##*/}"
+    fi
+  done | tr '[:upper:]' '[:lower:]'
+}
+
+# Whether ml_list's listing in ml_names has a file (f) or folder (d) named $2, in any case.
+ml_is() {
+  case "$ml_names" in *"
+$1 $2
+"*) return 0 ;; esac
+  return 1
+}
+
+# A mod loader is a proxy DLL beside the game that Wine passes over for its own builtin. A
+# proxy gets n,b only beside its loader's own files, so a DLL the game ships stays as it is.
+# dxgi and d3d11 belong to the backend and are never touched. Names match in any case, as
+# Windows does, so WinHttp.dll and bepinex/ count on a case-sensitive volume too. One listing
+# of the folder and, when a proxy is there, one glob for .asi files per folder.
+mod_loader_dir() {
+  ml_found=""
+  ml_names="
+$(ml_list "$1")
+"
+  for ml_name in winhttp version dinput8; do
+    case " $ml_seen " in *" $ml_name "*) continue ;; esac
+    if ml_is f "$ml_name.dll"; then ml_found="$ml_found $ml_name"; fi
+  done
+  [ -n "$ml_found" ] || return 0
+  ml_asi=0
+  for ml_dir in "$1" "$1"/[sS][cC][rR][iI][pP][tT][sS] "$1"/[pP][lL][uU][gG][iI][nN][sS]; do
+    for ml_file in "$ml_dir"/*.[aA][sS][iI]; do
+      if [ -f "$ml_file" ]; then ml_asi=1; break 2; fi
+    done
+  done
+  ml_any=0
+  for ml_name in $ml_found; do
+    ml_loader=""
+    case $ml_name in
+      winhttp|version)
+        if ml_is d bepinex; then ml_loader=BepInEx
+        elif ml_is f doorstop_config.ini; then ml_loader="Unity Doorstop"
+        elif ml_is d melonloader; then ml_loader=MelonLoader
+        fi ;;
+      dinput8)
+        if ml_is f scripthookv.dll || ml_is f scripthookrdr2.dll; then ml_loader="Script Hook"; fi ;;
+    esac
+    [ -n "$ml_loader" ] || [ "$ml_asi" = 0 ] || ml_loader="an ASI loader"
+    if [ -z "$ml_loader" ]; then
+      gamefix_log "mod loader: $ml_name.dll in $1 matches no known loader, left to Wine's default"
+      continue
+    fi
+    ml_seen="$ml_seen $ml_name" ml_any=1
+    case ";$gamefix_dlloverrides;" in
+      *[\;,]"$ml_name"[=,]*)
+        gamefix_log "mod loader: $ml_loader in $1, $ml_name already set by DLLOVERRIDES or a shim"
+        continue ;;
+    esac
+    ml_overrides="${ml_overrides:+$ml_overrides;}$ml_name=n,b"
+    gamefix_log "mod loader: $ml_loader in $1, $ml_name=n,b"
+  done
+  [ "$ml_any" = 1 ] || return 0
+  for ml_name in dxgi d3d11; do
+    ! ml_is f "$ml_name.dll" || gamefix_log "mod loader: $ml_name.dll in $1 left to the ${backend:-engine} backend"
+  done
+}
+
+# Before the conf's DLLOVERRIDES, so a conf and the launch options still win per DLL.
+# BRIDGEPLAY_MOD_LOADERS=0 or MOD_LOADERS=0 in a conf turns it off.
+detect_mod_loaders() {
+  [ "$verb" = waitforexitandrun ] && [ -f "$1" ] || return 0
+  case "$1" in */*) ;; *) return 0 ;; esac
+  if [ "${NOTPROTON_MOD_LOADERS:-1}" = 0 ]; then
+    gamefix_log "mod loader: detection off (MOD_LOADERS=0)"
+    return 0
+  fi
+  ml_seen="" ml_overrides=""
+  mod_loader_dir "${1%/*}"
+  # A launcher in the install folder starting a game below it: the folder itself too.
+  if [ -n "${STEAM_COMPAT_INSTALL_PATH:-}" ] && [ "$STEAM_COMPAT_INSTALL_PATH" != "${1%/*}" ] \
+    && [ -d "$STEAM_COMPAT_INSTALL_PATH" ]; then
+    mod_loader_dir "$STEAM_COMPAT_INSTALL_PATH"
+  fi
+  [ -z "$ml_overrides" ] || gamefix_dlloverrides="$ml_overrides${gamefix_dlloverrides:+;$gamefix_dlloverrides}"
+}
+
 # Last entry wins: backend, then the gamefix conf, then the launch options.
 compose_dll_overrides() {
   composed=$backend_overrides
@@ -1777,6 +1946,144 @@ APPLESCRIPT
   } >> "$log" 2>&1 || true
   np_outcome=anticheat_blocked
   exit 0
+}
+
+# The anti-cheat or DRM a launcher is there for, from its file name or the game folder, so
+# EXE never skips it. Prints nothing when the launcher only starts the game.
+launcher_needed() {
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    start_protected_game.exe | easyanticheat*.exe) echo "Easy Anti-Cheat"; return 0 ;;
+    *_be.exe | beservice*.exe | battleye*.exe) echo "BattlEye"; return 0 ;;
+    eaanticheat*.exe) echo "EA Javelin"; return 0 ;;
+    link2ea*.exe | eadesktop.exe | eabackgroundservice.exe | origin.exe) echo "the EA app"; return 0 ;;
+    upc.exe | uplay*.exe | ubisoftconnect*.exe | ubisoftgamelauncher*.exe) echo "Ubisoft Connect"; return 0 ;;
+    playgtav.exe | launcherpatcher.exe | rockstar*.exe | socialclub*.exe) echo "the Rockstar Games Launcher"; return 0 ;;
+  esac
+  [ -d "$2" ] || return 0
+  ln_dir=$(find "$2" -maxdepth 3 -type d \( -iname easyanticheat -o -iname easyanticheat_eos \
+    -o -iname battleye \) 2>/dev/null | head -n 1)
+  case "$(printf '%s' "${ln_dir##*/}" | tr '[:upper:]' '[:lower:]')" in
+    easyanticheat*) echo "Easy Anti-Cheat (${ln_dir##*/} folder)"; return 0 ;;
+    battleye) echo "BattlEye (${ln_dir##*/} folder)"; return 0 ;;
+  esac
+  find_kernel_anticheat "$2"
+}
+
+# A relative path under a folder, each part matched in any case when the exact spelling is
+# missing (a case-sensitive volume). Prints the file's path.
+find_in_game() {
+  fg_path=$1
+  fg_rest=$2
+  while [ -n "$fg_rest" ]; do
+    fg_part=${fg_rest%%/*}
+    case "$fg_rest" in */*) fg_rest=${fg_rest#*/} ;; *) fg_rest="" ;; esac
+    if [ -e "$fg_path/$fg_part" ]; then fg_path="$fg_path/$fg_part"; continue; fi
+    fg_want=$(printf '%s' "$fg_part" | tr '[:upper:]' '[:lower:]')
+    fg_hit=""
+    for fg_entry in "$fg_path"/*; do
+      [ -e "$fg_entry" ] || continue
+      if [ "$(printf '%s' "${fg_entry##*/}" | tr '[:upper:]' '[:lower:]')" = "$fg_want" ]; then
+        fg_hit=$fg_entry
+        break
+      fi
+    done
+    [ -n "$fg_hit" ] || return 1
+    fg_path=$fg_hit
+  done
+  [ -f "$fg_path" ] || return 1
+  printf '%s' "$fg_path"
+}
+
+# Follows a file's own symlinks, at most 20, and prints the path they end at.
+follow_file_links() {
+  fl_path=$1
+  fl_hops=0
+  while [ -L "$fl_path" ]; do
+    fl_hops=$((fl_hops + 1))
+    [ "$fl_hops" -le 20 ] || return 1
+    fl_link=$(readlink "$fl_path") || return 1
+    case "$fl_link" in
+      /*) fl_path=$fl_link ;;
+      *) fl_path=${fl_path%/*}/$fl_link ;;
+    esac
+  done
+  printf '%s\n' "$fl_path"
+}
+
+# EXE: start the game's own exe instead of a publisher launcher that fails under Wine. Sets
+# skip_exe and skip_cwd when the launch should change; every other case starts what Steam starts.
+launcher_skip() {
+  skip_exe=""
+  skip_cwd=""
+  sk_exe=$gamefix_exe
+  sk_from="the ${gamefix_from_EXE:-gamefix} conf"
+  sk_name=$gamefix_exe_from
+  if [ -n "${NOTPROTON_EXE+x}" ]; then
+    sk_why=$(gamefix_reason EXE "$NOTPROTON_EXE")
+    if [ -n "$sk_why" ]; then
+      gamefix_log "BRIDGEPLAY_EXE in the launch options ignored: $sk_why"
+    else
+      sk_exe=$NOTPROTON_EXE
+      sk_from="the launch options"
+    fi
+  fi
+  if [ -n "${NOTPROTON_EXE_FROM+x}" ]; then
+    sk_why=$(gamefix_reason EXE_FROM "$NOTPROTON_EXE_FROM")
+    if [ -n "$sk_why" ]; then
+      gamefix_log "BRIDGEPLAY_EXE_FROM in the launch options ignored: $sk_why"
+    else
+      sk_name=$NOTPROTON_EXE_FROM
+    fi
+  fi
+  [ -n "$sk_exe" ] || return 0
+  if [ "$sk_exe" = 0 ]; then
+    gamefix_log "EXE=0 from $sk_from, the launcher is not skipped"
+    return 0
+  fi
+  if [ "$verb" != waitforexitandrun ] || [ -z "$1" ]; then
+    gamefix_log "EXE not applied, $verb is not the game launch"
+    return 0
+  fi
+  sk_launched=${1##*/}
+  if [ -n "$sk_name" ] && [ "$(printf '%s' "$sk_launched" | tr '[:upper:]' '[:lower:]')" != \
+    "$(printf '%s' "$sk_name" | tr '[:upper:]' '[:lower:]')" ]; then
+    gamefix_log "EXE=$sk_exe not applied: Steam starts $sk_launched, not $sk_name"
+    return 0
+  fi
+  sk_root=$STEAM_COMPAT_INSTALL_PATH
+  if [ -z "$sk_root" ] || [ ! -d "$sk_root" ]; then
+    gamefix_log "EXE=$sk_exe not applied: no game folder"
+    return 0
+  fi
+  if ! sk_target=$(find_in_game "$sk_root" "$sk_exe"); then
+    gamefix_log "EXE=$sk_exe not applied: no such file in $sk_root, starting $sk_launched"
+    return 0
+  fi
+  # A symlink, to the folder or to the file itself, must not lead the launch out of the game folder.
+  sk_real_root=$(cd -P "$sk_root" 2>/dev/null && pwd -P) || sk_real_root=""
+  sk_real_dir=""
+  if sk_end=$(follow_file_links "$sk_target"); then
+    sk_real_dir=$(cd -P "${sk_end%/*}" 2>/dev/null && pwd -P) || sk_real_dir=""
+  fi
+  case "$sk_real_dir/" in
+    "$sk_real_root"/*) ;;
+    *)
+      gamefix_log "EXE=$sk_exe not applied: it leads outside $sk_root"
+      return 0 ;;
+  esac
+  if [ "$sk_target" -ef "$1" ]; then
+    gamefix_log "EXE=$sk_exe: Steam already starts it"
+    return 0
+  fi
+  sk_needed=$(launcher_needed "$sk_launched" "$sk_root")
+  if [ -n "$sk_needed" ]; then
+    gamefix_log "EXE=$sk_exe not applied: $sk_launched is kept, the game needs it for $sk_needed"
+    echo "=== launcher kept: $sk_launched starts $sk_needed, which EXE never skips ===" >> "$log" 2>&1 || true
+    return 0
+  fi
+  skip_exe=$sk_target
+  skip_cwd=${sk_target%/*}
+  echo "=== launcher skipped: starting $sk_exe instead of $sk_launched (EXE from $sk_from) ===" >> "$log" 2>&1 || true
 }
 
 # The anti-cheat whose driver failed to load, from Wine's log.
@@ -3982,11 +4289,19 @@ fi
 low_power_notice
 launch_step prepare
 
+# EXE replaces the launcher Steam starts with the game's own exe, before anything reads it.
+launcher_skip "$1" || true
+if [ -n "$skip_exe" ]; then
+  shift
+  set -- "$skip_exe" "$@"
+fi
+
 mark "graphics backend"
 select_backend "$1"
 activate_backend || true
 record_backend || true
 stage_rockstar_shim || true
+detect_mod_loaders "$1" || true
 fex_graphics_notice "$1" || true
 # An engine without lib/notproton-backends (CrossOver) picks its graphics itself, from
 # CX_GRAPHICS_BACKEND, so the log names that choice, not the dxmt-builtin placeholder.
@@ -4625,7 +4940,8 @@ terminate() {
 }
 trap terminate TERM INT HUP
 
-game_cwd="$(pwd)"
+# EXE starts the game in its own folder, as its launcher would.
+game_cwd=${skip_cwd:-$(pwd)}
 if [ -n "$gamefix_args" ]; then
   # shellcheck disable=SC2086 # ARGS tokens hold no spaces or glob characters and have to split
   set -- "$@" $gamefix_args
