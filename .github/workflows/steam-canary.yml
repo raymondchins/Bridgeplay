@@ -1,0 +1,144 @@
+# Steam build canary. Every hour a Linux job reads Valve's public client manifests for the
+# stable and beta channels. When a channel's build (or our signatures) changed since the last
+# check, a macOS job downloads the client packages, verifies them against the manifest's sha2,
+# runs anchorcheck --client-dir on them and opens or updates one issue when anchors fail.
+# It does not start Steam, so it misses sign-in order and appinfo changes.
+# The last builds checked live in the Actions cache; losing it only re-checks the current builds.
+name: steam-canary
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Check both channels even if their builds were checked already
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: steam-canary
+  cancel-in-progress: false
+
+env:
+  CANARY: build/steam-canary
+
+jobs:
+  poll:
+    name: read the manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      channels: ${{ steps.poll.outputs.channels }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Restore the builds checked last
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ env.CANARY }}/state.json
+          key: steam-canary-state-${{ github.run_id }}
+          restore-keys: steam-canary-state-
+
+      - name: Compare the builds
+        id: poll
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -eu
+          channels=$(python3 -I scripts/steam-canary.py poll --state "$CANARY/state.json" --manifests "$CANARY/manifests")
+          if [ "$FORCE" = "true" ]; then channels="stable beta"; fi
+          echo "channels=$channels" >>"$GITHUB_OUTPUT"
+
+  check:
+    name: check the new builds
+    needs: poll
+    if: needs.poll.outputs.channels != ''
+    runs-on: xcode-27
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # No token stays in .git: Valve's code runs in this job when anchorcheck loads it.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Restore the builds checked last
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ env.CANARY }}/state.json
+          key: steam-canary-state-${{ github.run_id }}
+          restore-keys: steam-canary-state-
+
+      - name: Build anchorcheck
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.0.app
+          make -s out/anchorcheck
+
+      # A channel that could not be checked (network, hash, unpack) writes no result: it is
+      # not recorded, so the next run tries it again, and the last step fails this run.
+      - name: Check each channel
+        env:
+          CHANNELS: ${{ needs.poll.outputs.channels }}
+        run: |
+          set -u
+          : >"$RUNNER_TEMP/unchecked"
+          for c in $CHANNELS; do
+            if python3 -I scripts/steam-canary.py poll --state /dev/null --manifests "$CANARY/manifests" --channel "$c" >/dev/null &&
+              python3 -I scripts/steam-canary.py check --channel "$c" --manifest "$CANARY/manifests/$c.manifest" \
+                --cache "$CANARY/cache" --work "$CANARY/work" --anchorcheck out/anchorcheck; then
+              echo "::group::anchorcheck $c"
+              cat "$CANARY/work/$c.log"
+              echo "::endgroup::"
+            else
+              echo "$c" >>"$RUNNER_TEMP/unchecked"
+            fi
+          done
+
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          report="$RUNNER_TEMP/report.md"
+          outcome=$(python3 -I scripts/steam-canary.py report --results "$CANARY/work" --state "$CANARY/state.json" \
+            --out "$report" --run-url "$RUN_URL")
+          marker="<!-- steam-canary -->"
+          issue=$(gh api "repos/$REPO/issues?state=open&creator=github-actions%5Bbot%5D&per_page=100" \
+            --jq "[.[] | select(.pull_request == null) | select(.body // \"\" | contains(\"$marker\"))][0].number // empty")
+          if [ "$outcome" = fail ]; then
+            if [ -n "$issue" ]; then
+              gh issue comment "$issue" --repo "$REPO" --body-file "$report"
+            else
+              { echo "$marker"; echo "A new Steam client build fails Bridgeplay's signature check."; echo; cat "$report"; } >"$report.new"
+              gh issue create --repo "$REPO" --title "Steam build canary: signatures fail on a new Steam build" --body-file "$report.new"
+            fi
+          elif [ "$outcome" = pass ] && [ -n "$issue" ]; then
+            { echo "The latest check passes."; echo; cat "$report"; } >"$report.new"
+            gh issue comment "$issue" --repo "$REPO" --body-file "$report.new"
+          fi
+
+      - name: Record the builds checked
+        run: python3 -I scripts/steam-canary.py record --state "$CANARY/state.json" --results "$CANARY/work"
+
+      - name: Save the builds checked
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ env.CANARY }}/state.json
+          key: steam-canary-state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Fail when a channel could not be checked
+        run: |
+          if [ -s "$RUNNER_TEMP/unchecked" ]; then
+            echo "not checked: $(tr '\n' ' ' <"$RUNNER_TEMP/unchecked")"
+            exit 1
+          fi

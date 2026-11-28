@@ -12,6 +12,9 @@ main `Steam Helper` (no `--type=` argument) it only installs the spawn hook.
   A new or renamed signature needs an entry in the signature files and a passing
   `make sigcheck`. `make sigdb-fixtures` and `make anchorcheck` check the files against the
   installed `steamclient.dylib`, so run them on a Mac with Steam; they are not in CI.
+  `make anchorcheck STEAM_CLIENT_DIR=<dir>` checks unzipped Valve packages instead; the
+  hourly `.github/workflows/steam-canary.yml` does that for each new stable and beta build
+  through `scripts/steam-canary.py` (tests: `make steamcanarycheck`).
 - **Child processes:** `hooks/hook_spawn.c` strips the insert from processes Steam starts,
   so games and other apps don't inherit the dylib. Keep that true for any new spawn path
   (`make spawn-env`).

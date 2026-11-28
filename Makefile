@@ -90,7 +90,7 @@ DEPS := $(OBJS:.o=.d)
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
         compatsvc-check prefixstate-check breakercheck clientgatecheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck \
-        gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check FORCE
+        gamefixescheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check steamcanarycheck FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
 
@@ -344,7 +344,8 @@ sigcheck:
 	@if [ ! -f dylib/tests/sigcheck.py ]; then $(call SKIP,sigcheck,dylib/tests/sigcheck.py); exit 0; fi; \
 	python3 dylib/tests/sigcheck.py
 
-# Validates anchors against a real dlopen'd steamclient.dylib
+# Validates anchors against a real dlopen'd steamclient.dylib: the installed one, or the
+# modules in STEAM_CLIENT_DIR (unzipped Valve packages, see scripts/steam-canary.py)
 ANCHORCHECK := $(OUT_DIR)/anchorcheck
 ANCHORCHECK_SRCS := dylib/tests/anchorcheck.c \
 	dylib/core/macho.c dylib/resolver/aob.c dylib/resolver/anchor.c \
@@ -358,7 +359,7 @@ $(ANCHORCHECK): $(ANCHORCHECK_SRCS) FORCE
 
 anchorcheck:
 	@if [ ! -f dylib/tests/anchorcheck.c ]; then $(call SKIP,anchorcheck,dylib/tests/anchorcheck.c); exit 0; fi; \
-	$(MAKE) -s $(ANCHORCHECK) && $(ANCHORCHECK)
+	$(MAKE) -s $(ANCHORCHECK) && $(ANCHORCHECK) $(if $(STEAM_CLIENT_DIR),--client-dir "$(STEAM_CLIENT_DIR)")
 
 CALLSCHECK := $(OUT_DIR)/callscheck
 CALLSCHECK_SRCS := dylib/tests/callscheck.c $(filter-out dylib/tests/anchorcheck.c,$(ANCHORCHECK_SRCS))
@@ -1012,6 +1013,11 @@ native-shim-tests:
 np-inventory-check:
 	@python3 scripts/tests/np-inventory.py
 
+# Offline tests for the Steam build canary's manifest, state and download handling.
+steamcanarycheck:
+	@if [ ! -f scripts/tests/steam-canary.py ]; then $(call SKIP,steamcanarycheck,scripts/tests/steam-canary.py); exit 0; fi; \
+	python3 -I scripts/tests/steam-canary.py
+
 # Every check .github/workflows/app.yml runs, after `make app`.
 # scripts/build-local.sh --checks runs this same target, so a local release build
 # and CI gate on one list. Each check runs even when an earlier one failed.
@@ -1020,7 +1026,7 @@ CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck breakercheck clientgatecheck compat-reported-import-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck gamedrivecheck fontlinkcheck launchercheck \
-	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check np-native-tests native-shim-tests \
+	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check steamcanarycheck np-native-tests native-shim-tests \
 	app-tests native-installercheck
 
 # app.yml runs the checks that need the built app in its build job and the rest in a
