@@ -6,18 +6,18 @@ SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 [ -f "$SRC" ] || { echo "==> anticheatcheck: $SRC not present, skipped"; exit 0; }
 
 extract() { sed -n "/^$1() {\$/,/^}\$/p" "$SRC"; }
-functions=$(grep '^kernel_anticheat_wait=' "$SRC") || { echo "FAIL: kernel_anticheat_wait not found in $SRC"; exit 1; }
-for name in kernel_anticheat_name find_kernel_anticheat kernel_anticheat_notice; do
+functions=$(grep -E '^(kernel_anticheat_wait|anticheat_elsewhere_url)=' "$SRC") || { echo "FAIL: kernel_anticheat_wait not found in $SRC"; exit 1; }
+for name in kernel_anticheat_name anticheat_label find_kernel_anticheat kernel_anticheat_notice alert_language alert_text; do
 	body=$(extract "$name")
 	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
 	functions="$functions
 $body"
 done
 eval "$functions"
-# shellcheck disable=SC2154 # the eval above sets it from the run script
-wait_seconds=$kernel_anticheat_wait
+# shellcheck disable=SC2154 # the eval above sets them from the run script
+wait_seconds=$kernel_anticheat_wait elsewhere=$anticheat_elsewhere_url
 
-work=$(mktemp -d)
+work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT
 
 fails=0
@@ -79,6 +79,8 @@ prompt_case() {
 				[ -z "$stub_out" ] || printf '%s\n' "$stub_out"
 				return "$stub_rc"
 			}
+			# shellcheck disable=SC2329 # Other Ways to Play runs this in place of a browser
+			open() { printf '%s\n' "$@" > "$case_dir/opened"; }
 		fi
 		kernel_anticheat_notice
 		echo launched > "$case_dir/launched"
@@ -93,13 +95,28 @@ answer "Don't Launch"
 prompt_case dont waitforexitandrun "$ka_game" stub
 is "Don't Launch: exits cleanly" 0 "$rc"
 is "Don't Launch: the game does not start" no "$launched"
-is "the dialog names the anti-cheat and the wait" "Ricochet (Randgrid.sys)
-$wait_seconds" "$(cat "$work/case dont/args")"
-has "the dialog gives up by itself" 'giving up after ((item 2 of argv) as integer)' "$(cat "$work/case dont/script")"
+is "the dialog names the anti-cheat and the wait" "$wait_seconds
+This game's anti-cheat can't run
+It uses Ricochet (Randgrid.sys), kernel anti-cheat that needs a Windows driver. Wine cannot load it, so the game will most likely quit at start. Playing online with it is at your own risk.
+Other Ways to Play
+Launch Anyway
+Don't Launch" "$(cat "$work/case dont/args")"
+has "the dialog offers other ways to play" 'buttons {item 4 of argv, item 5 of argv, item 6 of argv}' "$(cat "$work/case dont/script")"
+has "the dialog gives up by itself" 'giving up after ((item 1 of argv) as integer)' "$(cat "$work/case dont/script")"
 has "giving up is told apart from a choice" 'if gave up of answer then return "gave up"' "$(cat "$work/case dont/script")"
-has "Don't Launch is the default" "default button \"Don't Launch\"" "$(cat "$work/case dont/script")"
+has "Don't Launch is the default" "default button (item 6 of argv)" "$(cat "$work/case dont/script")"
+has "a translated button answers in English" 'if button returned of answer is (item 5 of argv) then return "Launch Anyway"' "$(cat "$work/case dont/script")"
+has "a translated Other Ways to Play answers in English" 'if button returned of answer is (item 4 of argv) then return "Other Ways to Play"' "$(cat "$work/case dont/script")"
 has "Don't Launch: logged" "=== not launched: kernel anti-cheat, the player chose Don't Launch ===" "$log"
-has "Don't Launch: exit cause" "=== exit cause: blocked: kernel anti-cheat Ricochet (Randgrid.sys) not confirmed, the player chose Don't Launch ===" "$log"
+has "Don't Launch: exit cause" "=== exit cause: blocked before launch: kernel anti-cheat Ricochet (Randgrid.sys), the player chose Don't Launch ===" "$log"
+
+answer "Other Ways to Play"
+prompt_case elsewhere waitforexitandrun "$ka_game" stub
+is "Other Ways to Play: exits cleanly" 0 "$rc"
+is "Other Ways to Play: the game does not start" no "$launched"
+is "Other Ways to Play: opens Bridgeplay's guide" "$elsewhere" "$(cat "$work/case elsewhere/opened" 2>/dev/null)"
+is "the guide is Bridgeplay's own page" "https://bridgeplay.dev/guides/anti-cheat-on-mac#alternatives" "$elsewhere"
+has "Other Ways to Play: exit cause" "=== exit cause: blocked before launch: kernel anti-cheat Ricochet (Randgrid.sys), the player chose Other Ways to Play ===" "$log"
 
 answer "Launch Anyway"
 prompt_case anyway waitforexitandrun "$ka_game" stub
@@ -113,7 +130,7 @@ is "no answer in time: exits cleanly" 0 "$rc"
 is "no answer in time: the game does not start" no "$launched"
 has "no answer in time: logged" "=== not launched: kernel anti-cheat, no answer within ${wait_seconds}s ===" "$log"
 has "no answer in time: exit summary" "=== exit summary: not launched, stopped before Wine started ===" "$log"
-has "no answer in time: exit cause" "=== exit cause: blocked: kernel anti-cheat Ricochet (Randgrid.sys) not confirmed, no answer within ${wait_seconds}s ===" "$log"
+has "no answer in time: exit cause" "=== exit cause: blocked before launch: kernel anti-cheat Ricochet (Randgrid.sys), no answer within ${wait_seconds}s ===" "$log"
 
 answer "" 1 "execution error: No user interaction allowed. (-1713)"
 prompt_case error waitforexitandrun "$ka_game" stub
@@ -121,7 +138,7 @@ is "dialog error: exits cleanly" 0 "$rc"
 is "dialog error: the game does not start" no "$launched"
 has "dialog error: why" "=== not launched: kernel anti-cheat, the dialog could not be shown (exit 1) ===" "$log"
 has "dialog error: the error is kept" "No user interaction allowed. (-1713)" "$log"
-has "dialog error: exit cause" "=== exit cause: blocked: kernel anti-cheat Ricochet (Randgrid.sys) not confirmed, the dialog could not be shown (exit 1) ===" "$log"
+has "dialog error: exit cause" "=== exit cause: blocked before launch: kernel anti-cheat Ricochet (Randgrid.sys), the dialog could not be shown (exit 1) ===" "$log"
 
 answer "" 0
 prompt_case empty waitforexitandrun "$ka_game" stub
@@ -141,6 +158,29 @@ prompt_case clean waitforexitandrun "$plain" stub
 is "a game without kernel anti-cheat is not asked" no "$asked"
 is "a game without kernel anti-cheat starts" yes "$launched"
 
+echo "== confirmed by a gamefix =="
+gamefix_anticheat=eac
+answer "Don't Launch"
+prompt_case confirmed waitforexitandrun "$plain" stub
+is "a confirmed game is asked with no anti-cheat file" yes "$asked"
+is "a confirmed game does not start on Don't Launch" no "$launched"
+has "the dialog names the confirmed anti-cheat" "It uses Easy Anti-Cheat, which the Bridgeplay maintainers found this game cannot run with on macOS" "$(cat "$work/case confirmed/args")"
+has "a confirmed game: logged" "anticheat: ANTICHEAT=eac in this game's gamefix, confirmed by a maintainer" "$log"
+has "a confirmed game: exit cause" "=== exit cause: blocked before launch: kernel anti-cheat Easy Anti-Cheat (gamefix), the player chose Don't Launch ===" "$log"
+lacks "a confirmed game: the exit cause does not contradict the maintainer line" "not confirmed" "$log"
+prompt_case confirmed-file waitforexitandrun "$ka_game" stub
+has "the gamefix comes before the file scan" "Easy Anti-Cheat" "$(cat "$work/case confirmed-file/args")"
+answer "Launch Anyway"
+prompt_case confirmed-anyway waitforexitandrun "$plain" stub
+is "a confirmed game still starts on Launch Anyway" yes "$launched"
+answer "Don't Launch"
+prompt_case confirmed-helper run "$plain" stub
+is "Steam's helpers of a confirmed game are not asked" no "$asked"
+# shellcheck disable=SC2034 # kernel_anticheat_notice, eval'd above, reads it
+gamefix_anticheat=other
+prompt_case confirmed-other waitforexitandrun "$plain" stub
+has "an unnamed anti-cheat reads as one" "It uses an anti-cheat, which" "$(cat "$work/case confirmed-other/args")"
+
 echo "== order =="
 # The prompt comes before anything that touches the prefix or starts Wine.
 notice_at=$(grep -n '^  kernel_anticheat_notice$' "$SRC" | cut -d: -f1)
@@ -154,4 +194,4 @@ else
 fi
 
 [ "$fails" -eq 0 ] || { echo "anticheatcheck: $fails failed"; exit 1; }
-echo "==> anticheatcheck: the kernel anti-cheat scan and prompt behave"
+echo "==> anticheatcheck: the kernel anti-cheat scan, the confirmed list and the prompt behave"

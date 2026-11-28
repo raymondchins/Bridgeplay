@@ -65,7 +65,13 @@ jobs:
           [ "$FULL" != "true" ] || { daily=1; mode=--full; }
           [ -n "$old" ] || { daily=1; mode=--full; }
           python3 scripts/compat-export.py fetch out $mode
-          python3 scripts/compat-export.py build out
+          # AreWeAntiCheatYet (MIT) names each game's anti-cheat; without it the build goes on.
+          ac=()
+          if curl -fsSL --max-time 60 -o "$RUNNER_TEMP/awacy.json" \
+            https://raw.githubusercontent.com/AreWeAntiCheatYet/AreWeAntiCheatYet/HEAD/games.json; then
+            ac=(--anticheat "$RUNNER_TEMP/awacy.json")
+          fi
+          python3 scripts/compat-export.py build out "${ac[@]}"
 
           cd out
           # Hourly runs publish only when a report came in or went away.

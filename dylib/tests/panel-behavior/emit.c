@@ -1,6 +1,7 @@
 // The payload is a macro, so the unit under test is included rather than linked.
 // All forms come from the same panel body.
 #include "../../feats/webpatch.c"
+#include "../../feats/compatverdict.c"
 #include "../../util/file.c"
 
 #include <stdio.h>
@@ -47,6 +48,14 @@ int main(int argc, char **argv) {
         fputs(NP_CX_PREFIX_ROW, stdout);
         return 0;
     }
+    if (argc == 2 && strcmp(argv[1], "verdict") == 0) {
+        fputs(NP_CX_VERDICT, stdout);
+        return 0;
+    }
+    if (argc == 2 && strcmp(argv[1], "install-banner") == 0) {
+        fputs(NP_INSTALL_BANNER, stdout);
+        return 0;
+    }
     if (argc == 2 && strcmp(argv[1], "migration") == 0) {
         fputs(NP_LAUNCH_MIGRATION, stdout);
         return 0;
@@ -88,6 +97,6 @@ int main(int argc, char **argv) {
     }
     fputs("usage: emit component|statement|vite [fallback [fex-tool...]]|migration|"
           "transform <chunk> <fallback tool>|compat-hint|image-files-label|"
-          "library-windows-hint|library-windows-summary|prefix-row\n", stderr);
+          "library-windows-hint|library-windows-summary|prefix-row|verdict|install-banner\n", stderr);
     return 2;
 }

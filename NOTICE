@@ -213,6 +213,11 @@ under the Steamworks SDK license whenever they are used.
 It also compiles against OpenVR and Wine headers, which are BSD-3-Clause and
 LGPL-V2, respectively.
 
+The compat-data export (scripts/compat-export.py) copies each game's anti-cheat
+names from AreWeAntiCheatYet's games.json into compat-index.json. That list is
+MIT licensed, Copyright © 2021 Starz0r, Curve, see
+https://github.com/AreWeAntiCheatYet/AreWeAntiCheatYet/blob/HEAD/LICENSE
+
 The app bundle embeds Sparkle, which checks for and installs updates. Sparkle is
 MIT licensed, see
 https://github.com/sparkle-project/Sparkle/blob/2.10.1/LICENSE

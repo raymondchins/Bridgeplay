@@ -560,6 +560,7 @@ gamefix_nvapi=""
 gamefix_dlss_fg=""
 gamefix_args=""
 gamefix_rockstar_shim=""
+gamefix_anticheat=""
 gamefix_exe=""
 gamefix_exe_from=""
 
@@ -638,6 +639,9 @@ gamefix_reason() {
     MOD_LOADERS)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     DXMT_?*|DXVK_?*|MVK_?*|VKD3D_?*|D3DM_?*|STAGING_?*) ;;
+    ANTICHEAT)
+      case "$2" in eac|battleye|ricochet|vanguard|ace|xigncode3|nprotect|javelin|denuvo|other) ;;
+        *) echo "not eac, battleye, ricochet, vanguard, ace, xigncode3, nprotect, javelin, denuvo or other" ;; esac ;;
     *) echo "not on the allow-list" ;;
   esac
 }
@@ -711,6 +715,8 @@ load_gamefixes() {
       NVAPI) gamefix_nvapi=$value; gamefix_log "NVAPI=$value from the $from conf" ;;
       DLSS_FG) gamefix_dlss_fg=$value; gamefix_log "DLSS_FG=$value from the $from conf" ;;
       ROCKSTAR_SHIM) gamefix_rockstar_shim=$value; gamefix_log "ROCKSTAR_SHIM=$value from the $from conf" ;;
+      # Read by kernel_anticheat_notice, never exported.
+      ANTICHEAT) gamefix_anticheat=$value; gamefix_log "ANTICHEAT=$value from the $from conf" ;;
       # Read by launcher_skip, which the launch options can override.
       EXE) gamefix_exe=$value; gamefix_log "EXE=$value from the $from conf" ;;
       EXE_FROM) gamefix_exe_from=$value; gamefix_log "EXE_FROM=$value from the $from conf" ;;
@@ -1995,24 +2001,56 @@ find_kernel_anticheat() {
     done
 }
 
+# The name of an ANTICHEAT gamefix id (docs/GAMEFIXES.md).
+anticheat_label() {
+  case "$1" in
+    eac) echo "Easy Anti-Cheat" ;;
+    battleye) echo "BattlEye" ;;
+    ricochet) echo "Ricochet" ;;
+    vanguard) echo "Vanguard" ;;
+    ace) echo "Anti-Cheat Expert" ;;
+    xigncode3) echo "XIGNCODE3" ;;
+    nprotect) echo "nProtect GameGuard" ;;
+    javelin) echo "EA Javelin" ;;
+    denuvo) echo "Denuvo Anti-Cheat" ;;
+    *) echo "an anti-cheat" ;;
+  esac
+}
+
 # Seconds the anti-cheat prompt waits. Steam shows the game as running until it is answered.
 kernel_anticheat_wait=90
+# Other Ways to Play in the prompt opens this: cloud gaming and Remote Play, with no service linked.
+anticheat_elsewhere_url="https://bridgeplay.dev/guides/anti-cheat-on-mac#alternatives"
 
-# Asks before a launch that cannot work and that could get the account banned. Only Launch
-# Anyway goes ahead: Don't Launch, no answer in time or a dialog that cannot show all exit
-# before Wine or the prefix is touched.
+# Asks before a launch that cannot work and that could get the account banned: a game whose
+# shipped gamefix names an anti-cheat a maintainer confirmed it cannot run with, then any game
+# with a kernel anti-cheat file. Only Launch Anyway goes ahead: Don't Launch, Other Ways to
+# Play, no answer in time or a dialog that cannot show all exit before Wine or the prefix is
+# touched.
 kernel_anticheat_notice() {
   [ "$verb" = waitforexitandrun ] || return 0
   alert_language
-  ka_found=$(find_kernel_anticheat "$STEAM_COMPAT_INSTALL_PATH")
-  [ -n "$ka_found" ] || return 0
-  echo "anticheat: found kernel anti-cheat $ka_found, whose driver Wine cannot load" >> "$log" 2>&1 || true
+  if [ -n "${gamefix_anticheat:-}" ]; then
+    ka_label=$(anticheat_label "$gamefix_anticheat")
+    ka_found="$ka_label (gamefix)"
+    ka_text=$(alert_text "It uses {1}, which the Bridgeplay maintainers found this game cannot run with on macOS, so it will most likely quit at start or refuse to play online. Playing online with it is at your own risk." "$(alert_text "$ka_label")")
+    echo "anticheat: ANTICHEAT=$gamefix_anticheat in this game's gamefix, confirmed by a maintainer" >> "$log" 2>&1 || true
+  else
+    ka_found=$(find_kernel_anticheat "$STEAM_COMPAT_INSTALL_PATH")
+    [ -n "$ka_found" ] || return 0
+    ka_text=$(alert_text "It uses {1}, kernel anti-cheat that needs a Windows driver. Wine cannot load it, so the game will most likely quit at start. Playing online with it is at your own risk." "$ka_found")
+    echo "anticheat: found kernel anti-cheat $ka_found, whose driver Wine cannot load" >> "$log" 2>&1 || true
+  fi
   ka_status=0
-  answer=$(osascript - "$ka_found" "$kernel_anticheat_wait" 8>&- 9>&- 2>> "$log" <<'APPLESCRIPT'
   # The dialog answers in English whatever its language, so the choices below stay as they are.
+  answer=$(osascript - "$kernel_anticheat_wait" "$(alert_text "This game's anti-cheat can't run")" "$ka_text" \
+    "$(alert_text "Other Ways to Play")" "$(alert_text "Launch Anyway")" "$(alert_text "Don't Launch")" 8>&- 9>&- 2>> "$log" <<'APPLESCRIPT'
 on run argv
-  set answer to display alert "This game's anti-cheat can't run" message ("It uses " & (item 1 of argv) & ", kernel anti-cheat that needs a Windows driver. Wine cannot load it, so the game will most likely quit at start. Playing online with it is at your own risk.") as critical buttons {"Launch Anyway", "Don't Launch"} default button "Don't Launch" giving up after ((item 2 of argv) as integer)
+  set answer to display alert (item 2 of argv) message (item 3 of argv) as critical buttons {item 4 of argv, item 5 of argv, item 6 of argv} default button (item 6 of argv) giving up after ((item 1 of argv) as integer)
   if gave up of answer then return "gave up"
+  if button returned of answer is (item 4 of argv) then return "Other Ways to Play"
+  if button returned of answer is (item 5 of argv) then return "Launch Anyway"
+  if button returned of answer is (item 6 of argv) then return "Don't Launch"
   return button returned of answer
 end run
 APPLESCRIPT
@@ -2022,6 +2060,9 @@ APPLESCRIPT
       echo "anticheat: the player chose Launch Anyway" >> "$log" 2>&1 || true
       return 0
       ;;
+    "0:Other Ways to Play")
+      ka_why="the player chose Other Ways to Play"
+      open "$anticheat_elsewhere_url" >/dev/null 2>&1 8>&- 9>&- || true ;;
     "0:Don't Launch") ka_why="the player chose Don't Launch" ;;
     "0:gave up") ka_why="no answer within ${kernel_anticheat_wait}s" ;;
     0:*) ka_why="the dialog returned no choice" ;;
@@ -2030,7 +2071,7 @@ APPLESCRIPT
   {
     echo "=== not launched: kernel anti-cheat, $ka_why ==="
     echo "=== exit summary: not launched, stopped before Wine started ==="
-    echo "=== exit cause: blocked: kernel anti-cheat $ka_found not confirmed, $ka_why ==="
+    echo "=== exit cause: blocked before launch: kernel anti-cheat $ka_found, $ka_why ==="
   } >> "$log" 2>&1 || true
   np_outcome=anticheat_blocked
   exit 0

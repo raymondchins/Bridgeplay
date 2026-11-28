@@ -25,7 +25,7 @@ launcher_body=$(sed -n '/^cat > "\$loader_macos\/launcher" <<LAUNCHER$/,/^LAUNCH
 append_args=$(sed -n '/^if \[ -n "\$gamefix_args" \]; then$/,/^fi$/p' "$SRC")
 [ -n "$append_args" ] || { echo "FAIL: the ARGS append not found"; exit 1; }
 
-work=$(mktemp -d)
+work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT
 
 fails=0
@@ -113,7 +113,7 @@ launch() {
 		sh -ec '
 			eval "$public_names"
 			eval "$functions"
-			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_nvapi="" gamefix_dlss_fg="" gamefix_args="" gamefix_rockstar_shim=""
+			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_nvapi="" gamefix_dlss_fg="" gamefix_args="" gamefix_rockstar_shim="" gamefix_anticheat=""
 			backend_root="$CX_ROOT/lib/notproton-backends"
 			load_gamefixes || true
 			consume_sidebar_quick_settings || true
@@ -128,7 +128,7 @@ launch() {
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
 				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE NOTPROTON_PERF_OVERLAY NOTPROTON_FPS_LIMIT NOTPROTON_FPS_LIMIT_OFF NOTPROTON_SCALING_FILTER NOTPROTON_SUSTAINED CX_GRAPHICS_BACKEND \
-				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_GAME_MODE NOTPROTON_HIDE_WINE_EXPORTS NOTPROTON_ROCKSTAR_DXGI CX_FWD_COMPAT_GL_CTX gamefix_args PATH DYLD_INSERT_LIBRARIES; do
+				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_GAME_MODE NOTPROTON_HIDE_WINE_EXPORTS NOTPROTON_ROCKSTAR_DXGI CX_FWD_COMPAT_GL_CTX gamefix_args gamefix_anticheat ANTICHEAT PATH DYLD_INSERT_LIBRARIES; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
 		' launch "$target" > "$case_dir/out" 2>&1 || bad "the launch sequence ran to the end" "exit 0" "exit $? $(tail -1 "$case_dir/out")"
@@ -222,6 +222,22 @@ is "a rejected FRAMEGEN leaves frame generation unset" "<unset>" "$(got NOTPROTO
 has "PERF_OVERLAY must be a level" "rejected PERF_OVERLAY: not 0, fps, summary or detailed" "$case_dir/log"
 is "a rejected PERF_OVERLAY leaves the overlay unset" "<unset>" "$(got NOTPROTON_PERF_OVERLAY)"
 has "applied values are logged" "applied DXVK_HUD=fps from the default conf" "$case_dir/log"
+
+echo "== parser: ANTICHEAT"
+new_case
+full_engine
+default_conf 'ANTICHEAT=eac'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "ANTICHEAT is read" "eac" "$(got gamefix_anticheat)"
+is "ANTICHEAT is not exported" "<unset>" "$(got ANTICHEAT)"
+has "ANTICHEAT is logged" "ANTICHEAT=eac from the default conf" "$case_dir/log"
+new_case
+full_engine
+default_conf 'ANTICHEAT=vac' 'ANTICHEAT=EAC'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "an unknown anti-cheat id is not read" "" "$(got gamefix_anticheat)"
+has "an unknown anti-cheat id is rejected" "line 1 rejected ANTICHEAT: not eac, battleye" "$case_dir/log"
+has "ids are lower case" "line 2 rejected ANTICHEAT: not eac, battleye" "$case_dir/log"
 
 echo "== precedence: launch options > user conf > default conf > auto > default"
 new_case

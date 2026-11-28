@@ -10601,6 +10601,30 @@
         }
       }
     },
+    "It uses %@, which the Bridgeplay maintainers found this game cannot run with on macOS, so it will most likely quit at start or refuse to play online. Playing online with it is at your own risk." : {
+      "comment" : "Run script dialog; %@ is the anti-cheat a maintainer confirmed for this game, such as Easy Anti-Cheat.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa %@, con cui i manutentori di Bridgeplay hanno verificato che questo gioco non può funzionare su macOS, quindi molto probabilmente si chiuderà all'avvio o non permetterà di giocare online. Giocarci online è a tuo rischio."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Она использует %@, и разработчики Bridgeplay выяснили, что с ним эта игра не работает на macOS, поэтому она, скорее всего, закроется при запуске или не пустит в сетевую игру. Играть в неё по сети — на ваш риск."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它使用 %@，Bridgeplay 维护者已确认此游戏在 macOS 上无法与之一起运行，因此游戏很可能在启动时退出或拒绝联网游玩。联网游玩风险自负。"
+          }
+        }
+      }
+    },
     "It will replace the DLLs used by CrossOver with ones that match your compatibility tool." : {
       "localizations" : {
         "it" : {
@@ -23793,6 +23817,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "大约还剩 %@"
+          }
+        }
+      }
+    },
+    "an anti-cheat" : {
+      "comment" : "Run script dialog; stands in for the anti-cheat's name in “It uses %@, which the Bridgeplay maintainers found…”.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un anti-cheat"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "античит"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "反作弊程序"
           }
         }
       }
