@@ -259,6 +259,12 @@ compat-export-check:
 	@if [ ! -f compat/tests/compat-export.py ]; then $(call SKIP,compat-export-check,compat/tests/compat-export.py); exit 0; fi; \
 	python3 compat/tests/compat-export.py
 
+# Offline test of the regression watch on the compat-export fixture.
+.PHONY: compat-regressions-check
+compat-regressions-check:
+	@if [ ! -f compat/tests/compat-regressions.py ]; then $(call SKIP,compat-regressions-check,compat/tests/compat-regressions.py); exit 0; fi; \
+	python3 compat/tests/compat-regressions.py
+
 .PHONY: mincheck
 mincheck:
 	@if [ ! -d "$(APP_BUNDLE)" ]; then echo "==> mincheck: $(APP_BUNDLE) not present, skipped (make app builds it)"; exit 0; fi; \
@@ -1066,7 +1072,7 @@ steamcanarycheck:
 # overlay-shim-tests is left out: it needs a Metal GPU and real frame timing.
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
-	activatecheck breakercheck clientgatecheck pauselistcheck compat-reported-import-check compat-export-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
+	activatecheck breakercheck clientgatecheck pauselistcheck compat-reported-import-check compat-export-check compat-regressions-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck launchercheck \
 	seedcheck gamefixescheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check benchcheck benchabcheck steamcanarycheck np-native-tests native-shim-tests \
 	app-tests native-installercheck
