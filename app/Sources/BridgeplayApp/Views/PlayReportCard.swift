@@ -38,8 +38,8 @@ struct PlayReportCard: View {
                 .font(BP.sans(13, .semibold))
                 HStack(spacing: 8) {
                     if status == .bronze {
-                        Picker("Main problem", selection: $issue) {
-                            Text("Main problem").tag(ReportIssue?.none)
+                        Picker("Problem", selection: $issue) {
+                            Text("Problem").tag(ReportIssue?.none)
                             ForEach(ReportIssue.allCases, id: \.self) { Text(Self.label($0)).tag(Optional($0)) }
                         }
                         .labelsHidden()
@@ -72,29 +72,48 @@ struct PlayReportCard: View {
 
     static func label(_ issue: ReportIssue) -> String {
         switch issue {
-        case .performance: String(localized: "Low frame rate or stutter")
+        case .performance: String(localized: "Low FPS or stutter")
         case .crash: String(localized: "Crashes or freezes")
         case .graphics: String(localized: "Graphics glitches")
         case .sound: String(localized: "Sound problems")
-        case .controls: String(localized: "Controller, keyboard or mouse")
-        case .launcher: String(localized: "Launcher, sign-in or anti-cheat")
+        case .controls: String(localized: "Controls")
+        case .launcher: String(localized: "Launcher or anti-cheat")
         }
     }
 
     private var answerRow: some View {
-        HStack(alignment: .center, spacing: 12) {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                sessionPrompt.fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: 12)
+                answers
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                sessionPrompt
+                answers
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var sessionPrompt: some View {
+        HStack(spacing: 12) {
             Image(systemName: "gamecontroller.fill")
                 .foregroundStyle(BP.blue)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(question).font(BP.sans(13, .semibold))
-                Toggle("Share automatically after each game", isOn: Binding(
+                Toggle("Auto-share", isOn: Binding(
                     get: { reports.autoShare }, set: { reports.setAutoShare($0) }))
                     .toggleStyle(.checkbox)
                     .font(BP.sans(12))
                     .foregroundStyle(BP.fg2)
             }
-            Spacer(minLength: 12)
+        }
+    }
+
+    private var answers: some View {
+        HStack(spacing: 8) {
             Button("Smooth") { reports.answer(.platinum) }
                 .buttonStyle(.borderedProminent)
             Button("Tweaked") { pending = .gold }
@@ -103,7 +122,7 @@ struct PlayReportCard: View {
             // A click is Not Now; the menu also offers never asking about this game.
             Menu {
                 Button("Not Now") { reports.dismiss() }
-                Button("Don't Ask About This Game") { reports.neverAsk() }
+                Button("Don't Ask Again") { reports.neverAsk() }
                 Divider()
                 Button("Report Your Games…") { reports.openBulk() }
             } label: {
@@ -122,10 +141,10 @@ struct PlayReportCard: View {
     private var question: String {
         let name = nudge.prefix.title
         guard let seconds = nudge.session.seconds, seconds >= 60 else {
-            return String(localized: "You played \(name). How did it run?")
+            return String(localized: "How did \(name) run?")
         }
         let time = Duration.seconds(seconds).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
-        return String(localized: "You played \(name) for \(time). How did it run?")
+        return String(localized: "How did \(name) run? · \(time)")
     }
 }
 
@@ -135,7 +154,7 @@ struct PlayReportThanks: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(BP.green)
                 .accessibilityHidden(true)
-            Text("Thanks! Your report is on its way.")
+            Text("Thanks! Report on its way.")
                 .font(BP.sans(13, .semibold))
             Spacer(minLength: 0)
         }

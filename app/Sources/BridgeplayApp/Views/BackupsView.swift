@@ -63,7 +63,7 @@ struct BackupsView: View {
             Button("Cancel", role: .cancel) { model.pendingConfirmation = nil }
                 .keyboardShortcut(.defaultAction)
         } message: {
-            Text(PrefixPrompt.deleteBackupsMessage(clearing))
+            Text(PrefixPrompt.deleteBackupsMessage(clearing).keepingLastWordsTogether)
         }
         .prefixDialogs()
     }
@@ -72,7 +72,7 @@ struct BackupsView: View {
         guard !model.backups.isEmpty else { return "" }
         let size = model.backupBytes.formatted(.byteCount(style: .file))
         let count = model.backups.count == 1 ? String(localized: "1 backup") : String(localized: "\(model.backups.count) backups")
-        return String(localized: "\(count), \(size) private size")
+        return "\(count), \(size)"
     }
 
     private var selected: [PrefixBackup] {
@@ -104,7 +104,7 @@ struct BackupsView: View {
             if let backup = selected.first, selected.count == 1 { model.reveal(backup) }
         }
         .disabled(selected.count != 1)
-        .help("Show the selected backup in the Finder.")
+        .help("Show in Finder.")
 
         Button("Restore", systemImage: "arrow.uturn.backward") {
             if let backup = selected.first, selected.count == 1 { model.pendingConfirmation = .restore(backup) }
@@ -128,7 +128,7 @@ struct BackupsView: View {
             Task { await model.load() }
         }
         .disabled(model.isLoading)
-        .help("List the backups again and update their sizes.")
+        .help("Reload the list.")
     }
 
     private var gameWidth: CGFloat {
@@ -162,7 +162,7 @@ struct BackupsView: View {
             }
             .width(min: 44, ideal: libraryWidth)
 
-            TableColumn("Private Size") { backup in
+            TableColumn("Size") { backup in
                 Text(backup.bytes.formatted(.byteCount(style: .file)))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)

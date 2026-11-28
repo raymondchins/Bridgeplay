@@ -30,7 +30,7 @@ struct StatusHero: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                             .accessibilityAddTraits(.isHeader)
-                        Text(detail)
+                        Text(detail.keepingLastWordsTogether)
                             .font(BP.sans(13))
                             .foregroundStyle(BP.fg2)
                             .lineLimit(2)
@@ -42,7 +42,9 @@ struct StatusHero: View {
                 }
                 .padding(.horizontal, 24)
         }
-        .frame(height: 148)
+        // A fixed height: a content-sized hero made the split view measure it at a narrow
+        // width, where the text wraps tall, and push the whole window's content off-screen.
+        .frame(height: 164)
         .clipShape(RoundedRectangle(cornerRadius: BP.radius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: BP.radius, style: .continuous).strokeBorder(BP.line, lineWidth: 1))
         .padding(.horizontal, BP.pageMargin)

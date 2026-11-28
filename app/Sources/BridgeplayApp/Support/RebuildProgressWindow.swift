@@ -84,6 +84,15 @@ final class ProgressPanel {
         note.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         note.textColor = .secondaryLabelColor
         note.preferredMaxLayoutWidth = Self.textWidth
+        if !activates {
+            message.maximumNumberOfLines = 0
+            message.lineBreakStrategy = .pushOut
+            phase.lineBreakMode = .byWordWrapping
+            phase.preferredMaxLayoutWidth = Self.textWidth
+            phase.maximumNumberOfLines = 0
+            phase.lineBreakStrategy = .pushOut
+            note.lineBreakStrategy = .pushOut
+        }
         note.isHidden = true
         bar.style = .bar
         bar.isIndeterminate = true

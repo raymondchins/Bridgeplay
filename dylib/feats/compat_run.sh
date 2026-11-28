@@ -1046,12 +1046,12 @@ fex_graphics_notice() {
   if imports_d3d12 "$1"; then
     graphics_log "the game imports d3d12.dll, and Wine through FEX has no Direct3D 12 yet, so it may quit or stay black"
     fex_title="This game needs Direct3D 12"
-    fex_body="FEX cannot run Direct3D 12. The game may quit or show a black screen. In Steam Compatibility, select the Rosetta tool for this CrossOver version."
+    fex_body="FEX can't run it. Pick this CrossOver's Rosetta tool in Steam."
   else
     case " $np_dropped " in *" CX_GRAPHICS_BACKEND=d3dmetal "*) ;; *) return 0 ;; esac
     graphics_log "D3DMetal was asked for, and Wine through FEX has none, so the engine picks the graphics"
     fex_title="D3DMetal is off on FEX"
-    fex_body="To use D3DMetal, select the Rosetta tool for this CrossOver version in Steam Compatibility."
+    fex_body="To use it, pick this CrossOver's Rosetta tool in Steam."
   fi
   fex_mark="$STEAM_COMPAT_DATA_PATH/bridgeplay-fex-noticed"
   [ -n "$STEAM_COMPAT_DATA_PATH" ] && [ "$(sed -n 1p "$fex_mark" 2>/dev/null)" != "$np_build" ] || return 0
@@ -1070,7 +1070,7 @@ toolkit_graphics_notice() {
   toolkit_mark="$STEAM_COMPAT_DATA_PATH/bridgeplay-toolkit-noticed"
   [ -n "$STEAM_COMPAT_DATA_PATH" ] && [ "$(sed -n 1p "$toolkit_mark" 2>/dev/null)" != "$np_build" ] || return 0
   printf '%s\n' "$np_build" > "$toolkit_mark" 2>/dev/null || true
-  notify_user "This game uses DirectX 12" "For best performance, get Game Porting Toolkit from Apple. In Bridgeplay, open Status and click Rescan. Your saves and games stay in place."
+  notify_user "This game uses DirectX 12" "Get Apple's Game Porting Toolkit, then click Rescan in Bridgeplay's Status."
 }
 
 # Returns 0 when the destination already matches or was replaced.
@@ -1875,7 +1875,7 @@ launch_progress() {
     np_panel_pid=$!
     echo "launch: progress panel started (new prefix: $prefix_was_new)" >> "$log" 2>&1 || true
   elif [ "$prefix_was_new" = 1 ]; then
-    notify_user "Getting this game ready" "First-time setup can take a few minutes. The screen may stay black while graphics load."
+    notify_user "Getting this game ready" "The first launch may take a few minutes and show a black screen."
   fi
 }
 
@@ -1935,7 +1935,7 @@ low_power_notice() {
         ;;
     esac
     exec 7>&-
-    [ -z "$tell" ] || notify_user "Low Power Mode is on" "Games run slower while it is on. Turn it off in System Settings > Battery, or Energy on a desktop Mac."
+    [ -z "$tell" ] || notify_user "Low Power Mode is on" "Games run slower. Turn it off in System Settings > Battery or Energy."
   ) >/dev/null 2>&1 &
 }
 
@@ -1968,7 +1968,7 @@ show_rebuild_failure() {
   launch_step dialog
   exec 8>&- 9>&-
   alert_language
-  answer=$(osascript - "$(alert_text "Prefix rebuild failed!")" "$(alert_text "Check bridgeplay-run.log at {1}." "$log")" \
+  answer=$(osascript - "$(alert_text "Prefix rebuild failed")" "$(alert_text "Check bridgeplay-run.log at {1}." "$log")" \
     "$(alert_text "Open Log")" "$(alert_text "OK")" <<'APPLESCRIPT'
 on run argv
   set answer to display alert (item 1 of argv) message (item 2 of argv) as critical buttons {item 3 of argv, item 4 of argv} default button (item 4 of argv)
@@ -2033,17 +2033,17 @@ kernel_anticheat_notice() {
   if [ -n "${gamefix_anticheat:-}" ]; then
     ka_label=$(anticheat_label "$gamefix_anticheat")
     ka_found="$ka_label (gamefix)"
-    ka_text=$(alert_text "Bridgeplay confirmed {1} blocks this game on Mac. It may quit at launch or block online play. Playing online risks an account ban." "$(alert_text "$ka_label")")
+    ka_text=$(alert_text "It uses {1}, which doesn't work on Mac. Playing online risks an account ban." "$(alert_text "$ka_label")")
     echo "anticheat: ANTICHEAT=$gamefix_anticheat in this game's gamefix, confirmed by a maintainer" >> "$log" 2>&1 || true
   else
     ka_found=$(find_kernel_anticheat "$STEAM_COMPAT_INSTALL_PATH")
     [ -n "$ka_found" ] || return 0
-    ka_text=$(alert_text "Wine cannot load the Windows driver for {1}. The game will likely quit at launch. Playing online risks an account ban." "$ka_found")
+    ka_text=$(alert_text "Wine can't load {1}. Playing online risks an account ban." "$ka_found")
     echo "anticheat: found kernel anti-cheat $ka_found, whose driver Wine cannot load" >> "$log" 2>&1 || true
   fi
   ka_status=0
   # The dialog answers in English whatever its language, so the choices below stay as they are.
-  answer=$(osascript - "$kernel_anticheat_wait" "$(alert_text "This game's anti-cheat can't run")" "$ka_text" \
+  answer=$(osascript - "$kernel_anticheat_wait" "$(alert_text "Anti-cheat can't run")" "$ka_text" \
     "$(alert_text "Other Ways to Play")" "$(alert_text "Launch Anyway")" "$(alert_text "Don't Launch")" 8>&- 9>&- 2>> "$log" <<'APPLESCRIPT'
 on run argv
   set answer to display alert (item 2 of argv) message (item 3 of argv) as critical buttons {item 4 of argv, item 5 of argv, item 6 of argv} default button (item 6 of argv) giving up after ((item 1 of argv) as integer)
@@ -2315,7 +2315,7 @@ APPLESCRIPT
   esac
   executable=$(cat "$np_support/app-executable" 2>/dev/null) || executable=""
   if [ ! -x "$executable" ]; then
-    show_alert "Couldn't find the Bridgeplay app" "The game did not launch or rebuild its prefix. Move Bridgeplay to Applications, open it, click Install, then launch the game again."
+    show_alert "Couldn't find the Bridgeplay app" "Move Bridgeplay to Applications, open it and click Install."
     exit 1
   fi
   if ! run_rebuild "$executable" "$backup"; then
@@ -2330,7 +2330,7 @@ APPLESCRIPT
   # A competing launch or rebuild may have run while the dialog was open.
   # Retake the normal launch lock and check both mismatches before touching Wine.
   if ! prepare_prefix_directory; then
-    show_alert "Prefix rebuilt" "Another launch is using this prefix. Wait for it to finish, then launch the game again."
+    show_alert "Prefix rebuilt" "Another launch is using it. Try again when that ends."
     exit 1
   fi
   np_rebuilt=1
@@ -2349,16 +2349,16 @@ refuse_foreign_prefix() {
   had_tool=$(tool_name "$have")
   want_tool=$(tool_name "$want")
   alert_language
-  explanation=$(alert_text "{1} prefixes cannot be used with versions of CrossOver that run through {2} unless they are rebuilt." "$had_tool" "$want_tool")
+  explanation=$(alert_text "A {1} prefix must be rebuilt for {2}." "$had_tool" "$want_tool")
   # note_other_build read the build that set up the prefix.
   case "$have:$had_display" in
     aa64:?* | 8664:?*)
-      explanation=$(alert_join "$(alert_text "This game's prefix was last used by {1}." "$(running_name "$had_display" "$had_tool")")" "$explanation")
+      explanation=$(alert_join "$(alert_text "Last used by {1}." "$(running_name "$had_display" "$had_tool")")" "$explanation")
       ;;
   esac
-  rebuild_prefix "This game needs its prefix rebuilt" "$explanation
+  rebuild_prefix "Prefix rebuild needed" "$explanation
 
-$(alert_text "Rebuild the prefix for {1}? Your saves will be kept." "$(running_name "$np_display" "$want_tool")")"
+$(alert_text "Rebuild for {1}? Saves are kept." "$(running_name "$np_display" "$want_tool")")"
 }
 
 last_wine_build() {
@@ -2665,11 +2665,11 @@ offer_switch_rebuild() {
   rm -f "$switch"
   echo "=== last session crashed after switching from $old_display, offering a rebuild ===" >> "$log" 2>&1 || true
   alert_language
-  rebuild_prefix "This game may need its prefix rebuilt" \
-    "$(alert_text "The last launch failed. Rebuilding the prefix may help.")
+  rebuild_prefix "Prefix rebuild may help" \
+    "$(alert_text "The last launch failed.")
 
-$(alert_text "Rebuild the prefix for {1}? Your saves will be kept." "$(running_name "$np_display" "$(tool_name "$now_arch")")")" \
-    "Launch Without Rebuilding"
+$(alert_text "Rebuild for {1}? Saves are kept." "$(running_name "$np_display" "$(tool_name "$now_arch")")")" \
+    "Launch Anyway"
 }
 
 claim_prefix() {
@@ -2693,7 +2693,7 @@ note_prefix_volume() {
   echo "=== compatdata is on $fs, not APFS: Wine prefixes are only tested on APFS, games may hang or fail to start ===" \
     >> "$log" 2>&1 || true
   [ "$prefix_was_new" = 1 ] || return 0
-  notify_user "This Steam library is not on APFS" "Games on {1} may freeze or fail to start. Move this game to a Steam library on an APFS drive." "$fs"
+  notify_user "Steam library isn't APFS" "Games on {1} may freeze. Move this one to an APFS library." "$fs"
 }
 
 # Without C:\windows\system32 Wine stops at "could not load kernel32.dll" and the game quits
@@ -2714,13 +2714,13 @@ refuse_broken_prefix() {
   vol=$(volume_type "$STEAM_COMPAT_DATA_PATH") || vol=""
   fs=${vol%% *}
   case "$fs" in exfat|msdos|ntfs)
-    show_alert "This Steam library cannot hold the game's prefix" "It is formatted {1}, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive." "$fs"
+    show_alert "This library can't hold the prefix" "{1} has no symbolic links. Move the game to an APFS library." "$fs"
     exit 1
   esac
   # Wine reports a full disk only as error=112 on each file it could not copy.
   free_kb=$(df -Pk "$STEAM_COMPAT_DATA_PATH" 2>/dev/null | awk 'NR == 2 { print $4 }')
   if [ -n "$free_kb" ] && [ "$free_kb" -lt 2097152 ]; then
-    show_alert "The disk is too full for the game's prefix" "Free about 2 GB on the Steam library drive, then rebuild the prefix in Bridgeplay."
+    show_alert "Not enough disk space" "Free about 2 GB on this library's drive, then rebuild in Bridgeplay."
     exit 1
   fi
   # set_up_prefix_contents runs reg import, which can leave wineserver holding the prefix
@@ -2731,7 +2731,7 @@ refuse_broken_prefix() {
     without_lock_fds "$WINESERVER" -w >> "$log" 2>&1 || true
   fi
   # The rebuild skips system.reg, which may contain game data.
-  rebuild_prefix "The game's prefix could not be set up" "Wine did not finish building it, so the game can't start. Rebuild the prefix now? Bridgeplay will keep a backup of the old prefix." "" keep-backup
+  rebuild_prefix "Prefix setup failed" "The game can't start. Rebuild it now? The old prefix is backed up." "" keep-backup
   broken_rebuilt=1
 }
 
@@ -2762,7 +2762,7 @@ note_other_prefixes() {
 $(steam_libraries)
 EOF_LIBRARIES
   [ -n "$old_prefix" ] || return 0
-  notify_user "This game starts with a new prefix" "Its earlier prefix is still in {1}. Saves or launcher sign-ins kept only there are not in the new one." "$old_prefix"
+  notify_user "New prefix for this game" "The old one is still in {1}, with any saves or sign-ins only it had." "$old_prefix"
 }
 
 # Steam cloud related
@@ -3151,10 +3151,10 @@ fold_wine_profile() {
     echo "=== moved users/$wine_user into steamuser, where Steam Cloud syncs ===" >> "$log" 2>&1 || true
     fold_note=""
     [ -z "$fold_parked" ] \
-      || fold_note=$(alert_text "Files that differed from Steam Cloud's copy were kept beside it with BACKUP in the name.")
+      || fold_note=$(alert_text "Conflicting copies have BACKUP in their names.")
     [ -z "$fold_homes" ] \
-      || fold_note=$(alert_join "$fold_note" "$(alert_text "Files the game kept in your Mac's Documents and other home folders stay there.")")
-    [ -z "$fold_note" ] || notify_user "Saved games moved to where Steam Cloud syncs" "$fold_note"
+      || fold_note=$(alert_join "$fold_note" "$(alert_text "Files in your Mac's home folders stay put.")")
+    [ -z "$fold_note" ] || notify_user "Saves moved for Steam Cloud" "$fold_note"
   fi
   ln -s steamuser "$own" 2>/dev/null \
     || echo "=== could not point users/$wine_user at steamuser ===" >> "$log" 2>&1 || true
@@ -3366,7 +3366,7 @@ import_prefix_settings() {
 mark "runner check"
 if [ -z "$np_build" ] || [ ! -d "$CX_ROOT/lib/wine" ]; then
   echo "=== build ${np_build:-(none recorded)} behind this compatibility tool is not set up, set it up in Bridgeplay ===" >> "$log" 2>&1 || true
-  show_alert "CrossOver is not set up" "Set up CrossOver for {1} in Bridgeplay, or choose another compatibility tool in Steam." "$(alert_safe "$np_display")"
+  show_alert "CrossOver is not set up" "Set it up for {1} in Bridgeplay, or pick another tool in Steam." "$(alert_safe "$np_display")"
   np_outcome=engine_missing
   exit 1
 fi
@@ -3392,7 +3392,7 @@ case "$(/usr/bin/file -b "$WINESERVER" 2>/dev/null)" in
     # ARM64 Wine needs what macOS 26.5 added (CrossOver falls back to Rosetta before it).
     if [ "${wine_unix##*/}" = aarch64-unix ] && macos_before 26 5 && ! engine_loader_runs; then
       echo "=== Wine through FEX did not start: it needs macOS 26.5 or later ===" >> "$log" 2>&1 || true
-      show_alert "This tool needs macOS 26.5" "{1} runs Windows games through FEX, which needs macOS 26.5 or later. Update macOS, or pick this CrossOver's Rosetta tool in the game's Compatibility settings in Steam." "$(alert_safe "$(preview_name "${np_display% - FEX}")")"
+      show_alert "This tool needs macOS 26.5" "Update macOS, or pick the Rosetta tool for {1} in Steam." "$(alert_safe "$(preview_name "${np_display% - FEX}")")"
       np_outcome=engine_unsupported
       exit 1
     fi
@@ -3405,7 +3405,7 @@ case "$(/usr/bin/file -b "$WINESERVER" 2>/dev/null)" in
         echo "=== arch -x86_64 failed, but the engine's loader runs, so Rosetta is there for it ===" >> "$log" 2>&1 || true
       else
         echo "=== Rosetta 2 is not installed, Wine cannot run: softwareupdate --install-rosetta --agree-to-license ===" >> "$log" 2>&1 || true
-        show_alert "Rosetta 2 is not installed" "To run the game, enter this command in Terminal, then launch again: softwareupdate --install-rosetta --agree-to-license"
+        show_alert "Rosetta 2 is not installed" "Run in Terminal, then relaunch: softwareupdate --install-rosetta --agree-to-license"
         np_outcome=rosetta_missing
         exit 1
       fi
@@ -3860,7 +3860,7 @@ prepare_prefix_directory() {
   for interrupted in "$STEAM_COMPAT_DATA_PATH"/pfx.replaced.*; do
     [ -e "$interrupted" ] || [ -L "$interrupted" ] || continue
     echo "=== interrupted prefix replacement needs recovery: $interrupted ===" >> "$log" 2>&1 || true
-    show_alert "Prefix recovery required" "An interrupted prefix replacement may hold saved games. Do not delete this prefix. Check its bridgeplay-run.log for the recovery folder."
+    show_alert "Prefix recovery required" "This prefix may hold saves, so don't delete it. See its bridgeplay-run.log."
     exit 1
   done
   mkdir -p "$WINEPREFIX"
@@ -4011,7 +4011,7 @@ fonts_inputs() {
 set_up_prefix_contents() {
   mark "profile layout"
   if ! lay_out_proton_profile; then
-    show_alert "Saved-game folders need attention" "Bridgeplay left the conflicting files in place. Open this prefix's bridgeplay-run.log for details before trying again."
+    show_alert "Saved-game folders need attention" "Some files may have moved. Check this prefix's bridgeplay-run.log before retrying."
     exit 1
   fi
   [ "$verb" != waitforexitandrun ] || echo "video: RetinaMode=${NOTPROTON_RETINA:-0}" >> "$log" 2>&1 || true
@@ -4665,7 +4665,7 @@ if [ -d "$bridge_src" ] && [ -n "$WINEPREFIX" ]; then
       fi
     done
     if [ "$unstaged" -eq 1 ]; then
-      show_alert "Steam files could not be copied" "Bridgeplay could not copy a file into this game's prefix. Open this prefix's bridgeplay-run.log for details."
+      show_alert "Couldn't copy Steam files" "See this prefix's bridgeplay-run.log."
       exit 1
     fi
   fi
@@ -4682,7 +4682,7 @@ if [ -d "$bridge_src" ] && [ -n "$WINEPREFIX" ]; then
   done
   verify_runner
   if ! install_lsteamclient_trigger; then
-    show_alert "Steam files could not be copied" "Bridgeplay could not copy a file into this game's prefix. Open this prefix's bridgeplay-run.log for details."
+    show_alert "Couldn't copy Steam files" "See this prefix's bridgeplay-run.log."
     exit 1
   fi
   install_legacy_steam_dll

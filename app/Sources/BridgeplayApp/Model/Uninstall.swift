@@ -60,7 +60,7 @@ enum Uninstall {
             return String(localized: "Your games stay.")
         }
         return missing.map {
-            String(localized: "Steam at \($0.path(percentEncoded: false)) isn't connected, so Bridgeplay can't be removed from it. All other Bridgeplay data is removed, except for Windows Games and prefixes.")
+            String(localized: "Steam at \($0.path(percentEncoded: false)) isn't connected, so it keeps Bridgeplay.")
         }.joined(separator: "\n\n")
     }
 

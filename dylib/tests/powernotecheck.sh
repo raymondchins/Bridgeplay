@@ -71,7 +71,7 @@ is "a lowpowermodefoo key is not read" "" "$(mode "$(pmset_g ' lowpowermodefoo  
 echo "== the notice"
 rm -f "$mark"
 run "$on"
-has "Low Power Mode on notifies" "Low Power Mode is on|Games run slower while it is on." "$work/notes"
+has "Low Power Mode on notifies" "Low Power Mode is on|Games run slower." "$work/notes"
 has "it is logged" "power: Low Power Mode is on" "$work/log"
 is "the session is marked" yes "$(marked)"
 run "$on"

@@ -73,9 +73,9 @@ struct LaunchProgressTests {
     func unknownStep() {
         #expect(first.action(step: nil, elapsed: 5, launchEnded: false, gameWindow: false) == .shown(nil))
         #expect(LaunchProgress.phase(nil) == "Still starting…")
-        #expect(LaunchProgress.phase(.setup) == "Setting up Windows for this game…")
-        #expect(LaunchProgress.message(game: "Hell Maiden") == "Bridgeplay is starting Hell Maiden.")
-        #expect(LaunchProgress.message(game: nil) == "Bridgeplay is starting this game.")
+        #expect(LaunchProgress.phase(.setup) == "Setting up Windows…")
+        #expect(LaunchProgress.message(game: "Hell Maiden") == "Starting Hell Maiden")
+        #expect(LaunchProgress.message(game: nil) == "Starting the game")
         #expect(first.note != nil)
         #expect(later.note == nil)
     }

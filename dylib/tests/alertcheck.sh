@@ -113,11 +113,11 @@ is "no defaults at all" en "$(lang_case - -)"
 echo "== text =="
 np_tool_dir="$work/tool"
 t() { (np_alert_lang=$1 && shift && alert_text "$@"); }
-is "English fills the args" "It is formatted exfat, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive." \
-	"$(t en "It is formatted {1}, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive." exfat)"
+is "English fills the args" "exfat has no symbolic links. Move the game to an APFS library." \
+	"$(t en "{1} has no symbolic links. Move the game to an APFS library." exfat)"
 is "Russian" "Rosetta 2 не установлена" "$(t ru "Rosetta 2 is not installed")"
-is "Chinese, two args in order" "Rosetta 游戏容器必须重建后才能用于通过 FEX 运行的 CrossOver 版本。" \
-	"$(t zh-Hans "{1} prefixes cannot be used with versions of CrossOver that run through {2} unless they are rebuilt." Rosetta FEX)"
+is "Chinese, two args in order" "Rosetta 游戏容器需重建后才能用于 FEX。" \
+	"$(t zh-Hans "A {1} prefix must be rebuilt for {2}." Rosetta FEX)"
 is "Italian" "CrossOver 25, tramite Rosetta" "$(t it "{1}, running through {2}" "CrossOver 25" Rosetta)"
 is "an arg is never read as a placeholder" "Check bridgeplay-run.log at /a/{2}/b." "$(t en "Check bridgeplay-run.log at {1}." "/a/{2}/b" x)"
 is "a missing arg is empty" "Check bridgeplay-run.log at ." "$(t en "Check bridgeplay-run.log at {1}.")"
@@ -135,15 +135,15 @@ echo "== dialogs and notifications =="
 verb=waitforexitandrun
 # shellcheck disable=SC2329 # show_alert runs this in place of the dialog
 osascript() { cat > /dev/null; shift; printf '%s\n' "$@" > "$work/osascript"; }
-(np_alert_lang=ru && show_alert "This Steam library cannot hold the game's prefix" "It is formatted {1}, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive." exfat)
-is "show_alert passes the Russian title and message" "Эта библиотека Steam не может хранить префикс игры
-Она отформатирована в exfat, где нет символических ссылок, поэтому Wine не может здесь настроить игру. Переместите игру в библиотеку на диске APFS." \
+(np_alert_lang=ru && show_alert "This library can't hold the prefix" "{1} has no symbolic links. Move the game to an APFS library." exfat)
+is "show_alert passes the Russian title and message" "Эта библиотека не может хранить префикс
+В exfat нет символических ссылок. Переместите игру в библиотеку на APFS." \
 	"$(cat "$work/osascript")"
 (verb=run && np_alert_lang=ru && : > "$work/osascript" && show_alert "a" "b")
 is "no dialog for Steam's run helpers" "" "$(cat "$work/osascript")"
 # shellcheck disable=SC2329 # notify_user runs this in place of LaunchServices
 open() { printf '%s\n' "$@" > "$work/open"; }
-(np_alert_lang=zh-Hans && notify_user "This game starts with a new prefix" "Its earlier prefix is still in {1}. Saves or launcher sign-ins kept only there are not in the new one." '/Vol/"x"/42' && wait)
+(np_alert_lang=zh-Hans && notify_user "New prefix for this game" "The old one is still in {1}, with any saves or sign-ins only it had." '/Vol/"x"/42' && wait)
 is "notify_user hands the app Chinese text, quotes taken out" "-n
 -g
 -b
@@ -151,8 +151,8 @@ com.bridgeplay.Bridgeplay
 --args
 --notify
 Bridgeplay
-此游戏将使用新的游戏容器启动
-它之前的游戏容器仍在 /Vol/x/42。只保存在那里的存档或启动器登录信息不在新容器中。" "$(cat "$work/open")"
+此游戏使用新的游戏容器
+旧的仍在 /Vol/x/42，只存于其中的存档或登录信息也在那里。" "$(cat "$work/open")"
 
 if [ "$fails" -gt 0 ]; then
 	echo "==> alertcheck: $fails failure(s)"

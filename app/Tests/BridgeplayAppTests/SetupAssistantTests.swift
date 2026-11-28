@@ -144,7 +144,7 @@ struct SetupAssistantTests {
         await model.repairSteamAndRetry(with: status) { _ in ran = true }
         #expect(!ran)
         #expect(model.needsSteamRepair == "Cartouche")
-        #expect(steamState(model) == .failed("Bridgeplay is still busy with another task. Try again when it finishes."))
+        #expect(steamState(model) == .failed("Another task is running. Retry when it ends."))
     }
 
     @Test("A repair waiting for App Management keeps waiting while Bridgeplay is busy, then resumes")

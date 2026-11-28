@@ -67,7 +67,7 @@ echo "== an older prefix in another library"
 : > "$one/steamapps/compatdata/42/pfx/system.reg"
 run 1 apfs
 has "the old prefix is logged" "an older prefix for this game is in another library: $one/steamapps/compatdata/42" "$work/log"
-has "the player is told where it is" "This game starts with a new prefix|Its earlier prefix is still in $one/steamapps/compatdata/42." "$work/notes"
+has "the player is told where it is" "New prefix for this game|The old one is still in $one/steamapps/compatdata/42," "$work/notes"
 run 0 apfs
 is "an existing prefix says nothing" "" "$(cat "$work/notes" "$work/log" | grep -v '^volume:' || true)"
 run 1 apfs 7
@@ -95,7 +95,7 @@ run 0 exfat
 has "exFAT is warned about in the log" "compatdata is on exfat, not APFS" "$work/log"
 is "an existing prefix on exFAT does not notify" "" "$(cat "$work/notes")"
 run 1 exfat
-has "a new prefix on exFAT notifies" "This Steam library is not on APFS|Games on exfat may freeze or fail to start." "$work/notes"
+has "a new prefix on exFAT notifies" "Steam library isn't APFS|Games on exfat may freeze." "$work/notes"
 run 1 ""
 has "an unknown file system is logged" "volume: compatdata on unknown" "$work/log"
 is "an unknown file system does not notify" "" "$(cat "$work/notes")"
@@ -114,7 +114,7 @@ check_prefix() { # check_prefix FS [FREE_KB]: prints the exit status
 }
 is "no dosdevices stops the launch" 1 "$(check_prefix apfs)"
 has "it is logged" "Wine did not finish building it" "$work/log"
-has "the player is offered a rebuild" "The game's prefix could not be set up|Wine did not finish building it, so the game can't start. Rebuild the prefix now?" "$work/notes"
+has "the player is offered a rebuild" "Prefix setup failed|The game can't start. Rebuild it now?" "$work/notes"
 has "the rebuild keeps a backup" "|keep-backup" "$work/notes"
 is "a rebuild lets the launch go on" 0 "$(rebuild=ok check_prefix apfs)"
 has "the rebuild is reported" "rebuilt=1" "$work/log"
@@ -126,7 +126,7 @@ chmod +x "$work/wineserver"
 ( WINESERVER="$work/wineserver" rebuild=ok check_prefix apfs >/dev/null )
 is "wineserver is stopped before offering a rebuild" "server -k
 server -w
-The game's prefix could not be set up|Wine did not finish building it, so the game can't start. Rebuild the prefix now? Bridgeplay will keep a backup of the old prefix.|keep-backup" "$(cat "$work/notes")"
+Prefix setup failed|The game can't start. Rebuild it now? The old prefix is backed up.|keep-backup" "$(cat "$work/notes")"
 is "install helpers stop silently on a broken prefix" 1 "$(verb=run WINESERVER="$work/wineserver" rebuild=ok check_prefix apfs)"
 is "install helpers skip both the rebuild and its server shutdown" "" "$(cat "$work/notes")"
 
@@ -174,9 +174,9 @@ is "a still-broken prefix reports rebuild failure without offering again" "rebui
 rebuild failed" "$(cat "$work/notes")"
 rm -rf "$pfx/dosdevices" "$pfx/drive_c"
 is "a full disk stops the launch" 1 "$(check_prefix apfs 1024)"
-has "a full disk is named" "The disk is too full for the game's prefix" "$work/notes"
+has "a full disk is named" "Not enough disk space" "$work/notes"
 is "exFAT stops the launch" 1 "$(check_prefix exfat)"
-has "exFAT names the file system" "This Steam library cannot hold the game's prefix|It is formatted exfat" "$work/notes"
+has "exFAT names the file system" "This library can't hold the prefix|exfat has no symbolic links." "$work/notes"
 mkdir -p "$pfx/drive_c/windows/system32" "$pfx/dosdevices"
 ln -s ../drive_c "$pfx/dosdevices/c:"
 is "C: without kernel32.dll stops the launch" 1 "$(check_prefix apfs)"
@@ -195,7 +195,7 @@ for name in kernel32 mspatcha ucrtbase user32 version; do
 done
 is "a 32-bit side without win32u.dll stops the launch" 1 "$(check_prefix apfs)"
 has "the 32-bit DLL is named" 'the prefix has no C:\windows\syswow64\win32u.dll' "$work/log"
-has "the player is told to rebuild it" "The game's prefix could not be set up" "$work/notes"
+has "the player is told to rebuild it" "Prefix setup failed" "$work/notes"
 : > "$pfx/drive_c/windows/syswow64/win32u.dll"
 : > "$pfx/drive_c/windows/syswow64/ws2_32.dll"
 is "a finished 32-bit side launches" 0 "$(check_prefix apfs)"

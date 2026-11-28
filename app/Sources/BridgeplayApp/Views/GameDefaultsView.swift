@@ -392,7 +392,7 @@ struct GameDefaultsView: View {
         } header: {
             header("Games with Their Own Settings")
         } footer: {
-            footer("Games with launch options reset in their Steam Properties › Bridgeplay.")
+            footer("Reset a game's own settings in its Steam Properties › Bridgeplay.")
         }
     }
 

@@ -84,8 +84,12 @@ struct SetupAssistantView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         content
                         if let message = model.message {
+                            let toolkitAbsent = model.step == .graphics
+                                && model.toolkitPlan == .without(.notInDownload)
+                                && message == model.toolkitPlan.message
                             SetupCard {
-                                WizardRow(row: StatusRow(title: String(localized: "Something went wrong"), value: message, tone: .bad,
+                                WizardRow(row: StatusRow(title: toolkitAbsent ? String(localized: "Game Porting Toolkit") : String(localized: "Something went wrong"),
+                                          value: message, tone: toolkitAbsent ? .info : .bad,
                                           action: failureAction(message, in: "Setup")))
                             }
                         }
@@ -240,7 +244,9 @@ struct SetupAssistantView: View {
                               }), symbol: "arrow.down.circle")
                     SetupHairline()
                 }
-                WizardRow(row: StatusRow(title: String(localized: "Or download it from Apple"),
+                WizardRow(row: StatusRow(title: model.toolkitPlan.offersComponentsDownload
+                                         ? String(localized: "Or download it from Apple")
+                                         : String(localized: "Download it from Apple"),
                           value: String(localized: "Sign in and download the latest .dmg."),
                           action: StatusAction(label: String(localized: "Open Apple Downloads")) {
                               NSWorkspace.shared.open(GPTKImport.appleDownloads)
@@ -680,6 +686,9 @@ private struct WizardRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                 }
+                if actionsBelowDetail {
+                    actions.padding(.top, 5)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if let toggle = row.toggle {
@@ -688,16 +697,22 @@ private struct WizardRow: View {
                     .labelsHidden()
                     .tint(BP.accent)
             }
-            if row.secondaryAction != nil || row.action != nil {
-                HStack(spacing: 8) {
-                    if let secondary = row.secondaryAction { button(secondary, prominent: false) }
-                    if let action = row.action { button(action, prominent: action.isProminent) }
-                }
-                .transition(.opacity)
+            if !actionsBelowDetail && (row.secondaryAction != nil || row.action != nil) {
+                actions
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
+    }
+
+    private var actionsBelowDetail: Bool { row.detail != nil && row.secondaryAction != nil }
+
+    private var actions: some View {
+        HStack(spacing: 8) {
+            if let secondary = row.secondaryAction { button(secondary, prominent: false) }
+            if let action = row.action { button(action, prominent: action.isProminent) }
+        }
+        .transition(.opacity)
     }
 
     private func button(_ action: StatusAction, prominent: Bool) -> some View {
