@@ -81,6 +81,8 @@ TEST_CC     := $(CC) -arch $(ARCH) -mmacosx-version-min=$(MIN_VER) -std=c17 -g \
 
 GENERATED_DIR := $(OUT_DIR)/generated
 RUN_SCRIPT_H  := $(GENERATED_DIR)/compat_run.h
+ALERT_STRINGS_H := $(GENERATED_DIR)/alert_strings.h
+ALERT_CATALOG := app/Sources/BridgeplayApp/Resources/Localization/Localizable.xcstrings
 CFLAGS += -I$(GENERATED_DIR)
 
 ARM64_DYLIB := $(OUT_DIR)/notproton.arm64.dylib
@@ -95,7 +97,7 @@ DEPS := $(OBJS:.o=.d)
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve detourcheck bridge runcheck compatcheck \
-        compatsvc-check prefixstate-check breakercheck clientgatecheck pauselistcheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck toolkitnotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck \
+        compatsvc-check prefixstate-check breakercheck clientgatecheck pauselistcheck shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck toolkitnotecheck exitcheck anticheatcheck alertcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck \
         gamefixescheck modloadercheck launchercheck padcheck mappingscheck launch-shell activatecheck stamp-check versioncheck ledgercheck stablecheck betacheck cicheck g1check compat-reported-check compat-export-check steamcanarycheck FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
@@ -210,6 +212,10 @@ anticheatcheck:
 	@if [ ! -f dylib/tests/anticheatcheck.sh ]; then $(call SKIP,anticheatcheck,dylib/tests/anticheatcheck.sh); exit 0; fi; \
 	sh dylib/tests/anticheatcheck.sh dylib/feats/compat_run.sh
 
+alertcheck:
+	@if [ ! -f dylib/tests/alertcheck.sh ]; then $(call SKIP,alertcheck,dylib/tests/alertcheck.sh); exit 0; fi; \
+	sh dylib/tests/alertcheck.sh dylib/feats/compat_run.sh
+
 launchprogresscheck:
 	@if [ ! -f dylib/tests/launchprogresscheck.sh ]; then $(call SKIP,launchprogresscheck,dylib/tests/launchprogresscheck.sh); exit 0; fi; \
 	sh dylib/tests/launchprogresscheck.sh dylib/feats/compat_run.sh
@@ -303,7 +309,7 @@ scriptcheck:
 
 COMPATCHECK := $(OUT_DIR)/compatcheck
 
-compatcheck: $(RUN_SCRIPT_H)
+compatcheck: $(RUN_SCRIPT_H) $(ALERT_STRINGS_H)
 	@if [ ! -f dylib/tests/compatcheck.c ]; then $(call SKIP,compatcheck,dylib/tests/compatcheck.c); exit 0; fi; \
 	mkdir -p $(OUT_DIR) && \
 	$(TEST_CC) -I$(GENERATED_DIR) \
@@ -658,7 +664,12 @@ $(RUN_SCRIPT_H): dylib/feats/compat_run.sh dylib/embed_script.py
 	@mkdir -p $(GENERATED_DIR)
 	python3 dylib/embed_script.py $< $@ RUN_SCRIPT
 
-$(OUT_DIR)/dylib/feats/compat.o: $(RUN_SCRIPT_H)
+# The run script's alert strings come from the app's catalogue (entries commented "Run script").
+$(ALERT_STRINGS_H): $(ALERT_CATALOG) dylib/alert_strings.py
+	@mkdir -p $(GENERATED_DIR)
+	python3 dylib/alert_strings.py $< $@ ALERT_STRINGS
+
+$(OUT_DIR)/dylib/feats/compat.o: $(RUN_SCRIPT_H) $(ALERT_STRINGS_H)
 
 SUPPORT_DIR        := $(HOME)/Library/Application Support/bridgeplay
 OVERLAY_SHIM_SRC   := overlay-shim/overlay_shim.m
@@ -1082,7 +1093,7 @@ steamcanarycheck:
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck breakercheck clientgatecheck pauselistcheck compat-reported-import-check compat-export-check compat-regressions-check compatcheck compatsvc-check quicksettings-check displayratecheck prefixstate-check shortcutcheck launch-shell envcheck \
-	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck toolkitnotecheck exitcheck anticheatcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck launchercheck \
+	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck toolkitnotecheck exitcheck anticheatcheck alertcheck launchprogresscheck warmcheck gamedrivecheck fontlinkcheck launchercheck \
 	seedcheck gamefixescheck modloadercheck versioncheck ledgercheck stablecheck betacheck cicheck padcheck mappingscheck detourcheck compat-reported-check np-inventory-check benchcheck benchabcheck steamcanarycheck np-native-tests native-shim-tests \
 	app-tests native-installercheck
 

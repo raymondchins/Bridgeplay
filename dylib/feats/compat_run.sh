@@ -1770,15 +1770,78 @@ preview_name() {
 running_name() {
   run_name=$1
   case "$run_name" in *" - Rosetta" | *" - FEX") run_name=${run_name% - *} ;; esac
-  printf '%s, running through %s' "$(preview_name "$run_name")" "$2"
+  alert_text "{1}, running through {2}" "$(preview_name "$run_name")" "$2"
+}
+
+# The player's language for alerts: Bridgeplay's own language setting, else the Mac's first
+# language the alerts have, else English, as the app picks its own. Asked once per launch.
+alert_language() {
+  [ -z "${np_alert_lang:-}" ] || return 0
+  np_alert_lang=en
+  for al_domain in com.bridgeplay.Bridgeplay -g; do
+    al_pick=$(defaults read "$al_domain" AppleLanguages 2>/dev/null 7>&- 8>&- 9>&- |
+      tr -d ' \t",()' | tr '[:upper:]_' '[:lower:]-' | while IFS= read -r al_line; do
+        case "$al_line" in
+          (en | en-*) echo en ;;
+          (it | it-*) echo it ;;
+          (ru | ru-*) echo ru ;;
+          (zh-hans | zh-hans-* | zh-cn | zh-sg) echo zh-Hans ;;
+          (*) continue ;;
+        esac
+        break
+      done) || al_pick=""
+    [ -z "$al_pick" ] || { np_alert_lang=$al_pick; return 0; }
+  done
+}
+
+# alert_text <English> [arg...]: the text in the player's language, from the table the dylib
+# writes beside this script (taken from the app's catalogue), else the English. {1} to {9}
+# become the args, in one pass, so an arg is never read as a placeholder.
+alert_text() {
+  alert_language
+  at_text=""
+  at_table="${np_tool_dir:-}/bridgeplay-alerts.tsv"
+  if [ "$np_alert_lang" != en ] && [ -f "$at_table" ]; then
+    at_text=$(AT_LANG=$np_alert_lang AT_KEY=$1 LC_ALL=C awk -F '\t' \
+      '$1 == ENVIRON["AT_LANG"] && $2 == ENVIRON["AT_KEY"] { gsub(/\\n/, "\n", $3); print $3; exit }' \
+      "$at_table" 2>/dev/null 7>&- 8>&- 9>&-) || at_text=""
+  fi
+  [ -n "$at_text" ] || at_text=$1
+  shift
+  at_out=""
+  while :; do
+    case "$at_text" in *"{"[1-9]"}"*) ;; *) break ;; esac
+    at_pre=${at_text%%"{"[1-9]"}"*}
+    at_text=${at_text#"$at_pre"}
+    at_n=${at_text#"{"}
+    at_n=${at_n%%"}"*}
+    at_text=${at_text#"{$at_n}"}
+    at_arg=""
+    eval "at_arg=\${$at_n-}"
+    at_out=$at_out$at_pre$at_arg
+  done
+  printf '%s' "$at_out$at_text"
+}
+
+# Two sentences, with the space Chinese goes without.
+alert_join() {
+  if [ -z "$1" ] || [ -z "$2" ]; then printf '%s' "$1$2"
+  elif [ "${np_alert_lang:-en}" = zh-Hans ]; then printf '%s%s' "$1" "$2"
+  else printf '%s %s' "$1" "$2"; fi
 }
 
 # Steam passes "run" for helpers such as install scripts, which get no dialog.
+# $1 is the title and $2 the message in English; {1} to {9} in them become $3 onwards.
 show_alert() {
   [ "$verb" != run ] || return 0
   launch_step dialog
   exec 8>&- 9>&-
-  osascript - "$1" "$2" >/dev/null 2>&1 <<'APPLESCRIPT' || true
+  sa_title=$1 sa_body=$2
+  shift 2
+  alert_language
+  sa_title=$(alert_text "$sa_title" "$@")
+  sa_body=$(alert_text "$sa_body" "$@")
+  osascript - "$sa_title" "$sa_body" >/dev/null 2>&1 <<'APPLESCRIPT' || true
 on run argv
   display alert (item 1 of argv) message (item 2 of argv) as critical
 end run
@@ -1871,11 +1934,17 @@ low_power_notice() {
 }
 
 # Posted by the Bridgeplay app, so it carries Bridgeplay's name and icon; osascript (shown
-# as Script Editor) only when the app cannot be found. Never holds up the launch.
+# as Script Editor) only when the app cannot be found. Never holds up the launch. Takes what
+# show_alert takes, and posts it in the player's language.
 notify_user() {
   (
     exec 8>&- 9>&-
-    title="Bridgeplay" subtitle=$(alert_safe "$1") body=$(alert_safe "$2")
+    nu_title=$1 nu_body=$2
+    shift 2
+    alert_language
+    title="Bridgeplay"
+    subtitle=$(alert_safe "$(alert_text "$nu_title" "$@")")
+    body=$(alert_safe "$(alert_text "$nu_body" "$@")")
     open -n -g -b com.bridgeplay.Bridgeplay --args --notify "$title" "$subtitle" "$body" ||
       osascript -e "display notification \"$body\" with title \"$title\" subtitle \"$subtitle\""
   ) >/dev/null 2>&1 &
@@ -1892,9 +1961,12 @@ show_rebuild_failure() {
   [ "$verb" != run ] || return 0
   launch_step dialog
   exec 8>&- 9>&-
-  answer=$(osascript - "$log" <<'APPLESCRIPT'
+  alert_language
+  answer=$(osascript - "$(alert_text "Prefix rebuild failed!")" "$(alert_text "Check bridgeplay-run.log at {1}." "$log")" \
+    "$(alert_text "Open Log")" "$(alert_text "OK")" <<'APPLESCRIPT'
 on run argv
-  set answer to display alert "Prefix rebuild failed!" message ("Check bridgeplay-run.log at " & (item 1 of argv) & ".") as critical buttons {"Open Log", "OK"} default button "OK"
+  set answer to display alert (item 1 of argv) message (item 2 of argv) as critical buttons {item 3 of argv, item 4 of argv} default button (item 4 of argv)
+  if button returned of answer is (item 3 of argv) then return "Open Log"
   return button returned of answer
 end run
 APPLESCRIPT
@@ -1931,11 +2003,13 @@ kernel_anticheat_wait=90
 # before Wine or the prefix is touched.
 kernel_anticheat_notice() {
   [ "$verb" = waitforexitandrun ] || return 0
+  alert_language
   ka_found=$(find_kernel_anticheat "$STEAM_COMPAT_INSTALL_PATH")
   [ -n "$ka_found" ] || return 0
   echo "anticheat: found kernel anti-cheat $ka_found, whose driver Wine cannot load" >> "$log" 2>&1 || true
   ka_status=0
   answer=$(osascript - "$ka_found" "$kernel_anticheat_wait" 8>&- 9>&- 2>> "$log" <<'APPLESCRIPT'
+  # The dialog answers in English whatever its language, so the choices below stay as they are.
 on run argv
   set answer to display alert "This game's anti-cheat can't run" message ("It uses " & (item 1 of argv) & ", kernel anti-cheat that needs a Windows driver. Wine cannot load it, so the game will most likely quit at start. Playing online with it is at your own risk.") as critical buttons {"Launch Anyway", "Don't Launch"} default button "Don't Launch" giving up after ((item 2 of argv) as integer)
   if gave up of answer then return "gave up"
@@ -2162,19 +2236,26 @@ rebuild_prefix() {
   icon=$(cat "$np_support/app-executable" 2>/dev/null) || icon=""
   icon="${icon%/Contents/MacOS/*}/Contents/Resources/Bridgeplay.icns"
   [ -f "$icon" ] || icon=""
-  choice=$(osascript - "$1" "$2" "${3:-Cancel}" "$icon" "${4:-}" <<'APPLESCRIPT'
+  alert_language
+  # The dialog answers in English whatever its language, so the choices below stay as they are.
+  choice=$(osascript - "$(alert_text "$1")" "$(alert_text "$2")" "$(alert_text "${3:-Cancel}")" "$icon" "${4:-}" \
+    "$(alert_text "Rebuild Prefix")" "$(alert_text "Backup & Rebuild Prefix")" <<'APPLESCRIPT'
 on run argv
-  set choices to {item 3 of argv, "Rebuild Prefix", "Backup & Rebuild Prefix"}
-  set preferred to "Backup & Rebuild Prefix"
+  set rebuildLabel to item 6 of argv
+  set backupLabel to item 7 of argv
+  set choices to {item 3 of argv, rebuildLabel, backupLabel}
+  set preferred to backupLabel
   if item 5 of argv is "keep-backup" then
-    set choices to {item 3 of argv, "Rebuild Prefix"}
-    set preferred to "Rebuild Prefix"
+    set choices to {item 3 of argv, rebuildLabel}
+    set preferred to rebuildLabel
   end if
   if item 4 of argv is "" then
     set answer to display dialog (item 2 of argv) with title (item 1 of argv) buttons choices default button preferred cancel button (item 3 of argv) with icon caution
   else
     set answer to display dialog (item 2 of argv) with title (item 1 of argv) buttons choices default button preferred cancel button (item 3 of argv) with icon ((POSIX file (item 4 of argv)) as alias)
   end if
+  if button returned of answer is backupLabel then return "Backup & Rebuild Prefix"
+  if button returned of answer is rebuildLabel then return "Rebuild Prefix"
   return button returned of answer
 end run
 APPLESCRIPT
@@ -2226,16 +2307,17 @@ refuse_foreign_prefix() {
   echo "=== prefix ntdll is $have and this compatibility tool wants $want, rebuild the prefix in Bridgeplay ===" >> "$log" 2>&1 || true
   had_tool=$(tool_name "$have")
   want_tool=$(tool_name "$want")
-  explanation="$had_tool prefixes cannot be used with versions of CrossOver that run through $want_tool unless they are rebuilt."
+  alert_language
+  explanation=$(alert_text "{1} prefixes cannot be used with versions of CrossOver that run through {2} unless they are rebuilt." "$had_tool" "$want_tool")
   # note_other_build read the build that set up the prefix.
   case "$have:$had_display" in
     aa64:?* | 8664:?*)
-      explanation="This game's prefix was last used by $(running_name "$had_display" "$had_tool"). $explanation"
+      explanation=$(alert_join "$(alert_text "This game's prefix was last used by {1}." "$(running_name "$had_display" "$had_tool")")" "$explanation")
       ;;
   esac
   rebuild_prefix "This game needs its prefix rebuilt" "$explanation
 
-Do you want to rebuild the prefix for $(running_name "$np_display" "$want_tool")? Your save games will be preserved and not lost."
+$(alert_text "Do you want to rebuild the prefix for {1}? Your save games will be preserved and not lost." "$(running_name "$np_display" "$want_tool")")"
 }
 
 last_wine_build() {
@@ -2541,10 +2623,11 @@ offer_switch_rebuild() {
   esac
   rm -f "$switch"
   echo "=== last session crashed after switching from $old_display, offering a rebuild ===" >> "$log" 2>&1 || true
+  alert_language
   rebuild_prefix "This game may need its prefix rebuilt" \
-    "Something appears to have gone wrong the last time you ran this game! Rebuilding the prefix may fix it.
+    "$(alert_text "Something appears to have gone wrong the last time you ran this game! Rebuilding the prefix may fix it.")
 
-Rebuild your prefix for $(running_name "$np_display" "$(tool_name "$now_arch")")? Your save games will be preserved and not lost." \
+$(alert_text "Rebuild your prefix for {1}? Your save games will be preserved and not lost." "$(running_name "$np_display" "$(tool_name "$now_arch")")")" \
     "Launch Without Rebuilding"
 }
 
@@ -2569,7 +2652,7 @@ note_prefix_volume() {
   echo "=== compatdata is on $fs, not APFS: Wine prefixes are only tested on APFS, games may hang or fail to start ===" \
     >> "$log" 2>&1 || true
   [ "$prefix_was_new" = 1 ] || return 0
-  notify_user "This Steam library is not on APFS" "It is formatted $fs. Games run from it may hang or fail to start. Move the game to a library on an APFS drive for the best results."
+  notify_user "This Steam library is not on APFS" "It is formatted {1}. Games run from it may hang or fail to start. Move the game to a library on an APFS drive for the best results." "$fs"
 }
 
 # Without C:\windows\system32 Wine stops at "could not load kernel32.dll" and the game quits
@@ -2590,7 +2673,7 @@ refuse_broken_prefix() {
   vol=$(volume_type "$STEAM_COMPAT_DATA_PATH") || vol=""
   fs=${vol%% *}
   case "$fs" in exfat|msdos|ntfs)
-    show_alert "This Steam library cannot hold the game's prefix" "It is formatted $fs, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive."
+    show_alert "This Steam library cannot hold the game's prefix" "It is formatted {1}, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive." "$fs"
     exit 1
   esac
   # Wine reports a full disk only as error=112 on each file it could not copy.
@@ -2638,7 +2721,7 @@ note_other_prefixes() {
 $(steam_libraries)
 EOF_LIBRARIES
   [ -n "$old_prefix" ] || return 0
-  notify_user "This game starts with a new prefix" "Its earlier prefix is still in $old_prefix. Saves or launcher sign-ins kept only there are not in the new one."
+  notify_user "This game starts with a new prefix" "Its earlier prefix is still in {1}. Saves or launcher sign-ins kept only there are not in the new one." "$old_prefix"
 }
 
 # Steam cloud related
@@ -3027,9 +3110,9 @@ fold_wine_profile() {
     echo "=== moved users/$wine_user into steamuser, where Steam Cloud syncs ===" >> "$log" 2>&1 || true
     fold_note=""
     [ -z "$fold_parked" ] \
-      || fold_note="Files that differed from Steam Cloud's copy were kept beside it with BACKUP in the name."
+      || fold_note=$(alert_text "Files that differed from Steam Cloud's copy were kept beside it with BACKUP in the name.")
     [ -z "$fold_homes" ] \
-      || fold_note="${fold_note:+$fold_note }Files the game kept in your Mac's Documents and other home folders stay there."
+      || fold_note=$(alert_join "$fold_note" "$(alert_text "Files the game kept in your Mac's Documents and other home folders stay there.")")
     [ -z "$fold_note" ] || notify_user "Saved games moved to where Steam Cloud syncs" "$fold_note"
   fi
   ln -s steamuser "$own" 2>/dev/null \
@@ -3242,7 +3325,7 @@ import_prefix_settings() {
 mark "runner check"
 if [ -z "$np_build" ] || [ ! -d "$CX_ROOT/lib/wine" ]; then
   echo "=== build ${np_build:-(none recorded)} behind this compatibility tool is not set up, set it up in Bridgeplay ===" >> "$log" 2>&1 || true
-  show_alert "CrossOver is not set up" "The CrossOver build behind $(alert_safe "$np_display") is not set up. Set it up in Bridgeplay, or pick another compatibility tool for this game."
+  show_alert "CrossOver is not set up" "The CrossOver build behind {1} is not set up. Set it up in Bridgeplay, or pick another compatibility tool for this game." "$(alert_safe "$np_display")"
   np_outcome=engine_missing
   exit 1
 fi
@@ -3268,7 +3351,7 @@ case "$(/usr/bin/file -b "$WINESERVER" 2>/dev/null)" in
     # ARM64 Wine needs what macOS 26.5 added (CrossOver falls back to Rosetta before it).
     if [ "${wine_unix##*/}" = aarch64-unix ] && macos_before 26 5 && ! engine_loader_runs; then
       echo "=== Wine through FEX did not start: it needs macOS 26.5 or later ===" >> "$log" 2>&1 || true
-      show_alert "This tool needs macOS 26.5" "$(alert_safe "$(preview_name "${np_display% - FEX}")") runs Windows games through FEX, which needs macOS 26.5 or later. Update macOS, or pick this CrossOver's Rosetta tool in the game's Compatibility settings in Steam."
+      show_alert "This tool needs macOS 26.5" "{1} runs Windows games through FEX, which needs macOS 26.5 or later. Update macOS, or pick this CrossOver's Rosetta tool in the game's Compatibility settings in Steam." "$(alert_safe "$(preview_name "${np_display% - FEX}")")"
       np_outcome=engine_unsupported
       exit 1
     fi

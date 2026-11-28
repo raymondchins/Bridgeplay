@@ -602,7 +602,7 @@ struct PrefixToolsTests {
     func alertTextIsArguments() throws {
         let source = try Self.compatSource()
         let helper = try #require(source.range(of: "show_alert() {\n"))
-        let script = try #require(source.range(of: #"osascript - "$1" "$2" >/dev/null 2>&1 <<'APPLESCRIPT' || true"#))
+        let script = try #require(source.range(of: #"osascript - "$sa_title" "$sa_body" >/dev/null 2>&1 <<'APPLESCRIPT' || true"#))
         let alert = try #require(source.range(of: "display alert (item 1 of argv) message (item 2 of argv) as critical"))
         #expect(helper.upperBound < script.lowerBound)
         #expect(script.upperBound < alert.lowerBound)

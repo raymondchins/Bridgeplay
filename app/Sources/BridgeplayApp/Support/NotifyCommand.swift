@@ -44,15 +44,24 @@ enum NotifyCommand {
     private static func post(_ parts: [String]) async -> Bool {
         let center = UNUserNotificationCenter.current()
         guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return false }
+        let text = Self.text(parts)
         let content = UNMutableNotificationContent()
-        content.title = parts.first ?? "Bridgeplay"
-        if parts.count > 2 {
-            content.subtitle = parts[1]
-            content.body = parts[2...].joined(separator: " ")
-        } else if parts.count == 2 {
-            content.body = parts[1]
-        }
+        content.title = text.title
+        content.subtitle = text.subtitle
+        content.body = text.body
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         return (try? await center.add(request)) != nil
+    }
+
+    // The dylib sends English (Steam opened without Bridgeplay), which is a catalogue key and
+    // shows in the player's language. The run script sends text it already translated, which
+    // is no key and shows as it is.
+    static func text(_ parts: [String], bundle: Bundle = .main) -> (title: String, subtitle: String, body: String) {
+        let shown = { (text: String) in bundle.localizedString(forKey: text, value: text, table: nil) }
+        let title = shown(parts.first ?? "Bridgeplay")
+        if parts.count > 2 {
+            return (title, shown(parts[1]), shown(parts[2...].joined(separator: " ")))
+        }
+        return (title, "", parts.count == 2 ? shown(parts[1]) : "")
     }
 }

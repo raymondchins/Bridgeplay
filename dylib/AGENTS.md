@@ -31,6 +31,12 @@ main `Steam Helper` (no `--type=` argument) it only installs the spawn hook.
     a passing `make gamefixescheck`.
   - Checks that run it: `runcheck`, `envcheck`, `envpasscheck`, `settingscheck`, `routecheck`,
     `buildcheck`, `bridgecheck`, `seedcheck`, `gamedrivecheck`, `fontlinkcheck`, `prefixnotecheck`,
+    `powernotecheck`, `toolkitnotecheck`, `exitcheck`, `launchprogresscheck`, `warmcheck`, `launchercheck`, `gamefixescheck`,
+    `modloadercheck`, `anticheatcheck`, `alertcheck`, `padcheck`, `shortcutcheck`.
+  - Alerts: `show_alert`, `notify_user` and `alert_text` take English with `{1}`…`{9}` for
+    their arguments. Each string is a key in the app's `Localizable.xcstrings` with a comment
+    starting "Run script", translated in it, ru and zh-Hans; `alert_strings.py` builds the
+    table the dylib writes beside `run` (`bridgeplay-alerts.tsv`). `make alertcheck`.
   - Controllers: the script starts the game's launcher bundle itself rather than through
     `open`, so macOS charges HID access to Steam and games need no Input Monitoring grant of
     their own (`BRIDGEPLAY_LAUNCH_SERVICES=1` goes back to `open`). It exports

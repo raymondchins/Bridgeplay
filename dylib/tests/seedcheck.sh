@@ -31,6 +31,10 @@ functions="$functions
 $(cut_block '^runner_id=""' '^if \[ -n ".STEAM_COMPAT_DATA_PATH" \]; then' "")"
 functions="$functions
 $(cut_block '^without_lock_fds\(\) \{' '^\}' 1)"
+for alert_function in alert_language alert_text alert_join; do
+  functions="$functions
+$(cut_block "^$alert_function\\(\\) \\{" '^\}' 1)"
+done
 np_build=fixture
 export np_build CX_ROOT CX_HOME wine_unix np_tool_dir WINELOADER WINESERVER
 export STEAM_COMPAT_DATA_PATH WINEPREFIX template_dir log seed_scratch seed_building
@@ -43,6 +47,9 @@ cp "$SRC" "$np_tool_dir/run"
 printf inf > "$CX_ROOT/share/wine/wine.inf"
 WINELOADER=/usr/bin/false
 WINESERVER=/usr/bin/false
+# The launch stamps block reads the verb at the top level; no helper or game here.
+# shellcheck disable=SC2034
+verb=""
 eval "$functions"
 fails=0
 check() {

@@ -63,6 +63,7 @@ static const char TOOL_DECLARATION_FMT[] =
     "}\n";
 
 #include "compat_run.h"  // RUN_SCRIPT, generated from compat_run.sh
+#include "alert_strings.h"  // ALERT_STRINGS, the run script's alerts in it, ru and zh-Hans
 
 // Written to a temporary file next to path and renamed over it, so a game launched
 // while Steam starts never runs a half-written run script.
@@ -773,6 +774,11 @@ static int write_tool(const tool_entry_t *tool) {
     if (write_file(path, RUN_SCRIPT, 1) == 0) wrote++;
     else NP_WARN("np_compat_ensure_tool_manifest: failed to write %s", path);
 
+    // Read by the run script when it shows an alert; without it alerts are in English.
+    snprintf(path, sizeof(path), "%s/bridgeplay-alerts.tsv", tool->dir);
+    if (write_file(path, ALERT_STRINGS, 0) == 0) wrote++;
+    else NP_WARN("np_compat_ensure_tool_manifest: failed to write %s", path);
+
     char line[80];
     snprintf(line, sizeof(line), "%s\n", tool->flavor);
     snprintf(path, sizeof(path), "%s/flavor", tool->dir);
@@ -816,7 +822,7 @@ static void remove_tool(const char *tools_dir, const char *name) {
     char path[768];
 
     static const char *const files[] = {
-        "compatibilitytool.vdf", "toolmanifest.vdf", "run", "flavor", "build",
+        "compatibilitytool.vdf", "toolmanifest.vdf", "run", "bridgeplay-alerts.tsv", "flavor", "build",
     };
 
     for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++) {

@@ -17,8 +17,10 @@ case "$retry" in
   *) echo "FAIL: the broken-prefix retry block was not found in $SRC"; exit 1 ;;
 esac
 body="$body"'
-notify_user() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }
-show_alert() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }
+# Both take English text with {1} for $3, which these fill in as the alert would.
+filled() { case "$1" in *"{1}"*) printf "%s" "${1%%"{1}"*}$2${1#*"{1}"}" ;; *) printf "%s" "$1" ;; esac; }
+notify_user() { printf "%s|%s\n" "$1" "$(filled "$2" "${3:-}")" >> "$notes"; }
+show_alert() { printf "%s|%s\n" "$1" "$(filled "$2" "${3:-}")" >> "$notes"; }
 show_rebuild_failure() { echo "rebuild failed" >> "$notes"; }
 # The player cancels unless the case sets rebuild=ok.
 rebuild_prefix() { printf "%s|%s|%s\n" "$1" "$2" "$4" >> "$notes"; [ "${rebuild:-}" = ok ] || exit 1; }'

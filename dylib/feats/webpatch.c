@@ -309,42 +309,47 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "globalThis.navigator?.language||\"\").toLowerCase().replace(/_/g,\"-\");" \
     "return /^(it(-[a-z0-9]+)*|italian)$/.test(l)})()"
 
-#define NP_WEB_TEXT(EN, ZH, IT) \
-    "(" NP_WEB_IS_ZH "?\"" ZH "\":" NP_WEB_IS_IT "?\"" IT "\":\"" EN "\")"
+#define NP_WEB_IS_RU \
+    "(()=>{const l=(globalThis.document?.documentElement?.lang||" \
+    "globalThis.navigator?.language||\"\").toLowerCase().replace(/_/g,\"-\");" \
+    "return /^(ru(-[a-z0-9]+)*|russian)$/.test(l)})()"
+
+#define NP_WEB_TEXT(EN, ZH, IT, RU) \
+    "(" NP_WEB_IS_ZH "?\"" ZH "\":" NP_WEB_IS_IT "?\"" IT "\":" NP_WEB_IS_RU "?\"" RU "\":\"" EN "\")"
 
 #define NP_COMPAT_HINT NP_WEB_TEXT( \
     "Enable CrossOver under Properties \\u203a Bridgeplay to install and run the Windows version.", \
     "请在“属性 \\u203a Bridgeplay”中启用 CrossOver，以安装并运行 Windows 版本。", \
-    "Abilita CrossOver in Propriet\\u00e0 \\u203a Bridgeplay per installare e avviare la versione Windows.")
+    "Abilita CrossOver in Propriet\\u00e0 \\u203a Bridgeplay per installare e avviare la versione Windows.", "Включите CrossOver в разделе «Свойства \\u203a Bridgeplay», чтобы установить и запустить версию для Windows.")
 
 #define NP_IMAGE_FILES_LABEL NP_WEB_TEXT( \
-    "Image Files (*.tga,*.png,*.exe)", "图像文件 (*.tga,*.png,*.exe)", "File immagine (*.tga,*.png,*.exe)")
+    "Image Files (*.tga,*.png,*.exe)", "图像文件 (*.tga,*.png,*.exe)", "File immagine (*.tga,*.png,*.exe)", "Файлы изображений (*.tga,*.png,*.exe)")
 
 #define NP_LIBRARY_WINDOWS_HINT NP_WEB_TEXT( \
     "Show only games that run on Windows and do not have a macOS version", \
     "仅显示可在 Windows 上运行且没有 macOS 版本的游戏", \
-    "Mostra solo i giochi che funzionano su Windows e non hanno una versione macOS")
+    "Mostra solo i giochi che funzionano su Windows e non hanno una versione macOS", "Показывать только игры, которые работают в Windows и не имеют версии для macOS")
 
 #define NP_LIBRARY_WINDOWS_SUMMARY NP_WEB_TEXT( \
     "Runs on Windows, no macOS version", \
     "可在 Windows 上运行，无 macOS 版本", \
-    "Funziona su Windows, nessuna versione macOS")
+    "Funziona su Windows, nessuna versione macOS", "Работает в Windows, версии для macOS нет")
 
 // Rebuild row in the CrossOver panel.
 // The row is redrawn on every poll, so the bar keeps its phase from when the rebuild started
 // instead of restarting on each redraw.
-#define NP_PREFIX_NEED NP_WEB_TEXT("Switching to this compatibility tool requires a prefix rebuild. Rebuild now?", "切换到此兼容性工具需要重建游戏容器。现在重建吗？", "Per passare a questo strumento di compatibilità serve ricostruire il prefisso. Ricostruirlo ora?")
-#define NP_PREFIX_BACKUP NP_WEB_TEXT("Backup & Rebuild Prefix", "备份并重建游戏容器", "Backup e ricostruisci prefisso")
-#define NP_PREFIX_REBUILD NP_WEB_TEXT("Rebuild Prefix", "重建游戏容器", "Ricostruisci prefisso")
-#define NP_PREFIX_RUNNING NP_WEB_TEXT("Quit the game to rebuild.", "请先退出游戏再重建。", "Chiudi il gioco per ricostruire.")
-#define NP_PREFIX_SETUP NP_WEB_TEXT("Rebuilding prefix\\u2026", "正在重建游戏容器\\u2026", "Ricostruzione del prefisso\\u2026")
-#define NP_PREFIX_COPY NP_WEB_TEXT("Copying your files\\u2026", "正在复制你的文件\\u2026", "Copia dei tuoi file\\u2026")
-#define NP_PREFIX_FINISH NP_WEB_TEXT("Finishing\\u2026", "正在完成\\u2026", "Completamento\\u2026")
-#define NP_PREFIX_DONE NP_WEB_TEXT("Prefix rebuilt.", "游戏容器已重建。", "Prefisso ricostruito.")
-#define NP_PREFIX_DONE_BACKUP NP_WEB_TEXT("Prefix rebuilt. A backup of the original is in Bridgeplay's Prefixes view.", "游戏容器已重建。原容器的备份在 Bridgeplay 的“游戏容器”视图中。", "Prefisso ricostruito. Un backup dell'originale è nella vista Prefissi di Bridgeplay.")
-#define NP_PREFIX_FAILED NP_WEB_TEXT("Could not rebuild the prefix.", "无法重建游戏容器。", "Impossibile ricostruire il prefisso.")
-#define NP_PREFIX_LOG NP_WEB_TEXT("Open Log", "打开日志", "Apri il log")
-#define NP_PREFIX_APP NP_WEB_TEXT("Could not find the Bridgeplay app. Move Bridgeplay to Applications, open it and click Install again.", "找不到 Bridgeplay 应用。请将 Bridgeplay 移到“应用程序”文件夹，打开它并再次点击“安装”。", "Impossibile trovare l'app Bridgeplay. Sposta Bridgeplay in Applicazioni, aprila e fai di nuovo clic su Installa.")
+#define NP_PREFIX_NEED NP_WEB_TEXT("Switching to this compatibility tool requires a prefix rebuild. Rebuild now?", "切换到此兼容性工具需要重建游戏容器。现在重建吗？", "Per passare a questo strumento di compatibilità serve ricostruire il prefisso. Ricostruirlo ora?", "Для перехода на этот инструмент совместимости нужно пересоздать префикс. Пересоздать сейчас?")
+#define NP_PREFIX_BACKUP NP_WEB_TEXT("Backup & Rebuild Prefix", "备份并重建游戏容器", "Backup e ricostruisci prefisso", "Создать копию и пересоздать префикс")
+#define NP_PREFIX_REBUILD NP_WEB_TEXT("Rebuild Prefix", "重建游戏容器", "Ricostruisci prefisso", "Пересоздать префикс")
+#define NP_PREFIX_RUNNING NP_WEB_TEXT("Quit the game to rebuild.", "请先退出游戏再重建。", "Chiudi il gioco per ricostruire.", "Закройте игру, чтобы пересоздать префикс.")
+#define NP_PREFIX_SETUP NP_WEB_TEXT("Rebuilding prefix\\u2026", "正在重建游戏容器\\u2026", "Ricostruzione del prefisso\\u2026", "Префикс пересоздаётся\\u2026")
+#define NP_PREFIX_COPY NP_WEB_TEXT("Copying your files\\u2026", "正在复制你的文件\\u2026", "Copia dei tuoi file\\u2026", "Копирование файлов\\u2026")
+#define NP_PREFIX_FINISH NP_WEB_TEXT("Finishing\\u2026", "正在完成\\u2026", "Completamento\\u2026", "Завершение\\u2026")
+#define NP_PREFIX_DONE NP_WEB_TEXT("Prefix rebuilt.", "游戏容器已重建。", "Prefisso ricostruito.", "Префикс пересоздан.")
+#define NP_PREFIX_DONE_BACKUP NP_WEB_TEXT("Prefix rebuilt. A backup of the original is in Bridgeplay's Prefixes view.", "游戏容器已重建。原容器的备份在 Bridgeplay 的“游戏容器”视图中。", "Prefisso ricostruito. Un backup dell'originale è nella vista Prefissi di Bridgeplay.", "Префикс пересоздан. Резервная копия исходного — в разделе «Префиксы» в Bridgeplay.")
+#define NP_PREFIX_FAILED NP_WEB_TEXT("Could not rebuild the prefix.", "无法重建游戏容器。", "Impossibile ricostruire il prefisso.", "Не удалось пересоздать префикс.")
+#define NP_PREFIX_LOG NP_WEB_TEXT("Open Log", "打开日志", "Apri il log", "Открыть журнал")
+#define NP_PREFIX_APP NP_WEB_TEXT("Could not find the Bridgeplay app. Move Bridgeplay to Applications, open it and click Install again.", "找不到 Bridgeplay 应用。请将 Bridgeplay 移到“应用程序”文件夹，打开它并再次点击“安装”。", "Impossibile trovare l'app Bridgeplay. Sposta Bridgeplay in Applicazioni, aprila e fai di nuovo clic su Installa.", "Не удалось найти приложение Bridgeplay. Переместите Bridgeplay в «Программы», откройте его и снова нажмите «Установить».")
 
 #define NP_CX_PREFIX_ROW \
     "globalThis.MSCXPrefixRow=(e,id)=>{if(e.npApp===id)return;e.npStop&&e.npStop();e.npApp=id;let ter" \
@@ -424,34 +429,34 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     ".MSCXBar>div{left:0;width:100%;animation:MSCXFade 1.2s ease-in-out infinite alternate}}" \
     "@keyframes MSCXFade{from{opacity:.35}to{opacity:1}}\""
 
-// Labels both panels (native and Wine) show, as npL(en, zh, it) calls.
-#define NP_L_OFF "npL(\"Off\",\"关闭\",\"Disattivato\")"
-#define NP_L_AUTO "npL(\"Automatic\",\"自动\",\"Automatico\")"
+// Labels both panels (native and Wine) show, as npL(en, zh, it, ru) calls.
+#define NP_L_OFF "npL(\"Off\",\"关闭\",\"Disattivato\",\"Выкл.\")"
+#define NP_L_AUTO "npL(\"Automatic\",\"自动\",\"Automatico\",\"Автоматически\")"
 #define NP_L_PO_TITLE "npL(\"Performance Overlay (In game, ⌥⌘P opens quick settings for these controls)\"," \
     "\"性能叠加层（游戏中按 ⌥⌘P 打开这些设置的快捷面板）\"," \
-    "\"Overlay delle prestazioni (in gioco, ⌥⌘P apre le impostazioni rapide di questi controlli)\")"
+    "\"Overlay delle prestazioni (in gioco, ⌥⌘P apre le impostazioni rapide di questi controlli)\",\"Оверлей производительности (в игре ⌥⌘P открывает быстрые настройки для этих параметров)\")"
 #define NP_L_PO_OPTIONS "[{data:\"0\",label:" NP_L_OFF "},{data:\"fps\",label:\"FPS\"}," \
     "{data:\"summary\",label:npL(\"Summary (FPS, frame time, CPU, GPU, memory, battery)\"," \
-    "\"摘要（FPS、帧时间、CPU、GPU、内存、电池）\",\"Riepilogo (FPS, tempo per fotogramma, CPU, GPU, memoria, batteria)\")}," \
+    "\"摘要（FPS、帧时间、CPU、GPU、内存、电池）\",\"Riepilogo (FPS, tempo per fotogramma, CPU, GPU, memoria, batteria)\",\"Сводка (FPS, время кадра, CPU, GPU, память, аккумулятор)\")}," \
     "{data:\"detailed\",label:npL(\"Detailed (adds a frame-time graph)\",\"详细（增加帧时间图表）\"," \
-    "\"Dettagliato (aggiunge il grafico dei tempi per fotogramma)\")}," \
-    "{data:\"hud\",label:npL(\"Apple Metal HUD\",\"Apple Metal 性能监视器\",\"Metal HUD di Apple\")}]"
+    "\"Dettagliato (aggiunge il grafico dei tempi per fotogramma)\",\"Подробно (добавляет график времени кадра)\")}," \
+    "{data:\"hud\",label:npL(\"Apple Metal HUD\",\"Apple Metal 性能监视器\",\"Metal HUD di Apple\",\"Apple Metal HUD\")}]"
 #define NP_L_FL_TITLE "npL(\"Frame Rate Limit (Paced to the display. Its refresh rate stays as it is)\"," \
-    "\"帧率限制（与显示器同步，不会更改其刷新率）\",\"Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)\")"
-#define NP_L_FL_SWITCH "npL(\"Enable frame limit\",\"启用帧率限制\",\"Attiva limite di fotogrammi\")"
+    "\"帧率限制（与显示器同步，不会更改其刷新率）\",\"Limite di fotogrammi (sincronizzato con il display, la cui frequenza non cambia)\",\"Ограничение частоты кадров (синхронизировано с дисплеем, его частота обновления не меняется)\")"
+#define NP_L_FL_SWITCH "npL(\"Enable frame limit\",\"启用帧率限制\",\"Attiva limite di fotogrammi\",\"Включить ограничение частоты кадров\")"
 #define NP_L_FL_COOL "npL(\"Cool and steady (Lowers the frame limit while the Mac runs hot)\"," \
     "\"凉爽稳定（Mac 发热时降低帧率上限）\",\"Fresco e stabile (abbassa il limite di fotogrammi quando il Mac \\u00e8 caldo)\"," \
     "\"Прохладно и стабильно (снижает ограничение частоты кадров, пока Mac сильно нагрет)\")"
 #define NP_L_SQ_TITLE "npL(\"Scaling Filter (When the game draws fewer pixels than the screen, as with High Resolution off)\"," \
     "\"缩放过滤（当游戏绘制的像素少于屏幕时生效，例如关闭高分辨率时）\"," \
-    "\"Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)\")"
+    "\"Filtro di scala (quando il gioco disegna meno pixel dello schermo, come con Alta risoluzione disattivata)\",\"Фильтр масштабирования (когда игра рисует меньше пикселей, чем у экрана, например при выключенном высоком разрешении)\")"
 #define NP_L_SQ_REST \
-    "{data:\"linear\",label:npL(\"Linear (smooth)\",\"线性（平滑）\",\"Lineare (morbido)\")}," \
+    "{data:\"linear\",label:npL(\"Linear (smooth)\",\"线性（平滑）\",\"Lineare (morbido)\",\"Линейный (плавный)\")}," \
     "{data:\"nearest\",label:npL(\"Nearest (sharp pixels at any scale)\",\"最近邻（任何比例都保持锐利像素）\"," \
-    "\"Nearest (pixel nitidi a qualsiasi scala)\")}," \
+    "\"Nearest (pixel nitidi a qualsiasi scala)\",\"Ближайший (чёткие пиксели при любом масштабе)\")}," \
     "{data:\"integer\",label:npL(\"Integer (sharp at exact 2x or 3x, smooth otherwise)\"," \
-    "\"整数（正好 2 倍或 3 倍时锐利，其他比例平滑）\",\"Intero (nitido a 2x o 3x esatti, morbido altrimenti)\")}"
-#define NP_L_CONTROLLERS "npL(\"Controllers\",\"控制器\",\"Controller\")"
+    "\"整数（正好 2 倍或 3 倍时锐利，其他比例平滑）\",\"Intero (nitido a 2x o 3x esatti, morbido altrimenti)\",\"Целочисленный (чёткий ровно при 2x или 3x, иначе плавный)\")}"
+#define NP_L_CONTROLLERS "npL(\"Controllers\",\"控制器\",\"Controller\",\"Контроллеры\")"
 
 // FEX runs arm64 Wine, which has no D3DMetal and never runs under Rosetta.
 #define NP_CX_OPTIONS_BODY(ARG, RT, BARREL, SLIDER) \
@@ -460,7 +465,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     /* MSCXApply hands in its own writer, to run several changes into one write. */ \
     "W=" ARG ".write||((a,b)=>SteamClient.Apps.SetAppLaunchOptions(a,b))," \
     "fex=" NP_FEX_TOOLS ".indexOf(t.strCompatToolName||\"" NP_FALLBACK_TOOL "\")>=0," \
-    "npZh=" NP_WEB_IS_ZH ",npIt=" NP_WEB_IS_IT ",npL=(en,zh,it)=>npZh?zh:npIt&&it?it:en," \
+    "npZh=" NP_WEB_IS_ZH ",npIt=" NP_WEB_IS_IT ",npRu=" NP_WEB_IS_RU "," \
+    "npL=(en,zh,it,ru)=>npZh?zh:npIt&&it?it:npRu&&ru?ru:en," \
     NP_CX_LAUNCH_PARSE \
     "nat=t.unAppID<2147483648&&(t.vecPlatforms||[]).indexOf(\"osx\")>=0&&!t.strCompatToolName," \
     "wv=w=>w.value===null?o.slice(w.start,w.end):w.value," \
@@ -513,20 +519,20 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "fz=x=>{x=(x||\"\").toLowerCase();return x===\"1\"?\"2\":/^(0|off|false|no)?$/.test(x)?\"0\":x}," \
     "fo=fz(ev(\"BRIDGEPLAY_FRAMEGEN\"))!==\"0\"," \
     "FG=()=>(0," RT ".jsxs)(" BARREL ".XY,{label:npL(\"Frame Generation (Experimental. Adds input lag)\"," \
-    "\"帧生成（实验性。会增加输入延迟）\",\"Generazione fotogrammi (sperimentale. Aggiunge input lag)\"),children:[" \
-    "D(\"BRIDGEPLAY_FRAMEGEN\",npL(\"Mode\",\"模式\",\"Modalit\\u00e0\"),[{data:\"0\",label:" NP_L_OFF "},{data:\"2\",label:\"2x\"}," \
+    "\"帧生成（实验性。会增加输入延迟）\",\"Generazione fotogrammi (sperimentale. Aggiunge input lag)\",\"Генерация кадров (экспериментально, увеличивает задержку ввода)\"),children:[" \
+    "D(\"BRIDGEPLAY_FRAMEGEN\",npL(\"Mode\",\"模式\",\"Modalit\\u00e0\",\"Режим\"),[{data:\"0\",label:" NP_L_OFF "},{data:\"2\",label:\"2x\"}," \
     "{data:\"3\",label:\"3x\"},{data:\"adaptive\",label:npL(\"Adaptive (fills to display refresh)\"," \
-    "\"自适应（补足到显示器刷新率）\",\"Adattiva (arriva alla frequenza dello schermo)\")}],fz)," \
-    "fo&&D(\"BRIDGEPLAY_FRAMEGEN_QUALITY\",npL(\"Quality\",\"画质\",\"Qualit\\u00e0\")," \
-    "[{data:\"performance\",label:npL(\"Performance\",\"性能\",\"Prestazioni\")}," \
-    "{data:\"balanced\",label:npL(\"Balanced\",\"均衡\",\"Bilanciato\")}," \
-    "{data:\"quality\",label:npL(\"Quality\",\"画质\",\"Qualit\\u00e0\")}],lc(\"balanced\"))," \
+    "\"自适应（补足到显示器刷新率）\",\"Adattiva (arriva alla frequenza dello schermo)\",\"Адаптивный (добирает до частоты обновления дисплея)\")}],fz)," \
+    "fo&&D(\"BRIDGEPLAY_FRAMEGEN_QUALITY\",npL(\"Quality\",\"画质\",\"Qualit\\u00e0\",\"Качество\")," \
+    "[{data:\"performance\",label:npL(\"Performance\",\"性能\",\"Prestazioni\",\"Производительность\")}," \
+    "{data:\"balanced\",label:npL(\"Balanced\",\"均衡\",\"Bilanciato\",\"Сбалансированно\")}," \
+    "{data:\"quality\",label:npL(\"Quality\",\"画质\",\"Qualit\\u00e0\",\"Качество\")}],lc(\"balanced\"))," \
     "fo&&T([\"BRIDGEPLAY_FRAMEGEN_UI\"],npL(\"Protect UI (keeps static HUD and menus sharp)\"," \
-    "\"保护界面（保持静态 HUD 和菜单清晰）\",\"Proteggi interfaccia (mantiene nitidi HUD e menu statici)\"),\"1\",\"0\")," \
+    "\"保护界面（保持静态 HUD 和菜单清晰）\",\"Proteggi interfaccia (mantiene nitidi HUD e menu statici)\",\"Защита интерфейса (сохраняет чёткость неподвижного HUD и меню)\"),\"1\",\"0\")," \
     "fo&&T([\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"],npL(\"Fast-motion fallback (skips frames that would smear)\"," \
-    "\"快速运动回退（跳过会产生拖影的帧）\",\"Ripiego per movimento veloce (salta i fotogrammi che sfocherebbero)\"),\"1\",\"0\")," \
-    "fo&&D(\"BRIDGEPLAY_FRAMEGEN_ENGINE\",npL(\"Engine\",\"引擎\",\"Motore\")," \
-    "[{data:\"own\",label:npL(\"Built-in optical flow\",\"内置光流\",\"Flusso ottico integrato\")}," \
+    "\"快速运动回退（跳过会产生拖影的帧）\",\"Ripiego per movimento veloce (salta i fotogrammi che sfocherebbero)\",\"Запасной режим для быстрого движения (пропускает кадры, которые дали бы смазывание)\"),\"1\",\"0\")," \
+    "fo&&D(\"BRIDGEPLAY_FRAMEGEN_ENGINE\",npL(\"Engine\",\"引擎\",\"Motore\",\"Движок\")," \
+    "[{data:\"own\",label:npL(\"Built-in optical flow\",\"内置光流\",\"Flusso ottico integrato\",\"Встроенный оптический поток\")}," \
     "{data:\"metalfx\",label:\"MetalFX\"}],lc(\"own\"))]},\"fgn\")," \
     /* The performance overlay and Apple's Metal HUD are one choice, so only one of them \
        is ever on screen. The Metal HUD wins in overlay-shim when both come from the confs. */ \
@@ -607,17 +613,17 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "PO(" NP_L_PO_TITLE "," NP_L_PO_OPTIONS ")," \
     "FL(" NP_L_FL_TITLE "," NP_L_FL_SWITCH ")," \
     "SQ(" NP_L_SQ_TITLE ",[" \
-    "{data:\"0\",label:npL(\"Automatic (as the game sets it)\",\"自动（沿用游戏的设置）\",\"Automatico (come lo imposta il gioco)\")}," \
+    "{data:\"0\",label:npL(\"Automatic (as the game sets it)\",\"自动（沿用游戏的设置）\",\"Automatico (come lo imposta il gioco)\",\"Автоматически (как задано в игре)\")}," \
     NP_L_SQ_REST "]),FG()," \
     "(0," RT ".jsx)(" BARREL ".XY,{label:" NP_L_CONTROLLERS ",children:" \
-    "D(\"NP_PAD_MODE\",npL(\"Controller layer\",\"控制器层\",\"Livello controller\"),[{data:\"\",label:" NP_L_AUTO "}," \
-    "{data:\"hid\",label:npL(\"Raw HID (Unity, SDL, Unreal)\",\"Raw HID（Unity、SDL、Unreal）\",\"Raw HID (Unity, SDL, Unreal)\")}," \
+    "D(\"NP_PAD_MODE\",npL(\"Controller layer\",\"控制器层\",\"Livello controller\",\"Слой контроллера\"),[{data:\"\",label:" NP_L_AUTO "}," \
+    "{data:\"hid\",label:npL(\"Raw HID (Unity, SDL, Unreal)\",\"Raw HID（Unity、SDL、Unreal）\",\"Raw HID (Unity, SDL, Unreal)\",\"Raw HID (Unity, SDL, Unreal)\")}," \
     "{data:\"gc\",label:\"GameController\"},{data:\"off\",label:" NP_L_OFF "}],lc(\"\"))},\"ctl\")" \
     "]})});" \
     "return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
     "typeof MSCXPrefixRow==\"function\"&&(0," RT ".jsx)(\"div\",{className:\"MSCXRow\",ref:e=>e&&MSCXPrefixRow(e,t.unAppID)},\"npstate\")," \
-    "(0," RT ".jsxs)(" BARREL ".XY,{label:npL(\"Graphics\",\"图形\",\"Grafica\"),children:[" \
+    "(0," RT ".jsxs)(" BARREL ".XY,{label:npL(\"Graphics\",\"图形\",\"Grafica\",\"Графика\"),children:[" \
     "(0," RT ".jsx)(" BARREL ".m,{rgOptions:B,selectedOption:b," \
     "onChange:v=>s([[\"CX_GRAPHICS_BACKEND\",v.data],[\"BRIDGEPLAY_BACKEND\",\"\"]]" \
     ".concat(\"\"===v.data||\"d3dmetal\"===v.data?[]:[[\"D3DM_ENABLE_METALFX\",\"\"],[\"BRIDGEPLAY_NVAPI\",\"\"]])" \
@@ -628,44 +634,44 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     /* NVAPI=1 is a shipped default; off writes BRIDGEPLAY_NVAPI=0, which wins over every conf. */ \
     "dm&&T([\"BRIDGEPLAY_NVAPI\"],npL(\"Report an NVIDIA GPU (Needed for DLSS. Turn off if the game crashes or looks wrong)\"," \
     "\"报告为 NVIDIA GPU（DLSS 需要。游戏崩溃或画面异常时关闭）\"," \
-    "\"Segnala una GPU NVIDIA (serve per DLSS. Disattiva se il gioco si blocca o si vede male)\"),\"1\",\"0\")," \
+    "\"Segnala una GPU NVIDIA (serve per DLSS. Disattiva se il gioco si blocca o si vede male)\",\"Сообщать о видеокарте NVIDIA (нужно для DLSS; отключите, если игра вылетает или выглядит неправильно)\"),\"1\",\"0\")," \
     "\"dxmt\"===b&&T([\"DXMT_ENABLE_NVEXT\"],\"DLSS\",\"1\")," \
-    "T([\"BRIDGEPLAY_RETINA\"],npL(\"High Resolution\",\"高分辨率\",\"Alta risoluzione\"),\"1\",\"0\")" \
+    "T([\"BRIDGEPLAY_RETINA\"],npL(\"High Resolution\",\"高分辨率\",\"Alta risoluzione\",\"Высокое разрешение\"),\"1\",\"0\")" \
     "]},\"gfx\")," \
     "PO(" NP_L_PO_TITLE "," NP_L_PO_OPTIONS ")," \
     "FL(" NP_L_FL_TITLE "," NP_L_FL_SWITCH ",T([\"BRIDGEPLAY_SUSTAINED\"]," NP_L_FL_COOL ",\"1\",\"0\"))," \
     "SQ(" NP_L_SQ_TITLE ",[" \
     "{data:\"0\",label:npL(\"Automatic (Wine keeps pixels sharp with High Resolution off)\"," \
-    "\"自动（关闭高分辨率时 Wine 保持像素锐利）\",\"Automatico (con Alta risoluzione disattivata Wine mantiene i pixel nitidi)\")}," \
+    "\"自动（关闭高分辨率时 Wine 保持像素锐利）\",\"Automatico (con Alta risoluzione disattivata Wine mantiene i pixel nitidi)\",\"Автоматически (при выключенном высоком разрешении Wine сохраняет пиксели чёткими)\")}," \
     NP_L_SQ_REST "])," \
     "FG()," \
     /* Expert settings, in a group that starts closed unless one of its settings is set, for \
        this game in its launch options or its own conf, or the player opened it this session. */ \
     "(0," RT ".jsxs)(\"details\",{className:\"MSCXAdv\",open:ao,onToggle:e=>{AO[t.unAppID]=!!e.target.open},children:[" \
-    "(0," RT ".jsx)(\"summary\",{children:npL(\"Advanced\",\"高级\",\"Avanzate\")})," \
-    "!fex&&X(\"ROSETTA_ADVERTISE_AVX\",npL(\"Advertise AVX2 to Rosetta\",\"向 Rosetta 声明 AVX2 支持\",\"Segnala AVX2 a Rosetta\"))," \
+    "(0," RT ".jsx)(\"summary\",{children:npL(\"Advanced\",\"高级\",\"Avanzate\",\"Дополнительно\")})," \
+    "!fex&&X(\"ROSETTA_ADVERTISE_AVX\",npL(\"Advertise AVX2 to Rosetta\",\"向 Rosetta 声明 AVX2 支持\",\"Segnala AVX2 a Rosetta\",\"Сообщать Rosetta о поддержке AVX2\"))," \
     "T([\"WINEMSYNC\"],\"MSync\",\"1\",\"0\")," \
     "dx&&(0," RT ".jsx)(" BARREL ".XY," \
     "{label:npL(\"MetalFX Upscaling (Samples from the resolution the game is set to)\"," \
-    "\"MetalFX 超分辨率（以游戏设置的分辨率为采样来源）\",\"Upscaling MetalFX (ingrandisce l'immagine dalla risoluzione impostata nel gioco)\")," \
+    "\"MetalFX 超分辨率（以游戏设置的分辨率为采样来源）\",\"Upscaling MetalFX (ingrandisce l'immagine dalla risoluzione impostata nel gioco)\",\"Масштабирование MetalFX (берёт за основу разрешение, заданное в игре)\")," \
     "children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:U," \
     "selectedOption:sw?(U.find(u=>u.data&&+u.data===fn)||{data:String(fn)}).data:\"\"," \
     "onChange:v=>s([[\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",v.data?\"1\":\"\"],[\"DXMT_CONFIG\",fx(v.data)]])})},\"usf\")," \
     "(0," RT ".jsxs)(" BARREL ".XY,{label:" NP_L_CONTROLLERS ",children:[" \
     "T([\"BRIDGEPLAY_RAW_CONTROLLERS\"],npL(\"Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)\"," \
     "\"允许游戏直接读取控制器（Mac 上推荐，仅在需要 Steam Input 按键映射时关闭）\"," \
-    "\"Lascia che i giochi leggano direttamente i controller (consigliato su Mac, disattiva solo per la rimappatura di Steam Input)\"),\"1\",\"\")," \
-    "T([\"BRIDGEPLAY_DISABLE_HIDRAW\"],npL(\"Disable hidraw\",\"停用 hidraw\",\"Disattiva hidraw\"),\"1\",\"\")" \
+    "\"Lascia che i giochi leggano direttamente i controller (consigliato su Mac, disattiva solo per la rimappatura di Steam Input)\",\"Разрешить играм напрямую читать данные геймпадов (рекомендуется на Mac; отключайте только для переназначения кнопок через Steam Input)\"),\"1\",\"\")," \
+    "T([\"BRIDGEPLAY_DISABLE_HIDRAW\"],npL(\"Disable hidraw\",\"停用 hidraw\",\"Disattiva hidraw\",\"Отключить hidraw\"),\"1\",\"\")" \
     "]},\"ctl\")," \
     "fex&&(0," RT ".jsx)(" BARREL ".XY,{label:\"FEX\"," \
     "children:X(\"FEX_X87REDUCEDPRECISION\"," \
     "npL(\"Reduced x87 Precision (Reducing precision improves game performance, is enabled by default in CrossOver Preview)\"," \
     "\"降低 x87 精度（降低精度可提升游戏性能，CrossOver Preview 中默认开启）\"," \
-    "\"Precisione x87 ridotta (ridurre la precisione migliora le prestazioni dei giochi, attiva di default in CrossOver Preview)\"))},\"fex\")" \
+    "\"Precisione x87 ridotta (ridurre la precisione migliora le prestazioni dei giochi, attiva di default in CrossOver Preview)\",\"Пониженная точность x87 (ускоряет игры, в CrossOver Preview включена по умолчанию)\"))},\"fex\")" \
     "]},\"adv\")," \
     "OV.length>0&&(0," RT ".jsx)(\"div\",{className:\"MSCXBtns\",children:(0," RT ".jsx)(\"button\",{className:\"MSCXBtn\"," \
     "onClick:()=>s(OV.map(k=>[k,\"DXMT_CONFIG\"===k?fx(\"\"):\"\"]))," \
-    "children:npL(\"Use Bridgeplay defaults\",\"使用 Bridgeplay 默认设置\",\"Usa le impostazioni predefinite di Bridgeplay\")})},\"npdef\")" \
+    "children:npL(\"Use Bridgeplay defaults\",\"使用 Bridgeplay 默认设置\",\"Usa le impostazioni predefinite di Bridgeplay\",\"Использовать настройки Bridgeplay по умолчанию\")})},\"npdef\")" \
     "]})})}"
 
 // Find the slider by its original name in webpack's barrel despite export renames.
