@@ -38,7 +38,7 @@ struct LastLaunchSection: View {
                 .joined(separator: " · "),
             secondaryAction: StatusAction(label: String(localized: "Open Log"),
                                           isEnabled: PrefixTools.hasLog(.launch, for: launch.prefix)) {
-                PrefixTools.open(.launch, for: launch.prefix)
+                PrefixTools.openLastRun(for: launch.prefix)
             },
             action: StatusAction(label: String(localized: "Report")) {
                 PlayReports.shared.ask(about: launch.prefix)

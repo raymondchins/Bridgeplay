@@ -200,16 +200,22 @@ struct LastLaunch: Equatable, Sendable, Identifiable {
                           ended: modified, hasPrefix: hasPrefix)
     }
 
-    // The last run block of a run log, sorted into a verdict. A block with neither an exit
-    // line nor a stop before launch is a game still running, or a log cut short: no verdict.
-    static func fromLog(_ log: String, modified: Date) -> (verdict: LaunchVerdict, seconds: Int?)? {
+    // The last run block of a run log: from its last "=== bridgeplay run" header to the end.
+    // nil when the log has no header.
+    static func lastRun(in log: String) -> Substring? {
         let headers = ["=== bridgeplay run ", "=== notproton run "]
         let starts = headers.compactMap { header -> String.Index? in
             if let found = log.range(of: "\n" + header, options: .backwards) { return log.index(after: found.lowerBound) }
             return log.hasPrefix(header) ? log.startIndex : nil
         }
         guard let start = starts.max() else { return nil }
-        let block = log[start...]
+        return log[start...]
+    }
+
+    // The last run block of a run log, sorted into a verdict. A block with neither an exit
+    // line nor a stop before launch is a game still running, or a log cut short: no verdict.
+    static func fromLog(_ log: String, modified: Date) -> (verdict: LaunchVerdict, seconds: Int?)? {
+        guard let block = lastRun(in: log) else { return nil }
 
         if let session = GameSession.last(in: String(block), modified: modified) {
             return (verdict(exited: session.exitStatus, seconds: session.seconds,

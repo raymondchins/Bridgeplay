@@ -174,4 +174,21 @@ struct LastLaunchTests {
         #expect(LastLaunch(prefix: prefix, verdict: .crashed, seconds: 840, ended: Date(), hasPrefix: true).duration == "Stopped after 14 min")
         #expect(LastLaunch(prefix: prefix, verdict: .aborted, seconds: nil, ended: Date(), hasPrefix: false).duration == "Stopped")
     }
+
+    @Test("Open Log on the card opens a file holding only the last run")
+    func lastRunFile() throws {
+        let library = try Self.library()
+        defer { try? FileManager.default.removeItem(at: library.root) }
+        let folder = try Self.game("1", in: library)
+        let first = "=== bridgeplay run Mon Oct 19 20:00:00 WIB 2026 ===\nverb=waitforexitandrun\nold run line\n"
+        let last = "=== bridgeplay run Wed Oct 21 20:00:00 WIB 2026 ===\nverb=waitforexitandrun\nnew run line\n"
+        try Data((first + last).utf8).write(to: folder.appending(path: "bridgeplay-run.log"))
+        let prefix = WinePrefix(appID: "1", name: nil, library: library, lastUsed: nil)
+        let out = library.root.appending(path: "last")
+        let file = try #require(PrefixTools.lastRunFile(for: prefix, folder: out))
+        #expect(try String(contentsOf: file, encoding: .utf8) == last)
+
+        try Data("no header here\n".utf8).write(to: folder.appending(path: "bridgeplay-run.log"))
+        #expect(PrefixTools.lastRunFile(for: prefix, folder: out) == nil)
+    }
 }

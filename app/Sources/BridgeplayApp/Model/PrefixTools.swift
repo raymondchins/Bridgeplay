@@ -555,6 +555,28 @@ enum PrefixTools {
         NSWorkspace.shared.open(log.url(for: prefix))
     }
 
+    // The run log holds every launch, oldest first, so it opens at a run long gone. This copies
+    // the last run into its own file (replaced each time) and opens that; the full log when
+    // the log has no run header.
+    static func openLastRun(for prefix: WinePrefix) {
+        NSWorkspace.shared.open(lastRunFile(for: prefix) ?? PrefixLog.launch.url(for: prefix))
+    }
+
+    static func lastRunFile(for prefix: WinePrefix,
+                            folder: URL = URL.temporaryDirectory.appending(path: "Bridgeplay Last Run")) -> URL? {
+        guard let text = PrefixLog.text(of: PrefixLog.launch.url(for: prefix)),
+              let block = LastLaunch.lastRun(in: text) else { return nil }
+        let file = folder.appending(path: "\(prefix.appID)-last-run.log")
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data(block.utf8).write(to: file, options: .atomic)
+        } catch {
+            AppLog.note("last run: \(file.path(percentEncoded: false)) not written: \(error)")
+            return nil
+        }
+        return file
+    }
+
     static func reveal(at url: URL) {
         NSWorkspace.shared.selectFile(
             url.path(percentEncoded: false),
