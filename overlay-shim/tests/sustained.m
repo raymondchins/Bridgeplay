@@ -69,12 +69,12 @@ static int child(const char *path, const char *mode)
 		static const double cases[][4] = {
 			{ 60, 60, 1, 30 },   { 60, 60, 2, 30 },  { 120, 120, 1, 60 }, { 120, 120, 2, 60 },
 			{ 60, 120, 1, 40 },  { 60, 120, 2, 30 }, { 144, 144, 1, 72 }, { 60, 0, 1, 45 },
-			{ 60, 0, 2, 30 },    { 50, 50, 1, 38 },  { 30, 60, 1, 30 },   { 20, 60, 2, 20 },
-			{ 60, 60, 0, 60 },   { 90, 120, 1, 60 },
+			{ 60, 0, 2, 30 },    { 50, 50, 1, 50 },  { 30, 60, 1, 30 },   { 20, 60, 2, 20 },
+			{ 60, 60, 0, 60 },   { 90, 120, 1, 60 }, { 75, 75, 1, 37.5 }, { 50, 50, 2, 50 },
 		};
 		for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
 			double got = rate(cases[i][0], (int)cases[i][1], (int)cases[i][2]);
-			CHECK(got == cases[i][3], "a limit of %.0f at %.0f Hz, step %.0f, gives %.1f, not %.0f", cases[i][0],
+			CHECK(got == cases[i][3], "a limit of %.0f at %.0f Hz, step %.0f, gives %.1f, not %.1f", cases[i][0],
 			      cases[i][1], cases[i][2], got, cases[i][3]);
 		}
 		printf("%-10s %zu rates: even display divisors, never below 30, never above the limit\n", mode,

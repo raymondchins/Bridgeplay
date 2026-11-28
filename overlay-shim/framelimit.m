@@ -69,19 +69,22 @@ static int framelimit_active(void)
 
 // Cool and steady's cap for a limit of base on a display refreshing at hz (0 when not known):
 // 3/4 of base at step 1, 1/2 at step 2, as the largest rate hz divides evenly at or below that,
-// never below 30. base itself when that would not lower it.
+// never below 30. base itself when that would not lower it, or when no such rate is 30 or more:
+// display sync is on, so a rate between divisors would alternate one and two refreshes.
 static double fl_cooled(double base, int hz, int step)
 {
 	if (step <= 0 || base <= fl_sustained_floor)
 		return base;
 	double target = fmax(base * (step >= 2 ? 0.5 : 0.75), fl_sustained_floor);
-	double rate = target;
+	double rate;
 	if (hz > 0) {
 		int n = (int)ceil(hz / target - 1e-9);
-		if (n >= 1 && (double)hz / n >= fl_sustained_floor)
-			rate = (double)hz / n;
+		if (n < 1 || (double)hz / n < fl_sustained_floor)
+			return base;
+		rate = (double)hz / n;
+	} else {
+		rate = round(target);
 	}
-	rate = round(rate);
 	return rate < base ? rate : base;
 }
 
